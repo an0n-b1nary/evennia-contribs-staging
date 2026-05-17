@@ -86,6 +86,33 @@ test = ["pytest>=8.0"]
 include = ["evennia_<contrib_name>*"]
 ```
 
+### `apps.py` (Django app registration)
+
+Every contrib needs an `apps.py` so the package is recognized as a Django app when added to `INSTALLED_APPS`. Even a pure-utility contrib (no models, no signals) needs one if it ships templates or static files, so Django's finders pick them up.
+
+```python
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+
+from django.apps import AppConfig
+
+
+class Evennia<ContribName>Config(AppConfig):
+    name = "evennia_<contrib_name>"
+    default_auto_field = "django.db.models.BigAutoField"
+```
+
+Add a `ready()` method only when the contrib has soft-dependency wiring to do (the cross-contrib bridge pattern — gate model/listener registration behind `INSTALLED_APPS` checks):
+
+```python
+    def ready(self):
+        from django.conf import settings
+        if "evennia_scenes" in settings.INSTALLED_APPS:
+            from . import bridges_scenes  # noqa: F401
+```
+
+Keep `ready()` minimal: import-only, no heavy work; Django calls it at startup.
+
 ### Dependencies between contribs
 
 - **Hard dependencies** on other staging-repo contribs go in `dependencies`, using the git-subdirectory pip syntax:
