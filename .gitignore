@@ -96,3 +96,6 @@ dmypy.json
 # Anonymity guard config — local-only so the public repo never reveals
 # which private names the guard is configured to block.
 .anonymity-patterns
+
+# Internal roadmap — names the source project explicitly, never commit.
+PLAN.md
