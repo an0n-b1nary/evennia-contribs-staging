@@ -57,6 +57,30 @@ pre-commit run --all-files
 
 If `.anonymity-patterns` is missing, the guard skips with a warning rather than failing — that way external contributors aren't blocked by maintainer-only config.
 
+## Code style
+
+This repo follows the [Evennia upstream code style](https://github.com/evennia/evennia/blob/main/CODING_STYLE.md) with one tooling difference: we use [Ruff](https://docs.astral.sh/ruff/) for both formatting and linting instead of Black + isort + Flake8. The rules are equivalent (100-char lines, Google-style docstrings, Evennia-conventional import order).
+
+See [CODING_STYLE.md](CODING_STYLE.md) for the full conventions and the per-contrib `pyproject.toml` template.
+
+Local setup (once per clone):
+
+```bash
+pip install pre-commit ruff
+pre-commit install
+```
+
+Then `git commit` will run the anonymity guard, Ruff format, and Ruff check automatically.
+
+## CI
+
+Every push and PR runs two jobs:
+
+- **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check.
+- **test** (~5–8 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test`.
+
+A PR can't merge until both jobs pass.
+
 ## License
 
 By contributing, you agree your contributions are licensed under [BSD 3-Clause](LICENSE), matching Evennia upstream.

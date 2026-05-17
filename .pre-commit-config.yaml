@@ -15,3 +15,10 @@ repos:
         entry: python scripts/anonymity_guard.py
         language: system
         types: [text]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0  # pin to a known-good version; update intentionally
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

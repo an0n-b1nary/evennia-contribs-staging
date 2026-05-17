@@ -1,0 +1,39 @@
+# Repo-level tooling config. This repo is NOT a Python package itself —
+# each contrib under `contribs/<category>/<name>/` has its own pyproject.toml.
+# What lives here is Ruff configuration shared across all contribs.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "contribs/*/*/migrations/*",
+    ".pre-commit-cache/",
+    "scripts/anonymity_guard.py",  # contains regex strings Ruff would flag
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # bugbear
+    "UP",      # pyupgrade
+    "SIM",     # simplify
+    "RUF",     # ruff-specific
+]
+ignore = [
+    "E501",  # line-too-long — let the formatter handle it
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evennia_accessibility", "evennia_links"]  # extend as contribs land
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests.py" = ["F401"]      # tests sometimes import for side effects
+"tests/*.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
