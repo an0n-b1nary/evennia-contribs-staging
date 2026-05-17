@@ -1,0 +1,27 @@
+{#
+  Render the submit and cancel buttons for an authoring form.
+
+  Usage:
+    {% include "evennia_accessibility/_form_actions.html" %}
+    {% include "evennia_accessibility/_form_actions.html" with submit_label="Save Changes" cancel_url=back_url %}
+
+  Variables (all optional with defaults):
+    submit_label  — text for the submit button  (default: "Submit")
+    cancel_url    — href for the Cancel link     (default: none — cancel link hidden)
+    cancel_label  — text for the cancel link     (default: "Cancel")
+
+  Tab order: submit first, cancel second — so Enter submits, Tab+Enter cancels.
+#}
+<div class="form-actions mt-4 d-flex align-items-center">
+
+  <button type="submit" class="btn btn-primary mr-3">
+    {{ submit_label|default:"Submit" }}
+  </button>
+
+  {% if cancel_url %}
+    <a href="{{ cancel_url }}" class="btn btn-link text-muted">
+      {{ cancel_label|default:"Cancel" }}
+    </a>
+  {% endif %}
+
+</div>

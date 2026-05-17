@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-accessibility"
+version = "0.1.0"
+description = "Screen-reader-aware helpers, accessible Django form base classes, and MXP URL utilities for Evennia."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+dependencies = ["evennia>=6.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+# Flat layout: package contents live at the same level as this pyproject.toml,
+# not in a nested `evennia_accessibility/` subdirectory. The `package-dir`
+# mapping below tells setuptools to treat "." as the root of the package.
+# This mirrors Evennia upstream's flat per-contrib structure so the `git mv`
+# into `evennia/contrib/...` for upstream submission is a path-only change.
+[tool.setuptools]
+packages = ["evennia_accessibility"]
+
+[tool.setuptools.package-dir]
+"evennia_accessibility" = "."
+
+[tool.setuptools.package-data]
+evennia_accessibility = [
+    "templates/evennia_accessibility/*.html",
+    "static/evennia_accessibility/css/*.css",
+]

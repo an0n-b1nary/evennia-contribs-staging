@@ -1,0 +1,28 @@
+{#
+  Render form-level (non-field) errors in an accessible alert region.
+
+  Usage:
+    {% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+  The outer div uses role="alert" so screen readers announce the error
+  summary immediately when the page loads after a failed submit. The div
+  also has tabindex="-1" so JS (or the submit button's autofocus logic)
+  can move focus here on re-render.
+
+  This partial handles __all__ errors (non_field_errors) only. Per-field
+  errors are handled by _form_field.html.
+#}
+{% if form.non_field_errors %}
+<div id="form-errors-summary"
+     class="alert alert-danger"
+     role="alert"
+     aria-live="assertive"
+     tabindex="-1">
+  <strong>Please correct the following errors:</strong>
+  <ul class="mb-0 mt-1">
+    {% for error in form.non_field_errors %}
+      <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

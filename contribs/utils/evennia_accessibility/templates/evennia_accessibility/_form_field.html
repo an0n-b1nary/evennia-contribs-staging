@@ -1,0 +1,56 @@
+{#
+  Render one form field: label + widget + error region + help text.
+
+  Usage:
+    {% include "evennia_accessibility/_form_field.html" with field=form.title %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.content %}
+
+  The error region div is always rendered (empty when no errors) so that
+  aria-describedby on the widget can reference a stable, pre-existing id
+  without JS. The div becomes visible and role="alert" only when errors exist.
+
+  Id convention (mirrors Django's auto_id="id_%s" default):
+    Widget id:  id_<name>
+    Error div:  id_<name>_errors
+    Help div:   id_<name>_help
+#}
+<div class="form-group{% if field.errors %} has-error{% endif %}">
+
+  {# Label — bold; required fields get an accessible asterisk. #}
+  <label for="{{ field.id_for_label }}" class="font-weight-bold">
+    {{ field.label }}
+    {% if field.field.required %}
+      <span class="form-required-marker" aria-hidden="true">*</span><span class="sr-only">(required)</span>
+    {% endif %}
+  </label>
+
+  {# Widget — Bootstrap is-invalid class added when errors exist. #}
+  {% if field.errors %}
+    {% with attrs=field.field.widget.attrs %}
+      {% comment %}
+        Django renders the widget via {{ field }} using already-set attrs.
+        We can't easily inject is-invalid here without sub-classing the widget,
+        so we rely on the .has-error parent class for visual styling and on the
+        explicit error div below for semantics.
+      {% endcomment %}
+    {% endwith %}
+  {% endif %}
+  {{ field }}
+
+  {# Error region — always present; role="alert" only when errors exist. #}
+  <div id="{{ field.id_for_label }}_errors"
+       class="form-field-error{% if not field.errors %} sr-only{% endif %}"
+       {% if field.errors %}role="alert" aria-live="polite"{% else %}aria-live="polite"{% endif %}>
+    {% for error in field.errors %}
+      <small class="d-block">{{ error }}</small>
+    {% endfor %}
+  </div>
+
+  {# Help text — rendered after the error region. #}
+  {% if field.help_text %}
+    <small class="form-text text-muted" id="{{ field.id_for_label }}_help">
+      {{ field.help_text }}
+    </small>
+  {% endif %}
+
+</div>

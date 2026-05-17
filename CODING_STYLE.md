@@ -82,9 +82,28 @@ dependencies = ["evennia>=6.0"]
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 
-[tool.setuptools.packages.find]
-include = ["evennia_<contrib_name>*"]
+# Flat layout: package contents (`__init__.py`, `models.py`, etc.) live at the
+# same level as this pyproject.toml — NOT in a nested `evennia_<contrib_name>/`
+# subdirectory. The package-dir mapping below tells setuptools that the
+# `evennia_<contrib_name>` import name resolves to the current directory.
+# This mirrors Evennia upstream's per-contrib layout so an upstream submission
+# is a path-only `git mv contribs/<cat>/<name>/* evennia/contrib/<cat>/<name>/`.
+[tool.setuptools]
+packages = ["evennia_<contrib_name>"]
+
+[tool.setuptools.package-dir]
+"evennia_<contrib_name>" = "."
+
+# Ship non-Python files (templates, static, fixtures) with the wheel. Adjust
+# the globs per contrib — omit a line if the contrib has no such files.
+[tool.setuptools.package-data]
+evennia_<contrib_name> = [
+    "templates/evennia_<contrib_name>/*.html",
+    "static/evennia_<contrib_name>/css/*.css",
+]
 ```
+
+**Why flat?** Setuptools' default `[tool.setuptools.packages.find]` expects a nested layout (`pyproject.toml` at `foo/`, package at `foo/foo/__init__.py`). Our contribs are flat — the `__init__.py` is *next to* the pyproject.toml. Without the `package-dir` mapping the package fails to install (silently — `pip install -e` reports success but `import` fails). If you see `ModuleNotFoundError: No module named 'evennia_<contrib_name>'` right after a clean install, this is the cause.
 
 ### `apps.py` (Django app registration)
 
