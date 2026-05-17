@@ -1,0 +1,17 @@
+# Pre-commit hooks for evennia-contribs-staging.
+#
+# Setup (one-time, per clone):
+#   pip install pre-commit
+#   pre-commit install
+#
+# Then `git commit` will automatically run these checks against staged files.
+# Run manually against everything with: pre-commit run --all-files
+
+repos:
+  - repo: local
+    hooks:
+      - id: anonymity-guard
+        name: anonymity guard (block forbidden upstream-project references)
+        entry: python scripts/anonymity_guard.py
+        language: system
+        types: [text]

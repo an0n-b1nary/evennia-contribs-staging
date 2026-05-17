@@ -1,0 +1,22 @@
+# .anonymity-patterns — patterns the anonymity guard will refuse to commit.
+#
+# Copy this file to `.anonymity-patterns` (which is gitignored) and edit with
+# the actual names you want to block. Keeping the live file out of git ensures
+# the public repo doesn't reveal which private project the guard is protecting.
+#
+# Format:
+#   - One regex per line.
+#   - Prefix `i:` for case-insensitive matching.
+#   - Lines starting with `#` are comments.
+#   - Blank lines are ignored.
+#
+# Tips:
+#   - Use `\b` word boundaries for short acronyms — case-sensitive without `\b`
+#     will false-positive on common substrings (e.g. "cov" matches "discover").
+#   - Full project names are safe to match case-insensitively; they rarely
+#     collide with anything benign.
+
+# Example patterns — REPLACE THESE with your actual names:
+\bExampleAcronym\b
+i:example full project name
+i:\bexample_package_slug\b
