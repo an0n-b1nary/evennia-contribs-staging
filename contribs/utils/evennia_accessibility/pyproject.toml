@@ -24,6 +24,10 @@ dependencies = ["evennia>=6.0"]
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
 # Flat layout: package contents live at the same level as this pyproject.toml,
 # not in a nested `evennia_accessibility/` subdirectory. The `package-dir`
 # mapping below tells setuptools to treat "." as the root of the package.

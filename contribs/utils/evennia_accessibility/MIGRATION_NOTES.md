@@ -49,9 +49,17 @@ Audit trail for the initial extraction. Useful for upstream reviewers, downstrea
 To audit drift between this extracted version and the source as it evolves, run in the source repository:
 
 ```bash
-git diff extracted/evennia-accessibility/v0.1..HEAD -- <source paths>
+git diff extracted/evennia-accessibility/v0.1..HEAD -- \
+  world/utils/accessibility.py \
+  world/utils/urls.py \
+  world/utils/tests_accessibility.py \
+  web/website/forms.py \
+  web/website/tests_forms.py \
+  web/templates/website/partials/_form_field.html \
+  web/templates/website/partials/_form_errors.html \
+  web/templates/website/partials/_form_actions.html
 ```
 
-The source paths are the ones listed in the source-inventory table above (`world/utils/accessibility.py`, `world/utils/urls.py`, `web/website/forms.py`, `web/templates/website/partials/_form_*.html`, the accessibility blocks of `web/static/website/css/<stylesheet>`, `world/utils/tests_accessibility.py`, and the widget-test classes in `web/website/tests_forms.py`). The full command with concrete paths lives in the maintainer's internal planning notes (gitignored).
+Plus the accessibility-relevant blocks of whichever site stylesheet ships those rules.
 
 If the diff shows substantive changes, those changes need to be re-extracted into this contrib via a new sync commit.

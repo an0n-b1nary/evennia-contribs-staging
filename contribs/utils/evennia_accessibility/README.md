@@ -40,11 +40,14 @@ In your game's `server/conf/settings.py`:
 ```python
 INSTALLED_APPS += ["evennia_accessibility"]
 
-OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = {
-    "default": False,
-    "category": "Accessibility",
-    "description": "Enable plain-text screen-reader output",
-}
+# Register the per-account screen-reader option.
+# Format matches Evennia's OPTIONS_ACCOUNT_DEFAULT shape:
+#   "key": ("description", "OptionClassName", default_value)
+OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = (
+    "Render plain-text output suited for screen readers.",
+    "Boolean",
+    False,
+)
 
 # Optional — only needed if you use `absolute_web_url()` in email/Discord/external contexts.
 SITE_URL = "https://your-game-domain.example"
@@ -55,6 +58,11 @@ Players can then toggle the option with the standard `@option` command:
 ```
 @option screenreader_mode = True
 ```
+
+## Compatibility
+
+- **Bootstrap 4.** The form template partials use Bootstrap 4 class names (`form-group`, `form-control`, `font-weight-bold`, `btn`, `btn-primary`, `mt-4`, `mr-3`, `d-flex`, `align-items-center`). On a site running Bootstrap 5 (or without Bootstrap), visual polish on buttons and inputs will be unstyled, but the accessibility semantics (`sr-only`, `aria-describedby`, `role="alert"`, focus-visible rings) remain correct because they're provided by the contrib's own `accessibility.css` — that stylesheet doesn't depend on Bootstrap.
+- **Evennia 6.0+, Python 3.12+.** The contrib uses PEP 604 union syntax in `isinstance` checks (`isinstance(widget, forms.HiddenInput | forms.MultipleHiddenInput)`); pre-3.10 interpreters won't parse it.
 
 ## Usage
 
