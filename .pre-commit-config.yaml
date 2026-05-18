@@ -16,6 +16,22 @@ repos:
         language: system
         types: [text]
 
+      - id: anonymity-identity-guard
+        name: anonymity guard (commit identity)
+        entry: python scripts/anonymity_identity_guard.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: anonymity-push-guard
+        name: anonymity guard (push remote <-> identity)
+        entry: python scripts/anonymity_push_guard.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.0  # pin to a known-good version; update intentionally
     hooks:
