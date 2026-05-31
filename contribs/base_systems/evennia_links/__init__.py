@@ -11,7 +11,8 @@ Public API:
     AbstractArchived        — soft-archive mixin with default manager
     ArchivedManager         — manager that filters out archived records
     ArchivedQuerySet        — queryset with include_archived() helper
-    connect_on_ready        — import-order-safe signal-registration helper
+    connect_on_ready            — import-order-safe signal-registration helper
+    connect_soft_ref_cleanup    — cascade compensation for integer soft-reference fields
 
 See each module's docstring for usage examples.
 
@@ -26,8 +27,9 @@ by which point the registry is ready.
 """
 
 from .listeners import connect_on_ready
+from .softref import connect_soft_ref_cleanup
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # name -> submodule that defines it. Imported on first access via __getattr__.
 _LAZY = {
@@ -47,6 +49,7 @@ __all__ = [
     "ArchivedManager",
     "ArchivedQuerySet",
     "connect_on_ready",
+    "connect_soft_ref_cleanup",
 ]
 
 

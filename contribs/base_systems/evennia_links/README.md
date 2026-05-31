@@ -22,6 +22,7 @@ together live in your own game code (or in downstream domain contribs like
 | `AbstractVersion` | `versioning.py` | Append-only version history for any text field |
 | `AbstractArchived` + `ArchivedManager` | `archiving.py` | Soft-archive with default-manager filtering |
 | `connect_on_ready` | `listeners.py` | Import-order-safe signal-registration helper |
+| `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
 
@@ -154,6 +155,43 @@ class MyAppConfig(AppConfig):
 
 Django deduplicates repeated `signal.connect()` calls for the same receiver,
 so calling `connect_on_ready` multiple times (e.g. in tests) is safe.
+
+### connect_soft_ref_cleanup
+
+Cross-domain bridge models that link to **optional** partner apps should store
+the foreign pk as a plain integer (`PositiveBigIntegerField`) rather than a
+real Django `ForeignKey`. This avoids a DB dependency on the optional app —
+the bridge table exists regardless of whether the partner is installed, and
+the partner can be added or removed without migration conflicts.
+
+The downside: Django's `CASCADE` rule no longer fires when the foreign entity
+is hard-deleted. `connect_soft_ref_cleanup` restores that semantics at the
+Python level by registering a `post_delete` receiver.
+
+```python
+from evennia_links import connect_soft_ref_cleanup
+
+# In AppConfig.ready(), gate on the partner app being installed:
+class MyTrackerConfig(AppConfig):
+    def ready(self):
+        from django.conf import settings
+        from django.apps import apps
+
+        label = getattr(settings, "MYAPP_SCENES_APP_LABEL", "scenes")
+        if label in {a.split(".")[-1] for a in settings.INSTALLED_APPS}:
+            from myapp.models import SessionSceneLink
+            SceneModel = apps.get_model(label, "Scene")
+            connect_soft_ref_cleanup(SceneModel, SessionSceneLink, "scene_id")
+```
+
+**Semantics:**
+- Fires on **hard delete only.** Soft-archived records keep their link rows —
+  the historical link survives the archive.
+- Idempotent: registering with the same arguments multiple times is safe
+  (Django deduplicates by `dispatch_uid`).
+
+See the [Soft-dependency pattern](#soft-dependency-pattern) section below for
+the companion pattern of gating the bridge's listener and migration.
 
 ---
 
