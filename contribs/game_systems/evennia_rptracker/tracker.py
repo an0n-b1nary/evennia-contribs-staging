@@ -446,6 +446,14 @@ def record_rp_channel_activity(character, channel):
 # ---------------------------------------------------------------------------
 # Evennia Script: idle check runner
 # ---------------------------------------------------------------------------
+#
+# The RPIdleCheckScript class lives in scripts.py, NOT here. tracker.py is
+# imported eagerly during Django's app-loading phase (via __init__.py), at
+# which point evennia.DefaultScript may not yet be available — subclassing it
+# would fail or bind to None. scripts.py is imported lazily (only when
+# create_script() resolves the dotted path at server start, by which point
+# evennia is fully initialized), so the Script class is always built against
+# a real DefaultScript.
 
 
 def ensure_idle_check_running():
@@ -460,34 +468,9 @@ def ensure_idle_check_running():
         from evennia.utils.create import create_script
 
         create_script(
-            "evennia_rptracker.tracker.RPIdleCheckScript",
+            "evennia_rptracker.scripts.RPIdleCheckScript",
             key="rp_idle_check",
             persistent=True,
             autostart=True,
         )
         logger.info("RPTracker: idle check Script started.")
-
-
-try:
-    from evennia import DefaultScript
-
-    if DefaultScript is None:
-        raise ImportError("DefaultScript not yet available")
-
-    class RPIdleCheckScript(DefaultScript):
-        """Evennia Script that periodically closes idle RP sessions."""
-
-        def at_script_creation(self):
-            from django.conf import settings
-
-            self.key = "rp_idle_check"
-            self.desc = "Closes idle RPTracker sessions."
-            self.interval = getattr(settings, "RPTRACKER_IDLE_CHECK_INTERVAL", 300)
-            self.persistent = True
-            self.repeats = 0
-
-        def at_repeat(self):
-            _check_idle_sessions()
-
-except (ImportError, TypeError):
-    RPIdleCheckScript = None

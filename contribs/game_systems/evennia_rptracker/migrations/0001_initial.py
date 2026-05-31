@@ -1,18 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 import django.db.models.deletion
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    """Create RPSession, RPSessionPartner, and RPSessionSceneLink tables.
-
-    RPSessionSceneLink uses an integer scene_id (no FK to a scenes app), so
-    this migration has no dependency on any optional partner contrib.
-    """
 
     initial = True
 
     dependencies = [
-        ("objects", "0001_initial"),
+        # Only need ObjectDB to exist; use __first__ for portability across
+        # Evennia games (which may have different objects-app migration states).
+        ("objects", "__first__"),
     ]
 
     operations = [
@@ -92,10 +91,7 @@ class Migration(migrations.Migration):
                     "ended_manually",
                     models.BooleanField(
                         default=False,
-                        help_text=(
-                            "True if the player explicitly ended this session. "
-                            "Too many manual ends in a day triggers an auto-flag."
-                        ),
+                        help_text="True if the player explicitly ended this session. Too many manual ends in a day triggers an auto-flag.",
                     ),
                 ),
                 (
@@ -163,10 +159,6 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ["-started_at"],
-                "indexes": [
-                    models.Index(fields=["character", "status"], name="rptracker_rpsess_char_status"),
-                    models.Index(fields=["status", "started_at"], name="rptracker_rpsess_status_start"),
-                ],
             },
         ),
         migrations.CreateModel(
@@ -218,13 +210,6 @@ class Migration(migrations.Migration):
                 "ordering": ["-pose_count"],
             },
         ),
-        migrations.AddConstraint(
-            model_name="rpsessionpartner",
-            constraint=models.UniqueConstraint(
-                fields=["session", "partner"],
-                name="rpsessionpartner_unique_session_partner",
-            ),
-        ),
         migrations.CreateModel(
             name="RPSessionSceneLink",
             fields=[
@@ -257,13 +242,27 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ["created_at"],
+                "abstract": False,
             },
         ),
-        migrations.AddConstraint(
-            model_name="rpsessionscenelink",
-            constraint=models.UniqueConstraint(
-                fields=["session", "scene_id"],
-                name="rpsessionscenelink_unique_session_scene",
+        migrations.AddIndex(
+            model_name="rpsession",
+            index=models.Index(
+                fields=["character", "status"], name="evennia_rpt_charact_cee33b_idx"
             ),
+        ),
+        migrations.AddIndex(
+            model_name="rpsession",
+            index=models.Index(
+                fields=["status", "started_at"], name="evennia_rpt_status_b8011d_idx"
+            ),
+        ),
+        migrations.AlterUniqueTogether(
+            name="rpsessionpartner",
+            unique_together={("session", "partner")},
+        ),
+        migrations.AlterUniqueTogether(
+            name="rpsessionscenelink",
+            unique_together={("session", "scene_id")},
         ),
     ]

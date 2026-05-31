@@ -19,10 +19,11 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-dependencies = ["evennia>=6.0"]
+# evennia-links provides AbstractLink (the base of RPSessionSceneLink, which
+# ships unconditionally) and connect_soft_ref_cleanup (used by the scene bridge).
+dependencies = ["evennia>=6.0", "evennia-links>=0.2"]
 
 [project.optional-dependencies]
-scenes = ["evennia-links>=0.2"]
 test = ["pytest>=8.0"]
 
 [project.urls]

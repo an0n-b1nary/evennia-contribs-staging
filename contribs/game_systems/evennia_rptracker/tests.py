@@ -491,6 +491,46 @@ class TestCmdRPTrackerStaffLock(EvenniaTest):
         self.assertEqual(CmdRPTrackerStaff.locks, "cmd:perm(Builder)")
 
 
+class TestIdleCheckScript(EvenniaTest):
+    """The idle-check Script must resolve to a real DefaultScript subclass.
+
+    Regression guard: the class lives in scripts.py (lazily imported) rather
+    than tracker.py (eagerly imported during app-load), so it is never bound
+    to None when evennia.DefaultScript isn't ready yet.
+    """
+
+    def test_script_class_is_resolvable(self):
+        from evennia import DefaultScript
+        from evennia.utils.utils import class_from_module
+
+        cls = class_from_module("evennia_rptracker.scripts.RPIdleCheckScript")
+        self.assertTrue(issubclass(cls, DefaultScript))
+
+    def test_idle_check_closes_active_session(self):
+        """_check_idle_sessions ends sessions idle past the timeout."""
+        import time
+
+        from evennia_rptracker import tracker
+
+        _clear_tracker()
+        self.room1.room_type = "ic"
+        self.char2.last_pose_time = time.time()
+        tracker.SESSION_ACTIVATION_POSES = 2
+        tracker.record_rp_activity(self.char1, self.room1)
+        tracker.record_rp_activity(self.char1, self.room1)
+        session_id = tracker._active_sessions[self.char1.id]["session_id"]
+
+        # Force the session's last pose well past the idle timeout.
+        tracker._active_sessions[self.char1.id]["last_pose_at"] = (
+            time.time() - tracker.SESSION_IDLE_TIMEOUT - 1
+        )
+        tracker._check_idle_sessions()
+
+        self.assertNotIn(self.char1.id, tracker._active_sessions)
+        self.assertEqual(RPSession.objects.get(pk=session_id).status, RPSession.Status.COMPLETED)
+        _clear_tracker()
+
+
 # ---------------------------------------------------------------------------
 # Scene bridge tests (scenes-absent profile)
 # ---------------------------------------------------------------------------

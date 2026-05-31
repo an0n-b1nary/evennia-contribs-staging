@@ -25,14 +25,19 @@ available for downstream reward systems (XP, lore, etc.).
 
 ## Installation
 
+This contrib depends on [evennia-links](../../base_systems/evennia_links) `>= 0.2`
+(it provides `AbstractLink`, the base of `RPSessionSceneLink`, plus the
+soft-reference cleanup helper). Install both:
+
 ```
+pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#subdirectory=contribs/base_systems/evennia_links&egg=evennia_links"
 pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#subdirectory=contribs/game_systems/evennia_rptracker&egg=evennia_rptracker"
 ```
 
-Add to `INSTALLED_APPS` in `server/conf/settings.py`:
+Add both to `INSTALLED_APPS` in `server/conf/settings.py`:
 
 ```python
-INSTALLED_APPS += ["evennia_rptracker"]
+INSTALLED_APPS += ["evennia_links", "evennia_rptracker"]
 ```
 
 **Run migrations:**
@@ -174,10 +179,12 @@ RPTRACKER_FLAG_REVIEW_HOOK = "myapp.jobs.create_review_ticket"
 When a scenes contrib is installed, `RPSessionSceneLink` rows are created
 automatically for each session↔scene overlap. This requires:
 
-1. `evennia-links >= 0.2` (for `AbstractLink` + `connect_soft_ref_cleanup`).
-2. A scenes app installed under the label set by `RPTRACKER_SCENES_APP_LABEL`
+1. A scenes app installed under the label set by `RPTRACKER_SCENES_APP_LABEL`
    (default `"scenes"`). The app must have a `Scene` model.
-3. Your room typeclass setting `room.active_scene_id` when a scene is active.
+2. Your room typeclass setting `room.active_scene_id` when a scene is active.
+
+(`evennia-links`, already a required dependency, provides the
+`connect_soft_ref_cleanup` hook that removes orphaned links on scene deletion.)
 
 `RPSessionSceneLink.scene_id` is a plain integer (no FK), so the bridge table
 has no DB dependency on the scenes app — install order doesn't matter.
