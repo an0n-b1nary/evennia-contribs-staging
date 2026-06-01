@@ -10,10 +10,8 @@ Run:
     evennia test --settings test_jobs_settings.py evennia_jobs
 """
 
-from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from django.utils import timezone
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_jobs.commands import (
@@ -206,18 +204,24 @@ class TestCmdJobsManagement(EvenniaCommandTest):
 
 
 class TestUsesScreenreaderFallback(EvenniaCommandTest):
-    """uses_screenreader returns False when evennia-accessibility not installed."""
+    """uses_screenreader falls back to a no-op when evennia-accessibility is absent."""
 
     def test_sr_fallback_returns_false(self):
+        import importlib
+
+        import evennia_jobs.commands as cmd_module
+
+        # Setting the module to None in sys.modules makes ``import
+        # evennia_accessibility`` raise ImportError, exercising the fallback.
         with patch.dict("sys.modules", {"evennia_accessibility": None}):
-            # Re-import to pick up the patched module dict.
-            import importlib
-
-            import evennia_jobs.commands as cmd_module
-
-            importlib.reload(cmd_module)
-            # After reload, uses_screenreader should be the fallback no-op.
-            self.assertFalse(cmd_module.uses_screenreader(self.char1))
+            try:
+                importlib.reload(cmd_module)
+                self.assertFalse(cmd_module.uses_screenreader(self.char1))
+            finally:
+                # Reload again WITHOUT the patch so the real accessibility-backed
+                # module is restored — otherwise the fallback would leak into
+                # every later test sharing this process.
+                importlib.reload(cmd_module)
 
 
 # ---------------------------------------------------------------------------

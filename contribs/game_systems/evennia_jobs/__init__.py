@@ -18,9 +18,9 @@ Commands (import explicitly when needed):
 
 Web/API surface (requires [web] extra):
 
-    from evennia_jobs.views import JobListView, JobDetailView, ...
+    from evennia_jobs.views import JobListView, JobDetailView
     from evennia_jobs.api.views import JobViewSet
-    from evennia_jobs import urls, api.urls
+    # wire URLs with: include("evennia_jobs.urls") / include("evennia_jobs.api.urls")
 """
 
 __version__ = "0.1.0"

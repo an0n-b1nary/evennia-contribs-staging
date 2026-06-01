@@ -31,7 +31,7 @@ pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#
 **With web + API surface** (requires evennia-accessibility, DRF, django-filter):
 
 ```
-pip install -e "...(same URL)...[web]"
+pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#subdirectory=contribs/game_systems/evennia_jobs&egg=evennia_jobs[web]"
 ```
 
 Add to `INSTALLED_APPS` in `server/conf/settings.py`:
