@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-jobs"
+version = "0.1.0"
+description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# Core: models + commands only. No web/API deps.
+dependencies = ["evennia>=6.0"]
+
+[project.optional-dependencies]
+# [web] enables website views, DRF API, and accessible forms/templates.
+web = [
+    "evennia-accessibility>=0.1",
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = ["evennia_jobs", "evennia_jobs.migrations", "evennia_jobs.api"]
+
+[tool.setuptools.package-dir]
+"evennia_jobs" = "."
+"evennia_jobs.migrations" = "migrations"
+"evennia_jobs.api" = "api"
+
+[tool.setuptools.package-data]
+evennia_jobs = ["templates/evennia_jobs/*.html"]

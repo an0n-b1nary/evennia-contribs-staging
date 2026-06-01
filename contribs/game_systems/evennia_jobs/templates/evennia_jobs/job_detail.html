@@ -1,0 +1,95 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Ticket #{{ job.job_number }}: {{ job.title }}{% endblock %}
+
+{% block content %}
+<h1>Ticket #{{ job.job_number }}: {{ job.title }}</h1>
+
+<div role="region" aria-label="Ticket details" tabindex="0">
+<table class="table table-sm table-bordered w-auto mb-4">
+  <tbody>
+    <tr>
+      <th scope="row">Type</th>
+      <td>{{ job.get_job_type_display }}</td>
+      <th scope="row">Status</th>
+      <td>{{ job.get_status_display }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Priority</th>
+      <td>
+        <span
+          {% if job.priority == "urgent" %}class="text-danger font-weight-bold"
+          {% elif job.priority == "high" %}class="text-warning font-weight-bold"
+          {% endif %}>
+          {{ job.get_priority_display }}
+        </span>
+      </td>
+      <th scope="row">Submitted</th>
+      <td>{{ job.created_at|date:"Y-m-d H:i" }} UTC</td>
+    </tr>
+    <tr>
+      <th scope="row">Reporter</th>
+      <td>
+        {% if hide_reporter %}
+        <span class="text-muted">[anonymous]</span>
+        {% else %}
+        {{ job.author_name|default:"—" }}
+        {% endif %}
+      </td>
+      <th scope="row">Assignee</th>
+      <td>{{ job.assignee_name|default:"—" }}</td>
+    </tr>
+    {% if job.closed_at %}
+    <tr>
+      <th scope="row">Closed</th>
+      <td colspan="3">{{ job.closed_at|date:"Y-m-d H:i" }} UTC</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+</div>
+
+<h2>Description</h2>
+<div class="card mb-4">
+  <div class="card-body">
+    {{ job.description|linebreaksbr }}
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="mb-0">Comments <span class="badge badge-secondary">{{ comments|length }}</span></h2>
+  {% if is_submitter or is_staff %}
+  <a href="{% url 'job-comment' job.pk %}" class="btn btn-sm btn-primary">Add Comment</a>
+  {% endif %}
+</div>
+
+{% if comments %}
+{% for comment in comments %}
+<div class="card mb-3{% if comment.is_staff_only %} border-warning{% endif %}">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>
+      <strong>{{ comment.author_name|default:"Staff" }}</strong>
+      {% if comment.is_staff_only %}
+      <span class="badge badge-warning ml-1">Staff-only</span>
+      <span class="sr-only">(staff-only note)</span>
+      {% endif %}
+    </span>
+    <span class="text-muted small">{{ comment.created_at|date:"Y-m-d H:i" }} UTC</span>
+  </div>
+  <div class="card-body">
+    {{ comment.content|linebreaksbr }}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted">No comments yet.</p>
+{% endif %}
+
+<div class="mt-4 d-flex gap-2">
+  <a href="{% url 'job-list' %}">&larr; My Tickets</a>
+  {% if is_staff %}
+  &nbsp;|&nbsp;
+  <a href="{% url 'job-all' %}">All Tickets</a>
+  {% endif %}
+</div>
+{% endblock %}

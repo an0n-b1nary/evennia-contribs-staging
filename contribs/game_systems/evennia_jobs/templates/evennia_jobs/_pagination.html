@@ -1,0 +1,78 @@
+{#
+  Accessible pagination partial.
+
+  Requires page_obj in context (standard Django ListView CBV).
+  Optional: extra_params — additional query string params to preserve.
+
+  Usage:
+    {% include "evennia_jobs/_pagination.html" %}
+#}
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Pagination" class="mt-4">
+  <ul class="pagination justify-content-center">
+
+    {# Previous #}
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link"
+         href="?{% if extra_params %}{{ extra_params }}&{% endif %}page={{ page_obj.previous_page_number }}"
+         aria-label="Go to previous page">
+        <span aria-hidden="true">&laquo;</span>
+        <span class="sr-only">Previous</span>
+      </a>
+    </li>
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link" aria-disabled="true" aria-label="Previous page, unavailable">
+        <span aria-hidden="true">&laquo;</span>
+        <span class="sr-only">Previous</span>
+      </span>
+    </li>
+    {% endif %}
+
+    {# Page numbers (window of ±4 around current) #}
+    {% for page_num in page_obj.paginator.page_range %}
+    {% if page_num >= page_obj.number|add:"-4" and page_num <= page_obj.number|add:"4" %}
+    {% if page_num == page_obj.number %}
+    <li class="page-item active">
+      <span class="page-link" aria-current="page" aria-label="Page {{ page_num }}, current">
+        {{ page_num }}
+      </span>
+    </li>
+    {% else %}
+    <li class="page-item">
+      <a class="page-link"
+         href="?{% if extra_params %}{{ extra_params }}&{% endif %}page={{ page_num }}"
+         aria-label="Go to page {{ page_num }}">
+        {{ page_num }}
+      </a>
+    </li>
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    {# Next #}
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link"
+         href="?{% if extra_params %}{{ extra_params }}&{% endif %}page={{ page_obj.next_page_number }}"
+         aria-label="Go to next page">
+        <span aria-hidden="true">&raquo;</span>
+        <span class="sr-only">Next</span>
+      </a>
+    </li>
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link" aria-disabled="true" aria-label="Next page, unavailable">
+        <span aria-hidden="true">&raquo;</span>
+        <span class="sr-only">Next</span>
+      </span>
+    </li>
+    {% endif %}
+
+  </ul>
+  <p class="text-center text-muted small mt-1" aria-live="polite">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  </p>
+</nav>
+{% endif %}

@@ -1,0 +1,25 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<p class="text-muted">
+  <strong>{{ job.title }}</strong> — {{ job.get_job_type_display }} #{{ job.job_number }}
+</p>
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Comment</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.content %}
+    {% if form.is_staff_only %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.is_staff_only %}
+    {% endif %}
+  </fieldset>
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url="{% url 'job-detail' job.pk %}" submit_label="Post Comment" %}
+</form>
+{% endblock %}

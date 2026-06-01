@@ -1,0 +1,30 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if is_issue %}
+<div class="alert alert-info" role="note" aria-live="polite">
+  <strong>Anonymous submission:</strong> Staff will see your character name, but
+  no other players will. Your identity is always stored internally for follow-up.
+</div>
+{% endif %}
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>
+      {% if job_type == "request" %}Request details
+      {% elif job_type == "bug" %}Bug details
+      {% else %}Issue details{% endif %}
+    </legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.title %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.description %}
+  </fieldset>
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url="{% url 'job-list' %}" submit_label="Submit" %}
+</form>
+{% endblock %}
