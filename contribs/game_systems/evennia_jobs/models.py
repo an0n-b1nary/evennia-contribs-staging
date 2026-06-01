@@ -22,9 +22,14 @@ Conceptual pattern adapted from Evennia's base_systems/ingame_reports
 contrib (credit: Evennia contributors).
 """
 
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Case, IntegerField, Max, Value, When
 from django.utils import timezone
+
+# Bounded retries for allocating a unique job_number under concurrent creation.
+# Each retry re-reads Max(job_number); the unique constraint turns a lost race
+# into an IntegrityError we recover from rather than a corrupted sequence.
+_CREATE_JOB_MAX_RETRIES = 5
 
 
 class JobType(models.TextChoices):
@@ -164,7 +169,15 @@ class Job(models.Model):
     @classmethod
     def create_job(cls, job_type, author, title, description):
         """
-        Create a new ticket, atomically assigning the next job_number.
+        Create a new ticket, assigning the next global job_number.
+
+        The next number is read as ``Max(job_number) + 1``. Because that read
+        and the insert are not a single atomic step, two concurrent creators
+        can pick the same number; the ``unique=True`` constraint then rejects
+        the loser with an ``IntegrityError``. We wrap each attempt in a
+        savepoint (``transaction.atomic``) and retry up to
+        ``_CREATE_JOB_MAX_RETRIES`` times, re-reading the max each pass, so a
+        lost race re-allocates cleanly instead of surfacing an error.
 
         Args:
             job_type: One of JobType choices.
@@ -174,15 +187,30 @@ class Job(models.Model):
 
         Returns:
             The newly created Job instance.
+
+        Raises:
+            IntegrityError: if a unique job_number could not be allocated
+                within the retry budget.
         """
-        current_max = cls.objects.aggregate(max_num=Max("job_number")).get("max_num") or 0
-        return cls.objects.create(
-            job_number=current_max + 1,
-            job_type=job_type,
-            title=title,
-            description=description,
-            author=author,
-            author_name=author.key if author else "Unknown",
+        author_name = author.key if author else "Unknown"
+        for _attempt in range(_CREATE_JOB_MAX_RETRIES):
+            current_max = cls.objects.aggregate(max_num=Max("job_number")).get("max_num") or 0
+            try:
+                # Savepoint so a collision rolls back just this insert, leaving
+                # any enclosing transaction usable for the next attempt.
+                with transaction.atomic():
+                    return cls.objects.create(
+                        job_number=current_max + 1,
+                        job_type=job_type,
+                        title=title,
+                        description=description,
+                        author=author,
+                        author_name=author_name,
+                    )
+            except IntegrityError:
+                continue
+        raise IntegrityError(
+            f"Could not allocate a unique job_number after " f"{_CREATE_JOB_MAX_RETRIES} attempts."
         )
 
     def mark_in_review(self):

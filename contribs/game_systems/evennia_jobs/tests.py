@@ -12,6 +12,7 @@ Run:
 
 from unittest.mock import MagicMock, patch
 
+from django.db import IntegrityError
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_jobs.commands import (
@@ -94,6 +95,48 @@ class TestJobModel(EvenniaTest):
         self.assertEqual(ordered[0].title, "Urgent")
         self.assertEqual(ordered[1].title, "High")
         self.assertEqual(ordered[2].title, "Normal")
+
+    def test_create_job_recovers_from_number_collision(self):
+        """A lost race on job_number is retried, not surfaced as an error.
+
+        Force the first ``objects.create`` to raise IntegrityError (as the DB
+        would on a duplicate job_number), then delegate to the real create. The
+        retry loop should re-read Max() and succeed on the next attempt.
+        """
+        real_create = Job.objects.create
+        state = {"raised": False}
+
+        def flaky_create(*args, **kwargs):
+            if not state["raised"]:
+                state["raised"] = True
+                raise IntegrityError("simulated duplicate job_number")
+            return real_create(*args, **kwargs)
+
+        with patch.object(Job.objects, "create", side_effect=flaky_create):
+            job = Job.create_job(
+                job_type=JobType.REQUEST,
+                author=self.char1,
+                title="Racy",
+                description="x",
+            )
+
+        self.assertTrue(state["raised"])  # the collision path executed
+        self.assertEqual(job.job_number, 1)
+        self.assertEqual(Job.objects.count(), 1)
+
+    def test_create_job_raises_after_exhausting_retries(self):
+        """If every attempt collides, the IntegrityError propagates and no row lands."""
+        with (
+            patch.object(Job.objects, "create", side_effect=IntegrityError("always collides")),
+            self.assertRaises(IntegrityError),
+        ):
+            Job.create_job(
+                job_type=JobType.REQUEST,
+                author=self.char1,
+                title="Doomed",
+                description="x",
+            )
+        self.assertEqual(Job.objects.count(), 0)
 
 
 class TestJobCommentModel(EvenniaTest):
