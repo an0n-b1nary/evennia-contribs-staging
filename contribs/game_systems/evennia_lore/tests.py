@@ -43,6 +43,16 @@ def _make_tag(name="Magic", is_major=False):
     return LoreTag.objects.create(name=name, is_major=is_major)
 
 
+def _room_context_provider(session):
+    """Module-level provider for exercising the LORE_SESSION_CONTEXT_PROVIDER seam.
+
+    Returns the session's room as room_id (what a real game's provider does for
+    the room-weighting path), with no region/thread context.
+    """
+    room = getattr(session, "room", None)
+    return {"room_id": room.pk if room else None, "region_id": None, "thread_ids": set()}
+
+
 # ---------------------------------------------------------------------------
 # LoreTag model
 # ---------------------------------------------------------------------------
@@ -310,25 +320,30 @@ class TestBuildPool(EvenniaTest):
         pool = _build_pool(self.char1, session)
         self.assertEqual(pool, [])
 
-    @override_settings(LORE_SESSION_CONTEXT_PROVIDER=None)
-    def test_room_weight_5_via_provider_stub(self):
-        """Stub provider injecting room_id exercises the room weight path."""
+    @override_settings(LORE_SESSION_CONTEXT_PROVIDER="evennia_lore.tests._room_context_provider")
+    def test_room_weight_5_via_provider_seam(self):
+        """The configured provider is resolved + called end-to-end (settings seam).
+
+        Exercises the real LORE_SESSION_CONTEXT_PROVIDER path: _resolve_context
+        imports the dotted callable, invokes it with the session, and the room_id
+        it returns drives the room-weighting branch (+5).
+        """
         entry = _make_entry("Room Lore", author=self.char1)
         entry.rooms.add(self.room1)
-        session = self._session()
-
-        def stub_provider(s):
-            return {"room_id": self.room1.pk, "region_id": None, "thread_ids": set()}
-
-        with (
-            override_settings(LORE_SESSION_CONTEXT_PROVIDER="builtins.print"),
-            patch(
-                "evennia_lore.selection._resolve_context",
-                return_value=stub_provider(session),
-            ),
-        ):
-            pool = _build_pool(self.char1, session)
+        session = self._session(room=self.room1)
+        pool = _build_pool(self.char1, session)
         self.assertEqual(pool[0][1], 5)
+
+    @override_settings(LORE_SESSION_CONTEXT_PROVIDER="evennia_lore.nonexistent.provider")
+    def test_provider_resolution_failure_degrades_to_tag_only(self):
+        """A broken provider path must not raise — context falls back to empty."""
+        entry = _make_entry("Tag Only", author=self.char1)
+        entry.rooms.add(self.room1)  # room signal would add +5 if provider worked
+        entry.tags.add(_make_tag("Topic"))
+        session = self._session()
+        pool = _build_pool(self.char1, session)
+        # Provider failed → no room_id → only the tag weight (1) applies.
+        self.assertEqual(pool[0][1], 1)
 
     @override_settings(
         LORE_SESSION_CONTEXT_PROVIDER=None,
