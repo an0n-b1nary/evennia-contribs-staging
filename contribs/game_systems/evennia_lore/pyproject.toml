@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-lore"
+version = "0.1.0"
+description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# Core: models + commands + trickle engine + 4 bridge models. No web/API deps.
+# evennia-links is HARD because shipped models inherit AbstractArchived,
+# AbstractVersion, AbstractAuthoredLink, and use connect_soft_ref_cleanup.
+dependencies = ["evennia>=6.0", "evennia-links>=0.2"]
+
+[project.optional-dependencies]
+# [web] enables website views, DRF API, and accessible forms/templates.
+web = [
+    "evennia-accessibility>=0.1",
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = ["evennia_lore", "evennia_lore.migrations", "evennia_lore.api"]
+
+[tool.setuptools.package-dir]
+"evennia_lore" = "."
+"evennia_lore.migrations" = "migrations"
+"evennia_lore.api" = "api"
+
+[tool.setuptools.package-data]
+evennia_lore = ["templates/evennia_lore/*.html"]

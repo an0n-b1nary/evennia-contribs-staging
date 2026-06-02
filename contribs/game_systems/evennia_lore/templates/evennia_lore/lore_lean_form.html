@@ -1,0 +1,30 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Set Investigation Lean{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Investigation Lean</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-1">Set Investigation Lean</h1>
+<p class="text-muted small mb-3">
+  Your lean tilts the passive lore trickle — entries matching your stated interest
+  are twice as likely to be selected at session end. Only one lean is active at a time.
+  Equivalent to <code>+investigate</code> in-game.
+</p>
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  {% include "evennia_accessibility/_form_field.html" with field=form.lean_type %}
+  {% include "evennia_accessibility/_form_field.html" with field=form.lean_value %}
+  {% include "evennia_accessibility/_form_actions.html" with submit_label="Save Lean" cancel_url="/lore/" %}
+</form>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ entry.title }} — Lore{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ entry.title }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">{{ entry.title }}
+    <small class="text-muted fs-6">#{{ entry.entry_number }}</small>
+  </h1>
+  <div class="d-flex gap-2">
+    {% if character_id == entry.author_id or is_staff %}
+    <a href="{% url 'lore-edit' entry.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+    <a href="{% url 'lore-history' entry.pk %}" class="btn btn-sm btn-outline-secondary">History</a>
+    {% endif %}
+    {% if is_staff and entry.status == 'submitted' %}
+    <form method="post" action="{% url 'lore-approve' entry.pk %}" class="d-inline">
+      {% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button>
+    </form>
+    <form method="post" action="{% url 'lore-reject' entry.pk %}" class="d-inline">
+      {% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Reject</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<p class="text-muted small mb-3">
+  By {{ entry.author_name|default:"Unknown" }} ·
+  {{ entry.created_at|date:"Y-m-d" }} ·
+  <span class="badge {% if entry.privacy == 'public' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
+    {{ entry.get_privacy_display }}
+  </span>
+  <span class="badge bg-info text-dark">{{ entry.get_status_display }}</span>
+  {% if entry.tags.exists %}
+  —
+  {% for tag in entry.tags.all %}
+  <a href="{% url 'lore-list' %}?tag={{ tag.name|urlencode }}"
+     class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+    {{ tag.name }}
+  </a>
+  {% endfor %}
+  {% endif %}
+</p>
+
+{% if is_accessible %}
+  {% if entry.body %}
+  <div class="lore-body mb-4">
+    {{ entry.body|linebreaks }}
+  </div>
+  {% else %}
+  <p class="text-muted mb-4"><em>(No body content yet.)</em></p>
+  {% endif %}
+{% else %}
+  <div class="alert alert-warning" role="alert">
+    <strong>Restricted Content</strong>
+    {% if entry.summary %}
+    <p class="mb-2 mt-1">{{ entry.summary }}</p>
+    {% endif %}
+    <p class="mb-0 small">Full content requires a storyteller to share this entry with you via <code>+share &lt;yourname&gt;={{ entry.entry_number }}</code>.</p>
+  </div>
+{% endif %}
+
+<div class="row mt-4">
+  {% if region_list %}
+  <div class="col-md-4 mb-3">
+    <h2 class="h6">Regions</h2>
+    <ul class="list-unstyled small">
+      {% for region in region_list %}
+      <li><a href="{% url 'region-detail' region.pk %}">{{ region.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if linked_scenes %}
+  <div class="col-md-4 mb-3">
+    <h2 class="h6">Linked Scenes</h2>
+    <ul class="list-unstyled small">
+      {% for scene in linked_scenes %}
+      <li><a href="{% url 'scene-detail' scene.pk %}">{{ scene.title|default:"Untitled Scene" }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if linked_plots %}
+  <div class="col-md-4 mb-3">
+    <h2 class="h6">Linked Plots</h2>
+    <ul class="list-unstyled small">
+      {% for thread in linked_plots %}
+      <li><a href="{% url 'plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+{% if versions %}
+<p class="text-muted small mt-2">
+  <a href="{% url 'lore-history' entry.pk %}">{{ versions|length }} version snapshot{{ versions|length|pluralize }}</a> available.
+</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
+    {% if is_edit %}
+    <li class="breadcrumb-item"><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Edit</li>
+    {% else %}
+    <li class="breadcrumb-item active" aria-current="page">Submit Entry</li>
+    {% endif %}
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="mb-3">
+    <legend class="h6">Entry details</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.title %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.summary %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.privacy %}
+  </fieldset>
+  <fieldset class="mb-3 mt-3">
+    <legend class="h6">Body</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.body %}
+  </fieldset>
+  {% if is_edit %}
+  {% include "evennia_accessibility/_form_actions.html" with submit_label="Save Changes" cancel_url=request.META.HTTP_REFERER|default:"/lore/" %}
+  {% else %}
+  {% include "evennia_accessibility/_form_actions.html" with submit_label="Submit Entry" cancel_url="/lore/" %}
+  {% endif %}
+</form>
+{% endblock %}

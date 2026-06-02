@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+"""Cursor pagination for evennia_lore API viewsets."""
+
+from rest_framework.pagination import CursorPagination
+
+
+class LoreCursorPagination(CursorPagination):
+    page_size = 20
+    ordering = "-created_at"
+    page_size_query_param = "page_size"
+    max_page_size = 100

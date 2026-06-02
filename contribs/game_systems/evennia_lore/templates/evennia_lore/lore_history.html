@@ -1,0 +1,46 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">History</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if versions %}
+<div class="table-responsive" role="region" aria-label="Version history" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Version</th>
+      <th scope="col">Edited by</th>
+      <th scope="col">Date</th>
+      <th scope="col">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for v in versions %}
+    <tr>
+      <td>v{{ v.version_number }}</td>
+      <td>{{ v.editor_name|default:"Unknown" }}</td>
+      <td>{{ v.edited_at|date:"Y-m-d H:i" }}</td>
+      <td>
+        <a href="{% url 'lore-diff' entry.pk v.version_number %}" class="btn btn-xs btn-outline-secondary">Diff</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+{% include "evennia_lore/_empty_state.html" with message="No version history yet." %}
+{% endif %}
+{% endblock %}

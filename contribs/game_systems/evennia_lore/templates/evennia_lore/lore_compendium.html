@@ -1,0 +1,51 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}My Lore Compendium{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
+    <li class="breadcrumb-item active" aria-current="page">My Compendium</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">My Lore Compendium</h1>
+
+{% if acquisitions %}
+<div class="table-responsive" role="region" aria-label="Acquired lore" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Title</th>
+      <th scope="col">Acquired</th>
+      <th scope="col">Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for acq in acquisitions %}
+    <tr>
+      <td>{{ acq.entry.entry_number }}</td>
+      <td>
+        <a href="{% url 'lore-detail' acq.entry.pk %}">{{ acq.entry.title }}</a>
+        {% if acq.entry.privacy == 'restricted' %}
+        <span class="badge bg-warning text-dark ms-1">Restricted</span>
+        {% endif %}
+      </td>
+      <td>{{ acq.acquired_at|date:"Y-m-d" }}</td>
+      <td>{{ acq.get_source_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% include "evennia_lore/_pagination.html" %}
+
+{% else %}
+{% include "evennia_lore/_empty_state.html" with message="You haven't acquired any lore yet. RP in regions and scenes to passively discover entries." %}
+{% endif %}
+{% endblock %}

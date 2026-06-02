@@ -1,0 +1,108 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Lore Compendium{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Lore</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Lore Compendium</h1>
+  <div class="d-flex gap-2">
+    {% if request.user.is_authenticated %}
+    <a href="{% url 'lore-compendium' %}" class="btn btn-sm btn-outline-secondary">My Lore</a>
+    <a href="{% url 'lore-create' %}" class="btn btn-sm btn-primary">Submit Entry</a>
+    {% endif %}
+    {% if is_staff %}
+    <a href="{% url 'lore-queue' %}" class="btn btn-sm btn-outline-warning">Queue</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="mb-3">
+  <form method="get" class="d-inline-flex flex-wrap gap-2" role="search" aria-label="Filter lore entries">
+    <label for="id_search_filter" class="sr-only">Search</label>
+    <input type="text" id="id_search_filter" name="search" value="{{ search_filter }}"
+           class="form-control form-control-sm" placeholder="Search titles &amp; body…" style="max-width:200px;">
+    <label for="id_tag_filter" class="sr-only">Filter by tag</label>
+    <input type="text" id="id_tag_filter" name="tag" value="{{ tag_filter }}"
+           class="form-control form-control-sm" placeholder="Tag…" style="max-width:140px;">
+    <label for="id_region_filter" class="sr-only">Filter by region</label>
+    <input type="text" id="id_region_filter" name="region" value="{{ region_filter }}"
+           class="form-control form-control-sm" placeholder="Region…" style="max-width:140px;">
+    <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+    {% if search_filter or tag_filter or theme_filter or region_filter %}
+    <a href="{% url 'lore-list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+    {% endif %}
+  </form>
+  {% if all_major_tags %}
+  <div class="mt-1 small text-muted">
+    Themes:
+    {% for tag in all_major_tags %}
+    <a href="?theme={{ tag.name|urlencode }}" class="badge bg-primary text-decoration-none me-1">{{ tag.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{% if entries %}
+<div class="table-responsive" role="region" aria-label="Lore entries" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Title</th>
+      <th scope="col">Tags</th>
+      <th scope="col">Author</th>
+      <th scope="col">Privacy</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in entries %}
+    <tr>
+      <td>{{ entry.entry_number }}</td>
+      <td>
+        <a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a>
+        {% if entry.privacy == 'restricted' %}
+        <span class="badge bg-warning text-dark ms-1" title="+share required for full content">🔒 Restricted</span>
+        {% endif %}
+        {% if entry.pk in acquired_pks %}
+        <span class="badge bg-success ms-1">Acquired</span>
+        {% endif %}
+        {% if entry.summary %}
+        <br><small class="text-muted">{{ entry.summary|truncatechars:100 }}</small>
+        {% endif %}
+      </td>
+      <td>
+        {% for tag in entry.tags.all %}
+        <a href="?tag={{ tag.name|urlencode }}"
+           class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+          {{ tag.name }}
+        </a>
+        {% endfor %}
+      </td>
+      <td>{{ entry.author_name }}</td>
+      <td>{{ entry.get_privacy_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% with extra=""%}
+  {% if search_filter %}{% with extra=extra|add:"&search="|add:search_filter %}{% endwith %}{% endif %}
+  {% if tag_filter %}{% with extra=extra|add:"&tag="|add:tag_filter %}{% endwith %}{% endif %}
+  {% if theme_filter %}{% with extra=extra|add:"&theme="|add:theme_filter %}{% endwith %}{% endif %}
+  {% if region_filter %}{% with extra=extra|add:"&region="|add:region_filter %}{% endwith %}{% endif %}
+  {% include "evennia_lore/_pagination.html" %}
+{% endwith %}
+
+{% else %}
+{% include "evennia_lore/_empty_state.html" with message="No lore entries found{% if search_filter or tag_filter or theme_filter or region_filter %} matching your filters{% endif %}." action_url="/lore/new/" action_label="Submit the first entry" %}
+{% endif %}
+{% endblock %}
