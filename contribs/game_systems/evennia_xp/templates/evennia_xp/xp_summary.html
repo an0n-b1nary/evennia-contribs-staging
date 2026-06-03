@@ -1,0 +1,122 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}My XP{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="breadcrumb-nav container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">My XP</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">My XP{% if character_name %} — {{ character_name }}{% endif %}</h1>
+
+{% if downtime_active %}
+<div class="alert alert-warning" role="alert" aria-live="polite">
+  <strong>Modified XP Rates</strong> — XP rates are currently reduced
+  (multiplier: {{ xp_mult }}×). Check with staff for details.
+</div>
+{% endif %}
+
+{# Balance card #}
+<div class="card mb-4">
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Current Balance</dt>
+      <dd class="col-sm-8"><strong>{{ balance }} XP</strong></dd>
+      <dt class="col-sm-4">Total Earned</dt>
+      <dd class="col-sm-8">{{ total_earned }} XP</dd>
+      <dt class="col-sm-4">Total Spent</dt>
+      <dd class="col-sm-8">{{ total_spent }} XP</dd>
+      {% if last_payout_week %}
+      <dt class="col-sm-4">Last Payout</dt>
+      <dd class="col-sm-8">{{ last_payout_week }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+</div>
+
+{# By-source breakdown #}
+{% if by_source %}
+<h2 class="h5 mt-4 mb-2">Lifetime Breakdown by Source</h2>
+{% if screenreader_mode %}
+<ul aria-label="XP breakdown by source">
+  {% for label, total in by_source %}
+  <li>{{ label }}: {{ total }} XP</li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="table-responsive" role="region" aria-label="XP breakdown by source" tabindex="0">
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Source</th>
+      <th scope="col" class="text-right">Total XP</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for label, total in by_source %}
+    <tr>
+      <td>{{ label }}</td>
+      <td class="text-right">{{ total }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endif %}
+
+{# Award log #}
+<h2 class="h5 mt-4 mb-2">Award History</h2>
+{% if logs %}
+{% if screenreader_mode %}
+<ul aria-label="XP award log">
+  {% for row in logs %}
+  <li>
+    {{ row.awarded_at|date:"Y-m-d" }} —
+    +{{ row.amount }} {{ row.get_source_type_display }}
+    week {{ row.week }}
+    {% if row.reason %}({{ row.reason }}){% endif %}
+    {% if row.granted_by_name %}granted by {{ row.granted_by_name }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="table-responsive" role="region" aria-label="XP award log" tabindex="0">
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Date</th>
+      <th scope="col">Source</th>
+      <th scope="col" class="text-right">Amount</th>
+      <th scope="col">Week</th>
+      <th scope="col">Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in logs %}
+    <tr>
+      <td>{{ row.awarded_at|date:"Y-m-d" }}</td>
+      <td>{{ row.get_source_type_display }}</td>
+      <td class="text-right">+{{ row.amount }}</td>
+      <td>{{ row.week }}</td>
+      <td class="text-muted small">
+        {% if row.reason %}{{ row.reason }}{% endif %}
+        {% if row.granted_by_name %}<em>(by {{ row.granted_by_name }})</em>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% include "evennia_xp/_pagination.html" %}
+
+{% else %}
+{% include "evennia_xp/_empty_state.html" with message="No XP has been awarded yet. RP activity earns XP each Monday." %}
+{% endif %}
+{% endblock %}

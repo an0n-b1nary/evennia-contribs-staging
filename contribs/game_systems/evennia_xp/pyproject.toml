@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-xp"
+version = "0.1.0"
+description = "Registry-driven weekly XP batch engine (earn, ledger, +xp command) for Evennia games."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# Core: models + awards + batch engine + Script + commands. No web/API deps.
+# No evennia-links dependency (no bridge models, no soft-ref cleanup).
+dependencies = ["evennia>=6.0"]
+
+[project.optional-dependencies]
+# [web] enables website views, DRF API, and accessible templates.
+web = [
+    "evennia-accessibility>=0.1",
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = [
+    "evennia_xp",
+    "evennia_xp.migrations",
+    "evennia_xp.api",
+    "evennia_xp.management",
+    "evennia_xp.management.commands",
+]
+
+[tool.setuptools.package-dir]
+"evennia_xp" = "."
+"evennia_xp.migrations" = "migrations"
+"evennia_xp.api" = "api"
+"evennia_xp.management" = "management"
+"evennia_xp.management.commands" = "management/commands"
+
+[tool.setuptools.package-data]
+evennia_xp = ["templates/evennia_xp/*.html"]
