@@ -8,12 +8,19 @@ get_permission_target() / check_permission() hooks. Requires [web] extra.
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 
 from evennia_boards.permissions import require_character
 
 
 class BoardsAuthoringMixin(LoginRequiredMixin):
-    """Mixin for all evennia_boards authoring (write) views."""
+    """Mixin for all evennia_boards authoring (write) views.
+
+    Combine with Django's ``FormView``, ``CreateView``, or ``UpdateView``.
+    The permission gate runs in ``get()``/``post()`` *before* the parent
+    view executes, so an unauthorised request never reaches ``form_valid``
+    (and therefore never writes to the database).
+    """
 
     login_url = "/accounts/login/"
 
@@ -28,18 +35,31 @@ class BoardsAuthoringMixin(LoginRequiredMixin):
         return self._character_id
 
     def get_permission_target(self):
-        """Return the object whose permissions should be checked. Override in subclasses."""
+        """Return the object whose permissions should be checked.
+
+        For create views this is typically the parent container (e.g. the
+        board); for edit views it is the object being edited. Override in
+        subclasses.
+        """
         return None
 
     def check_permission(self, character_id, target):
-        """Raise PermissionDenied if *character_id* cannot act on *target*. Override in subclasses."""
+        """Raise PermissionDenied if *character_id* may not act on *target*.
 
-    def dispatch(self, request, *args, **kwargs):
-        response = super().dispatch(request, *args, **kwargs)
-        # Character check on first dispatch so permission errors surface early.
-        if request.user.is_authenticated:
-            target = self.get_permission_target()
-            if target is not None:
-                character_id = self.get_character()
-                self.check_permission(character_id, target)
-        return response
+        The default implementation denies everything — subclasses MUST
+        override this to declare their own access rules.
+
+        Raises:
+            PermissionDenied: always, in the base implementation.
+        """
+        raise PermissionDenied("This view has not declared its permission rules.")
+
+    def get(self, request, *args, **kwargs):
+        character_id = self.get_character()
+        self.check_permission(character_id, self.get_permission_target())
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        character_id = self.get_character()
+        self.check_permission(character_id, self.get_permission_target())
+        return super().post(request, *args, **kwargs)

@@ -717,3 +717,84 @@ class TestIsStaff(EvenniaTest):
         self.char1.account.is_superuser = False
         result = is_staff(self.char1)
         self.assertIsInstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# Web authoring permission gate (regression: deny BEFORE any DB write)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthoringPermissionGate(EvenniaTest):
+    """The BoardsAuthoringMixin gate must run before the view writes anything.
+
+    These exercise only the deny / redirect paths, so they need neither a
+    URLconf (no reverse()) nor template rendering. The "nothing persisted"
+    assertions are the actual regression guard: an earlier dispatch()-based
+    implementation ran the write in form_valid() *before* checking
+    permission, so an unauthorised POST mutated the database.
+
+    EvenniaTest defaults: account/char1 = Developer (staff); account2/char2 =
+    non-staff. Bare test accounts have no sessions, so get_all_puppets()
+    returns []; tests that need a puppet patch it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from django.test import RequestFactory
+
+        self.factory = RequestFactory()
+        self.board = _make_board("Authoring")
+
+    def test_anonymous_get_redirects_to_login(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        from evennia_boards.views import PostCreateView
+
+        req = self.factory.get("/boards/new/")
+        req.user = AnonymousUser()
+        response = PostCreateView.as_view()(req, pk=self.board.pk)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response["Location"])
+
+    def test_no_puppet_raises_permission_denied(self):
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_boards.views import PostCreateView
+
+        req = self.factory.get("/boards/new/")
+        req.user = self.account2  # no active puppet in bare test context
+        with self.assertRaises(PermissionDenied):
+            PostCreateView.as_view()(req, pk=self.board.pk)
+
+    def test_readonly_board_post_denied_before_write(self):
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_boards.views import PostCreateView
+
+        ro = Board.objects.create(name="ReadOnly", is_read_only=True, order=2)
+        data = {"title": "Sneaky", "content": "Should never persist."}
+        with patch.object(self.account2, "get_all_puppets", return_value=[self.char2]):
+            req = self.factory.post("/", data)
+            req.user = self.account2
+            with self.assertRaises(PermissionDenied):
+                PostCreateView.as_view()(req, pk=ro.pk)
+        self.assertFalse(Post.all_objects.filter(board=ro).exists())
+
+    def test_non_author_edit_denied_before_write(self):
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_boards.views import PostEditView
+
+        post = Post.create_post(
+            board=self.board, author=self.char1, title="Original", content="Untouched."
+        )
+        data = {"title": "Hacked", "content": "Evil content."}
+        with patch.object(self.account2, "get_all_puppets", return_value=[self.char2]):
+            req = self.factory.post("/", data)
+            req.user = self.account2  # char2: non-staff, non-author
+            with self.assertRaises(PermissionDenied):
+                PostEditView.as_view()(req, pk=self.board.pk, post_id=post.pk)
+        post.refresh_from_db()
+        self.assertEqual(post.title, "Original")
+        self.assertEqual(post.content, "Untouched.")
+        self.assertEqual(PostVersion.objects.filter(parent=post).count(), 0)

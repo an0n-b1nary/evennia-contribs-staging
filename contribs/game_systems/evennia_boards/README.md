@@ -193,7 +193,9 @@ from evennia_boards.signals import post_created, board_unread_notified
 # post_created(sender=Post, post=Post, board=Board)
 post_created.connect(my_handler)
 
-# board_unread_notified(sender=Account, subscriptions=QuerySet)
+# board_unread_notified — reserved for future notification infrastructure.
+# Declared but not yet fired by the login listener.
+# Planned kwargs: account=AccountDB, board=Board, unread_count=int
 board_unread_notified.connect(my_handler)
 ```
 

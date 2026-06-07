@@ -27,14 +27,17 @@ class BoardsConfig(AppConfig):
     def _register_calendar_cleanup(self):
         """Register soft-ref cascade cleanup for PostCalendarLink.event_id.
 
-        Active only when the calendar app label (BOARDS_CALENDAR_APP_LABEL,
-        default "calendar") is present in INSTALLED_APPS. When dormant, the
-        PostCalendarLink rows orphan harmlessly on CalendarEvent deletion.
+        Opt-in: dormant unless BOARDS_CALENDAR_APP_LABEL names an app whose
+        label is present in INSTALLED_APPS (and which exposes a CalendarEvent
+        model). When dormant, PostCalendarLink rows orphan harmlessly on
+        CalendarEvent deletion. Default is None — no auto-wiring.
         """
         from django.apps import apps
         from django.conf import settings
 
-        calendar_label = getattr(settings, "BOARDS_CALENDAR_APP_LABEL", "calendar")
+        calendar_label = getattr(settings, "BOARDS_CALENDAR_APP_LABEL", None)
+        if not calendar_label:
+            return
         if not apps.is_installed(calendar_label) and not any(
             app_config.label == calendar_label for app_config in apps.get_app_configs()
         ):
