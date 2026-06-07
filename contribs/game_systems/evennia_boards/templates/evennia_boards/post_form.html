@@ -1,0 +1,61 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="boards-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_boards:board-list' %}">Bulletin Boards</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">
+      {% if parent_post %}Reply{% else %}New Post{% endif %}
+    </li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if parent_post %}
+<div class="card mb-3 border-secondary">
+  <div class="card-header text-muted small">
+    Replying to #{{ parent_post.post_number }}: {{ parent_post.title }}
+    &mdash; {{ parent_post.author_name }}
+  </div>
+  <div class="card-body py-2">
+    <p class="mb-0 small">{{ parent_post.content|truncatewords:40 }}</p>
+  </div>
+</div>
+{% endif %}
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  <strong>Please correct the errors below.</strong>
+</div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% for field in form %}
+  <div class="form-group">
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.errors %}
+    <div class="invalid-feedback d-block" id="{{ field.id_for_label }}_errors">
+      {% for error in field.errors %}{{ error }}{% endfor %}
+    </div>
+    {% endif %}
+    {% if field.help_text %}
+    <small class="form-text text-muted" id="{{ field.id_for_label }}_help">{{ field.help_text }}</small>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Post</button>
+    {% if cancel_url %}
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Cancel</a>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

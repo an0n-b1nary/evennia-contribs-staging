@@ -1,0 +1,44 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Bulletin Boards{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="boards-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Bulletin Boards</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Bulletin Boards</h1>
+
+{% if boards %}
+<div class="boards-table-scroll" role="region" aria-label="Bulletin boards" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Board</th>
+      <th scope="col">Description</th>
+      <th scope="col">Posts</th>
+      <th scope="col">Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for board in boards %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
+      <td>{{ board.description }}</td>
+      <td>{{ board._post_count }}</td>
+      <td>{{ board.get_board_type_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">No bulletin boards have been configured.</p>
+{% endif %}
+{% endblock %}

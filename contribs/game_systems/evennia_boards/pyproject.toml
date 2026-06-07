@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-boards"
+version = "0.1.0"
+description = "Bulletin board system (+bb/+board) with web UI, REST API, and XP integration for Evennia games."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# Core: models + commands only.
+dependencies = [
+    "evennia>=6.0",
+    "evennia-links>=0.2",
+]
+
+[project.optional-dependencies]
+# [web] enables website views, DRF API, and accessible forms/templates.
+web = [
+    "evennia-accessibility>=0.1",
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
+# [xp] enables IC-board XP awards and anti-gaming sweep via evennia_xp.
+xp = [
+    "evennia-xp>=0.1",
+]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = [
+    "evennia_boards",
+    "evennia_boards.migrations",
+    "evennia_boards.api",
+    "evennia_boards.integrations",
+]
+
+[tool.setuptools.package-dir]
+"evennia_boards" = "."
+"evennia_boards.migrations" = "migrations"
+"evennia_boards.api" = "api"
+"evennia_boards.integrations" = "integrations"
+
+[tool.setuptools.package-data]
+evennia_boards = ["templates/evennia_boards/*.html"]
