@@ -1,0 +1,41 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-list' %}">Scene Archive</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">{{ scene.title|default:"Untitled Scene" }}</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">History #{{ entry.pk }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Diff vs v{{ version.version_number }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Diff — Log Entry #{{ entry.pk }} vs v{{ version.version_number }}</h1>
+
+<div class="mb-2 text-muted small">
+  Comparing saved version <strong>v{{ version.version_number }}</strong>
+  ({{ version.created_at|date:"Y-m-d H:i" }}, by {{ version.editor_name }})
+  against the <strong>current</strong> version.
+</div>
+
+<div class="table-responsive">
+  <style>
+    .diff_header { background-color: #f0f0f0; }
+    .diff_next { background-color: #f0f0f0; }
+    .diff_add { background-color: #d4edda; }
+    .diff_chg { background-color: #fff3cd; }
+    .diff_sub { background-color: #f8d7da; }
+    table.diff { font-size: 0.85rem; font-family: monospace; width: 100%; }
+  </style>
+  {{ diff_html|safe }}
+</div>
+
+<div class="mt-4 d-flex gap-2">
+  <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">&larr; Back to History</a>
+  <a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">&larr; Back to Scene</a>
+</div>
+{% endblock %}

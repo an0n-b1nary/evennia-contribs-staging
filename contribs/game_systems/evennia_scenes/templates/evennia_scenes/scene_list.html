@@ -1,0 +1,67 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Scene Archive{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Scene Archive</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Scene Archive</h1>
+
+{% if scenes %}
+<div class="scenes-table-scroll" role="region" aria-label="Scene archive" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Title</th>
+      <th scope="col">Room</th>
+      <th scope="col">Participants</th>
+      <th scope="col">Entries</th>
+      <th scope="col">Date</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for scene in scenes %}
+    <tr>
+      <td>{{ scene.pk }}</td>
+      <td><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">{{ scene.title|default:"Untitled" }}</a></td>
+      <td>{{ scene.room_name }}</td>
+      <td>{{ scene.participants.count }}</td>
+      <td>{{ scene.log_entries.count }}</td>
+      <td>{{ scene.ended_at|date:"Y-m-d"|default:scene.created_at|date:"Y-m-d" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav aria-label="Scene archive pagination">
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo; Previous</a>
+    </li>
+    {% endif %}
+    <li class="page-item disabled">
+      <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </li>
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next &raquo;</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<p class="text-muted">No scenes have been archived yet.</p>
+{% endif %}
+{% endblock %}

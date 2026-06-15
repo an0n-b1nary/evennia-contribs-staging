@@ -1,0 +1,96 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-list' %}">Scene Archive</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ scene.title|default:"Untitled Scene" }}</h1>
+
+<div class="mb-3 text-muted small">
+  Room: <strong>{{ scene.room_name }}</strong> &mdash;
+  Creator: <strong>{{ scene.creator_name }}</strong> &mdash;
+  Status: {{ scene.get_status_display }} &mdash;
+  {{ scene.created_at|date:"Y-m-d" }}
+  {% if scene.ended_at %}&mdash; Closed {{ scene.ended_at|date:"Y-m-d" }}{% endif %}
+</div>
+
+{% if scene.description %}
+<blockquote class="blockquote mb-4">
+  <p>{{ scene.description|linebreaksbr }}</p>
+</blockquote>
+{% endif %}
+
+{% if participants %}
+<details class="mb-3">
+  <summary><strong>Participants ({{ participants|length }})</strong></summary>
+  <ul class="list-inline mt-2">
+    {% for p in participants %}
+    <li class="list-inline-item">
+      {{ p.character_name }}
+      <span class="text-muted small">({{ p.pose_count }} poses{% if not p.is_active %}, left{% endif %})</span>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+{% if log_entries %}
+<div role="region" aria-label="Scene log" tabindex="0">
+{% for entry in log_entries %}
+<div class="card mb-2 log-entry log-type-{{ entry.log_type }}">
+  <div class="card-header d-flex justify-content-between align-items-center py-1">
+    <span class="small">
+      <span class="badge bg-secondary">{{ entry.get_log_type_display }}</span>
+      <strong>{{ entry.author_name }}</strong>
+      <span class="text-muted ms-1">{{ entry.created_at|date:"H:i" }}</span>
+    </span>
+    <span>
+      {% if character_id == entry.author_id or is_staff %}
+      <a href="{% url 'evennia_scenes:log-edit' scene.pk entry.pk %}" class="btn btn-xs btn-outline-secondary">Edit</a>
+      {% endif %}
+      <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}" class="btn btn-xs btn-outline-secondary">History</a>
+    </span>
+  </div>
+  <div class="card-body py-2">
+    {{ entry.content|linebreaksbr }}
+  </div>
+</div>
+{% endfor %}
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav aria-label="Log pagination">
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo; Previous</a>
+    </li>
+    {% endif %}
+    <li class="page-item disabled">
+      <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </li>
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next &raquo;</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<p class="text-muted">No log entries found for this scene.</p>
+{% endif %}
+
+<div class="mt-4">
+  <a href="{% url 'evennia_scenes:scene-list' %}">&larr; Back to Scene Archive</a>
+</div>
+{% endblock %}
