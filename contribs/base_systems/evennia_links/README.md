@@ -6,10 +6,10 @@ Abstract base models and helpers for cross-system bridge ("link") models in
 [Evennia](https://www.evennia.com/) games.
 
 This package is the **shared hub** that domain contribs depend on. It ships
-no tables of its own — only abstract Django models and a small registration
-helper. The concrete bridge models that connect your game's domain apps
-together live in your own game code (or in downstream domain contribs like
-`evennia-scenes`, `evennia-plots`, etc.).
+no tables of its own — only abstract Django models, small runtime helpers, and
+a shared version-tracked text-editing mixin. The concrete bridge models that
+connect your game's domain apps together live in your own game code (or in
+downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 
 ---
 
@@ -21,6 +21,7 @@ together live in your own game code (or in downstream domain contribs like
 | `AbstractAuthoredLink` | `links.py` | Adds `created_by` / `created_by_name` audit block |
 | `AbstractVersion` | `versioning.py` | Append-only version history for any text field |
 | `AbstractArchived` + `ArchivedManager` | `archiving.py` | Soft-archive with default-manager filtering |
+| `EditingMixin` | `editing.py` | EvEditor + difflib mixin for version-tracked text editing; pairs with `AbstractVersion` |
 | `connect_on_ready` | `listeners.py` | Import-order-safe signal-registration helper |
 | `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
 
@@ -40,7 +41,7 @@ Add to `INSTALLED_APPS` in your `server/conf/settings.py`:
 INSTALLED_APPS += ["evennia_links"]
 ```
 
-No migrations to run — this contrib ships only abstract models.
+No migrations to run — this contrib ships only abstract models and a command mixin.
 
 ---
 
@@ -139,6 +140,46 @@ Scene.all_objects.all()       # secondary manager, same result
 scene.archive(editor=character)
 scene.unarchive()
 ```
+
+### EditingMixin
+
+Mix into `MuxCommand` subclasses to add EvEditor-based version-tracked editing
+of any model text field. The version model class is supplied at call-time, so
+`EditingMixin` works with any `AbstractVersion` subclass.
+
+```python
+from evennia_links import AbstractVersion, EditingMixin
+from evennia.commands.default.muxcommand import MuxCommand
+
+class PostVersion(AbstractVersion):
+    parent = models.ForeignKey("boards.Post", on_delete=models.CASCADE,
+                               related_name="versions")
+    class Meta(AbstractVersion.Meta):
+        unique_together = [("parent", "version_number")]
+
+class CmdPost(EditingMixin, MuxCommand):
+    key = "+post"
+
+    def func(self):
+        sw = self.switches
+        post = ...  # fetch the post
+        version_cls = PostVersion
+
+        if "edit" in sw:
+            self.start_edit(post, field_name="content", version_model_class=version_cls)
+        elif "history" in sw:
+            self.view_versions(post, version_cls)
+        elif "rollback" in sw:
+            self.do_rollback(post, version_cls, version_number=int(self.args))
+        elif "diff" in sw:
+            self.view_diff(post, version_cls, version_number=int(self.args))
+        elif "new" in sw:
+            self.start_new_edit(callback=my_create_callback)
+```
+
+`EditingMixin` is imported lazily — bringing in `evennia_links` does **not**
+import `EvEditor` until `EditingMixin` is first accessed, so model-only consumers
+pay no extra import cost.
 
 ### connect_on_ready
 

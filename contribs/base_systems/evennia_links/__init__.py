@@ -11,6 +11,7 @@ Public API:
     AbstractArchived        — soft-archive mixin with default manager
     ArchivedManager         — manager that filters out archived records
     ArchivedQuerySet        — queryset with include_archived() helper
+    EditingMixin            — EvEditor + difflib mixin for version-tracked text editing (pairs with AbstractVersion)
     connect_on_ready            — import-order-safe signal-registration helper
     connect_soft_ref_cleanup    — cascade compensation for integer soft-reference fields
 
@@ -29,7 +30,7 @@ by which point the registry is ready.
 from .listeners import connect_on_ready
 from .softref import connect_soft_ref_cleanup
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # name -> submodule that defines it. Imported on first access via __getattr__.
 _LAZY = {
@@ -39,6 +40,7 @@ _LAZY = {
     "AbstractArchived": "archiving",
     "ArchivedManager": "archiving",
     "ArchivedQuerySet": "archiving",
+    "EditingMixin": "editing",
 }
 
 __all__ = [
@@ -48,6 +50,7 @@ __all__ = [
     "AbstractVersion",
     "ArchivedManager",
     "ArchivedQuerySet",
+    "EditingMixin",
     "connect_on_ready",
     "connect_soft_ref_cleanup",
 ]

@@ -1,5 +1,16 @@
 # Changelog — evennia-links
 
+## 0.3.0 — shared editing framework
+
+- `EditingMixin`: EvEditor + difflib mixin for version-tracked text editing of model
+  text fields. Mix into `MuxCommand` subclasses that need `/edit`, `/history`,
+  `/rollback`, and `/diff` switches. Pairs with `AbstractVersion` — the version model
+  class is passed at call-time, so the mixin is not coupled to any particular domain.
+  Hoisted from `evennia-lore` (where it shipped as a local copy flagged for future
+  extraction). `evennia-lore>=0.1.1` now imports it from here.
+- Lazy export: importing `evennia_links` does not import `EvEditor` until `EditingMixin`
+  is first accessed — model-only consumers pay no extra import cost.
+
 ## 0.2.0 — soft-ref cleanup helper
 
 - `connect_soft_ref_cleanup(target_model, bridge_model, field_name)`: registers

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-links"
-version = "0.2.0"
-description = "Abstract base models and helpers for cross-system bridge models in Evennia games."
+version = "0.3.0"
+description = "Abstract base models, helpers, and a shared version-tracked text-editing mixin for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]

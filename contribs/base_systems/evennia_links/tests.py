@@ -297,3 +297,422 @@ class TestConnectOnReady(EvenniaTest):
         connect_on_ready(sig, receiver)  # ignored — same receiver
         sig.send(sender=None)
         self.assertEqual(len(calls), 1)
+
+
+# ---------------------------------------------------------------------------
+# EditingMixin
+# ---------------------------------------------------------------------------
+
+
+def _make_caller(editing_context=None):
+    """Return a mock caller with ndb._editing_context set."""
+    from unittest.mock import MagicMock
+
+    caller = MagicMock()
+    caller.ndb._editing_context = editing_context
+    return caller
+
+
+def _make_instance(content="Original", pk=1):
+    """Return a mock model instance."""
+    from unittest.mock import MagicMock
+
+    inst = MagicMock()
+    inst.pk = pk
+    inst.content = content
+    return inst
+
+
+def _make_model_class(instance=None):
+    """Return a mock model class whose objects.get() returns instance."""
+    from unittest.mock import MagicMock
+
+    cls = MagicMock()
+    cls.DoesNotExist = Exception
+    if instance is not None:
+        cls.objects.get.return_value = instance
+    return cls
+
+
+class TestEditingCallbacks(EvenniaTest):
+    """Tests for the module-level EvEditor callback functions."""
+
+    def test_load_func_returns_field_content(self):
+        from evennia_links.editing import _load_func
+
+        instance = _make_instance(content="Hello world")
+        model_cls = _make_model_class(instance)
+        caller = _make_caller(
+            editing_context={"model_class": model_cls, "instance_pk": 1, "field_name": "content"}
+        )
+        self.assertEqual(_load_func(caller), "Hello world")
+        model_cls.objects.get.assert_called_once_with(pk=1)
+
+    def test_load_func_empty_when_no_context(self):
+        from evennia_links.editing import _load_func
+
+        caller = _make_caller(editing_context=None)
+        self.assertEqual(_load_func(caller), "")
+
+    def test_load_func_empty_when_object_deleted(self):
+        from evennia_links.editing import _load_func
+
+        model_cls = _make_model_class()
+        model_cls.objects.get.side_effect = Exception("gone")
+        caller = _make_caller(
+            editing_context={"model_class": model_cls, "instance_pk": 1, "field_name": "content"}
+        )
+        self.assertEqual(_load_func(caller), "")
+        caller.msg.assert_called()
+
+    def test_save_func_snapshots_old_content_before_saving(self):
+        from evennia_links.editing import _save_func
+
+        instance = _make_instance(content="Old text")
+        model_cls = _make_model_class(instance)
+        version_cls = self._mock_version_cls()
+        caller = _make_caller(
+            editing_context={
+                "model_class": model_cls,
+                "instance_pk": 1,
+                "field_name": "content",
+                "version_model_class": version_cls,
+            }
+        )
+        result = _save_func(caller, "New text")
+        self.assertTrue(result)
+        version_cls.create_version.assert_called_once_with(
+            parent=instance, content="Old text", editor=caller
+        )
+        self.assertEqual(instance.content, "New text")
+        instance.save.assert_called_once_with(update_fields=["content"])
+
+    def test_save_func_noop_when_unchanged(self):
+        from evennia_links.editing import _save_func
+
+        instance = _make_instance(content="Same text")
+        model_cls = _make_model_class(instance)
+        version_cls = self._mock_version_cls()
+        caller = _make_caller(
+            editing_context={
+                "model_class": model_cls,
+                "instance_pk": 1,
+                "field_name": "content",
+                "version_model_class": version_cls,
+            }
+        )
+        result = _save_func(caller, "Same text")
+        self.assertTrue(result)
+        version_cls.create_version.assert_not_called()
+        instance.save.assert_not_called()
+
+    def test_save_func_skips_version_when_no_version_class(self):
+        from evennia_links.editing import _save_func
+
+        instance = _make_instance(content="Old")
+        model_cls = _make_model_class(instance)
+        caller = _make_caller(
+            editing_context={
+                "model_class": model_cls,
+                "instance_pk": 1,
+                "field_name": "content",
+                "version_model_class": None,
+            }
+        )
+        result = _save_func(caller, "New")
+        self.assertTrue(result)
+        instance.save.assert_called_once()
+
+    def test_save_func_false_when_no_context(self):
+        from evennia_links.editing import _save_func
+
+        caller = _make_caller(editing_context=None)
+        self.assertFalse(_save_func(caller, "text"))
+        caller.msg.assert_called()
+
+    def test_quit_func_clears_context(self):
+        from evennia_links.editing import _quit_func
+
+        caller = _make_caller(editing_context={"some": "data"})
+        _quit_func(caller)
+        self.assertIsNone(caller.ndb._editing_context)
+        caller.msg.assert_called_with("Editor closed.")
+
+    def test_new_save_func_calls_callback(self):
+        from unittest.mock import MagicMock
+
+        from evennia_links.editing import _new_save_func
+
+        callback = MagicMock()
+        caller = _make_caller(editing_context={"create_callback": callback})
+        result = _new_save_func(caller, "Some content")
+        self.assertTrue(result)
+        callback.assert_called_once_with(caller, "Some content")
+
+    def test_new_save_func_rejects_empty_buffer(self):
+        from unittest.mock import MagicMock
+
+        from evennia_links.editing import _new_save_func
+
+        callback = MagicMock()
+        caller = _make_caller(editing_context={"create_callback": callback})
+        result = _new_save_func(caller, "   ")
+        self.assertFalse(result)
+        callback.assert_not_called()
+
+    def test_new_save_func_false_when_no_context(self):
+        from evennia_links.editing import _new_save_func
+
+        caller = _make_caller(editing_context=None)
+        self.assertFalse(_new_save_func(caller, "text"))
+
+    def _mock_version_cls(self):
+        from unittest.mock import MagicMock
+
+        cls = MagicMock()
+        cls.DoesNotExist = Exception
+        return cls
+
+
+class TestEditingMixinStartEdit(EvenniaTest):
+    """Tests for EditingMixin.start_edit."""
+
+    def _make_mixin(self, caller):
+        from evennia_links.editing import EditingMixin
+
+        m = EditingMixin()
+        m.caller = caller
+        return m
+
+    def test_sets_context_and_launches_editor(self):
+        from unittest.mock import patch
+
+        instance = _make_instance(pk=7)
+        caller = _make_caller(editing_context=None)
+
+        with patch("evennia_links.editing.EvEditor") as mock_ev:
+            mixin = self._make_mixin(caller)
+            mixin.start_edit(instance, "content")
+            mock_ev.assert_called_once()
+            ctx = caller.ndb._editing_context
+            self.assertEqual(ctx["instance_pk"], 7)
+            self.assertEqual(ctx["field_name"], "content")
+
+    def test_editor_key_is_text_editor(self):
+        from unittest.mock import patch
+
+        instance = _make_instance()
+        caller = _make_caller(editing_context=None)
+
+        with patch("evennia_links.editing.EvEditor") as mock_ev:
+            self._make_mixin(caller).start_edit(instance, "content")
+            self.assertEqual(mock_ev.call_args[1]["key"], "text_editor")
+            self.assertFalse(mock_ev.call_args[1]["persistent"])
+
+    def test_blocks_double_session(self):
+        from unittest.mock import patch
+
+        caller = _make_caller(editing_context={"already": "open"})
+
+        with patch("evennia_links.editing.EvEditor") as mock_ev:
+            self._make_mixin(caller).start_edit(_make_instance(), "content")
+            mock_ev.assert_not_called()
+            caller.msg.assert_called()
+            self.assertIn("already", caller.msg.call_args[0][0].lower())
+
+
+class TestEditingMixinStartNewEdit(EvenniaTest):
+    """Tests for EditingMixin.start_new_edit."""
+
+    def _make_mixin(self, caller):
+        from unittest.mock import MagicMock
+
+        from evennia_links.editing import EditingMixin
+
+        m = EditingMixin()
+        m.caller = caller
+        return m
+
+    def test_sets_callback_and_launches_editor(self):
+        from unittest.mock import MagicMock, patch
+
+        callback = MagicMock()
+        caller = _make_caller(editing_context=None)
+
+        with patch("evennia_links.editing.EvEditor") as mock_ev:
+            self._make_mixin(caller).start_new_edit(callback)
+            mock_ev.assert_called_once()
+            self.assertEqual(caller.ndb._editing_context["create_callback"], callback)
+
+    def test_blocks_double_session(self):
+        from unittest.mock import MagicMock, patch
+
+        caller = _make_caller(editing_context={"already": "open"})
+
+        with patch("evennia_links.editing.EvEditor") as mock_ev:
+            self._make_mixin(caller).start_new_edit(MagicMock())
+            mock_ev.assert_not_called()
+
+
+class TestEditingMixinViewVersions(ProbeTablesTest):
+    """Tests for EditingMixin.view_versions using the DocVersionProbe."""
+
+    def _mixin(self, caller):
+        from evennia_links.editing import EditingMixin
+
+        m = EditingMixin()
+        m.caller = caller
+        return m
+
+    def test_shows_history_for_staff(self):
+        DocVersionProbe.create_version(self.char1, "v1 content", editor=self.char2)
+        DocVersionProbe.create_version(self.char1, "v2 content", editor=self.char2)
+
+        caller = _make_caller()
+        caller.locks.check_lockstring.return_value = True  # staff
+        self._mixin(caller).view_versions(self.char1, DocVersionProbe)
+        caller.msg.assert_called()
+        output = caller.msg.call_args[0][0]
+        self.assertIn("v1", output)
+        self.assertIn("v2", output)
+
+    def test_non_staff_sees_only_own_versions(self):
+        from unittest.mock import MagicMock, patch
+
+        # char2 authored one version; char1 authored another
+        DocVersionProbe.create_version(self.char1, "by char2", editor=self.char2)
+        DocVersionProbe.create_version(self.char1, "by char1", editor=self.char1)
+
+        # Use a real ObjectDB character as caller so the editor FK filter works against the DB.
+        caller = self.char2
+        caller.msg = MagicMock()
+        with patch.object(caller.locks, "check_lockstring", return_value=False):
+            self._mixin(caller).view_versions(self.char1, DocVersionProbe, page=1)
+        caller.msg.assert_called()
+
+    def test_no_history_message(self):
+        caller = _make_caller()
+        caller.locks.check_lockstring.return_value = True
+        self._mixin(caller).view_versions(self.char1, DocVersionProbe)
+        caller.msg.assert_called_with("No version history found.")
+
+
+class TestEditingMixinDoRollback(EvenniaTest):
+    """Tests for EditingMixin.do_rollback (mock-based to avoid ObjectDB field saves)."""
+
+    def _mixin(self, caller):
+        from evennia_links.editing import EditingMixin
+
+        m = EditingMixin()
+        m.caller = caller
+        return m
+
+    def test_snapshot_before_rollback(self):
+        from unittest.mock import MagicMock
+
+        version_cls = MagicMock()
+        version_cls.DoesNotExist = Exception
+        rollback_ver = MagicMock()
+        rollback_ver.version_number = 3
+        rollback_ver.content = "restored"
+        version_cls.rollback_to.return_value = rollback_ver
+
+        instance = _make_instance(content="current")
+        caller = _make_caller()
+
+        self._mixin(caller).do_rollback(instance, version_cls, version_number=1)
+
+        version_cls.create_version.assert_called_once_with(
+            parent=instance, content="current", editor=caller
+        )
+        version_cls.rollback_to.assert_called_once_with(
+            parent=instance, version_number=1, editor=caller
+        )
+        self.assertEqual(instance.content, "restored")
+        caller.msg.assert_called()
+
+    def test_missing_version_reports_error(self):
+        from unittest.mock import MagicMock
+
+        version_cls = MagicMock()
+        version_cls.DoesNotExist = Exception
+        version_cls.rollback_to.side_effect = Exception("not found")
+
+        instance = _make_instance()
+        caller = _make_caller()
+        self._mixin(caller).do_rollback(instance, version_cls, version_number=99)
+        caller.msg.assert_called()
+        self.assertIn("99", caller.msg.call_args[0][0])
+
+
+class TestEditingMixinViewDiff(EvenniaTest):
+    """Tests for EditingMixin.view_diff (mock-based)."""
+
+    def _mixin(self, caller):
+        from evennia_links.editing import EditingMixin
+
+        m = EditingMixin()
+        m.caller = caller
+        return m
+
+    def test_shows_diff(self):
+        from unittest.mock import MagicMock
+
+        version = MagicMock()
+        version.content = "old line\n"
+        version.editor_name = "Author"
+        version.is_rollback = False
+        from django.utils import timezone
+
+        version.created_at = timezone.now()
+        version.rolled_back_from = None
+
+        version_cls = MagicMock()
+        version_cls.DoesNotExist = Exception
+        version_cls.objects.get.return_value = version
+
+        instance = _make_instance(content="new line\n")
+        caller = _make_caller()
+
+        self._mixin(caller).view_diff(instance, version_cls, version_number=1)
+        caller.msg.assert_called()
+        output = caller.msg.call_args[0][0]
+        self.assertIn("old line", output)
+
+    def test_missing_version_reports_error(self):
+        from unittest.mock import MagicMock
+
+        version_cls = MagicMock()
+        version_cls.DoesNotExist = Exception
+        version_cls.objects.get.side_effect = Exception("not found")
+
+        instance = _make_instance()
+        caller = _make_caller()
+        self._mixin(caller).view_diff(instance, version_cls, version_number=5)
+        caller.msg.assert_called()
+        self.assertIn("5", caller.msg.call_args[0][0])
+
+
+class TestEditingMixinLazyImport(EvenniaTest):
+    """Verify that importing evennia_links does not eagerly import EvEditor."""
+
+    def test_editing_module_not_loaded_by_default(self):
+        import sys
+
+        # Remove the editing submodule to simulate a state where it has not yet been accessed.
+        # Other tests in the same run may have already triggered the lazy load, so we reset first.
+        sys.modules.pop("evennia_links.editing", None)
+
+        import evennia_links
+
+        # editing submodule must NOT be in sys.modules until EditingMixin is accessed
+        self.assertNotIn("evennia_links.editing", sys.modules)
+
+    def test_editing_module_loaded_after_access(self):
+        import sys
+
+        sys.modules.pop("evennia_links.editing", None)
+
+        from evennia_links import EditingMixin
+
+        self.assertIn("evennia_links.editing", sys.modules)
