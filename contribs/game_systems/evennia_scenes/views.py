@@ -84,7 +84,10 @@ class SceneDetailView(DetailView):
     context_object_name = "scene"
 
     def get_object(self, queryset=None):
-        scene = get_object_or_404(Scene.all_objects, pk=self.kwargs["pk"])
+        # CLOSED-only + non-archived (Scene.objects excludes archived): an
+        # in-progress or soft-archived scene must not be reachable by URL.
+        # _can_view_scene then applies the privacy tier (VIEW_PRIVATE → invited/staff).
+        scene = get_object_or_404(Scene.objects, pk=self.kwargs["pk"], status=Scene.Status.CLOSED)
         if not _can_view_scene(scene, self.request):
             raise PermissionDenied("This scene is private.")
         return scene
@@ -94,12 +97,20 @@ class SceneDetailView(DetailView):
         scene = self.object
         context["page_title"] = scene.title or f"Scene #{scene.pk}"
 
-        qs = scene.log_entries.filter(is_deleted=False).order_by("order", "created_at")
+        # Both in-room OOC and web-viewer OOC are excluded by default so the
+        # public log reads as IC; ?include_ooc=1 surfaces them.
+        qs = scene.log_entries.filter(is_deleted=False)
+        include_ooc = bool(self.request.GET.get("include_ooc"))
+        if not include_ooc:
+            qs = qs.exclude(log_type__in=[LogEntry.LogType.OOC, LogEntry.LogType.WEB_OOC])
+        qs = qs.order_by("order", "created_at")
+
         paginator = Paginator(qs, ENTRIES_PER_PAGE)
         page_number = self.request.GET.get("page", 1)
         page_obj = paginator.get_page(page_number)
         context["page_obj"] = page_obj
         context["log_entries"] = page_obj.object_list
+        context["include_ooc"] = include_ooc
         context["participants"] = scene.participants.all()
         context["is_staff"] = is_staff_user(self.request)
         context["character_id"] = get_character_id(self.request.user)
@@ -213,19 +224,38 @@ class LogEntryDiffView(TemplateView):
         entry = self._entry
         version = self._version
 
+        # Colorblind-safe diff: each line carries a +/- text prefix (from
+        # unified_diff) AND a CSS class, so meaning never relies on color alone.
         old_lines = version.content.splitlines(keepends=True)
         new_lines = entry.content.splitlines(keepends=True)
-        diff_html = difflib.HtmlDiff().make_table(
-            old_lines,
-            new_lines,
-            fromdesc=f"v{version.version_number}",
-            todesc="current",
-            context=True,
-            numlines=3,
+        raw_diff = list(
+            difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=f"v{version.version_number}",
+                tofile="current",
+                lineterm="",
+            )
         )
+
+        diff_lines = []
+        for line in raw_diff:
+            if line.startswith(("+++", "---")):
+                css = "diff-meta"
+            elif line.startswith("@@"):
+                css = "diff-hunk"
+            elif line.startswith("+"):
+                css = "diff-add"
+            elif line.startswith("-"):
+                css = "diff-remove"
+            else:
+                css = "diff-context"
+            diff_lines.append((css, line))
+
         context["entry"] = entry
         context["scene"] = entry.scene
         context["version"] = version
-        context["diff_html"] = diff_html
+        context["diff_lines"] = diff_lines
+        context["no_diff"] = not raw_diff
         context["page_title"] = f"Diff — Log Entry #{entry.pk} vs v{version.version_number}"
         return context

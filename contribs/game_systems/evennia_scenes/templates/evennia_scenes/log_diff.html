@@ -22,17 +22,21 @@
   against the <strong>current</strong> version.
 </div>
 
-<div class="table-responsive">
-  <style>
-    .diff_header { background-color: #f0f0f0; }
-    .diff_next { background-color: #f0f0f0; }
-    .diff_add { background-color: #d4edda; }
-    .diff_chg { background-color: #fff3cd; }
-    .diff_sub { background-color: #f8d7da; }
-    table.diff { font-size: 0.85rem; font-family: monospace; width: 100%; }
-  </style>
-  {{ diff_html|safe }}
-</div>
+{% if no_diff %}
+<p class="text-muted">This version is identical to the current content.</p>
+{% else %}
+{# Colorblind-safe: every line carries a +/- (or space) text prefix as well as a #}
+{# color class, so additions/removals are distinguishable without relying on color. #}
+<style>
+  pre.scene-diff { font-family: monospace; font-size: 0.85rem; line-height: 1.4; }
+  pre.scene-diff .diff-add { background-color: #d4edda; color: #155724; }
+  pre.scene-diff .diff-remove { background-color: #f8d7da; color: #721c24; }
+  pre.scene-diff .diff-hunk { background-color: #e2e3e5; color: #383d41; }
+  pre.scene-diff .diff-meta { color: #6c757d; }
+</style>
+<pre class="scene-diff" role="region" aria-label="Unified diff" tabindex="0">{% for css, line in diff_lines %}<span class="{{ css }}">{{ line }}</span>
+{% endfor %}</pre>
+{% endif %}
 
 <div class="mt-4 d-flex gap-2">
   <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">&larr; Back to History</a>

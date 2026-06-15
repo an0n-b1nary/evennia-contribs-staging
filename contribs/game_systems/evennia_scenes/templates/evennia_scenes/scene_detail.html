@@ -28,6 +28,14 @@
 </blockquote>
 {% endif %}
 
+<div class="mb-3">
+  {% if include_ooc %}
+  <a href="?">Hide OOC</a>
+  {% else %}
+  <a href="?include_ooc=1">Show OOC</a>
+  {% endif %}
+</div>
+
 {% if participants %}
 <details class="mb-3">
   <summary><strong>Participants ({{ participants|length }})</strong></summary>

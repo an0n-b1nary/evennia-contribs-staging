@@ -710,6 +710,151 @@ class TestScenesAuthoringPermissionGate(EvenniaTest):
 
 
 # ---------------------------------------------------------------------------
+# Web read views — render-checks + SceneDetailView parity
+# ---------------------------------------------------------------------------
+
+
+class TestSceneTemplatesLoad(EvenniaTest):
+    """Every shipped template compiles (catches missing files / syntax errors).
+
+    A lazy TemplateResponse masks a missing or malformed template — the view
+    returns fine and only blows up at render time. get_template() loads and
+    compiles each template, surfacing those failures at test time. (A full
+    .render() is not possible in isolation: the templates extend the host's
+    website/base.html and reverse the host-wired evennia_scenes: namespace,
+    neither of which the contrib can supply without coupling to a host — the
+    same reason the boards contrib does not full-render in its tests.)
+    """
+
+    TEMPLATES = (
+        "evennia_scenes/scene_list.html",
+        "evennia_scenes/scene_detail.html",
+        "evennia_scenes/log_edit_form.html",
+        "evennia_scenes/log_history.html",
+        "evennia_scenes/log_diff.html",
+    )
+
+    def test_all_templates_compile(self):
+        from django.template.loader import get_template
+
+        for name in self.TEMPLATES:
+            with self.subTest(template=name):
+                # Raises TemplateDoesNotExist / TemplateSyntaxError on failure.
+                self.assertIsNotNone(get_template(name))
+
+
+class TestSceneDetailViewVisibility(EvenniaTest):
+    """SceneDetailView parity: only CLOSED, non-archived scenes are reachable,
+    OOC is hidden by default, and VIEW_PRIVATE is gated. Assertions read
+    response.context_data so they do not depend on the host base template /
+    URLconf (no .render()).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.scene = _open_scene(self.room1, self.char1)
+        self.scene.status = Scene.Status.CLOSED
+        self.scene.save()
+        self.ic_entry = LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="An IC pose here.", log_type="pose"
+        )
+        self.ooc_entry = LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="Some OOC chatter.", log_type="ooc"
+        )
+
+    def _anon_get(self, path="/"):
+        from django.contrib.auth.models import AnonymousUser
+
+        req = self.factory.get(path)
+        req.user = AnonymousUser()
+        return req
+
+    def test_detail_excludes_ooc_by_default(self):
+        from evennia_scenes.views import SceneDetailView
+
+        resp = SceneDetailView.as_view()(self._anon_get(), pk=self.scene.pk)
+        entries = list(resp.context_data["log_entries"])
+        self.assertIn(self.ic_entry, entries)
+        self.assertNotIn(self.ooc_entry, entries)
+        self.assertFalse(resp.context_data["include_ooc"])
+
+    def test_detail_includes_ooc_with_param(self):
+        from evennia_scenes.views import SceneDetailView
+
+        resp = SceneDetailView.as_view()(self._anon_get("/?include_ooc=1"), pk=self.scene.pk)
+        entries = list(resp.context_data["log_entries"])
+        self.assertIn(self.ooc_entry, entries)
+        self.assertTrue(resp.context_data["include_ooc"])
+
+    def test_detail_open_scene_not_reachable(self):
+        from django.http import Http404
+
+        from evennia_scenes.views import SceneDetailView
+
+        open_scene = _open_scene(self.room2, self.char1)  # status OPEN
+        with self.assertRaises(Http404):
+            SceneDetailView.as_view()(self._anon_get(), pk=open_scene.pk)
+
+    def test_detail_archived_scene_not_reachable(self):
+        from django.http import Http404
+
+        from evennia_scenes.views import SceneDetailView
+
+        self.scene.is_archived = True
+        self.scene.save()
+        with self.assertRaises(Http404):
+            SceneDetailView.as_view()(self._anon_get(), pk=self.scene.pk)
+
+    def test_detail_view_private_blocked_for_anon(self):
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_scenes.views import SceneDetailView
+
+        self.scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        self.scene.save()
+        with self.assertRaises(PermissionDenied):
+            SceneDetailView.as_view()(self._anon_get(), pk=self.scene.pk)
+
+
+class TestLogEntryDiffViewColorblindSafe(EvenniaTest):
+    """The diff view must carry +/- text prefixes + CSS classes (not color alone)."""
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.scene = _open_scene(self.room1, self.char1)
+        self.scene.status = Scene.Status.CLOSED
+        self.scene.save()
+        self.entry = LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="Edited pose text."
+        )
+        LogEntryVersion.create_version(
+            parent=self.entry, content="Original pose text.", editor=self.char1
+        )
+
+    def test_diff_lines_have_prefixes_and_classes(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        from evennia_scenes.views import LogEntryDiffView
+
+        req = self.factory.get("/")
+        req.user = AnonymousUser()
+        resp = LogEntryDiffView.as_view()(
+            req, pk=self.scene.pk, entry_id=self.entry.pk, version_number=1
+        )
+        diff_lines = resp.context_data["diff_lines"]
+        classes = {css for css, _line in diff_lines}
+        self.assertIn("diff-add", classes)
+        self.assertIn("diff-remove", classes)
+        # Each add/remove line also carries a literal +/- text prefix.
+        adds = [line for css, line in diff_lines if css == "diff-add"]
+        removes = [line for css, line in diff_lines if css == "diff-remove"]
+        self.assertTrue(all(line.startswith("+") for line in adds))
+        self.assertTrue(all(line.startswith("-") for line in removes))
+
+
+# ---------------------------------------------------------------------------
 # __init__.py lazy exports
 # ---------------------------------------------------------------------------
 
