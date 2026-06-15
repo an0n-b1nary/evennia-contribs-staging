@@ -579,16 +579,24 @@ class TestEditingMixinViewVersions(ProbeTablesTest):
     def test_non_staff_sees_only_own_versions(self):
         from unittest.mock import MagicMock, patch
 
-        # char2 authored one version; char1 authored another
+        # Parent is char1. v1 is authored by char2; v2 is authored by char1.
         DocVersionProbe.create_version(self.char1, "by char2", editor=self.char2)
         DocVersionProbe.create_version(self.char1, "by char1", editor=self.char1)
 
-        # Use a real ObjectDB character as caller so the editor FK filter works against the DB.
+        # Use a real ObjectDB character as caller so the editor FK filter runs against the DB.
+        # char2 is non-staff, so view_versions should restrict to versions char2 authored (v1).
         caller = self.char2
         caller.msg = MagicMock()
         with patch.object(caller.locks, "check_lockstring", return_value=False):
             self._mixin(caller).view_versions(self.char1, DocVersionProbe, page=1)
+
         caller.msg.assert_called()
+        output = caller.msg.call_args[0][0]
+        # The editor FK filter must hide char1's version (v2) from non-staff char2.
+        # Assert on version tokens, not editor_name — EvenniaTest's "Char"/"Char2" keys
+        # are substrings of each other and would give a false pass.
+        self.assertIn("v1", output)
+        self.assertNotIn("v2", output)
 
     def test_no_history_message(self):
         caller = _make_caller()
