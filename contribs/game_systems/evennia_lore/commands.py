@@ -19,7 +19,7 @@ Settings:
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
-from evennia_lore.editing import EditingMixin
+from evennia_links import EditingMixin
 from evennia_lore.models import (
     LoreAcquisition,
     LoreEntry,

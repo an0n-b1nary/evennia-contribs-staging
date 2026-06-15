@@ -1,5 +1,14 @@
 # Changelog — evennia-lore
 
+## 0.1.1 — consume EditingMixin from evennia-links
+
+- `EditingMixin` removed from `evennia_lore/editing.py` (file deleted). The mixin
+  is now imported from `evennia-links>=0.3`. No behaviour change; the mixin API is
+  identical.
+- **Upgrade path:** if you imported `EditingMixin` from `evennia_lore.editing`,
+  change to `from evennia_links import EditingMixin`. Add `evennia-links>=0.3` to
+  your `INSTALLED_APPS` entry (it was already a transitive dep of `evennia-lore`).
+
 ## 0.1.0 — initial extraction
 
 - `LoreTag` model: major/minor tags with `is_major` flag for thematic grouping.

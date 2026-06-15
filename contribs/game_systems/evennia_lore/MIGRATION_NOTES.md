@@ -12,7 +12,7 @@ Extracted from a private Evennia game project.
 | `world/lore/admin.py` | `admin.py` | Rewritten; RUF012 noqa added |
 | `world/lore/selection.py` | `selection.py` | Rebased; `_resolve_context()` provider seam added (A4 from source game) |
 | `world/lore/providers.py` | _not shipped_ | source game-specific cross-domain context provider; consumers write their own |
-| `commands/editing.py` | `editing.py` | Copy of the EditingMixin; candidate for future hoisting into `evennia-links` |
+| `commands/editing.py` | _deleted in v0.1.1_ | `EditingMixin` hoisted into `evennia-links>=0.3`; imported from there |
 | `commands/lore.py` | `commands.py` | All 5 commands rebased; `is_staff` from `LORE_STAFF_LOCK`; partner app imports lazy via `_get_model()` helper; `uses_screenreader` optional-import fallback |
 | `world/links/models.py` (LoreAcquisition, PlotLoreLink, LoreSceneLink) | `models.py` | Bundled with their owning contrib; foreign edges are integer soft-refs (A1) |
 | `world/links/models.py` (LoreRegionLink) | `models.py` | New bridge introduced in A2 to replace the `LoreEntry.regions` M2M |
@@ -61,10 +61,10 @@ region_id`. Consumers write their own provider returning the required context di
 `perm(Builder)` in commands and web views. The contrib resolves this from the setting,
 consistent across commands, website views, and the API.
 
-**`EditingMixin` shipped as a local copy.** The mixin is shared with the plots system in
-the source game. It ships here as `evennia_lore/editing.py` to keep the contrib
-self-contained. Candidate for future hoisting into `evennia-links` (once the plots contrib
-ships its own copy, there will be three — the right time for a shared home).
+**`EditingMixin` hoisted into `evennia-links`.** Previously shipped as a local copy in
+`evennia_lore/editing.py`. As of v0.1.1, `commands.py` imports it from `evennia-links>=0.3`
+and the local file has been removed. Consumers who imported from `evennia_lore.editing`
+should update to `from evennia_links import EditingMixin`.
 
 **`cov-*` CSS class names stripped from templates.** Replaced with generic Bootstrap 4
 equivalents (`table-responsive`, `h6`, `mb-3`, etc.).
