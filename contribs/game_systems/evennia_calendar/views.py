@@ -302,9 +302,11 @@ class ClusterDetailView(TemplateView):
             if concrete:
                 seated_event = concrete.event
 
-        rsvp_counts = {}
+        # Materialize so the per-event RSVP count attached below survives into
+        # the template (a queryset would be re-evaluated and lose the attr).
+        member_events = list(member_events)
         for ev in member_events:
-            rsvp_counts[ev.pk] = ev.rsvps.exclude(status=RSVP.Status.RELEASED).count()
+            ev.rsvp_count = ev.rsvps.exclude(status=RSVP.Status.RELEASED).count()
 
         existing_ranked_ids = [p.event_id for p in existing_prefs]
         success = self.request.GET.get("success")
@@ -331,7 +333,6 @@ class ClusterDetailView(TemplateView):
             "existing_prefs": existing_prefs,
             "existing_ranked_ids": existing_ranked_ids,
             "seated_event": seated_event,
-            "rsvp_counts": rsvp_counts,
             "form": form,
             "checked_event_ids": checked_event_ids,
             "success": bool(success),

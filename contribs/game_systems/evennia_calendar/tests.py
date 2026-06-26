@@ -1015,6 +1015,66 @@ class TestEventInviteViewAntiCheating(EvenniaTest):
 
 
 # ---------------------------------------------------------------------------
+# Web: ClusterDetailView attaches a per-event RSVP count
+# ---------------------------------------------------------------------------
+
+
+class TestClusterDetailViewCounts(EvenniaTest):
+    """The cluster page exposes a per-event RSVP count (event.rsvp_count).
+
+    Regression: the count must be attached to each member event, not passed
+    as a dict the template has to index (which needs a non-stdlib filter).
+    """
+
+    def _build_cluster(self):
+        cluster = _make_cluster(self.char1)
+        when = _future(100)
+        ev1 = CalendarEvent.create_event(
+            creator=self.char1,
+            title="Alpha",
+            scheduled_time=when,
+            is_staff_event=True,
+            cluster=cluster,
+        )
+        ev2 = CalendarEvent.create_event(
+            creator=self.char1,
+            title="Beta",
+            scheduled_time=when,
+            is_staff_event=True,
+            cluster=cluster,
+        )
+        RSVP.objects.create(
+            event=ev1,
+            character=self.char1,
+            character_name=self.char1.key,
+            status=RSVP.Status.CONFIRMED,
+        )
+        RSVP.objects.create(
+            event=ev1,
+            character=self.char2,
+            character_name=self.char2.key,
+            status=RSVP.Status.CONFIRMED,
+        )
+        return cluster, ev1, ev2
+
+    def test_per_event_counts_attached(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+
+        from evennia_calendar.views import ClusterDetailView
+
+        cluster, ev1, ev2 = self._build_cluster()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = AnonymousUser()
+        response = ClusterDetailView.as_view()(request, pk=cluster.pk)
+        self.assertEqual(response.status_code, 200)
+        counts = {ev.pk: ev.rsvp_count for ev in response.context_data["member_events"]}
+        self.assertEqual(counts[ev1.pk], 2)
+        self.assertEqual(counts[ev2.pk], 0)
+
+
+# ---------------------------------------------------------------------------
 # Web: Template compile checks (12 templates)
 # ---------------------------------------------------------------------------
 
