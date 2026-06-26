@@ -1,0 +1,61 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Create Tag</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<p class="text-muted">
+  Canonical event tags are a staff-managed list to prevent name drift
+  (e.g. "Arcane" vs "arcane" vs "Magic"). Once created, a tag can be
+  applied to any event via <em>Manage Tags</em> on the event detail page,
+  or via <code>+calendar/tag</code>.
+</p>
+
+{% if existing_tags %}
+<h2 class="h5 mt-4">Existing tags</h2>
+<ul class="list-inline">
+  {% for tag in existing_tags %}
+  <li class="list-inline-item"><span class="badge badge-secondary">{{ tag.name }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  {% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|join:", " }}</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>New tag</legend>
+    {% for field in form %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+      {{ field }}
+      {% if field.errors %}
+      <div class="text-danger" role="alert">{{ field.errors|join:" " }}</div>
+      {% endif %}
+      {% if field.help_text %}
+      <small class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Create Tag</button>
+    <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

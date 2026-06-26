@@ -1,0 +1,74 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    {% if event %}
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Edit</li>
+    {% else %}
+    <li class="breadcrumb-item active" aria-current="page">New Event</li>
+    {% endif %}
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<p class="text-muted">All times are stored in UTC. The event detail page will display the time in your local timezone.</p>
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  Please correct the errors below.
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Event details</legend>
+    {% for field in form %}
+    {% if field.name != "is_staff_event" %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+      {{ field }}
+      {% if field.errors %}
+      <div id="{{ field.id_for_label }}_errors" class="text-danger" role="alert">{{ field.errors|join:" " }}</div>
+      {% else %}
+      <div id="{{ field.id_for_label }}_errors" class="sr-only" aria-hidden="true"></div>
+      {% endif %}
+      {% if field.help_text %}
+      <small id="{{ field.id_for_label }}_help" class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </fieldset>
+
+  {% if is_staff and form.is_staff_event %}
+  <fieldset class="mt-3">
+    <legend>Staff options</legend>
+    <div class="form-group">
+      <label for="{{ form.is_staff_event.id_for_label }}">{{ form.is_staff_event.label }}</label>
+      {{ form.is_staff_event }}
+      {% if form.is_staff_event.errors %}
+      <div class="text-danger" role="alert">{{ form.is_staff_event.errors|join:" " }}</div>
+      {% endif %}
+      {% if form.is_staff_event.help_text %}
+      <small class="form-text text-muted">{{ form.is_staff_event.help_text }}</small>
+      {% endif %}
+    </div>
+  </fieldset>
+  {% endif %}
+
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Save Event</button>
+    <a href="{{ request.META.HTTP_REFERER|default:'/calendar/list/' }}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

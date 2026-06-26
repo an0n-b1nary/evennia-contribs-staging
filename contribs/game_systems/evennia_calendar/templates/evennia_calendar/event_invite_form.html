@@ -1,0 +1,60 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Invite</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if invited_rsvps %}
+<h2 class="h5 mt-3">Currently invited</h2>
+<ul>
+  {% for rsvp in invited_rsvps %}
+  <li>{{ rsvp.character_name }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted">No characters have been invited yet.</p>
+{% endif %}
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  {% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|join:", " }}</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Invite a character</legend>
+    {% for field in form %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+      {{ field }}
+      {% if field.errors %}
+      <div id="{{ field.id_for_label }}_errors" class="text-danger" role="alert">{{ field.errors|join:" " }}</div>
+      {% else %}
+      <div id="{{ field.id_for_label }}_errors" class="sr-only" aria-hidden="true"></div>
+      {% endif %}
+      {% if field.help_text %}
+      <small id="{{ field.id_for_label }}_help" class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Send Invite</button>
+    <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

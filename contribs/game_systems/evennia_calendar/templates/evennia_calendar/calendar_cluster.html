@@ -1,0 +1,167 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ cluster.title }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ cluster.title }}</h1>
+
+{% if success %}
+<div class="alert alert-success" role="status">Your ranked preferences have been saved.</div>
+{% endif %}
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  {% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|join:", " }}</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+
+<p>
+  {% if cluster.is_locked %}
+    <span class="badge badge-warning">Locked &mdash; RSVP open</span>
+  {% else %}
+    <span class="badge badge-secondary">Open (not yet locked)</span>
+  {% endif %}
+  {% if cluster.has_run %}
+    <span class="badge badge-info">Draw complete</span>
+  {% endif %}
+</p>
+
+{% if cluster.description %}
+<p>{{ cluster.description|linebreaks }}</p>
+{% endif %}
+
+<h2>Member Events</h2>
+<div role="region" aria-label="Member events" tabindex="0">
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Event</th>
+      <th scope="col">Date (UTC)</th>
+      <th scope="col">Local Time</th>
+      <th scope="col">Emphasis</th>
+      <th scope="col">Cap</th>
+      <th scope="col">RSVPs</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in member_events %}
+    <tr>
+      <td>{{ event.pk }}</td>
+      <td>
+        <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a>
+        {% if event.is_staff_event %}
+        <span aria-hidden="true" style="color:gold;">&#9733;</span>
+        <span class="sr-only">Staff lottery event</span>
+        {% endif %}
+      </td>
+      <td>{{ event.scheduled_time|date:"Y-m-d H:i" }}</td>
+      <td><span class="local-time" data-utc="{{ event.scheduled_time|date:'c' }}">—</span></td>
+      <td>{{ event.get_emphasis_display }}</td>
+      <td>{{ event.participant_cap|default:"Open" }}</td>
+      <td>{{ rsvp_counts|get_item:event.pk|default:"0" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if existing_crsvp %}
+  <h2>Your RSVP Status</h2>
+  <p>Status: <strong>{{ existing_crsvp.get_status_display }}</strong></p>
+
+  {% if existing_crsvp.status == "seated" and seated_event %}
+  <p>You have been assigned to: <strong><a href="{% url 'evennia_calendar:calendar-event-detail' seated_event.pk %}">{{ seated_event.title }}</a></strong></p>
+  {% elif existing_crsvp.status == "unseated" %}
+  <p>You were not seated in this draw. You have received a priority token for the next run of this cluster.</p>
+  {% elif existing_prefs %}
+  <h3>Your current preferences (in order):</h3>
+  <ol>
+    {% for pref in existing_prefs %}
+    <li>{{ pref.event.title }} (#{{ pref.event.pk }})</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+{% endif %}
+
+{% if cluster.is_locked and not cluster.has_run %}
+<h2>Submit Ranked Preferences</h2>
+{% if character %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Event preferences</legend>
+    <p class="form-text text-muted" style="font-size:0.9rem;">
+      Check the events you want to attend. The order you submit them is treated
+      as rank 1, 2, 3, … For fine-grained ordering use the in-game command:
+      <code>+rsvp/cluster {{ cluster.pk }}=&lt;event_id1&gt;,&lt;event_id2&gt;,...</code>
+    </p>
+
+    {% if form.preferences.errors %}
+    <div id="id_preferences_errors" class="text-danger" role="alert">
+      {% for error in form.preferences.errors %}{{ error }}{% endfor %}
+    </div>
+    {% else %}
+    <div id="id_preferences_errors" class="sr-only" aria-hidden="true"></div>
+    {% endif %}
+
+    {% for event in member_events %}
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="preferences" value="{{ event.pk }}"
+        id="pref_{{ event.pk }}"
+        aria-describedby="id_preferences_errors"
+        {% if event.pk in checked_event_ids %}checked{% endif %}>
+      <label class="form-check-label" for="pref_{{ event.pk }}">
+        {{ event.title }} &mdash; {{ event.scheduled_time|date:"Y-m-d H:i" }} UTC
+        (cap: {{ event.participant_cap|default:"open" }})
+      </label>
+    </div>
+    {% endfor %}
+  </fieldset>
+
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Submit preferences</button>
+  </div>
+</form>
+{% else %}
+<p>Log in with an active character to RSVP.</p>
+{% endif %}
+
+{% elif cluster.has_run %}
+<h2>Draw Results</h2>
+<p>The lottery draw has been completed. Players have been assigned to events above.</p>
+{% else %}
+<p>This cluster has not been locked yet. RSVPs will open once staff lock it.</p>
+{% endif %}
+
+<p style="margin-top:1rem;"><a href="{% url 'evennia_calendar:calendar-list' %}">&larr; Back to calendar</a></p>
+
+<div aria-live="polite" aria-atomic="true" class="sr-only" id="tz-announce"></div>
+
+<script>
+(function () {
+  var updated = false;
+  document.querySelectorAll('.local-time').forEach(function (el) {
+    var utc = el.getAttribute('data-utc');
+    if (utc) {
+      el.textContent = new Date(utc).toLocaleString();
+      updated = true;
+    }
+  });
+  if (updated) {
+    document.getElementById('tz-announce').textContent =
+      'Times now shown in your local timezone.';
+  }
+})();
+</script>
+{% endblock %}

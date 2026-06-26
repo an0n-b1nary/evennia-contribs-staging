@@ -1,0 +1,153 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ event.title }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ event.title }}</h1>
+
+{% if event.is_clustered %}
+<div class="alert alert-info">
+  This event is part of cluster <strong>{{ event.cluster.title }}</strong>.
+  Players must RSVP via <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">the cluster page</a>
+  to submit ranked preferences. Direct RSVP is not available.
+</div>
+{% endif %}
+
+<div role="region" aria-label="Event details" tabindex="0">
+<table class="table table-sm" style="max-width:600px;">
+  <tr>
+    <th scope="row">Date (UTC)</th>
+    <td>{{ event.scheduled_time|date:"Y-m-d H:i" }} UTC</td>
+  </tr>
+  <tr>
+    <th scope="row">Local time</th>
+    <td><span id="local-time">—</span></td>
+  </tr>
+  <tr>
+    <th scope="row">Emphasis</th>
+    <td>{{ event.get_emphasis_display }}</td>
+  </tr>
+  <tr>
+    <th scope="row">Tags</th>
+    <td>
+      {% for tag in event.tags.all %}
+      <a href="{% url 'evennia_calendar:calendar-list' %}?tag={{ tag.name|urlencode }}"
+         class="badge bg-info text-dark text-decoration-none me-1">{{ tag.name }}</a>
+      {% empty %}(none){% endfor %}
+    </td>
+  </tr>
+  <tr>
+    <th scope="row">Capacity</th>
+    <td>
+      {% if event.participant_cap %}
+        {{ event.participant_cap }} max
+        ({{ event.seats_remaining }} remaining)
+      {% else %}
+        Open
+      {% endif %}
+    </td>
+  </tr>
+  <tr>
+    <th scope="row">Type</th>
+    <td>
+      {% if event.is_staff_event %}
+      <span aria-hidden="true" style="color:gold;">&#9733;</span>
+      Staff lottery event
+      {% else %}
+      Player Event
+      {% endif %}
+    </td>
+  </tr>
+  <tr>
+    <th scope="row">Created by</th>
+    <td>{{ event.creator_name|default:"Unknown" }}</td>
+  </tr>
+</table>
+</div>
+
+{% if character_id == event.creator_id or is_staff %}
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="{% url 'evennia_calendar:calendar-event-edit' event.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+  {% if not event.is_staff_event %}
+  <a href="{% url 'evennia_calendar:calendar-event-invite' event.pk %}" class="btn btn-sm btn-outline-secondary">Invite</a>
+  {% endif %}
+  <a href="{% url 'evennia_calendar:calendar-event-tags' event.pk %}" class="btn btn-sm btn-outline-secondary">Tags</a>
+  <a href="{% url 'evennia_calendar:calendar-event-cancel' event.pk %}" class="btn btn-sm btn-outline-danger">Cancel Event</a>
+</div>
+<details class="mb-3">
+  <summary class="text-muted small" style="cursor:pointer;">Advanced: mutual exclusions</summary>
+  <div class="mt-2">
+    <p class="text-muted small mb-2">
+      Mutual exclusions block a character from RSVPing to two events at once.
+    </p>
+    <a href="{% url 'evennia_calendar:calendar-event-exclusions' event.pk %}" class="btn btn-sm btn-outline-secondary">Manage exclusions</a>
+  </div>
+</details>
+{% endif %}
+
+{% if event.description %}
+<h2>Description</h2>
+<p>{{ event.description|linebreaks }}</p>
+{% endif %}
+
+{% if cluster_siblings %}
+<h2>Other events in this cluster</h2>
+<ul>
+  {% for sibling in cluster_siblings %}
+  <li>
+    <a href="{% url 'evennia_calendar:calendar-event-detail' sibling.pk %}">{{ sibling.title }}</a>
+    — {{ sibling.scheduled_time|date:"Y-m-d H:i" }} UTC
+  </li>
+  {% endfor %}
+</ul>
+<p><a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">View cluster and RSVP &rarr;</a></p>
+{% endif %}
+
+<h2>RSVPs</h2>
+{% if rsvps %}
+<div role="region" aria-label="RSVP list" tabindex="0">
+<table class="table table-sm table-striped" style="max-width:500px;">
+  <thead>
+    <tr><th scope="col">Character</th><th scope="col">Status</th></tr>
+  </thead>
+  <tbody>
+    {% for rsvp in rsvps %}
+    <tr>
+      <td>{{ rsvp.character_name }}</td>
+      <td>{{ rsvp.get_status_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">No RSVPs yet.</p>
+{% endif %}
+
+<p style="margin-top:1rem;">
+  <a href="{% url 'evennia_calendar:calendar-list' %}">&larr; Back to calendar</a>
+</p>
+
+<div aria-live="polite" aria-atomic="true" class="sr-only" id="tz-announce"></div>
+
+<script>
+(function () {
+  var el = document.getElementById('local-time');
+  var utc = "{{ event.scheduled_time|date:'c' }}";
+  if (el && utc) {
+    el.textContent = new Date(utc).toLocaleString();
+    document.getElementById('tz-announce').textContent =
+      'Times now shown in your local timezone.';
+  }
+})();
+</script>
+{% endblock %}

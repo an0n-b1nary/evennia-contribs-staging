@@ -1,0 +1,73 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-cluster-detail' cluster.pk %}">{{ cluster.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Manage Events</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if cluster.is_locked %}
+<div class="alert alert-warning" role="alert">
+  This cluster is <strong>locked</strong>. Membership cannot be changed once locked.
+</div>
+{% endif %}
+
+{% if member_events %}
+<h2 class="h5 mt-3">Member events</h2>
+<ul>
+  {% for ev in member_events %}
+  <li>
+    <a href="{% url 'evennia_calendar:calendar-event-detail' ev.pk %}">{{ ev.title }}</a>
+    <span class="text-muted">(ID: {{ ev.pk }} — {{ ev.scheduled_time|date:"Y-m-d H:i" }} UTC)</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted">No member events yet.</p>
+{% endif %}
+
+{% if not cluster.is_locked %}
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  {% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|join:", " }}</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Add or remove an event</legend>
+    <p class="text-muted small">
+      All events in a cluster must share the same <strong>is_staff_event</strong> flag
+      and <strong>scheduled_time</strong> (parallel events).
+    </p>
+    {% for field in form %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.errors %}
+      <div class="text-danger" role="alert">{{ field.errors|join:" " }}</div>
+      {% endif %}
+      {% if field.help_text %}
+      <small class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Update Membership</button>
+    <a href="{% url 'evennia_calendar:calendar-cluster-detail' cluster.pk %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

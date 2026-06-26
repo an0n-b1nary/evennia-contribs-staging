@@ -1,0 +1,40 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Cancel</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<div class="alert alert-warning" role="alert">
+  <strong>Are you sure?</strong> Cancelling an event cannot be undone. All existing RSVPs will remain in the database but the event will be hidden from listings.
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">Event</dt>
+  <dd class="col-sm-9">{{ event.title }}</dd>
+  <dt class="col-sm-3">Scheduled</dt>
+  <dd class="col-sm-9">{{ event.scheduled_time|date:"Y-m-d H:i" }} UTC</dd>
+  {% if event.rsvps.count %}
+  <dt class="col-sm-3">RSVPs</dt>
+  <dd class="col-sm-9">{{ event.rsvps.count }} on record</dd>
+  {% endif %}
+</dl>
+
+<form method="post" action="{% url 'evennia_calendar:calendar-event-cancel' event.pk %}">
+  {% csrf_token %}
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-danger">Yes, cancel this event</button>
+    <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}" class="btn btn-secondary">No, go back</a>
+  </div>
+</form>
+{% endblock %}

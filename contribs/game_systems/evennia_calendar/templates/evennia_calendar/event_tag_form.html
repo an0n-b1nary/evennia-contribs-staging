@@ -1,0 +1,66 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-list' %}">Event Calendar</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Manage Tags</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if current_tags %}
+<h2 class="h5 mt-3">Current tags</h2>
+<ul>
+  {% for tag in current_tags %}
+  <li>{{ tag.name }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted">No tags applied.</p>
+{% endif %}
+
+{% if available_tags %}
+<h2 class="h5 mt-3">Available tags</h2>
+<ul class="list-inline">
+  {% for tag in available_tags %}
+  <li class="list-inline-item"><span class="badge badge-secondary">{{ tag.name }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if form.errors %}
+<div class="alert alert-danger" role="alert">
+  {% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|join:", " }}</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset>
+    <legend>Add or remove a tag</legend>
+    {% for field in form %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.errors %}
+      <div class="text-danger" role="alert">{{ field.errors|join:" " }}</div>
+      {% endif %}
+      {% if field.help_text %}
+      <small class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Update Tags</button>
+    <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

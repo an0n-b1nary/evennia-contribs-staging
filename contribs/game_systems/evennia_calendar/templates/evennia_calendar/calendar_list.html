@@ -1,0 +1,161 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Event Calendar — List{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Event Calendar</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+<h1 class="mb-0">Event Calendar</h1>
+{% if request.user.is_authenticated %}
+<div class="d-flex gap-2">
+  <a href="{% url 'evennia_calendar:calendar-event-create' %}" class="btn btn-sm btn-primary">New Event</a>
+  <a href="{% url 'evennia_calendar:calendar-cluster-create' %}" class="btn btn-sm btn-outline-primary">New Cluster</a>
+  {% if is_staff %}
+  <a href="{% url 'evennia_calendar:calendar-tag-create' %}" class="btn btn-sm btn-outline-secondary">New Tag</a>
+  {% endif %}
+</div>
+{% endif %}
+</div>
+
+<div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap;">
+  <a href="{% url 'evennia_calendar:calendar-month' %}" class="btn btn-sm btn-outline-secondary">Month View</a>
+
+  <form method="get" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-left:auto;" role="search" aria-label="Filter events">
+    <label for="id_emphasis" class="sr-only">Emphasis</label>
+    <select id="id_emphasis" name="emphasis" class="form-control form-control-sm" style="width:auto;">
+      <option value="">Any emphasis</option>
+      {% for val, label in emphasis_choices %}
+      <option value="{{ val }}" {% if filters.emphasis == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="id_tag" class="sr-only">Tag</label>
+    <select id="id_tag" name="tag" class="form-control form-control-sm" style="width:auto;">
+      <option value="">Any tag</option>
+      {% for tag in tags %}
+      <option value="{{ tag.name }}" {% if filters.tag == tag.name %}selected{% endif %}>{{ tag.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.9rem;">
+      <input type="checkbox" name="staff" value="1" {% if filters.staff %}checked{% endif %}> Staff events
+    </label>
+    <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.9rem;">
+      <input type="checkbox" name="clustered" value="1" {% if filters.clustered %}checked{% endif %}> Clusters only
+    </label>
+    <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.9rem;">
+      <input type="checkbox" name="past" value="1" {% if filters.past %}checked{% endif %}> Past events
+    </label>
+    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+  </form>
+</div>
+
+{% if tags %}
+<div class="mb-3" role="navigation" aria-label="Filter by tag">
+  <span class="text-muted small me-2">Filter by tag:</span>
+  {% for tag in tags %}
+  <a href="?tag={{ tag.name|urlencode }}"
+     class="badge bg-info text-dark text-decoration-none me-1">{{ tag.name }}</a>
+  {% endfor %}
+  {% if filters.tag %}
+  <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-sm btn-outline-secondary ms-2 py-0">Clear filter</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if events %}
+<div role="region" aria-label="Event list" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Event</th>
+      <th scope="col">Date (UTC)</th>
+      <th scope="col">Local Time</th>
+      <th scope="col">Emphasis</th>
+      <th scope="col">Tags</th>
+      <th scope="col">Cap</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.pk }}</td>
+      <td>
+        {% if event.is_clustered %}
+        <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}" style="font-size:0.8rem;">[{{ event.cluster.title }}]</a><br>
+        {% endif %}
+        <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a>
+        {% if event.is_staff_event %}
+        <span aria-hidden="true" style="color:gold;">&#9733;</span>
+        <span class="sr-only">Staff lottery event</span>
+        {% endif %}
+      </td>
+      <td>{{ event.scheduled_time|date:"Y-m-d H:i" }}</td>
+      <td>
+        <span class="local-time" data-utc="{{ event.scheduled_time|date:'c' }}" style="font-size:0.85rem; color:#aaa;">—</span>
+      </td>
+      <td>{{ event.get_emphasis_display }}</td>
+      <td>
+        {% for tag in event.tags.all %}
+        <a href="?tag={{ tag.name|urlencode }}"
+           class="badge bg-info text-dark text-decoration-none me-1">{{ tag.name }}</a>
+        {% empty %}—{% endfor %}
+      </td>
+      <td>{{ event.participant_cap|default:"Open" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if is_paginated %}
+<nav aria-label="Page navigation">
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.emphasis %}&emphasis={{ request.GET.emphasis }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">Previous</a>
+    </li>
+    {% endif %}
+    <li class="page-item disabled">
+      <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </li>
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.emphasis %}&emphasis={{ request.GET.emphasis }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">Next</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<p class="text-muted">No events found matching those filters.</p>
+{% endif %}
+
+<div aria-live="polite" aria-atomic="true" class="sr-only" id="tz-announce"></div>
+
+<script>
+(function () {
+  var updated = false;
+  document.querySelectorAll('.local-time').forEach(function (el) {
+    var utc = el.getAttribute('data-utc');
+    if (utc) {
+      el.textContent = new Date(utc).toLocaleString();
+      updated = true;
+    }
+  });
+  if (updated) {
+    document.getElementById('tz-announce').textContent =
+      'Times now shown in your local timezone.';
+  }
+})();
+</script>
+{% endblock %}

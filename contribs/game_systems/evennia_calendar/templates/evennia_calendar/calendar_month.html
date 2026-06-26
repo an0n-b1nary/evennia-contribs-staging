@@ -1,0 +1,78 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Event Calendar</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+<h1 class="mb-0">Event Calendar</h1>
+{% if request.user.is_authenticated %}
+<div class="d-flex gap-2">
+  <a href="{% url 'evennia_calendar:calendar-event-create' %}" class="btn btn-sm btn-primary">New Event</a>
+  <a href="{% url 'evennia_calendar:calendar-cluster-create' %}" class="btn btn-sm btn-outline-primary">New Cluster</a>
+</div>
+{% endif %}
+</div>
+
+<div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+  <a href="?year={{ prev_year }}&month={{ prev_month }}"
+     class="btn btn-sm btn-secondary"
+     aria-label="Previous month">&larr; Prev</a>
+  <strong>{{ month_name }} {{ year }}</strong>
+  <a href="?year={{ next_year }}&month={{ next_month }}"
+     class="btn btn-sm btn-secondary"
+     aria-label="Next month">Next &rarr;</a>
+  <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-sm btn-outline-secondary" style="margin-left:auto;">List View</a>
+</div>
+
+<div role="region" aria-label="Calendar grid for {{ month_name }} {{ year }}" tabindex="0">
+<table class="table table-bordered" style="table-layout:fixed;">
+  <thead class="thead-dark">
+    <tr>
+      <th scope="col" style="width:14.28%;">Mon</th>
+      <th scope="col" style="width:14.28%;">Tue</th>
+      <th scope="col" style="width:14.28%;">Wed</th>
+      <th scope="col" style="width:14.28%;">Thu</th>
+      <th scope="col" style="width:14.28%;">Fri</th>
+      <th scope="col" style="width:14.28%;">Sat</th>
+      <th scope="col" style="width:14.28%;">Sun</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for week in cal_weeks_with_events %}
+    <tr style="height:6rem; vertical-align:top;">
+      {% for day, events in week %}
+      <td {% if day == today %}style="background:#1a2a1a;"{% endif %}>
+        {% if day %}
+        <small>{{ day }}{% if day == today %}<span class="sr-only"> (today)</span>{% endif %}</small>
+        {% for event in events %}
+        <div style="font-size:0.75rem; margin-top:2px;">
+          {% if event.is_clustered %}
+          <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">[{{ event.cluster.title|truncatechars:10 }}]</a>
+          {% endif %}
+          <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title|truncatechars:20 }}</a>
+          {% if event.is_staff_event %}<span aria-hidden="true">&#9733;</span><span class="sr-only">Staff lottery event</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<p style="font-size:0.85rem; color:#888;">
+  All times are UTC. Your browser will show local time on event detail pages.
+  <span aria-hidden="true">&#9733;</span><span class="sr-only">Star symbol</span> = staff lottery event
+  &nbsp;|&nbsp; [Cluster] = part of a grouped event cluster.
+</p>
+{% endblock %}
