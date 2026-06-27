@@ -1,0 +1,52 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-arc-list' %}">Plot Arcs</a></li>
+    {% if arc %}
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-arc-detail' arc.pk %}">Arc #{{ arc.arc_number }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Edit</li>
+    {% else %}
+    <li class="breadcrumb-item active" aria-current="page">New Arc</li>
+    {% endif %}
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% include "website/partials/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="cov-fieldset">
+    <legend class="cov-legend">Arc details</legend>
+    {% include "website/partials/_form_field.html" with field=form.name %}
+    {% include "website/partials/_form_field.html" with field=form.description %}
+    {% include "website/partials/_form_field.html" with field=form.arc_type %}
+  </fieldset>
+  {% if arc %}
+  <details class="cov-fieldset mt-3">
+    <summary class="cov-legend" style="cursor:pointer;">Advanced: XP multipliers</summary>
+    <p class="text-muted small mt-2 mb-3">
+      Override the default XP multiplier for each source on this arc.
+      Type defaults: Story&nbsp;=&nbsp;1.0&times;, Downtime&nbsp;=&nbsp;0.0&times;.
+      Leave a field blank to use the type default.
+    </p>
+    {% include "website/partials/_form_field.html" with field=form.xp_mult_rp_session %}
+    {% include "website/partials/_form_field.html" with field=form.xp_mult_cutscene %}
+    {% include "website/partials/_form_field.html" with field=form.xp_mult_lore %}
+    {% include "website/partials/_form_field.html" with field=form.xp_mult_thread_bonus %}
+  </details>
+  {% url 'evennia_plots:plot-arc-detail' arc.pk as cancel_url %}
+  {% include "website/partials/_form_actions.html" with cancel_url=cancel_url submit_label="Save Changes" %}
+  {% else %}
+  {% url 'evennia_plots:plot-arc-list' as cancel_url %}
+  {% include "website/partials/_form_actions.html" with cancel_url=cancel_url submit_label="Create Arc" %}
+  {% endif %}
+</form>
+{% endblock %}

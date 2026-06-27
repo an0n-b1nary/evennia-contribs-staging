@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-plots"
+version = "0.1.0"
+description = "Narrative plot management (+plot/+arc/+hook) with thread bonuses, arc XP multipliers, and a full web + REST surface for Evennia games."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# Core: 7 domain models + 3 bridge models + PlotBonusCredit + commands + XP
+# gating. evennia-links is HARD because shipped models inherit AbstractVersion
+# and AbstractAuthoredLink, and apps.py uses connect_soft_ref_cleanup +
+# connect_on_ready.
+dependencies = ["evennia>=6.0", "evennia-links>=0.2"]
+
+[project.optional-dependencies]
+# [web] enables website views, DRF API, accessible forms, and all 14 templates.
+web = [
+    "evennia-accessibility>=0.1",
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
+# [xp] enables the thread-bonus collector, arc-bonus collector, and the
+# anti-gaming sweep. The gating module (resolve_xp_multiplier) works without
+# this extra; only the collectors/sweep need evennia-xp.
+xp = ["evennia-xp>=0.1"]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = ["evennia_plots", "evennia_plots.migrations", "evennia_plots.api"]
+
+[tool.setuptools.package-dir]
+"evennia_plots" = "."
+"evennia_plots.migrations" = "migrations"
+"evennia_plots.api" = "api"
+
+[tool.setuptools.package-data]
+evennia_plots = ["templates/evennia_plots/*.html"]

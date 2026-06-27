@@ -1,0 +1,72 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Plot Tags{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Tags</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+<h1 class="mb-0">Plot Tags</h1>
+{% if is_staff %}
+<a href="{% url 'evennia_plots:plot-tag-create' %}" class="btn btn-sm btn-outline-secondary">New Major Tag</a>
+{% endif %}
+</div>
+
+{% if major_tags %}
+<h2>Major Tags <small class="text-muted fs-6">(staff-defined)</small></h2>
+<div class="cov-table-scroll" role="region" aria-label="Major tags" tabindex="0">
+<table class="table table-sm">
+  <thead>
+    <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
+  </thead>
+  <tbody>
+    {% for entry in major_tags %}
+    <tr>
+      <td>
+        <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
+           class="badge bg-primary text-decoration-none fs-6">{{ entry.tag.name }}</a>
+      </td>
+      <td>{{ entry.thread_count }}</td>
+      <td>{{ entry.arc_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if minor_tags %}
+<h2>Minor Tags <small class="text-muted fs-6">(player-created)</small></h2>
+<div class="cov-table-scroll" role="region" aria-label="Minor tags" tabindex="0">
+<table class="table table-sm">
+  <thead>
+    <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
+  </thead>
+  <tbody>
+    {% for entry in minor_tags %}
+    <tr>
+      <td>
+        <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
+           class="badge bg-secondary text-decoration-none">{{ entry.tag.name }}</a>
+      </td>
+      <td>{{ entry.thread_count }}</td>
+      <td>{{ entry.arc_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if not major_tags and not minor_tags %}
+{% include "website/partials/_empty_state.html" with message="No tags yet." %}
+{% endif %}
+
+{% endblock %}

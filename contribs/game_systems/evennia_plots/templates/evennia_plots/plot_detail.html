@@ -1,0 +1,179 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ thread.name }} — Plot Thread{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item active" aria-current="page">#{{ thread.plot_number }} {{ thread.name }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>#{{ thread.plot_number }}: {{ thread.name }}</h1>
+
+<div class="mb-2">
+  {% for tag in thread.tags.all %}
+  <a href="{% url 'evennia_plots:plot-list' %}?tag={{ tag.name|urlencode }}"
+     class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none me-1">
+    {{ tag.name }}
+  </a>
+  {% endfor %}
+</div>
+
+<dl class="row">
+  <dt class="col-sm-2">Status</dt>
+  <dd class="col-sm-10">{{ thread.get_status_display }}</dd>
+  <dt class="col-sm-2">Privacy</dt>
+  <dd class="col-sm-10">{{ thread.get_privacy_display }}</dd>
+  <dt class="col-sm-2">Creator</dt>
+  <dd class="col-sm-10">{{ thread.creator_name }}</dd>
+  {% if thread.arc %}
+  <dt class="col-sm-2">Arc</dt>
+  <dd class="col-sm-10">
+    <a href="{% url 'evennia_plots:plot-arc-detail' thread.arc.pk %}">{{ thread.arc.name }}</a>
+    <span class="badge {% if thread.arc.arc_type == 'downtime' %}bg-warning text-dark{% else %}bg-secondary{% endif %} ms-1">{{ thread.arc.get_arc_type_display }}</span>
+    {% if thread.arc.pauses_xp and thread.arc.is_current %}<span class="badge bg-danger ms-1">XP Paused</span>{% endif %}
+  </dd>
+  {% endif %}
+  <dt class="col-sm-2">Created</dt>
+  <dd class="col-sm-10">{{ thread.created_at|date:"Y-m-d" }}</dd>
+  {% if thread.concluded_at %}
+  <dt class="col-sm-2">Concluded</dt>
+  <dd class="col-sm-10">{{ thread.concluded_at|date:"Y-m-d" }}</dd>
+  {% endif %}
+</dl>
+
+{% if thread.description %}
+<p class="lead">{{ thread.description }}</p>
+{% endif %}
+
+{% if character_id or is_staff %}
+<div class="d-flex gap-2 mb-3">
+  {% if character_id == thread.creator_id or is_staff %}
+  <a href="{% url 'evennia_plots:plot-edit' thread.pk %}" class="btn btn-sm btn-outline-secondary">Edit Thread</a>
+  {% if thread.privacy == "invite_only" %}
+  <a href="{% url 'evennia_plots:plot-invite' thread.pk %}" class="btn btn-sm btn-outline-secondary">Manage Invites</a>
+  {% endif %}
+  {% endif %}
+  {% if character_id %}
+  <a href="{% url 'evennia_plots:plot-update-create' thread.pk %}" class="btn btn-sm btn-primary">Add Update</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- IC Narrative Updates -->
+{% if updates %}
+<h2>Narrative Updates</h2>
+{% for update in updates %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><strong>Block {{ update.block_number }}</strong> — {{ update.author_name }}</span>
+    <span class="d-flex align-items-center gap-2">
+      <span class="text-muted small">
+        {{ update.created_at|date:"Y-m-d" }}
+        {% if update.edited_at %}<em>(edited {{ update.edited_at|date:"Y-m-d" }})</em>{% endif %}
+      </span>
+      {% if character_id == update.author_id or is_staff %}
+      <a href="{% url 'evennia_plots:plot-update-edit' thread.pk update.pk %}" class="btn btn-xs btn-outline-secondary">Edit</a>
+      <a href="{% url 'evennia_plots:plot-update-history' thread.pk update.pk %}" class="btn btn-xs btn-outline-secondary">History</a>
+      {% endif %}
+    </span>
+  </div>
+  <div class="card-body">
+    <p class="card-text" style="white-space: pre-wrap;">{{ update.content }}</p>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted"><em>No narrative updates yet.</em></p>
+{% endif %}
+
+<!-- Linked Content -->
+{% if scene_links or event_links or board_links %}
+<h2>Linked Content</h2>
+<div class="row">
+  {% if scene_links %}
+  <div class="col-md-4">
+    <h3 class="h6">Scenes ({{ scene_links|length }})</h3>
+    <ul class="list-unstyled">
+      {% for link in scene_links %}
+      <li>
+        {% url 'scene-detail' link.scene.pk as scene_url %}{% if scene_url %}<a href="{{ scene_url }}">{% endif %}{{ link.scene.title|default:"Untitled Scene" }}{% if scene_url %}</a>{% endif %}
+        <small class="text-muted">({{ link.scene.ended_at|date:"Y-m-d"|default:"open" }})</small>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if event_links %}
+  <div class="col-md-4">
+    <h3 class="h6">Calendar Events ({{ event_links|length }})</h3>
+    <ul class="list-unstyled">
+      {% for link in event_links %}
+      <li>
+        {% url 'calendar-event-detail' link.event.pk as event_url %}{% if event_url %}<a href="{{ event_url }}">{% endif %}{{ link.event.title }}{% if event_url %}</a>{% endif %}
+        <small class="text-muted">({{ link.event.scheduled_time|date:"Y-m-d" }})</small>
+        {% if link.advance_notice_met %}<span class="badge bg-success">notice met</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if board_links %}
+  <div class="col-md-4">
+    <h3 class="h6">Posts ({{ board_links|length }})</h3>
+    <ul class="list-unstyled">
+      {% for link in board_links %}
+      <li>
+        {% url 'board-detail' link.post.board.pk as board_url %}{% if board_url %}<a href="{{ board_url }}">{% endif %}{{ link.post.board.name }} #{{ link.post.post_number }}{% if board_url %}</a>{% endif %}:
+        {{ link.post.title }}
+        {% if link.is_ic_post %}<span class="badge bg-warning text-dark">IC</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Participants -->
+{% if participants %}
+<h2>Participants</h2>
+<p>{{ participants|length }} participant(s):
+  {% for p in participants %}{{ p.character_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+<!-- Thread Connections -->
+{% if sequels or related_threads %}
+<h2>Connected Threads</h2>
+{% if sequels %}
+<h3 class="h6">Sequels</h3>
+<ul>
+  {% for link in sequels %}
+  <li><a href="{% url 'evennia_plots:plot-detail' link.to_thread.pk %}">
+    #{{ link.to_thread.plot_number }} {{ link.to_thread.name }}
+  </a></li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% if related_threads %}
+<h3 class="h6">Related</h3>
+<ul>
+  {% for link in related_threads %}
+  <li>
+    {% if link.to_thread %}
+    <a href="{% url 'evennia_plots:plot-detail' link.to_thread.pk %}">#{{ link.to_thread.plot_number }} {{ link.to_thread.name }}</a>
+    {% else %}
+    <a href="{% url 'evennia_plots:plot-detail' link.from_thread.pk %}">#{{ link.from_thread.plot_number }} {{ link.from_thread.name }}</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+
+{% endblock %}

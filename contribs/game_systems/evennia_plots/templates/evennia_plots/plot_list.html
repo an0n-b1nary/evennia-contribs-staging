@@ -1,0 +1,92 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Plot Threads{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Plot Threads</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h1 class="mb-0">Plot Threads</h1>
+{% if request.user.is_authenticated %}
+<a href="{% url 'evennia_plots:plot-create' %}" class="btn btn-sm btn-primary">New Plot</a>
+{% endif %}
+</div>
+
+<div class="mb-3">
+  <form method="get" class="d-inline-flex gap-2" role="search" aria-label="Filter plot threads by tag">
+    <label for="id_tag_filter" class="sr-only">Filter by tag</label>
+    <input type="text" id="id_tag_filter" name="tag" value="{{ tag_filter }}" class="form-control form-control-sm"
+           placeholder="Filter by tag..." style="max-width: 200px;">
+    <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+    {% if tag_filter %}
+    <a href="{% url 'evennia_plots:plot-list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+    {% endif %}
+  </form>
+  {% if all_major_tags %}
+  <div class="mt-1 small text-muted">
+    Major tags:
+    {% for tag in all_major_tags %}
+    <a href="?tag={{ tag.name|urlencode }}" class="badge bg-primary text-decoration-none me-1">{{ tag.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{% if threads %}
+<div class="cov-table-scroll" role="region" aria-label="Plot threads" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Name</th>
+      <th scope="col">Tags</th>
+      <th scope="col">Creator</th>
+      <th scope="col">Scenes</th>
+      <th scope="col">Arc</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for thread in threads %}
+    <tr>
+      <td>{{ thread.plot_number }}</td>
+      <td><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a>
+        {% if thread.description %}
+        <br><small class="text-muted">{{ thread.description }}</small>
+        {% endif %}
+      </td>
+      <td>
+        {% for tag in thread.tags.all %}
+        <a href="?tag={{ tag.name|urlencode }}"
+           class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+          {{ tag.name }}
+        </a>
+        {% endfor %}
+      </td>
+      <td>{{ thread.creator_name }}</td>
+      <td>{{ thread.scene_links.count }}</td>
+      <td>{% if thread.arc %}<a href="{% url 'evennia_plots:plot-arc-detail' thread.arc.pk %}">{{ thread.arc.name }}</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% with tag_q=tag_filter|urlencode %}
+{% include "website/partials/_pagination.html" with extra_params="tag="|add:tag_q %}
+{% endwith %}
+
+{% else %}
+{% url 'evennia_plots:plot-create' as action_url %}
+{% if tag_filter %}
+{% include "website/partials/_empty_state.html" with message="No active plot threads with that tag." action_url=action_url action_label="Start a new thread" %}
+{% else %}
+{% include "website/partials/_empty_state.html" with message="No active plot threads." action_url=action_url action_label="Start a new thread" %}
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Update History</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+<p class="text-muted small">
+  Block {{ update.block_number }} — {{ update.get_update_type_display }} — by {{ update.author_name }}
+  &mdash; {{ update.created_at|date:"Y-m-d H:i" }}
+</p>
+
+{% if versions %}
+<div class="cov-table-scroll" role="region" aria-label="Version history" tabindex="0">
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Version</th>
+      <th scope="col">Editor</th>
+      <th scope="col">Saved at (UTC)</th>
+      <th scope="col">Note</th>
+      <th scope="col">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for version in versions %}
+    <tr>
+      <td>v{{ version.version_number }}</td>
+      <td>{{ version.editor_name }}</td>
+      <td>{{ version.created_at|date:"Y-m-d H:i" }}</td>
+      <td>{% if version.is_rollback %}Rollback from v{{ version.rolled_back_from }}{% endif %}</td>
+      <td>
+        <a href="{% url 'evennia_plots:plot-update-diff' thread.pk update.pk version.version_number %}">
+          Diff vs. current
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+{% include "website/partials/_empty_state.html" with message="No edits recorded yet." %}
+{% endif %}
+
+<div class="mt-3">
+  <a href="{% url 'evennia_plots:plot-detail' thread.pk %}">&larr; Back to thread</a>
+</div>
+{% endblock %}

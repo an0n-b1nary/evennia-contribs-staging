@@ -1,0 +1,30 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Add Update</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% include "website/partials/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="cov-fieldset">
+    <legend class="cov-legend">Update content</legend>
+    {% include "website/partials/_form_field.html" with field=form.content %}
+    {% include "website/partials/_form_field.html" with field=form.update_type %}
+  </fieldset>
+  {% url 'evennia_plots:plot-detail' thread.pk as cancel_url %}
+  {% include "website/partials/_form_actions.html" with cancel_url=cancel_url submit_label="Post Update" %}
+</form>
+{% endblock %}

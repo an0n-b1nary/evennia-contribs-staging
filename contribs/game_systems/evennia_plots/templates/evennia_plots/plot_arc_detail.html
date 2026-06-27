@@ -1,0 +1,154 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ arc.name }} — Plot Arc{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    {% if is_staff %}<li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-arc-list' %}">Arcs</a></li>{% endif %}
+    <li class="breadcrumb-item active" aria-current="page">Arc #{{ arc.arc_number }}: {{ arc.name }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-2">
+  <h1 class="mb-0">
+    Arc #{{ arc.arc_number }}: {{ arc.name }}
+    {% if is_current %}<span class="badge bg-success ms-2 align-middle" style="font-size:0.55em;">Current</span>{% endif %}
+  </h1>
+  {% if can_manage %}
+  <div class="d-flex gap-2 flex-shrink-0 ms-3">
+    <a href="{% url 'evennia_plots:plot-arc-edit' arc.pk %}" class="btn btn-sm btn-outline-secondary">Edit Arc</a>
+    {% if is_current %}
+    <form method="post" action="{% url 'evennia_plots:plot-arc-clear-current' arc.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-warning">Clear Current</button>
+    </form>
+    {% elif arc.status == 'active' %}
+    <form method="post" action="{% url 'evennia_plots:plot-arc-set-current' arc.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-success">Set as Current</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if pauses_xp %}
+<div class="alert alert-warning" role="alert" aria-live="polite">
+  <strong>XP gain is paused</strong> — this is a Downtime arc and is currently active. XP from plot thread conclusions will not be distributed while this arc is current.
+</div>
+{% endif %}
+
+<div class="mb-2">
+  <span class="badge {% if arc.arc_type == 'downtime' %}bg-warning text-dark{% else %}bg-secondary{% endif %} me-1">
+    {{ arc.get_arc_type_display }}
+  </span>
+  {% for tag in arc.tags.all %}
+  <a href="{% url 'evennia_plots:plot-list' %}?tag={{ tag.name|urlencode }}"
+     class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none me-1">
+    {{ tag.name }}
+  </a>
+  {% endfor %}
+</div>
+
+<dl class="row">
+  <dt class="col-sm-2">Status</dt>
+  <dd class="col-sm-10">{{ arc.get_status_display }}</dd>
+  <dt class="col-sm-2">Creator</dt>
+  <dd class="col-sm-10">{{ arc.creator_name }}</dd>
+  <dt class="col-sm-2">Created</dt>
+  <dd class="col-sm-10">{{ arc.created_at|date:"Y-m-d" }}</dd>
+  {% if arc.concluded_at %}
+  <dt class="col-sm-2">Concluded</dt>
+  <dd class="col-sm-10">{{ arc.concluded_at|date:"Y-m-d" }}</dd>
+  {% endif %}
+</dl>
+
+{% if arc.description %}
+<p class="lead">{{ arc.description }}</p>
+{% endif %}
+
+{% if xp_overrides %}
+<div class="mt-2 mb-3">
+  <strong>XP multiplier overrides:</strong>
+  <ul class="list-inline mb-0 ms-2 d-inline">
+    {% for source, info in xp_overrides.items %}
+    <li class="list-inline-item">
+      <span class="badge bg-info text-dark" title="Type default: {{ info.type_default }}&times;">
+        {{ info.label }}: {{ info.override }}&times;
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- IC Narrative Updates -->
+{% if updates %}
+<h2>Arc Updates</h2>
+{% for update in updates %}
+<div class="card mb-3">
+  <div class="card-header">
+    <strong>Block {{ update.block_number }}</strong> — {{ update.author_name }}
+    <span class="text-muted float-end">
+      {{ update.created_at|date:"Y-m-d" }}
+      {% if update.edited_at %}<em>(edited {{ update.edited_at|date:"Y-m-d" }})</em>{% endif %}
+    </span>
+  </div>
+  <div class="card-body">
+    <p class="card-text" style="white-space: pre-wrap;">{{ update.content }}</p>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted"><em>No narrative updates yet.</em></p>
+{% endif %}
+
+<!-- Member Threads -->
+<h2>Threads ({{ threads.count }})</h2>
+{% if threads %}
+<div class="cov-table-scroll" role="region" aria-label="Member threads" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Name</th>
+      <th scope="col">Tags</th>
+      <th scope="col">Status</th>
+      <th scope="col">Creator</th>
+      <th scope="col">Scenes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for thread in threads %}
+    <tr>
+      <td>{{ thread.plot_number }}</td>
+      <td><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a>
+        {% if thread.description %}
+        <br><small class="text-muted">{{ thread.description }}</small>
+        {% endif %}
+      </td>
+      <td>
+        {% for tag in thread.tags.all %}
+        <a href="{% url 'evennia_plots:plot-list' %}?tag={{ tag.name|urlencode }}"
+           class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+          {{ tag.name }}
+        </a>
+        {% endfor %}
+      </td>
+      <td>{{ thread.get_status_display }}</td>
+      <td>{{ thread.creator_name }}</td>
+      <td>{{ thread.scene_links.count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+{% include "website/partials/_empty_state.html" with message="No threads in this arc yet." %}
+{% endif %}
+
+{% endblock %}

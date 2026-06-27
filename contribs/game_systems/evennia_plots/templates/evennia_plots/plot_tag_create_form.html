@@ -1,0 +1,45 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-tags' %}">Tags</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Create Major Tag</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<p class="text-muted">
+  Major plot tags are staff-defined and provide a canonical thematic
+  taxonomy (e.g. "Magic", "Politics", "Religion"). Minor tags are
+  player-created implicitly via <code>+plot/tag #N=&lt;name&gt;</code>
+  and don't need this form.
+</p>
+
+{% if major_tags %}
+<h2 class="h5 mt-4">Existing major tags</h2>
+<ul class="list-inline">
+  {% for tag in major_tags %}
+  <li class="list-inline-item"><span class="badge bg-primary">{{ tag.name }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% include "website/partials/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="cov-fieldset">
+    <legend class="cov-legend">New major tag</legend>
+    {% include "website/partials/_form_field.html" with field=form.name %}
+  </fieldset>
+  {% url 'evennia_plots:plot-tags' as cancel_url %}
+  {% include "website/partials/_form_actions.html" with cancel_url=cancel_url submit_label="Create Major Tag" %}
+</form>
+{% endblock %}
