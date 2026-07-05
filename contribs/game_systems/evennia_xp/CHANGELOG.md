@@ -1,6 +1,24 @@
 # Changelog — evennia-xp
 
-## 0.1.0 (2026-06-02)
+All notable changes to `evennia-xp` will be documented here.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.1] — 2026-07-05 — update future-ownership map in MIGRATION_NOTES
+
+- `MIGRATION_NOTES.md` future-ownership table updated to reflect items that
+  have shipped in other contribs: rptracker 0.1.1 (`collect_rp_sessions` +
+  `flip_session_flags`), lore 0.1.2 (`collect_lore_authored`,
+  `collect_lore_inspiration`, `LoreInspirationCredit`), boards 0.1.0
+  (`collect_cutscene_posts`), and plots 0.2.0 (`collect_thread_bonuses`,
+  `sweep`, `resolve_xp_multiplier`). Doc-only; no code change.
+
+---
+
+## [0.1.0] — 2026-06-02 — initial extraction
 
 Initial extraction from source MUSH project.
 

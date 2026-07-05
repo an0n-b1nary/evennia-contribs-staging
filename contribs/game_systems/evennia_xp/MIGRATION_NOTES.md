@@ -30,20 +30,19 @@ settings-driven registry that ships here.
 ## What stayed game-local (future-ownership map)
 
 These pieces were deliberately not included in the contrib because they
-depend on other game-specific domain apps. Each has a clear future owner.
+depend on other game-specific domain apps. Items marked **shipped** have
+since landed in the indicated contrib package.
 
-| Game-local piece | Source domain | Eventual contrib owner |
+| Game-local piece | Source domain | Status |
 |---|---|---|
-| `world/xp/collectors.py` — `collect_rp_sessions` + session flag-flip | RPSession | `evennia-rptracker` (optional xp-integration submodule) |
-| `world/xp/collectors.py` — `collect_lore_authored`, `collect_lore_inspiration` + `LoreInspirationCredit` | LoreEntry, LoreSceneLink | `evennia-lore` |
-| `world/xp/collectors.py` — `collect_cutscene_posts` | Post | `evennia-boards` (#7) |
-| `world/xp/collectors.py` — `collect_thread_bonuses` + `PlotBonusCredit` + thread flag-flip | PlotThread, PlotParticipant | `evennia-plots` (#10) |
-| `world/xp/antigaming.py` — `_flag_cutscene_spam`, `_flag_thread_gaming`, `sweep()` | Post, PlotThread, Job | `evennia-boards` / `evennia-plots` |
-| `world/xp/hooks.py` — `_flip_session_flags`, `_flip_thread_flags` | RPSession, PlotThread | `evennia-rptracker` / `evennia-plots` |
-| `world/utils/xp_gating.py` — `resolve_xp_multiplier`, `resolve_active_arc` | PlotArc | `evennia-plots` (#10) — registered via `XP_MULTIPLIER_RESOLVER` |
-| `world/xp/collectors.py` — `project_for_character` (balance projection) | RPSession, LoreEntry, Post, PlotThread | `evennia-plots` / `evennia-rptracker` |
-| `LoreInspirationCredit.link` FK → LoreSceneLink | — | Converts to soft-ref when `evennia-lore` absorbs it |
-| `PlotBonusCredit.thread` FK → PlotThread | — | Converts to soft-ref when `evennia-plots` absorbs it |
+| `world/xp/collectors.py` — `collect_rp_sessions` + session flag-flip | RPSession | **Shipped** — `evennia-rptracker` 0.1.1 (`integrations/xp.py`) |
+| `world/xp/collectors.py` — `collect_lore_authored`, `collect_lore_inspiration` + `LoreInspirationCredit` | LoreEntry, LoreSceneLink | **Shipped** — `evennia-lore` 0.1.2 (`integrations/xp.py` + `LoreInspirationCredit` model) |
+| `world/xp/collectors.py` — `collect_cutscene_posts` + `_flag_cutscene_spam` | Post | **Shipped** — `evennia-boards` 0.1.0 (`integrations/xp.py`) |
+| `world/xp/collectors.py` — `collect_thread_bonuses` + `PlotBonusCredit` + `_flag_thread_gaming`, `sweep()` | PlotThread, PlotParticipant | **Shipped** — `evennia-plots` 0.2.0 (`integrations/xp.py` + `integrations/antigaming.py`; `PlotBonusCredit` intra-domain FK is fine) |
+| `world/utils/xp_gating.py` — `resolve_xp_multiplier`, `resolve_active_arc` | PlotArc | **Shipped** — `evennia-plots` 0.2.0 (`integrations/gating.py`), registered via `XP_MULTIPLIER_RESOLVER` |
+| `world/xp/hooks.py` — `_flip_session_flags` | RPSession | **Shipped** — `evennia-rptracker` 0.1.1 (`integrations/xp.flip_session_flags`) |
+| `world/xp/collectors.py` — `project_for_character` (balance projection) | RPSession, LoreEntry, Post, PlotThread | Not yet shipped — game-specific projection across multiple domains |
+| `+spend`/`+upgrade` commands | Combat stats | Not yet shipped — requires Phase 6 combat-stats system |
 
 ## Divergences from the source
 
