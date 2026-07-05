@@ -20,7 +20,7 @@ discovery via evennia_rptracker (RPSession/RPSessionPartner). This is gated
 at call time: if evennia_rptracker is not installed the collector falls back to
 scene participants only. The scenes app label is configurable:
 
-    LORE_SCENES_APP_LABEL = "scenes"  # default
+    LORE_SCENES_APP_LABEL = "evennia_scenes"  # default
 
 The rptracker app is resolved via its standard installed-app label:
 
@@ -152,7 +152,7 @@ def collect_lore_inspiration(window_end):
         ).values_list("source_ref_id", flat=True)
     )
 
-    scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "scenes")
+    scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "evennia_scenes")
     try:
         SceneParticipant = django_apps.get_model(scenes_label, "SceneParticipant")
     except Exception:
@@ -164,8 +164,9 @@ def collect_lore_inspiration(window_end):
         SceneParticipant = None
 
     rptracker_label = getattr(settings, "LORE_RPTRACKER_APP_LABEL", "evennia_rptracker")
-    installed = {a.split(".")[-1] for a in settings.INSTALLED_APPS}
-    use_rptracker = rptracker_label in installed
+    use_rptracker = django_apps.is_installed(rptracker_label) or any(
+        cfg.label == rptracker_label for cfg in django_apps.get_app_configs()
+    )
     if use_rptracker:
         try:
             from evennia_rptracker.models import RPSession, RPSessionPartner

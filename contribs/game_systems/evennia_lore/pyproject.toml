@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-lore"
-version = "0.1.2"
+version = "0.1.3"
 description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

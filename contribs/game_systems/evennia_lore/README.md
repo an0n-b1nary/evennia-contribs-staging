@@ -78,9 +78,9 @@ class CharacterCmdSet(CmdSet):
 | `LORE_PASSIVE_LEAN_MULTIPLIER` | `Decimal("2.0")` | Weight multiplier for lean-matching entries |
 | `LORE_SESSION_CONTEXT_PROVIDER` | `None` | Dotted path to your session context provider (see below) |
 | `LORE_RPTRACKER_APP_LABEL` | `"evennia_rptracker"` | App label for the rptracker contrib |
-| `LORE_SCENES_APP_LABEL` | `"scenes"` | App label for scenes (used for scene links + hint regions) |
-| `LORE_PLOTS_APP_LABEL` | `"plots"` | App label for plots (used for plot-lore links and lean) |
-| `LORE_REGIONS_APP_LABEL` | `"regions"` | App label for regions (used for region weighting and hint) |
+| `LORE_SCENES_APP_LABEL` | `"evennia_scenes"` | App label for scenes (used for scene links + hint regions) |
+| `LORE_PLOTS_APP_LABEL` | `"evennia_plots"` | App label for plots (used for plot-lore links and lean) |
+| `LORE_REGIONS_APP_LABEL` | `"evennia_regions"` | App label for regions (used for region weighting and hint) |
 
 ---
 

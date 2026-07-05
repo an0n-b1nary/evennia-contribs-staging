@@ -14,6 +14,7 @@ class LoreConfig(AppConfig):
     verbose_name = "Evennia Lore"
 
     def ready(self):
+        from django.apps import apps
         from django.conf import settings
 
         from evennia_links import connect_soft_ref_cleanup
@@ -24,11 +25,14 @@ class LoreConfig(AppConfig):
             PlotLoreLink,
         )
 
-        installed = {a.split(".")[-1] for a in settings.INSTALLED_APPS}
+        def _app_present(label):
+            return apps.is_installed(label) or any(
+                cfg.label == label for cfg in apps.get_app_configs()
+            )
 
         # --- rptracker: register the passive-trickle listener ---
         rptracker_label = getattr(settings, "LORE_RPTRACKER_APP_LABEL", "evennia_rptracker")
-        if rptracker_label in installed:
+        if _app_present(rptracker_label):
             from evennia_rptracker.signals import rp_session_ended
 
             from evennia_links import connect_on_ready
@@ -37,34 +41,28 @@ class LoreConfig(AppConfig):
             connect_on_ready(rp_session_ended, _on_rp_session_ended)
 
         # --- scenes: cleanup LoreSceneLink.scene_id on Scene hard-delete ---
-        scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "scenes")
-        if scenes_label in installed:
+        scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "evennia_scenes")
+        if _app_present(scenes_label):
             try:
-                from django.apps import apps as django_apps
-
-                Scene = django_apps.get_model(scenes_label, "Scene")
+                Scene = apps.get_model(scenes_label, "Scene")
                 connect_soft_ref_cleanup(Scene, LoreSceneLink, "scene_id")
             except Exception:
                 pass
 
         # --- plots: cleanup PlotLoreLink.thread_id on PlotThread hard-delete ---
-        plots_label = getattr(settings, "LORE_PLOTS_APP_LABEL", "plots")
-        if plots_label in installed:
+        plots_label = getattr(settings, "LORE_PLOTS_APP_LABEL", "evennia_plots")
+        if _app_present(plots_label):
             try:
-                from django.apps import apps as django_apps
-
-                PlotThread = django_apps.get_model(plots_label, "PlotThread")
+                PlotThread = apps.get_model(plots_label, "PlotThread")
                 connect_soft_ref_cleanup(PlotThread, PlotLoreLink, "thread_id")
             except Exception:
                 pass
 
         # --- regions: cleanup LoreRegionLink.region_id on Region hard-delete ---
-        regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "regions")
-        if regions_label in installed:
+        regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "evennia_regions")
+        if _app_present(regions_label):
             try:
-                from django.apps import apps as django_apps
-
-                Region = django_apps.get_model(regions_label, "Region")
+                Region = apps.get_model(regions_label, "Region")
                 connect_soft_ref_cleanup(Region, LoreRegionLink, "region_id")
             except Exception:
                 pass

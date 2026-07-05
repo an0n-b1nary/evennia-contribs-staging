@@ -11,9 +11,9 @@ Add to your CharacterCmdSet::
 
 Settings:
   LORE_STAFF_LOCK — lock string for staff operations (default "cmd:perm(Builder)").
-  LORE_SCENES_APP_LABEL  — app label for the scenes model (default "scenes").
-  LORE_PLOTS_APP_LABEL   — app label for the plots/PlotThread model (default "plots").
-  LORE_REGIONS_APP_LABEL — app label for the regions model (default "regions").
+  LORE_SCENES_APP_LABEL  — app label for the scenes model (default "evennia_scenes").
+  LORE_PLOTS_APP_LABEL   — app label for the plots/PlotThread model (default "evennia_plots").
+  LORE_REGIONS_APP_LABEL — app label for the regions model (default "evennia_regions").
 """
 
 from django.conf import settings
@@ -366,7 +366,7 @@ class CmdLore(EditingMixin, MuxCommand):
         region_ids = LoreRegionLink.objects.filter(entry=entry).values_list("region_id", flat=True)
         regions_str = "none"
         try:
-            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "regions")
+            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "evennia_regions")
             regions_str = (
                 ", ".join(
                     Region.objects.filter(pk__in=list(region_ids))
@@ -489,7 +489,7 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("Only the entry author (or staff) can associate regions.")
             return
         try:
-            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "regions")
+            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "evennia_regions")
             region = Region.objects.get(name__iexact=region_name)
         except Exception:
             caller.msg(f"No region named '{region_name}' found.")
@@ -514,7 +514,7 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("Only the entry author (or staff) can modify region associations.")
             return
         try:
-            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "regions")
+            Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "evennia_regions")
             region = Region.objects.get(name__iexact=region_name)
         except Exception:
             caller.msg(f"No region named '{region_name}' found.")
@@ -568,7 +568,7 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("Scene ID must be an integer.")
             return
         try:
-            Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "scenes")
+            Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "evennia_scenes")
             scene = Scene.objects.get(pk=int(scene_arg))
         except Exception:
             caller.msg(f"No scene #{scene_arg} found.")
@@ -597,7 +597,7 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("Plot thread ID must be an integer (e.g. #5 or 5).")
             return
         try:
-            PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "plots")
+            PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "evennia_plots")
             thread = PlotThread.objects.get(plot_number=int(plot_arg))
         except Exception:
             caller.msg(f"No plot thread #{plot_arg} found.")
@@ -738,7 +738,7 @@ def _lore_submit_save(caller, content):
 
     if scene_arg and scene_arg.isdigit():
         try:
-            Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "scenes")
+            Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "evennia_scenes")
             scene = Scene.objects.get(pk=int(scene_arg))
             LoreSceneLink.objects.get_or_create(
                 entry=entry,
@@ -854,7 +854,7 @@ class CmdInvestigate(MuxCommand):
                 caller.msg("Plot lean requires a numeric ID (e.g. +investigate/plot #3).")
                 return
             try:
-                PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "plots")
+                PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "evennia_plots")
                 thread = PlotThread.objects.get(plot_number=int(val))
             except Exception:
                 caller.msg(f"No plot thread #{val} found.")
@@ -868,7 +868,7 @@ class CmdInvestigate(MuxCommand):
 
         if lean_type == "region":
             try:
-                Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "regions")
+                Region = _get_model("LORE_REGIONS_APP_LABEL", "Region", "evennia_regions")
                 region = Region.objects.get(name__iexact=value)
             except Exception:
                 caller.msg(f"No region named '{value}' found.")
@@ -1025,7 +1025,7 @@ class CmdHint(MuxCommand):
         try:
             from django.apps import apps as django_apps
 
-            regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "regions")
+            regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "evennia_regions")
             RegionMembership = django_apps.get_model(regions_label, "RegionMembership")
             membership = RegionMembership.objects.filter(room=room).first()
             if membership:

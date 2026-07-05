@@ -88,7 +88,7 @@ def _lean_matches(entry, lean_type, lean_value):
                 from django.apps import apps as _apps
                 from django.conf import settings as _s
 
-                regions_label = getattr(_s, "LORE_REGIONS_APP_LABEL", "regions")
+                regions_label = getattr(_s, "LORE_REGIONS_APP_LABEL", "evennia_regions")
                 Region = _apps.get_model(regions_label, "Region")
                 region = Region.objects.filter(name__iexact=lean_value).first()
                 if region is None:
@@ -111,7 +111,7 @@ def _lean_matches(entry, lean_type, lean_value):
             from django.apps import apps as _apps
             from django.conf import settings as _s
 
-            plots_label = getattr(_s, "LORE_PLOTS_APP_LABEL", "plots")
+            plots_label = getattr(_s, "LORE_PLOTS_APP_LABEL", "evennia_plots")
             PlotThread = _apps.get_model(plots_label, "PlotThread")
             thread_ids = PlotThread.objects.filter(plot__title__icontains=lean_value).values_list(
                 "id", flat=True

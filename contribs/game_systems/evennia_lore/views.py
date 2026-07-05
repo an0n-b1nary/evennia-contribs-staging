@@ -77,7 +77,7 @@ class LoreListView(ListView):
             from django.conf import settings
 
             try:
-                regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "regions")
+                regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "evennia_regions")
                 Region = django_apps.get_model(regions_label, "Region")
                 region_ids = Region.objects.filter(name__icontains=region).values_list(
                     "pk", flat=True
@@ -156,7 +156,7 @@ class LoreDetailView(DetailView):
         )
         linked_scenes = []
         try:
-            scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "scenes")
+            scenes_label = getattr(settings, "LORE_SCENES_APP_LABEL", "evennia_scenes")
             Scene = django_apps.get_model(scenes_label, "Scene")
             scenes_by_id = {s.pk: s for s in Scene.all_objects.filter(pk__in=scene_ids)}
             linked_scenes = [scenes_by_id[sid] for sid in scene_ids if sid in scenes_by_id]
@@ -169,7 +169,7 @@ class LoreDetailView(DetailView):
         )
         linked_plots = []
         try:
-            plots_label = getattr(settings, "LORE_PLOTS_APP_LABEL", "plots")
+            plots_label = getattr(settings, "LORE_PLOTS_APP_LABEL", "evennia_plots")
             PlotThread = django_apps.get_model(plots_label, "PlotThread")
             threads_by_id = {t.pk: t for t in PlotThread.objects.filter(pk__in=thread_ids)}
             linked_plots = [threads_by_id[tid] for tid in thread_ids if tid in threads_by_id]
@@ -180,7 +180,7 @@ class LoreDetailView(DetailView):
         region_ids = LoreRegionLink.objects.filter(entry=entry).values_list("region_id", flat=True)
         region_list = []
         try:
-            regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "regions")
+            regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "evennia_regions")
             Region = django_apps.get_model(regions_label, "Region")
             region_list = list(Region.objects.filter(pk__in=list(region_ids)).order_by("name"))
         except Exception:

@@ -1,6 +1,31 @@
 # Changelog — evennia-lore
 
-## 0.1.2 — add LoreInspirationCredit and XP integration module
+All notable changes to `evennia-lore` will be documented here.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.3] — 2026-07-05 — fix app-label defaults and gate hardening
+
+- `LORE_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"`.
+- `LORE_PLOTS_APP_LABEL` default changed from `"plots"` → `"evennia_plots"`.
+- `LORE_REGIONS_APP_LABEL` default changed from `"regions"` → `"evennia_regions"`.
+  (`LORE_RPTRACKER_APP_LABEL` was already `"evennia_rptracker"` — no change.)
+- `LoreConfig.ready()` membership gate replaced with the robust
+  `apps.is_installed(label) or any(cfg.label == label …)` pattern via an
+  inline `_app_present()` helper; eliminates false negatives for AppConfig-path
+  installs.
+- Same gate hardening applied to the rptracker membership check in
+  `integrations/xp.py` (`collect_lore_inspiration`).
+- Updated all `_get_model(…)` third-arg defaults in `commands.py`, and all
+  `getattr(settings, …)` defaults in `views.py`, `selection.py`, and
+  `integrations/xp.py` to match.
+
+---
+
+## [0.1.2] — 2026-07-05 — add LoreInspirationCredit and XP integration module
 
 - `LoreInspirationCredit` model: per-`(LoreSceneLink, character_id)` XP eligibility
   row. Used as `source_ref_id` for `XPLog(LORE_INSPIRATION, ...)` so the batch is
@@ -20,7 +45,7 @@
   ]
   ```
 
-## 0.1.1 — consume EditingMixin from evennia-links
+## [0.1.1] — consume EditingMixin from evennia-links
 
 - `EditingMixin` removed from `evennia_lore/editing.py` (file deleted). The mixin
   is now imported from `evennia-links>=0.3`. No behaviour change; the mixin API is
@@ -29,7 +54,7 @@
   change to `from evennia_links import EditingMixin`. Add `evennia-links>=0.3` to
   your `INSTALLED_APPS` entry (it was already a transitive dep of `evennia-lore`).
 
-## 0.1.0 — initial extraction
+## [0.1.0] — 2026-06-27 — initial extraction
 
 - `LoreTag` model: major/minor tags with `is_major` flag for thematic grouping.
 - `LoreEntry(AbstractArchived)` model: full status lifecycle (DRAFT → SUBMITTED →
