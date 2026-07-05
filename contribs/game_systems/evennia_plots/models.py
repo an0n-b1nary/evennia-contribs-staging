@@ -211,7 +211,7 @@ class PlotArc(models.Model):
         """True when this arc type suppresses XP gain (Downtime arcs only).
 
         UI intent signal for banners/badges. The behavioral gate is
-        get_xp_multiplier() / resolve_xp_multiplier() from evennia_plots.gating.
+        get_xp_multiplier() / resolve_xp_multiplier() from evennia_plots.integrations.gating.
         """
         return self.arc_type == self.ArcType.DOWNTIME
 
@@ -522,7 +522,7 @@ class PlotThread(models.Model):
         """True when there is bonus XP to give and the arc's thread_bonus mult > 0."""
         if self.bonus_xp_computed <= 0:
             return False
-        from evennia_plots.gating import resolve_xp_multiplier
+        from evennia_plots.integrations.gating import resolve_xp_multiplier
 
         return resolve_xp_multiplier("thread_bonus", thread=self) > 0
 

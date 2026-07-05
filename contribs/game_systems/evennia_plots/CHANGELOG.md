@@ -7,6 +7,32 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] — 2026-07-05 — XP glue moved to integrations/ + app-label fixes
+
+### Changed (breaking)
+
+- XP integration modules moved into an `integrations/` subpackage for
+  consistency with `evennia-lore`, `evennia-rptracker`, and `evennia-boards`.
+  Update settings paths:
+
+  | Old path | New path |
+  |---|---|
+  | `evennia_plots.gating.resolve_xp_multiplier` | `evennia_plots.integrations.gating.resolve_xp_multiplier` |
+  | `evennia_plots.collectors.collect_thread_bonuses` | `evennia_plots.integrations.xp.collect_thread_bonuses` |
+  | `evennia_plots.collectors.collect_arc_bonuses` | `evennia_plots.integrations.xp.collect_arc_bonuses` |
+  | `evennia_plots.antigaming.sweep` | `evennia_plots.integrations.antigaming.sweep` |
+
+  The old top-level `collectors.py`, `antigaming.py`, and `gating.py` are now
+  empty stubs; they will be removed in a future release.
+
+- `PLOTS_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"`.
+- `PLOTS_BOARDS_APP_LABEL` default changed from `"boards"` → `"evennia_boards"`.
+- `PLOTS_CALENDAR_APP_LABEL` default changed from `"calendar"` → `"evennia_calendar"`.
+- `PlotsConfig.ready()` membership gate replaced with the robust
+  `apps.is_installed(label) or any(cfg.label == label …)` pattern.
+
+---
+
 ## [0.1.0] — 2026-06-27
 
 ### Added

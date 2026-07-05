@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-plots"
-version = "0.1.0"
+version = "0.2.0"
 description = "Narrative plot management (+plot/+arc/+hook) with thread bonuses, arc XP multipliers, and a full web + REST surface for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -44,12 +44,13 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_plots", "evennia_plots.migrations", "evennia_plots.api"]
+packages = ["evennia_plots", "evennia_plots.migrations", "evennia_plots.api", "evennia_plots.integrations"]
 
 [tool.setuptools.package-dir]
 "evennia_plots" = "."
 "evennia_plots.migrations" = "migrations"
 "evennia_plots.api" = "api"
+"evennia_plots.integrations" = "integrations"
 
 [tool.setuptools.package-data]
 evennia_plots = ["templates/evennia_plots/*.html"]

@@ -23,9 +23,9 @@ from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
-from evennia_plots.antigaming import _flag_thread_gaming
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
-from evennia_plots.gating import resolve_active_arc, resolve_xp_multiplier
+from evennia_plots.integrations.antigaming import _flag_thread_gaming
+from evennia_plots.integrations.gating import resolve_active_arc, resolve_xp_multiplier
 from evennia_plots.listeners import on_scene_linked_to_thread
 from evennia_plots.models import (
     PlotArc,
@@ -908,7 +908,7 @@ class TestCollectors(EvenniaTest):
         return thread, now
 
     def test_yields_award_for_concluded_thread(self):
-        from evennia_plots.collectors import collect_thread_bonuses
+        from evennia_plots.integrations.xp import collect_thread_bonuses
 
         thread, now = self._make_concluded_thread_with_bonus(bonus=3)
         PlotParticipant.objects.create(
@@ -919,7 +919,7 @@ class TestCollectors(EvenniaTest):
         self.assertEqual(awards[0].character_id, self.char1.pk)
 
     def test_creates_plot_bonus_credit(self):
-        from evennia_plots.collectors import collect_thread_bonuses
+        from evennia_plots.integrations.xp import collect_thread_bonuses
 
         thread, now = self._make_concluded_thread_with_bonus(bonus=2)
         PlotParticipant.objects.create(
@@ -933,7 +933,7 @@ class TestCollectors(EvenniaTest):
     def test_idempotent_when_xplog_already_has_credit(self):
         from evennia_xp.models import XPLog
 
-        from evennia_plots.collectors import collect_thread_bonuses
+        from evennia_plots.integrations.xp import collect_thread_bonuses
 
         thread, now = self._make_concluded_thread_with_bonus(bonus=2)
         PlotParticipant.objects.create(
@@ -959,7 +959,7 @@ class TestCollectors(EvenniaTest):
         self.assertEqual(len(awards_second), 0)
 
     def test_downtime_arc_suppresses_yield(self):
-        from evennia_plots.collectors import collect_thread_bonuses
+        from evennia_plots.integrations.xp import collect_thread_bonuses
 
         arc = _make_arc(creator=self.char1, arc_type=PlotArc.ArcType.DOWNTIME)
         arc.is_current = True

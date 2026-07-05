@@ -103,17 +103,17 @@ Register the seams in your settings when `evennia-xp` (`[xp]`) is installed:
 
 ```python
 # Multiplier: arc-aware — called for every XP award in the batch.
-XP_MULTIPLIER_RESOLVER = "evennia_plots.gating.resolve_xp_multiplier"
+XP_MULTIPLIER_RESOLVER = "evennia_plots.integrations.gating.resolve_xp_multiplier"
 
 # Collectors: called each week to emit thread-bonus and arc-bonus awards.
 XP_COLLECTORS = [
-    ("thread_bonus", "evennia_plots.collectors.collect_thread_bonuses"),
-    ("arc_bonus",    "evennia_plots.collectors.collect_arc_bonuses"),
+    ("thread_bonus", "evennia_plots.integrations.xp.collect_thread_bonuses"),
+    ("arc_bonus",    "evennia_plots.integrations.xp.collect_arc_bonuses"),
 ]
 
 # Anti-gaming: called before the batch to zero out suspicious threads.
 XP_ANTIGAMING_SWEEPS = [
-    "evennia_plots.antigaming.sweep",
+    "evennia_plots.integrations.antigaming.sweep",
 ]
 ```
 
@@ -126,9 +126,9 @@ These settings are no-ops unless `evennia-xp` is installed.
 | Setting | Default | Purpose |
 |---|---|---|
 | `PLOTS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock expression that grants staff access to `+arc`, `+hook`, and staff-only `+plot` switches. The `cmd:` prefix is stripped before evaluation. |
-| `PLOTS_SCENES_APP_LABEL` | `"scenes"` | Django app label for the scenes app; used by `apps.py` to register soft-ref cleanup for `ScenePlotLink.scene_id`. |
-| `PLOTS_CALENDAR_APP_LABEL` | `"calendar"` | Same, for `PlotCalendarLink.event_id`. |
-| `PLOTS_BOARDS_APP_LABEL` | `"boards"` | Same, for `PlotBoardLink.post_id`. |
+| `PLOTS_SCENES_APP_LABEL` | `"evennia_scenes"` | Django app label for the scenes app; used by `apps.py` to register soft-ref cleanup for `ScenePlotLink.scene_id`. |
+| `PLOTS_CALENDAR_APP_LABEL` | `"evennia_calendar"` | Same, for `PlotCalendarLink.event_id`. |
+| `PLOTS_BOARDS_APP_LABEL` | `"evennia_boards"` | Same, for `PlotBoardLink.post_id`. |
 | `SITE_URL` | `""` | When set, `+plot` output includes a clickable web URL link to the thread's detail page. |
 
 ---
@@ -203,7 +203,7 @@ from evennia_plots import (
 
 ```python
 from evennia_plots.models import PlotThread, PlotArc, ScenePlotLink
-from evennia_plots.gating import resolve_xp_multiplier
+from evennia_plots.integrations.gating import resolve_xp_multiplier
 
 # Create a thread
 thread = PlotThread.create_thread(name="The Dragon Crisis", creator=character)

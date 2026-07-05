@@ -85,15 +85,15 @@ Register the XP seams in your settings only when `evennia-xp` is installed:
 
 ```python
 # settings.py
-XP_MULTIPLIER_RESOLVER = "evennia_plots.gating.resolve_xp_multiplier"
+XP_MULTIPLIER_RESOLVER = "evennia_plots.integrations.gating.resolve_xp_multiplier"
 
 XP_COLLECTORS = [
-    ("thread_bonus", "evennia_plots.collectors.collect_thread_bonuses"),
-    ("arc_bonus",    "evennia_plots.collectors.collect_arc_bonuses"),
+    ("thread_bonus", "evennia_plots.integrations.xp.collect_thread_bonuses"),
+    ("arc_bonus",    "evennia_plots.integrations.xp.collect_arc_bonuses"),
 ]
 
 XP_ANTIGAMING_SWEEPS = [
-    "evennia_plots.antigaming.sweep",
+    "evennia_plots.integrations.antigaming.sweep",
 ]
 ```
 
