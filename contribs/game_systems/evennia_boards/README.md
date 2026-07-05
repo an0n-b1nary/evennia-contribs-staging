@@ -162,7 +162,7 @@ When `BOARDS_CALENDAR_APP_LABEL` is set and that app is in `INSTALLED_APPS`,
 calendar event also deletes all `PostCalendarLink` rows pointing to it:
 
 ```python
-BOARDS_CALENDAR_APP_LABEL = "calendar"  # the app_label of your calendar model
+BOARDS_CALENDAR_APP_LABEL = "evennia_calendar"  # the app_label of your calendar model
 ```
 
 ---

@@ -1,6 +1,22 @@
 # Changelog — evennia-boards
 
-## 0.1.0 (2026-06-07)
+All notable changes to `evennia-boards` will be documented here.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.1] — 2026-07-05 — fix README label example
+
+- `BOARDS_CALENDAR_APP_LABEL` README example corrected from `"calendar"` to
+  `"evennia_calendar"` to match `evennia_calendar`'s real Django app-label.
+  The code default (`None`) was never wrong; only the documentation example
+  referenced a non-resolving bare label.
+
+---
+
+## [0.1.0] — 2026-06-07 — initial extraction
 
 Initial extraction. All features drawn from a production MUSH installation.
 
