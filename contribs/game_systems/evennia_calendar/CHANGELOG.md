@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.1 — add SceneCalendarLink bridge model
+
+- `SceneCalendarLink(AbstractAuthoredLink)` model: links a `CalendarEvent` to a
+  Scene via an integer soft-reference (`scene_id`). Owned by evennia_calendar per
+  the bridge-ownership convention. Uniqueness: one link per `(event, scene_id)`.
+- `CalendarConfig.ready()` now registers a `connect_soft_ref_cleanup()` hook to
+  cascade-delete orphaned `SceneCalendarLink` rows when a Scene is hard-deleted
+  (gated on `CALENDAR_SCENES_APP_LABEL` being present in `INSTALLED_APPS`; default
+  label: `"evennia_scenes"`).
+- `SceneCalendarLinkAdmin` registered in `admin.py`.
+- Migration `0002_scenecalendarlink`.
+- **evennia-links** is now a runtime dependency (was a dev/test-only dep prior to
+  this release). Add `evennia-links` to your `INSTALLED_APPS`.
+
 ## v0.1.0 (2026-06-25)
 
 Initial extraction and packaging from a source MUSH project.

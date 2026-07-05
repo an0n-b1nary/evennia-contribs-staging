@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-calendar"
-version = "0.1.0"
+version = "0.1.1"
 description = "Event calendar system (+calendar/+rsvp) with cluster lottery, priority tokens, web UI, and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -19,9 +19,10 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-# Core: models + commands only. No evennia-links dependency.
+# Core: models + commands. evennia-links required for AbstractAuthoredLink and cleanup hooks.
 dependencies = [
     "evennia>=6.0",
+    "evennia-links>=0.2",
 ]
 
 [project.optional-dependencies]

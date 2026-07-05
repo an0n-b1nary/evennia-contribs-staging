@@ -13,6 +13,7 @@ from evennia_calendar.models import (
     EventExclusion,
     EventTag,
     PriorityToken,
+    SceneCalendarLink,
 )
 
 
@@ -120,3 +121,10 @@ class PriorityTokenAdmin(admin.ModelAdmin):
 class EventExclusionAdmin(admin.ModelAdmin):
     list_display = ["pk", "event_a", "event_b", "creator_name", "created_at"]  # noqa: RUF012
     readonly_fields = ["created_at"]  # noqa: RUF012
+
+
+@admin.register(SceneCalendarLink)
+class SceneCalendarLinkAdmin(admin.ModelAdmin):
+    list_display = ["pk", "event", "scene_id", "created_at"]  # noqa: RUF012
+    readonly_fields = ["created_at"]  # noqa: RUF012
+    search_fields = ["event__title"]  # noqa: RUF012

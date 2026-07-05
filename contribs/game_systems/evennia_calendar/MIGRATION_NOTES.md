@@ -82,12 +82,25 @@ The source templates used game-specific partials:
 The contrib templates inline equivalent Bootstrap 4 markup. Games that have
 these partials can re-introduce them by overriding the contrib templates.
 
-## No `evennia-links` dependency
+## `evennia-links` dependency (added in v0.1.1)
 
-The source calendar was the *target* of soft-reference bridges owned by other
-apps (`world/links/`, evennia-boards, etc.). The contrib does not import from
-`evennia-links` at all. Consumers who create soft-reference bridges to calendar
-objects are responsible for registering their own cleanup signals.
+As of v0.1.1, `evennia_calendar` depends on `evennia-links`. The
+`SceneCalendarLink` bridge model inherits from `AbstractAuthoredLink`, and
+`CalendarConfig.ready()` calls `connect_soft_ref_cleanup()` from that package.
+
+Add `evennia_links` to `INSTALLED_APPS` before `evennia_calendar` if upgrading
+from v0.1.0 without it.
+
+## `SceneCalendarLink` bridge model (added in v0.1.1)
+
+The source game's `SceneCalendarLink` lived in `world/links/` per the
+domain-island rule. In the contrib it lives here because `evennia_calendar`
+owns the relationship: the real FK is `event → CalendarEvent` and the integer
+soft-ref is `scene_id`.
+
+Hard-deletion of a Scene is compensated by a `connect_soft_ref_cleanup()` hook
+registered in `CalendarConfig.ready()` when the scenes app is present
+(`CALENDAR_SCENES_APP_LABEL`, default `"evennia_scenes"`).
 
 ## CalendarMaintenanceScript — manual hook required
 

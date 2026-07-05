@@ -26,6 +26,8 @@ Models:
 - EventExclusion: optional mutual-exclusion pair for standalone events.
   Redundant within a cluster (seating is one-per-player by construction) but
   useful for events in different clusters or cross-cluster scenarios.
+- SceneCalendarLink: cross-domain bridge (owned here) linking a CalendarEvent
+  to a Scene via a scene_id integer soft-reference (lore ↔ scenes).
 
 ObjectDB FK convention: ForeignKey("objects.ObjectDB",
 on_delete=SET_NULL, null=True) + denormalized *_name CharField. Prevents
@@ -38,6 +40,8 @@ No AbstractVersion (descriptions are not version-tracked at this layer).
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+from evennia_links import AbstractAuthoredLink
 
 # ---------------------------------------------------------------------------
 # EventTag
@@ -789,3 +793,43 @@ class EventExclusion(models.Model):
         excluded_ids.update(cls.objects.filter(event_a=event).values_list("event_b_id", flat=True))
         excluded_ids.update(cls.objects.filter(event_b=event).values_list("event_a_id", flat=True))
         return CalendarEvent.objects.filter(pk__in=excluded_ids)
+
+
+# ---------------------------------------------------------------------------
+# Bridge: CalendarEvent ↔ Scene
+# ---------------------------------------------------------------------------
+
+
+class SceneCalendarLink(AbstractAuthoredLink):
+    """
+    Links a CalendarEvent to a Scene (integer soft-reference).
+
+    Used to associate RP scenes with the calendar event they belong to.
+    Created manually by event organisers or scene owners.
+
+    The scene reference is stored as an integer soft-ref (scene_id) rather
+    than a FK to the scenes app. Hard-deletion of a Scene is compensated by
+    the connect_soft_ref_cleanup() hook in CalendarConfig.ready() when the
+    scenes app is present.
+
+    Uniqueness: one link per (event, scene_id) pair.
+    """
+
+    event = models.ForeignKey(
+        CalendarEvent,
+        on_delete=models.CASCADE,
+        related_name="scene_links",
+        help_text="The calendar event associated with this scene.",
+    )
+    scene_id = models.PositiveBigIntegerField(
+        db_index=True,
+        help_text="PK of the Scene associated with this calendar event.",
+    )
+
+    link_fields = ("event", "scene_id")
+
+    class Meta(AbstractAuthoredLink.Meta):
+        unique_together = [("event", "scene_id")]  # noqa: RUF012
+
+    def __str__(self):
+        return f"CalendarEvent #{self.event_id} ↔ Scene #{self.scene_id}"
