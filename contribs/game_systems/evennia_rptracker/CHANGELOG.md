@@ -1,6 +1,22 @@
 # Changelog — evennia-rptracker
 
-## 0.1.1 — add XP integration module
+All notable changes to `evennia-rptracker` will be documented here.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.2] — 2026-07-05 — fix app-label defaults and gate hardening
+
+- `RPTRACKER_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"` to
+  match `evennia_scenes`'s real Django app-label.
+- `EvenniaRptrackerConfig.ready()` membership gate replaced with the robust
+  `apps.is_installed(label) or any(cfg.label == label …)` pattern.
+
+---
+
+## [0.1.1] — 2026-07-05 — add XP integration module
 
 - `evennia_rptracker/integrations/xp.py` — new module with XP collector and
   post-batch hook:
@@ -20,7 +36,7 @@
   ]
   ```
 
-## 0.1.0 — initial extraction
+## [0.1.0] — 2026-06-27 — initial extraction
 
 - `RPSession` + `RPSessionPartner` models: passive RP session detection
   with status lifecycle (pending → active → completed / flagged), duration
