@@ -1,6 +1,25 @@
 # Changelog
 
-## v0.1.1 — add SceneCalendarLink bridge model
+All notable changes to `evennia-calendar` will be documented here.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.2] — 2026-07-05 — fix app-label defaults and gate hardening
+
+- `CALENDAR_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"` to
+  match `evennia_scenes`'s real Django app-label. Out-of-the-box contrib-to-contrib
+  installs now resolve the cleanup hook correctly without overriding the setting.
+- `CalendarConfig.ready()` membership gate replaced with the robust
+  `apps.is_installed(label) or any(cfg.label == label …)` pattern (same as
+  `evennia_boards`); eliminates false negatives when apps register via a
+  dotted-path `AppConfig` subclass.
+
+---
+
+## [0.1.1] — 2026-07-05 — add SceneCalendarLink bridge model
 
 - `SceneCalendarLink(AbstractAuthoredLink)` model: links a `CalendarEvent` to a
   Scene via an integer soft-reference (`scene_id`). Owned by evennia_calendar per
@@ -14,7 +33,7 @@
 - **evennia-links** is now a runtime dependency (was a dev/test-only dep prior to
   this release). Add `evennia-links` to your `INSTALLED_APPS`.
 
-## v0.1.0 (2026-06-25)
+## [0.1.0] — 2026-06-25 — initial extraction
 
 Initial extraction and packaging from a source MUSH project.
 
