@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-lore"
-version = "0.1.1"
+version = "0.1.2"
 description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -39,11 +39,12 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_lore", "evennia_lore.migrations", "evennia_lore.api"]
+packages = ["evennia_lore", "evennia_lore.migrations", "evennia_lore.integrations", "evennia_lore.api"]
 
 [tool.setuptools.package-dir]
 "evennia_lore" = "."
 "evennia_lore.migrations" = "migrations"
+"evennia_lore.integrations" = "integrations"
 "evennia_lore.api" = "api"
 
 [tool.setuptools.package-data]

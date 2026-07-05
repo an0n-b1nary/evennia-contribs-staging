@@ -5,6 +5,7 @@ from django.contrib import admin
 from evennia_lore.models import (
     LoreAcquisition,
     LoreEntry,
+    LoreInspirationCredit,
     LoreRegionLink,
     LoreSceneLink,
     LoreTag,
@@ -76,3 +77,10 @@ class LoreAcquisitionAdmin(admin.ModelAdmin):
     search_fields = ["character_name", "entry__title"]  # noqa: RUF012
     readonly_fields = ["acquired_at"]  # noqa: RUF012
     raw_id_fields = ["entry", "character", "shared_by"]  # noqa: RUF012
+
+
+@admin.register(LoreInspirationCredit)
+class LoreInspirationCreditAdmin(admin.ModelAdmin):
+    list_display = ["pk", "character_name", "link", "created_at"]  # noqa: RUF012
+    readonly_fields = ["created_at"]  # noqa: RUF012
+    search_fields = ["character_name"]  # noqa: RUF012

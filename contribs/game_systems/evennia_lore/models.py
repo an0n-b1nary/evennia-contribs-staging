@@ -16,10 +16,11 @@ Privacy:
                  requires a storyteller +share.
 
 Bridge models (cross-domain, owned by evennia_lore):
-    LoreAcquisition  — per-character compendium row (lore ↔ rptracker).
-    PlotLoreLink     — links a LoreEntry to a PlotThread (lore ↔ plots).
-    LoreSceneLink    — links a LoreEntry to a Scene (lore ↔ scenes).
-    LoreRegionLink   — links a LoreEntry to a Region (lore ↔ regions).
+    LoreAcquisition      — per-character compendium row (lore ↔ rptracker).
+    PlotLoreLink         — links a LoreEntry to a PlotThread (lore ↔ plots).
+    LoreSceneLink        — links a LoreEntry to a Scene (lore ↔ scenes).
+    LoreRegionLink       — links a LoreEntry to a Region (lore ↔ regions).
+    LoreInspirationCredit — per-(LoreSceneLink, character) XP eligibility row.
 
 All bridge models use integer soft-references for the partner-app side so
 the bridge table has no DB dependency on the partner app. Hard-deletion of
@@ -533,3 +534,41 @@ class LoreRegionLink(AbstractAuthoredLink):
 
     def __str__(self):
         return f"LoreEntry #{self.entry_id} ↔ Region #{self.region_id}"
+
+
+class LoreInspirationCredit(models.Model):
+    """
+    Per-(LoreSceneLink, character) eligibility row for lore inspiration XP.
+
+    Created (get_or_created) by collect_lore_inspiration() in
+    evennia_lore.integrations.xp when the weekly XP batch runs. One row
+    per (link, character_id) pair — its pk is used as source_ref_id so
+    XPLog's (source_type, source_ref_id) unique constraint guarantees
+    idempotency across batch re-runs even without a flag field on LoreSceneLink.
+
+    character_name is denormalized for display after character deletion.
+    """
+
+    link = models.ForeignKey(
+        LoreSceneLink,
+        on_delete=models.CASCADE,
+        related_name="inspiration_credits",
+        help_text="The LoreSceneLink that generated this credit.",
+    )
+    character_id = models.PositiveIntegerField(
+        db_index=True,
+        help_text="ObjectDB pk of the character who receives the inspiration credit.",
+    )
+    character_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Denormalized character name for display after deletion.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("link", "character_id")]  # noqa: RUF012
+        ordering = ["created_at"]  # noqa: RUF012
+
+    def __str__(self):
+        return f"LoreInspirationCredit: {self.character_name} " f"← LoreSceneLink #{self.link_id}"

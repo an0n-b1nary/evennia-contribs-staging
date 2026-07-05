@@ -1,5 +1,25 @@
 # Changelog — evennia-lore
 
+## 0.1.2 — add LoreInspirationCredit and XP integration module
+
+- `LoreInspirationCredit` model: per-`(LoreSceneLink, character_id)` XP eligibility
+  row. Used as `source_ref_id` for `XPLog(LORE_INSPIRATION, ...)` so the batch is
+  idempotent across re-runs. Migration `0002_loreinspirationcredit`.
+- `evennia_lore/integrations/xp.py` — new module with two collectors:
+  - `collect_lore_authored(window_end)` — 1 XP per published `LoreEntry` authored
+    within the window; skips already-awarded entries via `XPLog` pre-fetch.
+  - `collect_lore_inspiration(window_end)` — 0.5 XP per `(LoreSceneLink, participant)`
+    pair; participant discovery unions `SceneParticipant` rows (gated on
+    `LORE_SCENES_APP_LABEL`) and `RPSessionPartner` rows (gated on
+    `LORE_RPTRACKER_APP_LABEL`); falls back gracefully when either app is absent.
+- Register in `settings.py`:
+  ```python
+  XP_COLLECTORS += [
+      ("lore_authored",    "evennia_lore.integrations.xp.collect_lore_authored"),
+      ("lore_inspiration", "evennia_lore.integrations.xp.collect_lore_inspiration"),
+  ]
+  ```
+
 ## 0.1.1 — consume EditingMixin from evennia-links
 
 - `EditingMixin` removed from `evennia_lore/editing.py` (file deleted). The mixin

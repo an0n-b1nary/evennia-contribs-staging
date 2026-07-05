@@ -79,4 +79,21 @@ renamed to `evennia_lore_title_published_unique` for the same reason.
 
 **FK dependency pinned to `("objects","__first__")`.** Portable across Evennia installs.
 
+## v0.1.2 additions (LoreInspirationCredit + XP integration)
+
+**`LoreInspirationCredit` model.** Added as a same-app FK on `LoreSceneLink`.
+In the source game this model lived in `world/lore/models.py`. In the contrib it
+is at the end of `models.py`. FK to `LoreSceneLink` (direct model reference, not
+string). Its `pk` is used as `source_ref_id` for `XPLog(LORE_INSPIRATION, ...)`
+so the batch is idempotent across re-runs.
+
+**`evennia_lore/integrations/xp.py`.** New module porting
+`world/lore/xp_integration.py` from the source game with three changes:
+- Local `Award` namedtuple removed; uses `from evennia_xp.batch import Award`.
+- `resolve_xp_multiplier` imported from `evennia_xp.gating` (not `world.utils.xp_gating`).
+- `collect_lore_inspiration`'s `SceneParticipant` resolved via
+  `django.apps.get_model(LORE_SCENES_APP_LABEL, "SceneParticipant")` (dynamic);
+  `RPSession` / `RPSessionPartner` gated on `LORE_RPTRACKER_APP_LABEL` being in
+  `INSTALLED_APPS` with a lazy import.
+
 ## v0.1.0 extracted from source MUSH project at commit: _see git tag in private repo_
