@@ -1,5 +1,25 @@
 # Changelog — evennia-rptracker
 
+## 0.1.1 — add XP integration module
+
+- `evennia_rptracker/integrations/xp.py` — new module with XP collector and
+  post-batch hook:
+  - `collect_rp_sessions(window_end)` — yields 1 XP `Award` per eligible
+    `RPSession` (status=COMPLETED, duration ≥ 30 min, ≥ 1 partner,
+    `xp_awarded=False`). Multiplier via `evennia_xp.gating.resolve_xp_multiplier`.
+  - `flip_session_flags(window_end, awards, week_label)` — post-batch hook:
+    sets `xp_awarded=True` / `xp_week` on sessions that have confirmed `XPLog`
+    rows (DB-checked for safety after partial rollbacks).
+- Register in `settings.py`:
+  ```python
+  XP_COLLECTORS += [
+      ("rp_session", "evennia_rptracker.integrations.xp.collect_rp_sessions"),
+  ]
+  XP_POST_BATCH_HOOKS += [
+      "evennia_rptracker.integrations.xp.flip_session_flags",
+  ]
+  ```
+
 ## 0.1.0 — initial extraction
 
 - `RPSession` + `RPSessionPartner` models: passive RP session detection

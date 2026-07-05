@@ -14,6 +14,7 @@ contrib equivalents:
 | `world/rptracker/admin.py` | `admin.py` | Imports rebased |
 | `commands/events/rptracker.py` | `commands.py` | Post-A2 version with pluggable hooks |
 | `world/links/listeners.py` (partial) | `bridges_scenes.py` | Only the `on_rp_activity_recorded` listener |
+| `world/rptracker/xp_integration.py` | `integrations/xp.py` | `collect_rp_sessions` + `flip_session_flags`; local `Award` namedtuple and `resolve_xp_multiplier` rebased onto `evennia_xp.batch` / `evennia_xp.gating` (added v0.1.1) |
 
 ## Structural divergences from source game
 

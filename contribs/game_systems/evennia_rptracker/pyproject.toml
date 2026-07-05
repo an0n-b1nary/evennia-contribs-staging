@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rptracker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Passive RP session detection and tracking for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -33,8 +33,9 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 # Flat layout: package contents live at the same level as this pyproject.toml.
 # Mirrors Evennia upstream's flat per-contrib structure.
 [tool.setuptools]
-packages = ["evennia_rptracker", "evennia_rptracker.migrations"]
+packages = ["evennia_rptracker", "evennia_rptracker.migrations", "evennia_rptracker.integrations"]
 
 [tool.setuptools.package-dir]
 "evennia_rptracker" = "."
 "evennia_rptracker.migrations" = "migrations"
+"evennia_rptracker.integrations" = "integrations"
