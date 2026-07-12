@@ -32,6 +32,12 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.per-file-ignores]
 "tests.py" = ["F401"]      # tests sometimes import for side effects
 "tests/*.py" = ["F401"]
+# example_game/ is a scaffolded Evennia game dir (evennia --init), not a contrib.
+# settings.py uses `from evennia.settings_default import *` (Evennia's required
+# pattern) and has an intentional late import (Decimal), grouped next to the
+# settings that use it rather than hoisted to the top of the file.
+"example_game/server/conf/settings.py" = ["F403", "F405", "E402"]
+"example_game/**/migrations/*" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
