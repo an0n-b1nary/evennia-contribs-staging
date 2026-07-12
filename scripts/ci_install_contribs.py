@@ -1,5 +1,8 @@
 """Iterate contribs, pip-install each, append app labels to INSTALLED_APPS.
 
+Also swaps in a fast (test-only) password hasher so the throwaway game's test
+run isn't dominated by PBKDF2 hashing of the accounts EvenniaTest creates.
+
 Invoked by `.github/workflows/ci.yml` from the repo root with one argument:
 the path to the throwaway Evennia game directory created by `evennia --init`.
 """
@@ -43,6 +46,14 @@ def main(game_dir: pathlib.Path) -> int:
         for label in labels:
             f.write(f'    "{label}",\n')
         f.write("]\n")
+        # Swap in a fast (insecure) password hasher for the test run. Every
+        # contrib built on EvenniaTest creates two accounts per test in setUp,
+        # and each create_account() runs "testpassword" through Django's default
+        # PBKDF2 hasher, which is deliberately slow. MD5 makes those hashes
+        # effectively free without changing behavior (they still verify). This
+        # mirrors Evennia's own dummyrunner profiling mixin. CI/test only.
+        f.write("\n# Fast test-only password hasher (see comment in this script).\n")
+        f.write('PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)\n')
     print(f"Registered {len(labels)} contrib app(s) in {settings_path}")
     return 0
 
