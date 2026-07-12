@@ -104,9 +104,9 @@ a compromise of the whole box (or the other game).
 ### 0. Create the service user (as root)
 
 ```bash
-adduser --disabled-password covsandbox
-sudo -iu covsandbox
-# Everything below runs as covsandbox. sudo is only needed again for
+adduser --disabled-password contrib_sandbox
+sudo -iu contrib_sandbox
+# Everything below runs as contrib_sandbox. sudo is only needed again for
 # steps 7 (systemd) and 8 (nginx/certbot).
 ```
 
@@ -181,11 +181,11 @@ After=network.target
 
 [Service]
 Type=forking
-User=covsandbox
-WorkingDirectory=/home/covsandbox/sandbox/evennia-contribs-staging/example_game
-ExecStart=/home/covsandbox/sandbox/venv/bin/evennia start
-ExecStop=/home/covsandbox/sandbox/venv/bin/evennia stop
-PIDFile=/home/covsandbox/sandbox/evennia-contribs-staging/example_game/server/portal.pid
+User=contrib_sandbox
+WorkingDirectory=/home/contrib_sandbox/sandbox/evennia-contribs-staging/example_game
+ExecStart=/home/contrib_sandbox/sandbox/venv/bin/evennia start
+ExecStop=/home/contrib_sandbox/sandbox/venv/bin/evennia stop
+PIDFile=/home/contrib_sandbox/sandbox/evennia-contribs-staging/example_game/server/portal.pid
 Restart=on-failure
 
 [Install]
