@@ -90,11 +90,24 @@ AMP_PORT = 4106
 # actual domain (anonymity guard).
 SANDBOX_HOSTNAME = "sandbox.YOURDOMAIN"
 
-ALLOWED_HOSTS = [SANDBOX_HOSTNAME]
+# localhost/127.0.0.1 are included so the local dry-run (README) and nginx
+# (which proxies with Host: <hostname>, but health-checks may use localhost)
+# both pass Django's Host header check. Harmless in production — those hosts
+# are only reachable on-box anyway.
+ALLOWED_HOSTS = [SANDBOX_HOSTNAME, "localhost", "127.0.0.1"]
 # nginx (the reverse proxy) talks to the Server from localhost.
 UPSTREAM_IPS = ["127.0.0.1"]
 SERVER_HOSTNAME = SANDBOX_HOSTNAME
 WEBSOCKET_CLIENT_URL = f"wss://{SANDBOX_HOSTNAME}/ws"
+
+# Bind the HTTP webserver-proxy and the websocket to localhost only. nginx
+# (on this same host) reverse-proxies both, and the only public entry points
+# are TLS via the subdomain (HTTP/WS) and telnet on 4100. This keeps plaintext
+# HTTP/WS off every public interface — defense-in-depth alongside the firewall,
+# which opens only telnet. Telnet stays on all interfaces (its default) so MUD
+# clients can reach it directly.
+WEBSERVER_INTERFACES = ["127.0.0.1"]
+WEBSOCKET_CLIENT_INTERFACE = "127.0.0.1"
 # Used by evennia-accessibility's absolute_web_url() and the scenes/plots/
 # calendar |lu MXP link builders so telnet clients get real URLs.
 SITE_URL = f"https://{SANDBOX_HOSTNAME}"

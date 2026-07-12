@@ -206,23 +206,23 @@ class Command(BaseCommand):
         return 1
 
     def _create_boards(self):
+        # Django-model content (boards/posts and the calendar/lore/plot rows
+        # below) has no Evennia tag handler, so it's purged by name/title in
+        # _purge() rather than by the sandbox_default tag.
         from evennia_boards.models import Board
 
-        general = Board.objects.create(
+        Board.objects.create(
             name="General",
             description="OOC discussion.",
             board_type=Board.BoardType.OOC,
             order=0,
         )
-        self._tag_django(general)
-
         cutscenes = Board.objects.create(
             name="Cutscenes",
             description="In-character narrative posts.",
             board_type=Board.BoardType.IC,
             order=1,
         )
-        self._tag_django(cutscenes)
 
         from evennia_boards.models import Post
 
@@ -236,14 +236,6 @@ class Command(BaseCommand):
             ),
         )
         return 2
-
-    def _tag_django(self, instance):
-        """Django models have no tag handler; nothing to do here.
-
-        Purge for these is name-based (see _purge). This helper exists only
-        to make the "we don't tag Django rows" decision explicit at each
-        call site rather than silently absent.
-        """
 
     def _create_calendar_event(self):
         from datetime import UTC, datetime, timedelta
@@ -277,14 +269,22 @@ class Command(BaseCommand):
         return 2
 
     def _create_plot(self):
+        from django.db.models import Max
         from evennia_plots.models import PlotArc, PlotThread
 
+        # PlotArc has no create classmethod, so assign arc_number ourselves.
+        # Compute max+1 (rather than hardcoding 1) and only claim is_current
+        # when no other arc already holds it — otherwise seeding on a DB where
+        # staff already ran +arc would hit the unique arc_number / partial
+        # unique is_current constraints and crash.
+        next_num = (PlotArc.objects.aggregate(m=Max("arc_number")).get("m") or 0) + 1
+        has_current = PlotArc.objects.filter(is_current=True).exists()
         PlotArc.objects.create(
-            arc_number=1,
+            arc_number=next_num,
             name=PLOT_ARC_NAME,
             description="The sandbox's default story arc.",
             arc_type=PlotArc.ArcType.STORY,
-            is_current=True,
+            is_current=not has_current,
         )
         PlotThread.create_thread(
             name=PLOT_THREAD_NAME,

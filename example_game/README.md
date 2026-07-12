@@ -73,8 +73,12 @@ evennia start   # create the superuser when prompted
 evennia seed_sandbox
 ```
 
-Connect with a telnet client to `localhost:4100` or the webclient at
-`http://localhost:4101`, and run through the Verification checklist below.
+Connect with a telnet client to `localhost:4100` and run through the
+Verification checklist below — telnet is the local smoke-test path. The
+webclient at `http://localhost:4101` loads, but its websocket points at
+`WEBSOCKET_CLIENT_URL` (the production subdomain), so the in-page client
+won't fully connect until you're deployed behind nginx with the real
+hostname set.
 
 ---
 
