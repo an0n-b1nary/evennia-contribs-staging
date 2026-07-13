@@ -207,6 +207,7 @@ SANDBOX_HOSTNAME = "sandbox.YOURDOMAIN"
 ALLOWED_HOSTS = [SANDBOX_HOSTNAME, "localhost", "127.0.0.1"]
 SERVER_HOSTNAME = SANDBOX_HOSTNAME
 WEBSOCKET_CLIENT_URL = f"wss://{SANDBOX_HOSTNAME}/ws"
+CSRF_TRUSTED_ORIGINS = [f"https://{SANDBOX_HOSTNAME}"]
 SITE_URL = f"https://{SANDBOX_HOSTNAME}"
 SECRET
 # then edit the first line to your real subdomain
@@ -313,9 +314,14 @@ server {
         proxy_pass http://127.0.0.1:4101;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
+
+`X-Forwarded-Proto` lets Django see the original HTTPS scheme through the proxy —
+without it, secure POSTs (web-admin / login) fail CSRF with a 403. It pairs with
+`SECURE_PROXY_SSL_HEADER` + `CSRF_TRUSTED_ORIGINS` on the app side (steps 4 & B).
 
 ```bash
 ln -s /etc/nginx/sites-available/evennia-sandbox /etc/nginx/sites-enabled/
@@ -368,9 +374,14 @@ via a **DNS challenge**.
            proxy_pass http://127.0.0.1:4101;
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-Proto $scheme;
        }
    }
    ```
+
+   (`X-Forwarded-Proto` is required for the app-side CSRF fix — see step 4's
+   `secret_settings.py` and `SECURE_PROXY_SSL_HEADER` in `settings.py`. Without
+   it, the web-admin/login POST fails CSRF with a 403.)
 
 3. Enable it and — crucially — **disable any default vhost that listens on 80**,
    or nginx won't start at all. A single `listen 80` colliding with the other
@@ -419,6 +430,7 @@ droplet" configuration:
 | systemd stuck at `activating (start)`, Tasks: 1, no ports listening | Same PATH issue, or the manual migrate/first-boot/superuser (step 4) was skipped. |
 | `nginx` won't start / `bind() to 0.0.0.0:80 failed (Address already in use)` | A default vhost with `listen 80` collides with the other game; one bad `listen` aborts all of nginx. Find it with `nginx -T`, disable it (step 8B). |
 | Web client returns **Bad Request (400)** | Request host not in `ALLOWED_HOSTS` → set the real `SANDBOX_HOSTNAME` in `secret_settings.py` and restart (step 4). Means nginx *is* proxying correctly. |
+| Web-admin / login returns **Forbidden (403) CSRF verification failed** | TLS terminates at nginx but Django sees plain HTTP → Origin scheme mismatch. Need `SECURE_PROXY_SSL_HEADER` + `CSRF_TRUSTED_ORIGINS` (steps 4/settings) **and** nginx sending `proxy_set_header X-Forwarded-Proto $scheme;` (step 8). Reload the login page fresh (or clear the site's cookies) after fixing. |
 | Boot fails: `IndentationError: unexpected indent` in `secret_settings.py` | Stray leading whitespace; every line must be flush-left. `sed -i 's/^[[:space:]]*//' server/conf/secret_settings.py`. |
 | DNS TXT / A record "not resolving" | Query a public resolver (`dig +short … @8.8.8.8`) to skip negative caching; check the record **name** wasn't double-suffixed with the domain; allow for slow propagation. |
 | Web client loads but won't connect | Websocket — confirm `WEBSOCKET_CLIENT_URL` = `wss://…/ws` and the nginx `/ws` → `4102` proxy block. |

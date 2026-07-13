@@ -34,6 +34,13 @@ from evennia.settings_default import *
 # This is the name of your game. Make it catchy!
 SERVERNAME = "Contrib Sandbox"
 
+# Use the stock Django admin site instead of Evennia's customized one. Evennia's
+# admin only surfaces its own registered models; with the base site, the
+# contribs' custom models (boards, plots, lore, calendar, jobs, etc.) appear too.
+# Tradeoff: Evennia's own account/object/script admin pages aren't registered on
+# the default site, so they won't show here.
+EVENNIA_ADMIN = False
+
 ######################################################################
 # Contrib apps
 ######################################################################
@@ -99,6 +106,11 @@ ALLOWED_HOSTS = [SANDBOX_HOSTNAME, "localhost", "127.0.0.1"]
 UPSTREAM_IPS = ["127.0.0.1"]
 SERVER_HOSTNAME = SANDBOX_HOSTNAME
 WEBSOCKET_CLIENT_URL = f"wss://{SANDBOX_HOSTNAME}/ws"
+# Django 4+ checks the Origin header on secure POSTs (e.g. the web-admin login
+# form); the browser sends an https origin but nginx proxies to the Server over
+# plain HTTP, so the https origin must be trusted explicitly. Override this in
+# secret_settings.py alongside SANDBOX_HOSTNAME (see README step 4).
+CSRF_TRUSTED_ORIGINS = [f"https://{SANDBOX_HOSTNAME}"]
 
 # Bind the HTTP webserver-proxy and the websocket to localhost only. nginx
 # (on this same host) reverse-proxies both, and the only public entry points
@@ -111,6 +123,12 @@ WEBSOCKET_CLIENT_INTERFACE = "127.0.0.1"
 # Used by evennia-accessibility's absolute_web_url() and the scenes/plots/
 # calendar |lu MXP link builders so telnet clients get real URLs.
 SITE_URL = f"https://{SANDBOX_HOSTNAME}"
+
+# nginx terminates TLS and proxies to the Server over plain HTTP; this header
+# (nginx sends `X-Forwarded-Proto: $scheme`) tells Django the original request
+# was HTTPS, so scheme detection, secure cookies, and the CSRF origin check all
+# work. Generic (no domain), so it lives here, not in secret_settings.py.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # This is a real, persistent, publicly-reachable server — never weaken the
 # password hasher here. A fast MD5 hasher belongs only in a test-suite
