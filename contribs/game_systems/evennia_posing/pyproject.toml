@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-posing"
+version = "0.1.0"
+description = "The pose pipeline for Evennia games: pose/emit/say/semipose capture, pose order tracking, pose headers, and name highlighting."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# No models, so no dependency on evennia-links. This contrib is a peer of
+# evennia-links at the foundational layer, not a consumer of it.
+dependencies = ["evennia>=6.0"]
+
+[project.optional-dependencies]
+# +pot renders a screen-reader-friendly plain list when this is installed
+# and the caller has screenreader_mode enabled. Soft dependency — commands.py
+# falls back to a no-op uses_screenreader() when this extra is absent.
+accessibility = ["evennia-accessibility>=0.1"]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as this pyproject.toml,
+# not in a nested `evennia_posing/` subdirectory. The `package-dir` mapping
+# below tells setuptools to treat "." as the root of the package. This
+# mirrors Evennia upstream's flat per-contrib structure so the `git mv` into
+# `evennia/contrib/...` for upstream submission is a path-only change.
+[tool.setuptools]
+packages = ["evennia_posing"]
+
+[tool.setuptools.package-dir]
+"evennia_posing" = "."
