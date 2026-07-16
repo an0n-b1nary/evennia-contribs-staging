@@ -76,6 +76,12 @@ signal-based decoupling).
   cleared room would be listed as an *empty hangout* forever. This contrib
   adds an `if not hangout: continue` guard. The same bug is still live in
   the source's `discovery.py` and is a candidate for backporting.
+- **Unread-pages notice: closed an unterminated color code.** The source
+  read `"|wYou have N unread pages. Use |wpage/last N|n to view."` — the
+  first `|w` is never closed, so the whole sentence rendered highlighted
+  and only `" to view."` came out plain, the inverse of the obvious intent
+  (highlight just the command). Now `"...unread pages.|n Use |wpage/last
+  N|n to view."`. Fixed in the source too.
 - **`_get_all_rooms()` (fuzzy-match fallback) uses
   `DefaultRoom.objects.all_family()`.** The source filtered on its own
   typeclass path in SQL (`db_typeclass_path__contains="typeclasses.rooms.Room"`),

@@ -144,7 +144,9 @@ class SocialCharacterMixin:
         count = pages.count()
         if count > 0:
             plural = "s" if count != 1 else ""
-            self.msg(f"|wYou have {count} unread page{plural}. Use |wpage/last {count}|n to view.")
+            self.msg(
+                f"|wYou have {count} unread page{plural}.|n Use |wpage/last {count}|n to view."
+            )
         self.last_page_seen = datetime.now(UTC).isoformat()
 
     def msg(self, text=None, from_obj=None, session=None, options=None, **kwargs):
