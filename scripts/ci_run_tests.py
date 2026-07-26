@@ -25,8 +25,12 @@ def main() -> int:
         return 0
 
     print(f"Running tests for: {', '.join(labels)}")
+    # NB: Evennia's --settings takes a bare filename relative to
+    # gamedir/server/conf/ — passing a dotted path makes the launcher prepend
+    # its own "server.conf." prefix, the config import then fails, and the
+    # launcher exits 0 having run ZERO tests (a silently-green CI job).
     result = subprocess.run(
-        ["evennia", "test", "--settings=server.conf.settings", *labels],
+        ["evennia", "test", "--settings=settings.py", *labels],
         check=False,
     )
     return result.returncode
