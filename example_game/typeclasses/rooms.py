@@ -3,25 +3,40 @@ Room
 
 Rooms are simple containers that has no location of their own.
 
-Contrib sandbox extensions:
-- `room_type` — read by evennia_rptracker; only "ic" rooms are tracked
-  (rooms without the attribute default to "ic" from the contrib's side, but
-  we set it explicitly here so seed content can flip specific rooms to "ooc").
+Contrib sandbox extensions (mixin-based, no hand-rolled hooks):
+- `SocialRoomMixin` (evennia_social) — hangout-directory designation
+  (`hangout_type`) and per-room teleport access control (`allow_teleport`),
+  read by `+hangouts`/`+where`/`@tel`.
+- `PosingRoomMixin` (evennia_posing) — pose-sorted character listing (used
+  by `+pot`/`+lastpose`) and name highlighting in room appearance.
+
+Game-owned attributes kept on this class directly (not provided by either
+mixin):
+- `room_type` — a shared game-level attribute read by evennia_rptracker
+  (only "ic" rooms are tracked), evennia_scenes, and evennia_social's
+  `+where`. Owned by no single contrib, per evennia_social's README
+  attribute table — rooms without it default to "ic" on the rptracker
+  side, but we set it explicitly here so seed content can flip specific
+  rooms to "ooc".
 - `active_scene_id` — evennia_scenes' integration contract: the room stores
   the active scene's pk here, an Evennia Attribute (not a Django FK), so
   cross-domain consumers (rptracker's scene bridge) can read it without a
   hard dependency on evennia_scenes.
 - `at_object_receive` override — registers arriving player characters as
   scene participants, per evennia_scenes' "Wire capture hooks" recipe.
+  Evennia ships no room-receive signal, so this stays hand-wired.
 """
 
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
 
+from evennia_posing import PosingRoomMixin
+from evennia_social import SocialRoomMixin
+
 from .objects import ObjectParent
 
 
-class Room(ObjectParent, DefaultRoom):
+class Room(SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom):
     """
     Rooms are like any Object, except their location is None
     (which is default). They also use basetype_setup() to

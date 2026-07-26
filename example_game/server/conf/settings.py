@@ -58,9 +58,13 @@ INSTALLED_APPS += [
     "evennia_jobs",
     "evennia_xp",
     "evennia_accessibility",
-    # This game's own glue module + seed_sandbox management command. No
-    # models — registered only so Django's management-command autodiscovery
-    # finds world/sandbox/management/commands/.
+    "evennia_posing",
+    "evennia_social",
+    # This game's own glue module + seed_sandbox management command, plus
+    # (via its apps.py) the pose_recorded signal connect. No models —
+    # registered only so Django's management-command autodiscovery finds
+    # world/sandbox/management/commands/, and so apps.py's AppConfig is
+    # discovered and its ready() runs.
     "world.sandbox",
 ]
 
@@ -73,6 +77,55 @@ OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = (
     "Boolean",
     False,
 )
+
+######################################################################
+# Posing (evennia-posing) — account options the contrib expects the game
+# to register (see its README §"Register the account options"). Without
+# these, +poseheader/+highlight raise "Option not found!".
+######################################################################
+
+OPTIONS_ACCOUNT_DEFAULT["show_pose_headers"] = (
+    "Show character name headers above poses.",
+    "Boolean",
+    True,
+)
+OPTIONS_ACCOUNT_DEFAULT["pose_header_format"] = (
+    "Format string for pose headers ({name} placeholder required).",
+    "Text",
+    "--- {name} ---",
+)
+OPTIONS_ACCOUNT_DEFAULT["pose_separator"] = (
+    "Visual separator between poses.",
+    "Text",
+    "",
+)
+OPTIONS_ACCOUNT_DEFAULT["highlight_enabled"] = (
+    "Highlight character names in poses and room descriptions.",
+    "Boolean",
+    True,
+)
+OPTIONS_ACCOUNT_DEFAULT["highlight_self_color"] = (
+    "Color for your own name in poses.",
+    "Color",
+    "w",
+)
+OPTIONS_ACCOUNT_DEFAULT["highlight_others_color"] = (
+    "Color for other character names.",
+    "Color",
+    "c",
+)
+
+######################################################################
+# Social (evennia-social) — see its README §"Register the settings this
+# contrib reads".
+######################################################################
+
+# Dbref of the OOC hub room. Required for +ooc and +home's fallback.
+OOC_ROOM_DBREF = "#2"
+
+# "visited" restricts player @tel to rooms they've visited or control;
+# "open" allows any public room.
+TELEPORT_MODE = "visited"
 
 ######################################################################
 # Networking — shifted port block

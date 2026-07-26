@@ -3,7 +3,7 @@
 A persistent, hand-tested downstream Evennia 6.0 game that installs and wires
 together every contrib in this repo. It exists for two reasons:
 
-1. **Reference integration.** It's the "how do these 10 contribs actually get
+1. **Reference integration.** It's the "how do these 12 contribs actually get
    wired into a real game" example this repo otherwise lacks — settings,
    cmdsets, server hooks, and the typeclass seams that can't auto-wire.
 2. **A living sandbox to hand-test against**, as new contribs (Regions, Maps,
@@ -16,16 +16,19 @@ part of this repo).
 
 ## What's wired up
 
-All 10 current contribs, in dependency order — `evennia_links` first, then
+All 12 current contribs, in dependency order — `evennia_links` first, then
 the five apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`), then the four standalone
 apps (`evennia_calendar`, `evennia_jobs`, `evennia_xp`,
-`evennia_accessibility`). See `server/conf/settings.py` for the full
-`INSTALLED_APPS` list and every XP/rptracker/lore/boards/plots setting.
+`evennia_accessibility`), then the pose/social layer (`evennia_posing`
+before `evennia_social` — social hard-depends on posing). See
+`server/conf/settings.py` for the full `INSTALLED_APPS` list and every
+XP/rptracker/lore/boards/plots/posing/social setting.
 
 **Settings hooks point at the contribs' own shipped integration functions**
-(`evennia_*.integrations.*`), not at hand-written glue — except five
-dotted-path settings that have no shipped default:
+(`evennia_*.integrations.*`), not at hand-written glue — except the
+dotted-path settings below (three wired to `world/sandbox/glue.py`, two
+deliberately omitted):
 
 | Setting | Wired to |
 |---|---|
@@ -35,11 +38,18 @@ dotted-path settings that have no shipped default:
 | `RPTRACKER_XP_PROJECTION` | left `None` (cosmetic-only `+activity` lines) |
 | plots' `XP_POST_BATCH_HOOKS` entry | omitted — no `flip_thread_flags` equivalent ships |
 
-**Typeclass seams** (`typeclasses/characters.py`, `typeclasses/rooms.py`,
-`commands/pose_seam.py`) feed `evennia_rptracker` and `evennia_scenes` on
-every pose/say and room entry — these cannot auto-wire per each contrib's
-README ("Evennia ships no room-receive signal; you must call this
-manually").
+**Typeclass seams.** `typeclasses/characters.py` and `typeclasses/rooms.py`
+mix in `SocialCharacterMixin`/`PosingCharacterMixin` and
+`SocialRoomMixin`/`PosingRoomMixin` (social before posing, so ignore-
+filtering runs before header/highlight in the cooperative `msg()` chain —
+see both contribs' READMEs). Pose/say/emit activity reaches
+`evennia_rptracker` and `evennia_scenes` through `evennia_posing`'s
+`pose_recorded` signal: `world/sandbox/apps.py` connects it, at server
+start, to the single ordered listener in `world/sandbox/glue.py`, which
+calls `capture_to_scene` then `record_rp_activity`. The one seam that still
+can't auto-wire is `Room.at_object_receive` → `evennia_scenes`'
+`register_room_entry`, per that contrib's README ("Evennia ships no
+room-receive signal; you must call this manually").
 
 Not yet extracted as contribs: Regions, Maps, crafting. This sandbox will
 grow to cover them as they land.
@@ -65,7 +75,9 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_calendar \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
-         contribs/utils/evennia_accessibility; do
+         contribs/utils/evennia_accessibility \
+         contribs/game_systems/evennia_posing \
+         contribs/game_systems/evennia_social; do
     pip install -e "$d"
 done
 cd example_game
@@ -186,7 +198,9 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_calendar \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
-         contribs/utils/evennia_accessibility; do
+         contribs/utils/evennia_accessibility \
+         contribs/game_systems/evennia_posing \
+         contribs/game_systems/evennia_social; do
     pip install -e "$d"
 done
 ```
@@ -458,9 +472,13 @@ Two mechanisms, for two different needs:
    `telnet sandbox.YOURDOMAIN 4100` both connect.
 3. **Every contrib runs** — one command each, no import/lock/settings
    errors: `+bb`, `+calendar`, `+request`, `+lore`, `+plot`, `+xp`,
-   `+activity`, `+scene`.
-4. **Seams fire** — pose in a seeded room, then `+activity` shows a tracked
-   RP session and `+scene` (after `+scene/open`) shows auto-captured poses.
+   `+activity`, `+scene`, `+pot`, `+lastpose`, `+finger`, `+where`,
+   `+hangouts`, `page`.
+4. **Seams fire** — pose in a seeded room; the pose fires evennia_posing's
+   `pose_recorded` signal, which the listener in `world/sandbox/glue.py`
+   fans out to `capture_to_scene` and `record_rp_activity` — confirm with
+   `+activity` (shows a tracked RP session) and `+scene` after `+scene/open`
+   (shows the auto-captured pose).
 5. **Seeder is idempotent** — run `evennia seed_sandbox` twice; no
    duplicate rooms/boards/entries.
 6. **Golden reset works** — make a throwaway change, run
