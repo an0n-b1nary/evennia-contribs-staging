@@ -99,3 +99,6 @@ dmypy.json
 
 # Internal roadmap — names the source project explicitly, never commit.
 PLAN.md
+
+# Throwaway game dir created when replicating CI locally (see ci.yml).
+ci_game/

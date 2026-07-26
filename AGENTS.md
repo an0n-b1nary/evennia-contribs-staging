@@ -31,7 +31,9 @@ must pass on every commit. `PLAN.md` is gitignored and must stay that way.
 
 ## Running checks
 
-Use a Python 3.12 venv with `evennia>=6.0` and every contrib installed
+Use a Python 3.12 venv with `evennia==6.0.0` (pinned to the source project's
+runtime — CI installs the same; the contrib packages themselves declare the
+wider `evennia>=6.0`) and every contrib installed
 editable (`pip install -e`, in dependency order — see the install loop in
 `example_game/README.md`; `evennia_links` first, `evennia_posing` before
 `evennia_social`).

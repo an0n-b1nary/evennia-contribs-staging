@@ -47,7 +47,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Evennia
-        run: pip install evennia
+        # Pinned to the Evennia version the source project runs on.
+        # Bump deliberately, in lockstep with the source project's runtime.
+        run: pip install evennia==6.0.0
       - name: Initialize throwaway game directory
         run: evennia --init ci_game
       - name: Install all contribs and register their apps
