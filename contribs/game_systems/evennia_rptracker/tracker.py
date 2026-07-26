@@ -124,11 +124,25 @@ def _flush_session(char_id, state):
 
     Also syncs RPSessionPartner records with current partner_pose_counts.
     Resets pending_pose_count to 0.
+
+    If the RPSession row no longer exists (rolled-back test transaction,
+    manual DB purge, or crash between activation and flush), the in-memory
+    entry is stale: the pose_count update would silently no-op, but the
+    partner sync would insert rows whose FK references the missing session —
+    which detonates later at commit time under SQLite's deferred FK checks
+    (surfaced when other apps' test suites ran with game glue feeding
+    record_rp_activity() inside rolled-back transactions). Drop the stale
+    entry instead; the next record_rp_activity() starts a fresh pending
+    state.
     """
     from evennia_rptracker.models import RPSession, RPSessionPartner
 
     session_id = state.get("session_id")
     if not session_id:
+        return
+
+    if not RPSession.objects.filter(pk=session_id).exists():
+        _active_sessions.pop(char_id, None)
         return
 
     pending = state.get("pending_pose_count", 0)

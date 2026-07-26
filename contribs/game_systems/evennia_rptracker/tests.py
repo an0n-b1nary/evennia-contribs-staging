@@ -320,6 +320,55 @@ class TestTrackerRecordRpActivity(EvenniaTest):
         self.assertEqual(session.status, RPSession.Status.COMPLETED)
 
 
+class TestStaleSessionStateSelfHeals(EvenniaTest):
+    """Regression: a stale _active_sessions entry whose RPSession row has
+    vanished must be dropped on flush instead of writing orphaned
+    RPSessionPartner rows.
+
+    The contaminated state arises across Django TestCase boundaries when
+    game glue feeds record_rp_activity(): each test's transaction rolls back
+    (deleting the RPSession row and recycling SQLite row ids) while the
+    process-global _active_sessions dict survives. On the next flush, the
+    partner sync would INSERT a row referencing the missing session, and
+    SQLite's deferred FK check would detonate at commit — as an error in an
+    unrelated later test. The flush must self-heal instead.
+    """
+
+    def setUp(self):
+        super().setUp()
+        _clear_tracker()
+        self.room1.room_type = "ic"
+        self.char2.last_pose_time = time.time()
+
+    def tearDown(self):
+        super().tearDown()
+        _clear_tracker()
+
+    def test_flush_drops_stale_state_without_writing_partner_rows(self):
+        from evennia_rptracker import tracker
+
+        # Activate a real session through the public path.
+        tracker.record_rp_activity(self.char1, self.room1)
+        tracker.record_rp_activity(self.char1, self.room1)
+        session_id = tracker.get_active_session_id(self.char1.id)
+        self.assertIsNotNone(session_id)
+
+        # Simulate the row vanishing (rollback / purge) while the in-memory
+        # state survives — the cross-suite contamination shape.
+        RPSession.objects.filter(pk=session_id).delete()
+
+        # Drive poses past the flush threshold: must not raise, must not
+        # write any partner row referencing the vanished session.
+        for _ in range(tracker.POSE_FLUSH_THRESHOLD + 1):
+            tracker.record_rp_activity(self.char1, self.room1)
+
+        self.assertFalse(RPSessionPartner.objects.filter(session_id=session_id).exists())
+        # The stale entry was dropped; any fresh state started over as
+        # pending with no session id.
+        state = tracker.get_session_state(self.char1.id)
+        self.assertTrue(state is None or state["session_id"] != session_id)
+
+
 # ---------------------------------------------------------------------------
 # Anti-gaming tests
 # ---------------------------------------------------------------------------
