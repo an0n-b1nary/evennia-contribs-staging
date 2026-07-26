@@ -123,6 +123,21 @@ automatically excluded from tracking and partner detection.
 
 ---
 
+## Recommended companion: evennia-posing
+
+The `last_pose_time` seam documented above (set on each pose, cleared on
+disconnect) is satisfied out of the box by
+[evennia-posing](../evennia_posing)'s `PosingCharacterMixin`. Its
+`record_pose()` fires a `pose_recorded` signal on every pose/emit/say, and
+a single ordered game-side listener can call `record_rp_activity()` from
+it — no `at_say`/pose-command overrides needed. Reference wiring in this
+repo: `example_game/world/sandbox/glue.py` (listener) and
+`example_game/world/sandbox/apps.py` (signal connect). This is a
+documentation cross-reference only — evennia-rptracker gains no dependency
+on evennia-posing.
+
+---
+
 ## Settings reference
 
 Add any of these to `server/conf/settings.py`. All have sensible defaults.

@@ -44,8 +44,9 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-accessibility` (utils) — screen-reader helpers, accessible Django forms, MXP link conventions
 - `evennia-links` (base_systems) — shared bridge-model base classes, edit-history & soft-delete mixins, optional notification dispatcher
 
-**RP infrastructure** (each depends on `evennia-links`)
-- `evennia-rp-social` (game_systems) — social foundation for RP games: ignore/mute, pose tracker, extended profiles, location discovery, instant teleport shortcuts, private messaging
+**RP infrastructure** (all but the posing/social layer depend on `evennia-links`; posing and social are model-free and depend only on each other)
+- `evennia-posing` (game_systems) — the pose pipeline: pose/emit/semipose capture, pose-order tracker, pose headers, name highlighting; foundation other RP systems build on
+- `evennia-social` (game_systems) — social QoL layer on evennia-posing: profiles, player/venue discovery, page, ignore/mute, consensual teleportation, OOC chat, navigation shortcuts
 - `evennia-regions` (game_systems) — geographic grouping of rooms with soft-archive and web views
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns

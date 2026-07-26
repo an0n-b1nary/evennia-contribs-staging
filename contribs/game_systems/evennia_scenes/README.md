@@ -123,6 +123,23 @@ attribute is the only surface this contrib exposes to consumers.
 
 ---
 
+## Recommended companion: evennia-posing
+
+The character-side capture hook above (`capture_to_scene` on every
+pose/say/emit) is satisfied out of the box by
+[evennia-posing](../evennia_posing): its `pose_recorded` signal fires on
+every pose/emit/say/semipose, and a single ordered game-side listener can
+call `capture_to_scene(character, pose_text, log_type=pose_type)` — the
+pass-through also covers `pose_type="ooc"` from evennia-social's `+ooc`,
+which maps onto `LogEntry.LogType.OOC`. Reference wiring in this repo:
+`example_game/world/sandbox/glue.py` and `example_game/world/sandbox/apps.py`.
+The room-side `register_room_entry` hook still cannot auto-wire (Evennia
+ships no room-receive signal) and stays in the game's
+`Room.at_object_receive`. Documentation cross-reference only — no
+dependency is added.
+
+---
+
 ## Settings
 
 | Setting | Default | Description |
