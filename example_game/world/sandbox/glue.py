@@ -1,5 +1,6 @@
 """Sandbox glue — the handful of dotted-path settings hooks that have no
-shipped contrib default.
+shipped contrib default, plus the single ordered signal listener for
+evennia_posing's `pose_recorded`.
 
 Every other cross-contrib wiring point in this game (XP collectors,
 antigaming sweeps, scene display) is a function shipped inside a contrib
@@ -16,7 +17,18 @@ such in its owning contrib's README/settings-reference table):
 That these three must be hand-written here — instead of shipping as optional
 adapters inside evennia_rptracker/evennia_boards/evennia_lore — is itself a
 sandboxing finding worth feeding back upstream.
+
+This module also holds `on_pose_recorded`, the single ordered listener for
+`evennia_posing.pose_recorded` (see that contrib's README §"Wire the
+pose_recorded signal"). Unlike the three hooks above, it isn't a dotted-path
+setting — it's connected once in `world/sandbox/apps.py`'s `SandboxConfig.
+ready()` with a `dispatch_uid`. It fans each recorded pose/emit/say out to
+evennia_scenes and evennia_rptracker in a fixed order.
 """
+
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 def rptracker_flag_review_hook(title, description):
@@ -81,3 +93,41 @@ def lore_session_context_provider(session):
         )
 
     return {"room_id": room_id, "region_id": None, "thread_ids": thread_ids}
+
+
+def on_pose_recorded(sender, character, pose_text, pose_type, location, **kwargs):
+    """Single ordered listener for evennia_posing's pose_recorded signal.
+
+    Connected once in world/sandbox/apps.py (SandboxConfig.ready) with a
+    dispatch_uid. Django does not guarantee delivery order across multiple
+    independent receivers, so both downstream consumers are called from
+    this one receiver, in this order:
+
+    1. evennia_scenes.capture.capture_to_scene — scene state first, so
+       rptracker's session bookkeeping runs after any scene updates.
+       log_type is passed through from pose_type; "ooc" (fired by
+       evennia_social's CmdOoc) maps onto LogEntry.LogType.OOC.
+    2. evennia_rptracker.record_rp_activity — skipped when location is
+       None (the signal allows a None location; rptracker needs a room).
+
+    Each call is wrapped so one failing consumer cannot break the other
+    or the caller — record_pose() fires this synchronously from the
+    pose/say code path, so an escaping exception would surface to the
+    posing player. Failures are logged with traceback.
+    """
+    from evennia_scenes.capture import capture_to_scene
+
+    try:
+        capture_to_scene(character, pose_text, log_type=pose_type)
+    except Exception:
+        _logger.exception("on_pose_recorded: capture_to_scene failed")
+
+    if location is None:
+        return
+
+    from evennia_rptracker import record_rp_activity
+
+    try:
+        record_rp_activity(character, location)
+    except Exception:
+        _logger.exception("on_pose_recorded: record_rp_activity failed")

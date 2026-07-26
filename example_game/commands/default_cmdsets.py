@@ -24,7 +24,30 @@ from evennia_rptracker.commands import CmdActivity, CmdRPTrackerStaff
 from evennia_scenes.commands import CmdLog, CmdScene
 from evennia_xp.commands import CmdXp
 
-from commands.pose_seam import CmdSandboxPose
+from evennia_posing.commands import (
+    CmdEmit,
+    CmdHighlight,
+    CmdLastPose,
+    CmdPose,
+    CmdPoseHeader,
+    CmdPot,
+    CmdSemipose,
+)
+from evennia_social.commands import (
+    CmdFinger,
+    CmdHangouts,
+    CmdHome,
+    CmdIgnore,
+    CmdJoin,
+    CmdOoc,
+    CmdOocTeleport,
+    CmdPage,
+    CmdRoomConfig,
+    CmdRoulette,
+    CmdSummon,
+    CmdTel,
+    CmdWhere,
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -42,9 +65,30 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         """
         super().at_cmdset_creation()
 
-        # Replaces the stock pose/emote command — same behavior, plus the
-        # rptracker/scenes seam calls. See commands/pose_seam.py.
-        self.add(CmdSandboxPose)
+        # Pose pipeline (evennia_posing) — CmdPose replaces Evennia's stock
+        # pose/emote command, the same way the old hand-rolled stopgap did.
+        self.add(CmdPose)
+        self.add(CmdEmit)
+        self.add(CmdSemipose)
+        self.add(CmdPot)
+        self.add(CmdLastPose)
+        self.add(CmdPoseHeader)
+        self.add(CmdHighlight)
+
+        # Social QoL (evennia_social) — CmdTel replaces Evennia's stock @tel.
+        self.add(CmdFinger)
+        self.add(CmdWhere)
+        self.add(CmdHangouts)
+        self.add(CmdIgnore)
+        self.add(CmdPage)
+        self.add(CmdSummon)
+        self.add(CmdJoin)
+        self.add(CmdOoc)
+        self.add(CmdOocTeleport)
+        self.add(CmdHome)
+        self.add(CmdRoomConfig)
+        self.add(CmdRoulette)
+        self.add(CmdTel)
 
         # RP session tracking
         self.add(CmdActivity)
