@@ -276,7 +276,7 @@ class TestLoreRegionLink(EvenniaTest):
 
 class TestBuildPool(EvenniaTest):
     def _session(self, room=None):
-        from world.rptracker.models import RPSession
+        from evennia_rptracker.models import RPSession
 
         return RPSession.objects.create(
             character=self.char1,
@@ -363,7 +363,7 @@ class TestBuildPool(EvenniaTest):
 
 class TestSelectPassiveLore(EvenniaTest):
     def _session(self):
-        from world.rptracker.models import RPSession
+        from evennia_rptracker.models import RPSession
 
         return RPSession.objects.create(
             character=self.char1,
