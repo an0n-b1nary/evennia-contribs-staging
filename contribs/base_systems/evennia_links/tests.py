@@ -87,30 +87,34 @@ class DocVersionProbe(AbstractVersion):
 
 
 class ProbeTablesTest(EvenniaTest):
-    """Base test that creates/drops the probe model tables via the schema editor.
+    """Base test that creates the probe model tables via the schema editor.
 
     The contrib ships no migrations (it only exports abstract models), so the
-    concrete probe tables don't exist in the test database by default. We build
-    them with the schema editor *before* EvenniaTest's class-level atomic block
-    opens (and drop them after it closes), because SQLite's schema editor cannot
-    toggle foreign-key checks inside an open transaction.
+    concrete probe tables don't exist in the test database by default. We
+    build them with the schema editor *before* EvenniaTest's class-level
+    atomic block opens, because SQLite's schema editor cannot toggle
+    foreign-key checks inside an open transaction.
+
+    The tables are created if missing and NEVER dropped. The probe classes
+    stay registered in Django's app registry for the whole process once this
+    module is imported, so any later ObjectDB hard-delete — in *any* app's
+    test suite sharing the process — makes Django's deletion collector query
+    these tables; dropping them turned that into
+    ``sqlite3.OperationalError: no such table: evennia_links_plainlinkprobe``
+    in unrelated contribs' tests during combined runs. Empty throwaway
+    tables in a test database are harmless; missing ones are not.
     """
 
     probe_models = (PlainLinkProbe, AuthoredLinkProbe, DocProbe, DocVersionProbe)
 
     @classmethod
     def setUpClass(cls):
+        existing = connection.introspection.table_names()
         with connection.schema_editor() as schema_editor:
             for model in cls.probe_models:
-                schema_editor.create_model(model)
+                if model._meta.db_table not in existing:
+                    schema_editor.create_model(model)
         super().setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        with connection.schema_editor() as schema_editor:
-            for model in reversed(cls.probe_models):
-                schema_editor.delete_model(model)
 
 
 # ---------------------------------------------------------------------------
