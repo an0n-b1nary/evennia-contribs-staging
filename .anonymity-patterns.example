@@ -20,3 +20,11 @@
 \bExampleAcronym\b
 i:example full project name
 i:\bexample_package_slug\b
+
+# Source-tree module paths (SAFE to commit — no identity content). An import
+# of a source-game domain app that survives extraction-strip breaks the
+# contrib standalone and reveals the source layout. Scoped to import
+# statements only: MIGRATION_NOTES.md legitimately names these apps in prose
+# (backticked, never in `from ...`/`import ...` form).
+from world\.(rptracker|scenes|lore|links|xp|plots|boards|jobs|calendar|regions|npcs)\b
+import world\.(rptracker|scenes|lore|links|xp|plots|boards|jobs|calendar|regions|npcs)\b
