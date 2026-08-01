@@ -42,6 +42,23 @@ class Scene(AbstractArchived):
         # Only invited characters (and staff) can view or pose.
         VIEW_PRIVATE = "view_private", "View-Private"
 
+    # The single answer to "may a web visitor read this scene's log?" — used
+    # by SceneListView, SceneDetailView, the log history/diff views and the
+    # DRF SceneViewSet, which must agree with each other. Games adding their
+    # own surface (a map overlay, a search index) should ask this too rather
+    # than re-deriving the rule.
+    #
+    # Deliberately a membership test rather than "not VIEW_PRIVATE". The two
+    # are equivalent only while there are exactly three tiers; stated this way
+    # a tier added later is private until it is named here, so forgetting to
+    # classify it fails closed instead of publishing it.
+    WEB_READABLE_PRIVACY = (Privacy.PUBLIC, Privacy.POSE_PRIVATE)
+
+    @classmethod
+    def is_web_readable(cls, privacy):
+        """Return True if *privacy* (a Privacy value) is world-readable on the web."""
+        return privacy in cls.WEB_READABLE_PRIVACY
+
     title = models.CharField(
         max_length=200,
         blank=True,

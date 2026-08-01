@@ -12,6 +12,9 @@ when this package is imported during Django's app-loading phase):
     LogEntryVersion   — append-only edit history for LogEntry
     Status            — Scene.Status enum (OPEN / ACTIVE / CLOSED)
     Privacy           — Scene.Privacy enum (PUBLIC / POSE_PRIVATE / VIEW_PRIVATE)
+                        Scene.WEB_READABLE_PRIVACY / Scene.is_web_readable(tier)
+                        are the canonical "may a web visitor read this log?"
+                        rule — ask them rather than re-deriving the tier set.
     Role              — SceneParticipant.Role enum (PARTICIPANT / OBSERVER)
     LogType           — LogEntry.LogType enum (POSE / EMIT / SAY / OOC / …)
 
@@ -34,7 +37,7 @@ Web/API surface (requires [web] extra):
     # API: include("evennia_scenes.api.urls") at /api/v1/ or similar
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from evennia_scenes.signals import (
     log_entry_created,

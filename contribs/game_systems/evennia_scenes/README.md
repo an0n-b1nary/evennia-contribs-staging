@@ -160,6 +160,20 @@ dependency is added.
 Closed `public` and `pose-private` scenes appear in the web log browser
 automatically — no separate publish step is needed.
 
+If you add your own web surface (a map overlay, a search index, a digest
+email), decide visibility with the model's own rule rather than rewriting the
+tier list:
+
+```python
+Scene.objects.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)   # querysets
+Scene.is_web_readable(scene.privacy)                            # single scene
+```
+
+Stated as membership rather than "not view-private" on purpose: if you
+subclass or extend the tiers, a tier you have not classified stays private
+until you add it to `WEB_READABLE_PRIVACY`, instead of being published by
+default.
+
 ---
 
 ## Commands

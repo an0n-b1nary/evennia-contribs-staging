@@ -817,6 +817,92 @@ class TestSceneDetailViewVisibility(EvenniaTest):
             SceneDetailView.as_view()(self._anon_get(), pk=self.scene.pk)
 
 
+class TestWebReadableParityAcrossTiers(EvenniaTest):
+    """Every consumer of Scene privacy answers "is this log public?" the same
+    way, for every tier that exists.
+
+    These used to be two encodings of one rule: SceneListView and the DRF
+    SceneViewSet filtered ``privacy__in [PUBLIC, POSE_PRIVATE]`` while
+    _can_view_scene() tested ``!= VIEW_PRIVATE``. Equivalent only while there
+    are exactly three tiers — a game adding a fourth would have had it hidden
+    from the listing but served by SceneDetailView and the history/diff
+    drill-downs, which is the whole surface _can_view_scene() guards.
+
+    Written as a loop over Scene.Privacy.choices rather than a case per tier,
+    so a tier added downstream is covered the moment it is declared: it fails
+    here unless it is classified in WEB_READABLE_PRIVACY and every consumer
+    agrees about it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _anon_get(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        req = self.factory.get("/")
+        req.user = AnonymousUser()
+        return req
+
+    def test_listing_and_detail_agree_for_every_declared_tier(self):
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_scenes.views import SceneDetailView, SceneListView
+
+        for tier in Scene.Privacy.values:
+            with self.subTest(tier=tier):
+                scene = _open_scene(self.room1, self.char1)
+                scene.status = Scene.Status.CLOSED
+                scene.privacy = tier
+                scene.save()
+                expected = Scene.is_web_readable(tier)
+
+                listed = SceneListView().get_queryset().filter(pk=scene.pk).exists()
+                self.assertEqual(
+                    listed, expected, f"SceneListView disagrees with is_web_readable() for {tier}"
+                )
+
+                if expected:
+                    resp = SceneDetailView.as_view()(self._anon_get(), pk=scene.pk)
+                    self.assertEqual(resp.status_code, 200)
+                else:
+                    with self.assertRaises(
+                        PermissionDenied,
+                        msg=f"detail view served a non-web-readable tier ({tier}) to anonymous",
+                    ):
+                        SceneDetailView.as_view()(self._anon_get(), pk=scene.pk)
+                scene.delete()
+
+    def test_api_queryset_agrees_for_every_declared_tier(self):
+        # Requires the [web] extra; DRF's Request wrapper supplies the
+        # .query_params SceneViewSet.get_queryset() reads.
+        from rest_framework.request import Request
+
+        from evennia_scenes.api.views import SceneViewSet
+
+        for tier in Scene.Privacy.values:
+            with self.subTest(tier=tier):
+                scene = _open_scene(self.room1, self.char1)
+                scene.status = Scene.Status.CLOSED
+                scene.privacy = tier
+                scene.save()
+
+                viewset = SceneViewSet()
+                viewset.request = Request(self.factory.get("/"))
+                exposed = viewset.get_queryset().filter(pk=scene.pk).exists()
+                self.assertEqual(
+                    exposed,
+                    Scene.is_web_readable(tier),
+                    f"SceneViewSet disagrees with is_web_readable() for {tier}",
+                )
+                scene.delete()
+
+    def test_web_readable_privacy_is_a_subset_of_declared_tiers(self):
+        """A tier removed from Privacy must not linger in the readable set."""
+        self.assertTrue(set(Scene.WEB_READABLE_PRIVACY).issubset(set(Scene.Privacy.values)))
+
+
 class TestLogEntryDiffViewColorblindSafe(EvenniaTest):
     """The diff view must carry +/- text prefixes + CSS classes (not color alone)."""
 

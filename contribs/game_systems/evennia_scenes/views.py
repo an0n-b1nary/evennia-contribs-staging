@@ -43,8 +43,17 @@ VERSIONS_PER_PAGE = 20
 
 
 def _can_view_scene(scene, request):
-    """Return True if the request may view this scene."""
-    if scene.privacy != Scene.Privacy.VIEW_PRIVATE:
+    """Return True if the request may view this scene.
+
+    Web-readable tiers are world-readable; every other tier is visible only
+    to staff and invited participants.
+
+    Asks Scene.is_web_readable() rather than testing != VIEW_PRIVATE. The two
+    agree only while there are exactly three tiers, and this predicate gates
+    SceneDetailView plus the log history/diff drill-downs — of the two ways
+    to be wrong about a tier added later, serving it is the bad one.
+    """
+    if Scene.is_web_readable(scene.privacy):
         return True
     if is_staff_user(request):
         return True
@@ -67,7 +76,7 @@ class SceneListView(ListView):
     def get_queryset(self):
         return Scene.objects.filter(
             status=Scene.Status.CLOSED,
-            privacy__in=[Scene.Privacy.PUBLIC, Scene.Privacy.POSE_PRIVATE],
+            privacy__in=Scene.WEB_READABLE_PRIVACY,
         ).order_by("-ended_at")
 
     def get_context_data(self, **kwargs):

@@ -1,5 +1,24 @@
 # Changelog — evennia-scenes
 
+## [0.2.0] — 2026-08-01
+
+### Added
+- `Scene.WEB_READABLE_PRIVACY` and `Scene.is_web_readable(privacy)` — the
+  canonical answer to "may a web visitor read this scene's log?", declared
+  next to the `Privacy` enum. Games adding their own web surface should ask
+  these rather than re-deriving the tier set.
+
+### Fixed
+- **Privacy could fail open on an added tier.** `SceneListView` and the DRF
+  `SceneViewSet` filtered `privacy__in [PUBLIC, POSE_PRIVATE]`, while
+  `_can_view_scene()` — which gates `SceneDetailView`, `LogEntryHistoryView`
+  and `LogEntryDiffView` — tested `!= VIEW_PRIVATE`. Those agree only while
+  exactly three tiers exist. A game adding a fourth tier got it hidden from
+  the listing and the API but *served* by the detail page and the edit-history
+  drill-downs. All consumers now ask `is_web_readable()`, which is a
+  membership test, so an unclassified tier is private everywhere.
+  No behaviour change for the three shipped tiers; no migration.
+
 ## [0.1.0] — 2026-06-14
 
 Initial extraction from source MUSH project.

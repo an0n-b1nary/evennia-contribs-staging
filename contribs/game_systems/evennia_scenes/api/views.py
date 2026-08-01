@@ -25,9 +25,10 @@ from evennia_scenes.models import LogEntry, Scene
 class SceneViewSet(ReadOnlyModelViewSet):
     """Closed public scenes.
 
-    Only PUBLIC and POSE_PRIVATE scenes are exposed in the API.
-    VIEW_PRIVATE scenes are excluded to avoid leaking sensitive content to
-    unauthenticated or uninvited observers.
+    Only web-readable tiers (Scene.WEB_READABLE_PRIVACY — PUBLIC and
+    POSE_PRIVATE) are exposed in the API. Every other tier is excluded to
+    avoid leaking sensitive content to unauthenticated or uninvited
+    observers.
 
     Usage::
 
@@ -47,7 +48,7 @@ class SceneViewSet(ReadOnlyModelViewSet):
     ordering = ["-created_at"]  # noqa: RUF012
 
     def get_queryset(self):
-        qs = Scene.objects.filter(privacy__in=[Scene.Privacy.PUBLIC, Scene.Privacy.POSE_PRIVATE])
+        qs = Scene.objects.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)
         status = self.request.query_params.get("status")
         qs = qs.filter(status=status) if status else qs.filter(status=Scene.Status.CLOSED)
         return qs
