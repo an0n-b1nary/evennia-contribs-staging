@@ -61,6 +61,41 @@ editable (`pip install -e`, in dependency order — see the install loop in
   MD5 hasher (throwaway games get it from `ci_install_contribs.py`;
   `example_game` has it in `test_settings.py`).
 
+## Landing a new contrib — wiring `example_game` is part of the job
+
+**An extraction is not finished when the package is written and its own suite
+passes. It is finished when `example_game` installs and exercises it.** Treat
+the sandbox wiring as a required phase of every extraction, not a follow-up.
+
+Three classes of defect are invisible to a contrib's own tests and only appear
+in a game that loads everything together:
+
+- **Install-order and app-registry faults** — `INSTALLED_APPS` ordering,
+  `AppConfig.ready()` gating against partners that really are (or really
+  aren't) installed, `AppRegistryNotReady` from an eager model import.
+- **Seams under real partners** — a settings registry, signal collector, or
+  soft-reference cleanup hook can be unit-tested with a stub on both ends and
+  still be wrong. The sandbox is the only place the actual partner packages
+  are present, which is the whole point of a seam.
+- **Web wiring** — URL includes and namespaces, cross-contrib `{% url %}`
+  reverses, template inheritance from `website/base.html`, static discovery,
+  DRF router mounting. A `TemplateResponse` is lazy, so view tests asserting
+  `status_code` or `context_data` never render the template and never see a
+  `NoReverseMatch`.
+
+Minimum wiring checklist: dependency-ordered `pip install -e`;
+`INSTALLED_APPS` + a `####`-bannered settings block; commands registered in
+`commands/default_cmdsets.py`; any typeclass mixin with its MRO-ordering note;
+URL + API mounting if the contrib ships a web surface; `seed_sandbox` content
+so the feature is visible rather than an empty page; a seam test in
+`world/sandbox/tests.py`; `example_game/README.md` updated; golden DB
+re-snapshotted after `evennia migrate`.
+
+Easy to forget and worth doing every time: **uninstall an optional partner,
+restart, and confirm the feature degrades instead of breaking.** Gated
+`ready()` blocks and settings seams exist for exactly the absent-partner case,
+and no suite here runs it.
+
 ## Conventions
 
 - Commit prefixes: `[evennia-<name>]` for per-contrib history
