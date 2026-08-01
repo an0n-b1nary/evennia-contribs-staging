@@ -67,6 +67,7 @@ ipython_config.py
 .env
 .envrc
 .venv
+.venv_sandbox/
 env/
 venv/
 ENV/
