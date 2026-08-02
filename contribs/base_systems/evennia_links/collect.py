@@ -99,10 +99,16 @@ def resolve_dotted(path):
         The imported attribute, or None if *path* is None/empty.
 
     Raises:
-        ImportError: if the module cannot be imported.
+        ImportError: if *path* has no module component, or the module
+            cannot be imported. A dotless path is the likeliest typo in a
+            settings hook; raising ImportError rather than letting
+            import_module("") surface a bare ``ValueError: Empty module
+            name`` keeps the failure mode callers guard against uniform.
         AttributeError: if the module has no such attribute.
     """
     if not path:
         return None
     module_path, _, attr = path.rpartition(".")
+    if not module_path:
+        raise ImportError(f"{path!r} is not a dotted path (expected 'pkg.mod.attr')")
     return getattr(import_module(module_path), attr)

@@ -540,6 +540,54 @@ class TestCmdRPTrackerStaffLock(EvenniaTest):
         self.assertEqual(CmdRPTrackerStaff.locks, "cmd:perm(Builder)")
 
 
+class TestResolveDottedDegradesGracefully(EvenniaTest):
+    """A misconfigured optional hook must degrade, never crash the command.
+
+    RPTRACKER_SCENE_DISPLAY / RPTRACKER_XP_PROJECTION are optional settings
+    hooks, so _resolve_dotted deliberately catches Exception rather than just
+    (ImportError, AttributeError): resolving a path *imports the target
+    module*, which runs the game's own top-level code and can therefore fail
+    in any way that code can fail. Narrowing this except clause looks tidy and
+    silently reintroduces "one typo in settings.py breaks +activity".
+    """
+
+    def test_empty_and_none_resolve_to_none(self):
+        from evennia_rptracker.commands import _resolve_dotted
+
+        self.assertIsNone(_resolve_dotted(None))
+        self.assertIsNone(_resolve_dotted(""))
+
+    def test_resolves_a_real_path(self):
+        from evennia_rptracker.commands import _iso_week, _resolve_dotted
+
+        self.assertIs(_resolve_dotted("evennia_rptracker.commands._iso_week"), _iso_week)
+
+    def test_bad_module_returns_none(self):
+        from evennia_rptracker.commands import _resolve_dotted
+
+        self.assertIsNone(_resolve_dotted("no_such_module.attr"))
+
+    def test_missing_attribute_returns_none(self):
+        from evennia_rptracker.commands import _resolve_dotted
+
+        self.assertIsNone(_resolve_dotted("evennia_rptracker.commands.not_a_real_hook"))
+
+    def test_dotless_path_returns_none(self):
+        from evennia_rptracker.commands import _resolve_dotted
+
+        self.assertIsNone(_resolve_dotted("notdotted"))
+
+    def test_hook_module_raising_at_import_returns_none(self):
+        """The case a narrowed except clause misses."""
+        from evennia_rptracker.commands import _resolve_dotted
+
+        with patch(
+            "evennia_rptracker.commands.resolve_dotted",
+            side_effect=KeyError("hook module blew up at import"),
+        ):
+            self.assertIsNone(_resolve_dotted("some.hook.path"))
+
+
 class TestIdleCheckScript(EvenniaTest):
     """The idle-check Script must resolve to a real DefaultScript subclass.
 

@@ -385,7 +385,14 @@ class TestCollectDicts(EvenniaTest):
         finally:
             sig.disconnect(dispatch_uid="test_nondict")
 
-    def test_key_collision_last_write_wins(self):
+    def test_key_collision_resolves_to_exactly_one_value(self):
+        """Colliding keys must not crash or accumulate.
+
+        Which provider wins is deliberately NOT asserted: receiver order is
+        not part of the contract, and two providers claiming one key is a bug
+        in the providers. All this guarantees is that the merge stays a flat
+        dict with one value per key.
+        """
         from django.dispatch import Signal
 
         sig = Signal()
@@ -403,6 +410,7 @@ class TestCollectDicts(EvenniaTest):
         finally:
             sig.disconnect(dispatch_uid="test_1")
             sig.disconnect(dispatch_uid="test_2")
+        self.assertEqual(list(merged), ["key"])
         self.assertIn(merged["key"], ("first", "second"))
 
 
@@ -425,6 +433,12 @@ class TestResolveDotted(EvenniaTest):
     def test_bad_module_raises_import_error(self):
         with self.assertRaises(ImportError):
             resolve_dotted("nonexistent.module.path.attr")
+
+    def test_dotless_path_raises_import_error(self):
+        # The likeliest settings typo. Must not leak import_module's bare
+        # ValueError("Empty module name") — callers guard on ImportError.
+        with self.assertRaises(ImportError):
+            resolve_dotted("notdotted")
 
     def test_bad_attribute_raises_attribute_error(self):
         with self.assertRaises(AttributeError):

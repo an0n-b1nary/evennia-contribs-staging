@@ -8,7 +8,8 @@
   itself in its own gated `ready()`. A raising or non-dict receiver is logged and skipped
   rather than taking the request down. Lifted from the source game's `world.utils.collect`.
 - `resolve_dotted(path)`: import and return the object at a dotted `"pkg.mod.attr"` path;
-  None/empty input returns None. Deduplicates a helper that had been hand-rolled three times
+  None/empty input returns None, a bad *or dotless* path raises `ImportError`, and a missing
+  attribute raises `AttributeError`. Deduplicates a helper that had been hand-rolled three times
   (`evennia_rptracker.commands`, `evennia_xp.batch`, `evennia_xp.gating`) — migrated
   `evennia_rptracker` to it, since it already depends on `evennia-links`. Left `evennia_xp`'s
   copies alone: it deliberately declares no `evennia-links` dependency, and adding one to

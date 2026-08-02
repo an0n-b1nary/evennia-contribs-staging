@@ -30,10 +30,15 @@ def _resolve_dotted(dotted_path):
     Wraps evennia_links.resolve_dotted() with a log-and-skip fallback: a
     misconfigured optional settings hook (RPTRACKER_SCENE_DISPLAY,
     RPTRACKER_XP_PROJECTION) must not crash the command that reads it.
+
+    Catches Exception, not just ImportError/AttributeError: importing the
+    hook runs the target module's top-level code, which can fail in any way
+    the game's own code can fail. Degrading the optional hook is always
+    preferable to taking +activity down with it.
     """
     try:
         return resolve_dotted(dotted_path)
-    except (ImportError, AttributeError):
+    except Exception:
         import logging
 
         logging.getLogger("evennia").exception("rptracker: failed to import hook %r", dotted_path)

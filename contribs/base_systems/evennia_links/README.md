@@ -24,6 +24,8 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `EditingMixin` | `editing.py` | EvEditor + difflib mixin for version-tracked text editing; pairs with `AbstractVersion` |
 | `connect_on_ready` | `listeners.py` | Import-order-safe signal-registration helper |
 | `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
+| `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
+| `resolve_dotted` | `collect.py` | Import an object from a `"pkg.mod.attr"` settings path |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
 
@@ -233,6 +235,70 @@ class MyTrackerConfig(AppConfig):
 
 See the [Soft-dependency pattern](#soft-dependency-pattern) section below for
 the companion pattern of gating the bridge's listener and migration.
+
+### collect_dicts
+
+Where `connect_on_ready` is for **notification** signals (fire and forget),
+`collect_dicts` is for **collector** signals: one app asks a question and
+merges the answers from however many apps happen to be installed.
+
+This is what lets a feature aggregate data it does not own. The asking app
+never imports the answering apps, so each side installs, uninstalls, and
+ships independently — the answers simply stop arriving when a provider is
+not present.
+
+```python
+# The asking app — owns the signal and the question:
+from django.dispatch import Signal
+collect_tile_overlays = Signal()   # kwargs: room_ids, staff
+
+from evennia_links import collect_dicts
+overlays = collect_dicts(
+    collect_tile_overlays, sender=MapPlane, room_ids=room_ids, staff=staff
+)
+# -> {"has_active_scene": {12: True}, "upcoming_events": {12: [...]}, ...}
+
+# A providing app — connects itself in its own gated AppConfig.ready():
+def provide(sender, room_ids, staff, **kwargs):
+    qs = Scene.objects.filter(room_id__in=room_ids)
+    if not staff:                      # each provider keeps its OWN privacy rule
+        qs = qs.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)
+    return {"has_active_scene": {s.room_id: True for s in qs}}
+```
+
+**Contract for providers:**
+
+- Return a dict, or `None`/`{}` to contribute nothing.
+- **Write disjoint top-level keys.** Receiver order is not guaranteed and must
+  not matter; two providers claiming one key is a bug in the providers.
+- A provider that raises, or returns a non-dict, is logged and skipped — it
+  degrades its own contribution to absent and never breaks the asking request.
+- **Keep each provider to one bulk query.** The signal is sent once per
+  request, not once per item; a provider that queries per item reintroduces
+  the N+1 the seam exists to avoid.
+
+Privacy is the reason providers exist at all: only the owning app knows which
+of its records a given viewer may see, so the filter must live on its side of
+the seam rather than being re-encoded by the asking app.
+
+### resolve_dotted
+
+Imports the object at a dotted `"pkg.mod.attr"` path — the standard shape for
+an optional hook configured in `settings.py`. Returns `None` for a `None`/empty
+path; raises `ImportError` for a bad or dotless path, `AttributeError` if the
+module has no such attribute.
+
+```python
+from evennia_links import resolve_dotted
+
+hook = resolve_dotted(getattr(settings, "MYAPP_DISPLAY_HOOK", None))
+if hook:
+    line = hook(obj.pk)
+```
+
+Callers that treat the hook as *optional* should wrap the call and log-and-skip
+on failure, so a game's misconfigured setting degrades that one feature instead
+of crashing the command reading it.
 
 ---
 
