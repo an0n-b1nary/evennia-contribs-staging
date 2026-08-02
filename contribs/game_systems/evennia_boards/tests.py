@@ -221,11 +221,19 @@ class TestSubscriptionModel(EvenniaTest):
         self.assertEqual(sub.unread_count(), 2)
 
     def test_unread_count_with_cutoff(self):
-        Post.create_post(board=self.board, author=self.char1, title="Old", content="x")
+        # Post.created_at is auto_now_add, so it races timezone.now(): on a
+        # coarse system timer both can land in the same tick, making the "New"
+        # post fail created_at__gt=cutoff and the count come back 0. Pin all
+        # three timestamps explicitly instead of relying on wall-clock ordering.
+        old = Post.create_post(board=self.board, author=self.char1, title="Old", content="x")
+        new = Post.create_post(board=self.board, author=self.char1, title="New", content="x")
+        cutoff = timezone.now()
+        # auto_now_add ignores instance assignment; rewrite via the queryset.
+        Post.objects.filter(pk=old.pk).update(created_at=cutoff - timedelta(hours=1))
+        Post.objects.filter(pk=new.pk).update(created_at=cutoff + timedelta(hours=1))
         sub = Subscription.objects.create(
-            account=self.account, board=self.board, last_notified_at=timezone.now()
+            account=self.account, board=self.board, last_notified_at=cutoff
         )
-        Post.create_post(board=self.board, author=self.char1, title="New", content="x")
         self.assertEqual(sub.unread_count(), 1)
 
     def test_unread_count_excludes_archived(self):
