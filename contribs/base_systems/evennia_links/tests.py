@@ -11,14 +11,16 @@ the one model every Evennia install guarantees.
 These test models are defined in a ``tests`` module, so they are only imported
 (and only registered with Django) when the test runner loads this file — they
 do not appear in a consuming game's migrations. Because this contrib ships no
-migrations directory, the probe tables are created/dropped per test class via
-the schema editor (``ProbeTablesTest``) rather than being built by ``migrate``.
+migrations directory, the probe tables are built by a ``post_migrate`` receiver
+during test-database setup (see ``_create_probe_tables``) rather than by
+``migrate`` itself.
 
 EvenniaTest provides self.char1 / self.char2 (ObjectDB instances) and
 self.room1, used here as generic linkable/versionable objects.
 """
 
 from django.db import connection, models
+from django.db.models.signals import post_migrate
 from evennia.utils.test_resources import EvenniaTest
 
 from evennia_links import (
@@ -88,34 +90,55 @@ class DocVersionProbe(AbstractVersion):
 # ---------------------------------------------------------------------------
 
 
+PROBE_MODELS = (PlainLinkProbe, AuthoredLinkProbe, DocProbe, DocVersionProbe)
+
+
+def _create_probe_tables(**kwargs):
+    """Create any missing probe tables with the schema editor.
+
+    Idempotent, and deliberately run outside any open transaction: SQLite's
+    schema editor cannot toggle foreign-key checks inside one.
+    """
+    existing = connection.introspection.table_names()
+    with connection.schema_editor() as schema_editor:
+        for model in PROBE_MODELS:
+            if model._meta.db_table not in existing:
+                schema_editor.create_model(model)
+
+
+# Build the probe tables during test-database setup, not on the first
+# ProbeTablesTest.
+#
+# Once this module is imported the probe classes are registered in Django's
+# app registry for the whole process, and they hold CASCADE foreign keys to
+# ObjectDB — so *every* ObjectDB hard-delete from that point on, in any app's
+# test suite sharing the process, makes Django's deletion collector query
+# these tables. Creating them in ProbeTablesTest.setUpClass covers that only
+# if a ProbeTablesTest happens to run first, which is purely an artifact of
+# label order: `evennia test evennia_maps evennia_links` used to fail one
+# unrelated maps test with
+# ``sqlite3.OperationalError: no such table: evennia_links_plainlinkprobe``,
+# while the reverse order passed. The test runner imports every test module
+# (build_suite) before it creates the databases (setup_databases), so a
+# post_migrate receiver connected here always fires, and always before any
+# test runs. The tables are never dropped — empty throwaway tables in a test
+# database are harmless; missing ones are not.
+post_migrate.connect(_create_probe_tables, dispatch_uid="evennia_links.create_probe_tables")
+
+
 class ProbeTablesTest(EvenniaTest):
-    """Base test that creates the probe model tables via the schema editor.
+    """Base test for cases that read or write the probe tables.
 
-    The contrib ships no migrations (it only exports abstract models), so the
-    concrete probe tables don't exist in the test database by default. We
-    build them with the schema editor *before* EvenniaTest's class-level
-    atomic block opens, because SQLite's schema editor cannot toggle
-    foreign-key checks inside an open transaction.
-
-    The tables are created if missing and NEVER dropped. The probe classes
-    stay registered in Django's app registry for the whole process once this
-    module is imported, so any later ObjectDB hard-delete — in *any* app's
-    test suite sharing the process — makes Django's deletion collector query
-    these tables; dropping them turned that into
-    ``sqlite3.OperationalError: no such table: evennia_links_plainlinkprobe``
-    in unrelated contribs' tests during combined runs. Empty throwaway
-    tables in a test database are harmless; missing ones are not.
+    The tables themselves come from the ``post_migrate`` receiver above; this
+    class is the marker for "this case needs them", and re-checks them so a
+    runner that somehow skipped ``post_migrate`` still gets a working suite.
     """
 
-    probe_models = (PlainLinkProbe, AuthoredLinkProbe, DocProbe, DocVersionProbe)
+    probe_models = PROBE_MODELS
 
     @classmethod
     def setUpClass(cls):
-        existing = connection.introspection.table_names()
-        with connection.schema_editor() as schema_editor:
-            for model in cls.probe_models:
-                if model._meta.db_table not in existing:
-                    schema_editor.create_model(model)
+        _create_probe_tables()
         super().setUpClass()
 
 

@@ -1,5 +1,15 @@
 # Changelog — evennia-links
 
+## Unreleased
+
+- Test-only fix: the probe tables are now created by a `post_migrate` receiver during
+  test-database setup instead of by the first `ProbeTablesTest` to run. Importing this
+  contrib's test module registers probe models holding CASCADE FKs to `ObjectDB`, so every
+  later `ObjectDB` hard-delete in a combined run queries those tables — which made
+  `evennia test evennia_maps evennia_links` fail an unrelated maps test with
+  `no such table: evennia_links_plainlinkprobe` while the reverse label order passed.
+  No packaged code changed.
+
 ## 0.4.0 — collector-signal helper
 
 - `collect_dicts(signal, **kwargs)`: `send_robust()` a collector signal and merge every
