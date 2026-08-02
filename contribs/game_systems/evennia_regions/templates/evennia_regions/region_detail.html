@@ -1,0 +1,40 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}{{ region.name }} — Region{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_regions:region-list' %}">Regions</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ region.name }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-1">{{ region.name }}</h1>
+<p class="text-muted small mb-3">
+  Created by {{ region.created_by_name|default:"Unknown" }}
+  on {{ region.created_at|date:"Y-m-d" }}
+</p>
+
+{% if region.description %}
+<p class="mb-4">{{ region.description }}</p>
+{% else %}
+<p class="text-muted mb-4"><em>(No description.)</em></p>
+{% endif %}
+
+<h2 class="h5 mb-2">Member Rooms ({{ memberships|length }})</h2>
+{% if memberships %}
+<ul class="list-group mb-4">
+  {% for m in memberships %}
+  <li class="list-group-item">
+    <span class="text-muted small">#{{ m.room_id }}</span> {{ m.room_name }}
+    {% if m.is_primary %}<span class="badge bg-primary ms-1">Primary</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted mb-4"><em>No rooms have been assigned to this region yet.</em></p>
+{% endif %}
+{% endblock %}

@@ -30,6 +30,7 @@ known-first-party = [
     "evennia_accessibility",
     "evennia_links",
     "evennia_posing",
+    "evennia_regions",
     "evennia_social",
 ]  # extend as contribs land
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]

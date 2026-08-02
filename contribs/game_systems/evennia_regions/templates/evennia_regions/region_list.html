@@ -1,0 +1,43 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Regions{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Regions</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Regions</h1>
+
+{% if regions %}
+<div class="table-responsive" role="region" aria-label="Regions" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      {% if show_member_counts %}<th scope="col">Rooms</th>{% endif %}
+      <th scope="col">Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for region in regions %}
+    <tr>
+      <td><a href="{% url 'evennia_regions:region-detail' region.pk %}">{{ region.name }}</a></td>
+      {% if show_member_counts %}<td>{{ region.member_count }}</td>{% endif %}
+      <td class="text-muted">{{ region.description|truncatechars:80 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% include "evennia_regions/_pagination.html" %}
+
+{% else %}
+{% include "evennia_regions/_empty_state.html" with message="No regions have been defined yet." %}
+{% endif %}
+{% endblock %}
