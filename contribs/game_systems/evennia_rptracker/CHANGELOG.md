@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.3] — 2026-08-02 — use the shared resolve_dotted
+
+- `commands.py`'s local `_resolve_dotted` now delegates to
+  `evennia_links.resolve_dotted`, wrapped in the same log-and-skip fallback so a
+  misconfigured `RPTRACKER_SCENE_DISPLAY` / `RPTRACKER_XP_PROJECTION` still degrades
+  gracefully instead of crashing the command. Dedupes one of three hand-rolled copies
+  of this helper across the staging repo. Requires `evennia-links>=0.4`.
+
 ## [0.1.2] — 2026-07-05 — fix app-label defaults and gate hardening
 
 - `RPTRACKER_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"` to

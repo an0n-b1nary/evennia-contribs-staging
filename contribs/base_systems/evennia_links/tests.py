@@ -26,7 +26,9 @@ from evennia_links import (
     AbstractAuthoredLink,
     AbstractLink,
     AbstractVersion,
+    collect_dicts,
     connect_on_ready,
+    resolve_dotted,
 )
 
 # ---------------------------------------------------------------------------
@@ -301,6 +303,132 @@ class TestConnectOnReady(EvenniaTest):
         connect_on_ready(sig, receiver)  # ignored — same receiver
         sig.send(sender=None)
         self.assertEqual(len(calls), 1)
+
+
+# ---------------------------------------------------------------------------
+# collect_dicts
+# ---------------------------------------------------------------------------
+
+
+class TestCollectDicts(EvenniaTest):
+    def test_merges_dict_responses(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+
+        def receiver_a(sender, **kw):
+            return {"a": 1}
+
+        def receiver_b(sender, **kw):
+            return {"b": 2}
+
+        sig.connect(receiver_a, dispatch_uid="test_a")
+        sig.connect(receiver_b, dispatch_uid="test_b")
+        try:
+            merged = collect_dicts(sig, sender=None)
+        finally:
+            sig.disconnect(dispatch_uid="test_a")
+            sig.disconnect(dispatch_uid="test_b")
+        self.assertEqual(merged, {"a": 1, "b": 2})
+
+    def test_no_receivers_returns_empty_dict(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+        self.assertEqual(collect_dicts(sig, sender=None), {})
+
+    def test_none_response_contributes_nothing(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+
+        def receiver(sender, **kw):
+            return None
+
+        sig.connect(receiver, dispatch_uid="test_none")
+        try:
+            self.assertEqual(collect_dicts(sig, sender=None), {})
+        finally:
+            sig.disconnect(dispatch_uid="test_none")
+
+    def test_raising_receiver_is_skipped_not_propagated(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+
+        def bad_receiver(sender, **kw):
+            raise RuntimeError("boom")
+
+        def good_receiver(sender, **kw):
+            return {"ok": True}
+
+        sig.connect(bad_receiver, dispatch_uid="test_bad")
+        sig.connect(good_receiver, dispatch_uid="test_good")
+        try:
+            merged = collect_dicts(sig, sender=None)
+        finally:
+            sig.disconnect(dispatch_uid="test_bad")
+            sig.disconnect(dispatch_uid="test_good")
+        self.assertEqual(merged, {"ok": True})
+
+    def test_non_dict_response_is_skipped(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+
+        def receiver(sender, **kw):
+            return ["not", "a", "dict"]
+
+        sig.connect(receiver, dispatch_uid="test_nondict")
+        try:
+            self.assertEqual(collect_dicts(sig, sender=None), {})
+        finally:
+            sig.disconnect(dispatch_uid="test_nondict")
+
+    def test_key_collision_last_write_wins(self):
+        from django.dispatch import Signal
+
+        sig = Signal()
+
+        def receiver_1(sender, **kw):
+            return {"key": "first"}
+
+        def receiver_2(sender, **kw):
+            return {"key": "second"}
+
+        sig.connect(receiver_1, dispatch_uid="test_1")
+        sig.connect(receiver_2, dispatch_uid="test_2")
+        try:
+            merged = collect_dicts(sig, sender=None)
+        finally:
+            sig.disconnect(dispatch_uid="test_1")
+            sig.disconnect(dispatch_uid="test_2")
+        self.assertIn(merged["key"], ("first", "second"))
+
+
+# ---------------------------------------------------------------------------
+# resolve_dotted
+# ---------------------------------------------------------------------------
+
+
+class TestResolveDotted(EvenniaTest):
+    def test_none_input_returns_none(self):
+        self.assertIsNone(resolve_dotted(None))
+
+    def test_empty_string_returns_none(self):
+        self.assertIsNone(resolve_dotted(""))
+
+    def test_resolves_module_attribute(self):
+        result = resolve_dotted("evennia_links.collect.collect_dicts")
+        self.assertIs(result, collect_dicts)
+
+    def test_bad_module_raises_import_error(self):
+        with self.assertRaises(ImportError):
+            resolve_dotted("nonexistent.module.path.attr")
+
+    def test_bad_attribute_raises_attribute_error(self):
+        with self.assertRaises(AttributeError):
+            resolve_dotted("evennia_links.collect.not_a_real_attr")
 
 
 # ---------------------------------------------------------------------------

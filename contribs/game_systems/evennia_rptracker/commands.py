@@ -21,16 +21,19 @@ Optional hooks (configure in settings.py):
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links import resolve_dotted
+
 
 def _resolve_dotted(dotted_path):
-    """Import and return a callable from a dotted module path, or None."""
-    if not dotted_path:
-        return None
-    try:
-        from django.utils.module_loading import import_string
+    """Import and return a callable from a dotted module path, or None.
 
-        return import_string(dotted_path)
-    except Exception:
+    Wraps evennia_links.resolve_dotted() with a log-and-skip fallback: a
+    misconfigured optional settings hook (RPTRACKER_SCENE_DISPLAY,
+    RPTRACKER_XP_PROJECTION) must not crash the command that reads it.
+    """
+    try:
+        return resolve_dotted(dotted_path)
+    except (ImportError, AttributeError):
         import logging
 
         logging.getLogger("evennia").exception("rptracker: failed to import hook %r", dotted_path)

@@ -14,6 +14,8 @@ Public API:
     EditingMixin            — EvEditor + difflib mixin for version-tracked text editing (pairs with AbstractVersion)
     connect_on_ready            — import-order-safe signal-registration helper
     connect_soft_ref_cleanup    — cascade compensation for integer soft-reference fields
+    collect_dicts            — send_robust() a collector signal and merge dict responses
+    resolve_dotted            — import an object from a "pkg.mod.attr" path
 
 See each module's docstring for usage examples.
 
@@ -27,10 +29,11 @@ consuming app's ``models.py`` does ``from evennia_links import AbstractLink``),
 by which point the registry is ready.
 """
 
+from .collect import collect_dicts, resolve_dotted
 from .listeners import connect_on_ready
 from .softref import connect_soft_ref_cleanup
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 # name -> submodule that defines it. Imported on first access via __getattr__.
 _LAZY = {
@@ -51,8 +54,10 @@ __all__ = [
     "ArchivedManager",
     "ArchivedQuerySet",
     "EditingMixin",
+    "collect_dicts",
     "connect_on_ready",
     "connect_soft_ref_cleanup",
+    "resolve_dotted",
 ]
 
 

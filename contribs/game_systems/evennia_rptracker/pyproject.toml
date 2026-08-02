@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rptracker"
-version = "0.1.2"
+version = "0.1.3"
 description = "Passive RP session detection and tracking for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -20,8 +20,9 @@ classifiers = [
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
 # evennia-links provides AbstractLink (the base of RPSessionSceneLink, which
-# ships unconditionally) and connect_soft_ref_cleanup (used by the scene bridge).
-dependencies = ["evennia>=6.0", "evennia-links>=0.2"]
+# ships unconditionally), connect_soft_ref_cleanup (used by the scene bridge),
+# and resolve_dotted (used to resolve the optional settings hooks in commands.py).
+dependencies = ["evennia>=6.0", "evennia-links>=0.4"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

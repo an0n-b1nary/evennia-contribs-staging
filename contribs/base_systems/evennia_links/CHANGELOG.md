@@ -1,5 +1,19 @@
 # Changelog — evennia-links
 
+## 0.4.0 — collector-signal helper
+
+- `collect_dicts(signal, **kwargs)`: `send_robust()` a collector signal and merge every
+  receiver's dict response into one. Lets an "asking" app (e.g. `evennia-maps`) read data
+  owned by several "answering" apps without importing any of them — each provider connects
+  itself in its own gated `ready()`. A raising or non-dict receiver is logged and skipped
+  rather than taking the request down. Lifted from the source game's `world.utils.collect`.
+- `resolve_dotted(path)`: import and return the object at a dotted `"pkg.mod.attr"` path;
+  None/empty input returns None. Deduplicates a helper that had been hand-rolled three times
+  (`evennia_rptracker.commands`, `evennia_xp.batch`, `evennia_xp.gating`) — migrated
+  `evennia_rptracker` to it, since it already depends on `evennia-links`. Left `evennia_xp`'s
+  copies alone: it deliberately declares no `evennia-links` dependency, and adding one to
+  dedupe a 10-line helper is a bad trade.
+
 ## 0.3.0 — shared editing framework
 
 - `EditingMixin`: EvEditor + difflib mixin for version-tracked text editing of model
