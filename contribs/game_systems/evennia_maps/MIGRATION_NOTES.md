@@ -51,6 +51,15 @@ that signal itself (`evennia_maps.signals.terrain_changed.send(sender=Room, room
 after updating its own terrain state, and the listener will refresh the snapshot the
 same way.
 
+**Settings namespaced under `MAPS_`.** The source game reads `DIRECTION_OFFSETS` and
+`TERRAIN_PRECEDENCE`; the contrib reads `MAPS_DIRECTION_OFFSETS` and
+`MAPS_TERRAIN_PRECEDENCE`. Unprefixed names are fine inside one game, but a contrib
+shares `settings.py` with every other installed app, and `DIRECTION_OFFSETS` in
+particular is a name a game or a second mapping contrib could plausibly want. Every other
+setting across these contribs is already `<PREFIX>_*` (`MAPS_STAFF_LOCK`,
+`REGIONS_STAFF_LOCK`, `LORE_*`); these two now match. A game moving from the source
+layout renames the two settings — no data or schema change.
+
 **Constraint name prefixed with `evennia_maps_`.** `maps_one_plane_per_elevation` is
 renamed to `evennia_maps_one_plane_per_elevation` for the same collision-avoidance reason
 `evennia-lore`/`evennia-regions` rename theirs.

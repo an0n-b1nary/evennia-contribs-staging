@@ -188,7 +188,7 @@ class TestDirectionResolve(MapsTestCase):
         self.assertIsNone(direction.resolve(self._make_exit("in")))
 
     def test_get_offsets_merges_settings_override(self):
-        with self.settings(DIRECTION_OFFSETS={"n": (0, 2, 0, "planar")}):
+        with self.settings(MAPS_DIRECTION_OFFSETS={"n": (0, 2, 0, "planar")}):
             offsets = direction.get_offsets()
             self.assertEqual(offsets["n"], (0, 2, 0, "planar"))
             # Unrelated entries are untouched by the override.
@@ -446,7 +446,7 @@ class TestMoveUnplacePin(MapsTestCase):
         # Both write paths must leave the snapshot in the same state, or
         # +map/check reports drift that depends only on which one ran.
         placement.place_tile(self.room1, self.plane, 0, 0)
-        with self.settings(TERRAIN_PRECEDENCE=["forest"]):
+        with self.settings(MAPS_TERRAIN_PRECEDENCE=["forest"]):
             self.room1.terrain_tags = {"forest"}
             self.room1.key = "Renamed Room"
             moved = placement.move_tile(self.room1, 4, 4)
@@ -1068,7 +1068,7 @@ class TestTerrainChangedListener(MapsTestCase):
     def test_set_terrain_refreshes_tile_snapshot(self):
         plane = _make_plane()
         placement.place_tile(self.room1, plane, 0, 0)
-        with self.settings(TERRAIN_PRECEDENCE=["forest", "hills"]):
+        with self.settings(MAPS_TERRAIN_PRECEDENCE=["forest", "hills"]):
             self.room1.set_terrain({"hills", "forest"})
         tile = RoomTile.objects.get(room=self.room1)
         self.assertEqual(tile.terrain, "forest")

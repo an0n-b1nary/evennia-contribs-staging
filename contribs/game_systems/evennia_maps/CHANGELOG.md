@@ -15,9 +15,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `RoomTile` model: places a room at `(x, y)` on a plane. One tile per room, one room per
   cell (`unique_together`), plus a `pinned` flag and a denormalized `terrain` snapshot.
 - `direction.resolve()`: canonical direction vocabulary (n/s/e/w/ne/nw/se/sw/u/d, both
-  abbreviation and full name), settings-overridable via `DIRECTION_OFFSETS`.
+  abbreviation and full name), settings-overridable via `MAPS_DIRECTION_OFFSETS`.
 - `terrain.resolve_terrain()`: resolves a room's `terrain_tags` to a single base terrain
-  key via ordered `TERRAIN_PRECEDENCE`.
+  key via ordered `MAPS_TERRAIN_PRECEDENCE`.
 - `placement` module: the single tile-write path (`place_tile`, `place_relative`,
   `move_tile`, `unplace_tile`, `set_pin`, `apply_plan`). Every write either succeeds or
   returns a `Conflict` — never silently overwrites a held cell.

@@ -83,8 +83,8 @@ doesn't matter — `MapsRoomMixin` doesn't override `msg()` or any hook they tou
 | Setting | Default | Description |
 |---|---|---|
 | `MAPS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for place/move/unplace/pin/reflow/check |
-| `DIRECTION_OFFSETS` | `direction.DEFAULT_DIRECTION_OFFSETS` | Merged over the built-in table — add or override individual directions without redeclaring the whole set |
-| `TERRAIN_PRECEDENCE` | `[]` | Ordered list of terrain tag names; the first one present on a room's `terrain_tags` wins as `RoomTile.terrain` |
+| `MAPS_DIRECTION_OFFSETS` | `{}` | Merged over `direction.DEFAULT_DIRECTION_OFFSETS` — add or override individual directions without redeclaring the whole table |
+| `MAPS_TERRAIN_PRECEDENCE` | `[]` | Ordered list of terrain tag names; the first one present on a room's `terrain_tags` wins as `RoomTile.terrain` |
 
 ---
 

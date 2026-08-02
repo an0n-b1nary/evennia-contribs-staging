@@ -8,8 +8,8 @@ layout (auto-placement, +map/reflow, derive-on-render). Free-form/flavor
 exits are ignored by layout entirely — this is the minimum discipline that
 makes an auto-growing tile grid possible without banning creative exits.
 
-DIRECTION_OFFSETS is settings-overridable: a game may add or replace
-entries via settings.DIRECTION_OFFSETS, merged over the module default.
+The table is settings-overridable: a game may add or replace entries via
+settings.MAPS_DIRECTION_OFFSETS, merged over the module default.
 """
 
 import contextlib
@@ -55,12 +55,12 @@ def get_offsets():
     """
     Return the effective direction-offset registry.
 
-    Merges settings.DIRECTION_OFFSETS (if any) over DEFAULT_DIRECTION_OFFSETS,
-    so a game can add or override individual directions without redeclaring
-    the whole table.
+    Merges settings.MAPS_DIRECTION_OFFSETS (if any) over
+    DEFAULT_DIRECTION_OFFSETS, so a game can add or override individual
+    directions without redeclaring the whole table.
     """
     offsets = dict(DEFAULT_DIRECTION_OFFSETS)
-    offsets.update(getattr(settings, "DIRECTION_OFFSETS", {}) or {})
+    offsets.update(getattr(settings, "MAPS_DIRECTION_OFFSETS", {}) or {})
     return offsets
 
 
