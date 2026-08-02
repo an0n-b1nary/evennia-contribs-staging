@@ -46,6 +46,20 @@ def _always_hidden(room):
     return False
 
 
+def _always_visible(room):
+    """REGIONS_ROOM_VISIBILITY test stub: every room is visible."""
+    return True
+
+
+def _exploding_rule(room):
+    """REGIONS_ROOM_VISIBILITY test stub: raises when called."""
+    raise RuntimeError("visibility rule blew up")
+
+
+_NOT_CALLABLE = None
+"""REGIONS_ROOM_VISIBILITY test stub: a dotted path that resolves to None."""
+
+
 # ---------------------------------------------------------------------------
 # Region model tests
 # ---------------------------------------------------------------------------
@@ -180,6 +194,34 @@ class TestRegionMembership(EvenniaTest):
 
     def test_primary_for_none_when_no_membership(self):
         self.assertIsNone(RegionMembership.primary_for(self.room1.pk))
+
+    def test_same_room_cannot_join_same_region_twice(self):
+        """Without this constraint member_count() double-counts one room."""
+        RegionMembership.objects.create(
+            region=self.region_a, room=self.room1, room_name=self.room1.key
+        )
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            RegionMembership.objects.create(
+                region=self.region_a, room=self.room1, room_name=self.room1.key
+            )
+
+    def test_create_link_is_idempotent(self):
+        """AbstractLink.create_link get_or_creates on the unique pair.
+
+        Also pins the README's documented call shape: AbstractAuthoredLink
+        takes linked_by= (deriving created_by_name), not created_by=.
+        """
+        first, created_first = RegionMembership.create_link(
+            self.region_a, self.room1, linked_by=self.char1, room_name=self.room1.key
+        )
+        second, created_second = RegionMembership.create_link(
+            self.region_a, self.room1, linked_by=self.char1, room_name=self.room1.key
+        )
+        self.assertTrue(created_first)
+        self.assertFalse(created_second)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(first.created_by, self.char1)
+        self.assertEqual(first.created_by_name, self.char1.key)
 
     def test_str_contains_room_and_region_names(self):
         m = RegionMembership.objects.create(
@@ -456,20 +498,89 @@ class TestCmdRegionRemoveRoom(EvenniaCommandTest):
 
 
 class TestIsRoomWebVisible(EvenniaTest):
-    """Default rule and the REGIONS_ROOM_VISIBILITY override seam."""
+    """The default rule and the REGIONS_ROOM_VISIBILITY override seam.
 
-    def test_default_rule_visible_when_no_attributes(self):
-        # room1 has neither room_type nor allow_teleport set — both getattr
-        # defaults apply, so the room is visible.
+    This is the contrib's only privacy predicate, so the cases that matter
+    most are the ones where it must answer *False*. A version of this class
+    asserting only the True cases passes happily while the helper hides
+    nothing at all — which is how the plain-Attribute gap below survived
+    the first pass.
+    """
+
+    def test_default_rule_visible_when_nothing_is_flagged(self):
         self.assertTrue(is_room_web_visible(self.room1))
+
+    # -- the default rule must actually hide, under either storage form --
+
+    def test_staff_room_hidden_via_plain_attribute(self):
+        """A game that flags rooms with room.db.<flag>, not AttributeProperty.
+
+        getattr() never consults the AttributeHandler, so reading the flag
+        with getattr alone reports "ic" for a room the game has explicitly
+        marked staff, and the region page publishes it.
+        """
+        self.room1.db.room_type = "staff"
+        self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_secret_room_hidden_via_plain_attribute(self):
+        self.room1.db.allow_teleport = "secret"
+        self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_staff_room_hidden_via_typeclass_attribute(self):
+        """The storage form the source game uses — a typeclass-level value."""
+        with patch.object(type(self.room1), "room_type", "staff", create=True):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_permissive_class_default_does_not_shadow_a_staff_attribute(self):
+        """A plain class attribute must not override an Attribute that hides.
+
+        getattr() finds the class default and stops; if that were the only
+        source consulted, a game whose Room typeclass carries a non-descriptor
+        `room_type = "ic"` default would publish every room it had marked
+        staff via room.db.
+        """
+        self.room1.db.room_type = "staff"
+        with patch.object(type(self.room1), "room_type", "ic", create=True):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_ordinary_flag_values_stay_visible(self):
+        self.room1.db.room_type = "ic"
+        self.room1.db.allow_teleport = "public"
+        self.assertTrue(is_room_web_visible(self.room1))
+
+    # -- the override seam --
 
     def test_override_used_when_configured(self):
         with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"):
             self.assertFalse(is_room_web_visible(self.room1))
 
-    def test_bad_override_path_falls_back_to_default(self):
-        with override_settings(REGIONS_ROOM_VISIBILITY="not_a_dotted_path"):
+    def test_override_is_the_whole_answer_not_an_extra_filter(self):
+        self.room1.db.room_type = "staff"
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_visible"):
             self.assertTrue(is_room_web_visible(self.room1))
+
+    # -- misconfiguration must fail CLOSED, never back to the looser default --
+
+    def test_dotless_override_path_hides_rather_than_falling_back(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="not_a_dotted_path"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_missing_attribute_override_hides_and_does_not_raise(self):
+        """Valid module, wrong attribute name: resolve_dotted raises AttributeError."""
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.permissions.no_such_fn"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_unimportable_module_override_hides(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="no_such_module_at_all.rule"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_override_resolving_to_none_hides(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._NOT_CALLABLE"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_override_raising_at_call_time_hides(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._exploding_rule"):
+            self.assertFalse(is_room_web_visible(self.room1))
 
 
 # ---------------------------------------------------------------------------

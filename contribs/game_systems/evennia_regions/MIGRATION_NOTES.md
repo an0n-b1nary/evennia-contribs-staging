@@ -43,11 +43,32 @@ the API.
 **Room-visibility rule made configurable (`REGIONS_ROOM_VISIBILITY`).** The source game's
 `is_room_web_visible()` lived in one shared `web/website/permissions.py`, hardcoding
 `room_type`/`allow_teleport` attribute names that come from another contrib
-(`evennia-social`'s `SocialRoomMixin`). The contrib ships the same default rule (both
-attributes read via `getattr` so it degrades gracefully without social installed) but
+(`evennia-social`'s `SocialRoomMixin`). The contrib ships the same default rule but
 exposes a dotted-path override for games with a different hiding convention. This is a
 deliberate two-line duplication rather than a dependency edge — `evennia-maps` is
 expected to ship the identical seam (`MAPS_ROOM_VISIBILITY`) rather than share one.
+
+**The flag reads consult the AttributeHandler, not just `getattr`.** The source game reads
+`getattr(room, "room_type", "ic")`, which works there only because its own Room typeclass
+declares both flags as `AttributeProperty` descriptors. A game that instead sets
+`room.db.room_type = "staff"` — the ordinary Evennia idiom — gets nothing from `getattr`,
+which silently reported every such room as visible. The contrib checks the descriptor first
+(so a typeclass default still wins) and falls back to `room.attributes.get(...)`, so either
+storage convention hides the room.
+
+**`REGIONS_ROOM_VISIBILITY` fails closed.** A configured-but-unusable override hides every
+room rather than reverting to the built-in rule. A game sets this setting only because its
+rules are *stricter* than the default, so falling back on a typo would publish exactly the
+rooms the operator was withholding. The resolution also catches `Exception`, not
+`ImportError` alone — importing the path runs the game's own top-level code, and calling the
+override runs game code too (the same failure mode fixed in `evennia-rptracker` v0.1.3).
+
+**`RegionMembership` gained `unique_together = [("region", "room")]`.** The source game
+constrains only one-primary-per-room, leaving nothing to stop the same room joining the same
+region twice; `member_count()` then double-counts it on the region page, and
+`create_link()`'s `get_or_create` is not race-safe. `AbstractAuthoredLink`'s own docstring
+requires the two `link_fields` be unique together. Added as migration `0002` rather than
+folded into `0001` so anyone who already applied `0001` upgrades cleanly.
 
 **Constraint name prefixed with `evennia_regions_`.** `regions_one_primary_per_room` is
 renamed to `evennia_regions_one_primary_per_room` for the same collision-avoidance reason

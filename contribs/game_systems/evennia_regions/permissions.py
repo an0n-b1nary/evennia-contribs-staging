@@ -8,15 +8,20 @@ Settings:
         (default "cmd:perm(Builder)").
     REGIONS_ROOM_VISIBILITY — dotted path to a callable(room) -> bool for
         games whose room-hiding rules differ from the default. Without an
-        override, a room is web-visible unless its ``room_type`` attribute
-        is ``"staff"`` or its ``allow_teleport`` attribute is ``"secret"``
-        (both read via getattr, so games without those attributes see
-        every room as visible).
+        override, a room is web-visible unless it is flagged ``room_type
+        == "staff"`` or ``allow_teleport == "secret"``.
+
+``is_room_web_visible`` is a privacy predicate, so every uncertain answer
+resolves to "hidden". See its docstring for why.
 """
+
+import logging
 
 from django.conf import settings
 
 from evennia_links import resolve_dotted
+
+_log = logging.getLogger("evennia")
 
 
 def _staff_lock_expr():
@@ -43,25 +48,93 @@ def is_staff_user(request) -> bool:
         return bool(getattr(account, "is_superuser", False))
 
 
+def _room_flag_values(room, name):
+    """Return every value the game might have stored for a room flag.
+
+    Games store room flags two ways: as a typeclass attribute (an
+    ``AttributeProperty`` descriptor, or a plain class default) or as an
+    ordinary Evennia Attribute (``room.db.room_type = "staff"``). ``getattr``
+    sees only the first — it never consults the AttributeHandler — which is
+    why the source game can read these with ``getattr`` alone: its own Room
+    typeclass declares both flags as AttributeProperty. A game that instead
+    writes ``room.db.room_type`` would have had every such room published.
+
+    Both sources are returned rather than picking a winner, because a plain
+    class attribute can shadow an Attribute that disagrees with it and a
+    privacy predicate has no basis for preferring the permissive one. The
+    caller lets the hidden answer win.
+    """
+    values = []
+    direct = getattr(room, name, None)
+    if direct is not None:
+        values.append(direct)
+    handler = getattr(room, "attributes", None)
+    if handler is not None:
+        stored = handler.get(name, default=None)
+        if stored is not None:
+            values.append(stored)
+    return values
+
+
 def _default_room_visible(room) -> bool:
-    room_type = getattr(room, "room_type", "ic") or "ic"
-    allow_teleport = getattr(room, "allow_teleport", "public") or "public"
-    return room_type != "staff" and allow_teleport != "secret"
+    try:
+        room_types = _room_flag_values(room, "room_type")
+        teleport_settings = _room_flag_values(room, "allow_teleport")
+    except Exception:
+        _log.exception(
+            "evennia_regions: could not read visibility flags for room %r; treating as hidden",
+            getattr(room, "pk", room),
+        )
+        return False
+    return "staff" not in room_types and "secret" not in teleport_settings
 
 
 def is_room_web_visible(room) -> bool:
     """Return True if *room* may be named or located on a public web page.
 
-    Checks REGIONS_ROOM_VISIBILITY first — a dotted path to a
-    callable(room) -> bool — falling back to the default rule when no
-    override is configured or the override fails to resolve.
+    When REGIONS_ROOM_VISIBILITY names a ``callable(room) -> bool``, that
+    callable is the whole answer. Otherwise a room is visible unless it is
+    flagged ``room_type == "staff"`` or ``allow_teleport == "secret"``.
+
+    **Fails closed.** A configured-but-unusable override returns False (room
+    hidden) rather than falling back to the default rule. The fallback looks
+    tidier, but it is a silent privacy leak: a game only sets this setting
+    because its hiding rules are *stricter* than the default, so quietly
+    reverting to the default on a typo publishes exactly the rooms the
+    operator was trying to withhold. A region page that suddenly lists no
+    rooms is loud, logged, and diagnosable; one that lists secret rooms is
+    none of those.
+
+    Catches Exception rather than ImportError alone: resolving the path
+    imports the target module, which runs the game's own top-level code and
+    can fail any way that code can fail — and calling the override runs game
+    code too.
     """
     override_path = getattr(settings, "REGIONS_ROOM_VISIBILITY", None)
-    if override_path:
-        try:
-            override = resolve_dotted(override_path)
-        except ImportError:
-            override = None
-        if override is not None:
-            return bool(override(room))
-    return _default_room_visible(room)
+    if not override_path:
+        return _default_room_visible(room)
+
+    try:
+        override = resolve_dotted(override_path)
+    except Exception:
+        _log.exception(
+            "evennia_regions: REGIONS_ROOM_VISIBILITY=%r failed to import; hiding all rooms",
+            override_path,
+        )
+        return False
+    if override is None:
+        _log.error(
+            "evennia_regions: REGIONS_ROOM_VISIBILITY=%r resolved to None; hiding all rooms",
+            override_path,
+        )
+        return False
+
+    try:
+        return bool(override(room))
+    except Exception:
+        _log.exception(
+            "evennia_regions: REGIONS_ROOM_VISIBILITY=%r raised for room %r; treating as hidden",
+            override_path,
+            getattr(room, "pk", room),
+        )
+        return False

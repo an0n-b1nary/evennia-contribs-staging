@@ -70,7 +70,7 @@ class CharacterCmdSet(CmdSet):
 | Setting | Default | Description |
 |---|---|---|
 | `REGIONS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for create/edit/add-room/remove-room/here-add/primary; also used by web views and API |
-| `REGIONS_ROOM_VISIBILITY` | `None` | Dotted path to a `callable(room) -> bool` overriding the default room-visibility rule used by the member-room list and the API's staff-only member count |
+| `REGIONS_ROOM_VISIBILITY` | `None` | Dotted path to a `callable(room) -> bool` (**True means visible**) replacing the default room-visibility rule used by the member-room list and the API's staff-only member count |
 
 ---
 
@@ -78,18 +78,33 @@ class CharacterCmdSet(CmdSet):
 
 The region detail page and API withhold hidden rooms from non-staff visitors — otherwise a
 region page could name a room a game intentionally hides elsewhere. Without a
-`REGIONS_ROOM_VISIBILITY` override, a room is visible unless `room.room_type == "staff"` or
-`room.allow_teleport == "secret"` (both read via `getattr`, so games without those attributes
-see every room as visible). Games with a different hiding convention can supply their own:
+`REGIONS_ROOM_VISIBILITY` override, a room is visible unless it is flagged
+`room_type == "staff"` or `allow_teleport == "secret"`. Both flags are read from a typeclass
+attribute *and* a plain Evennia Attribute (`room.db.room_type = "staff"`) — either storage
+convention hides the room, and if the two disagree the hidden answer wins. A game that uses
+neither flag sees every room as visible.
+
+Games with a different hiding convention can replace the rule entirely. The callable returns
+**True when the room may be shown** — note the polarity, it is easy to invert:
 
 ```python
 # my_game/room_visibility.py
-def is_room_hidden_from_web(room):
-    return room.tags.has("secret", category="zone")
+def is_room_web_visible(room):
+    return not room.tags.has("secret", category="zone")
 
 # settings.py
-REGIONS_ROOM_VISIBILITY = "my_game.room_visibility.is_room_hidden_from_web"
+REGIONS_ROOM_VISIBILITY = "my_game.room_visibility.is_room_web_visible"
 ```
+
+An override *replaces* the default rule rather than adding to it — if you want the built-in
+staff/secret checks too, call them yourself from your own function.
+
+**This setting fails closed.** If the path cannot be imported, resolves to `None`, or the
+callable raises, every room is treated as hidden and the failure is logged. Falling back to
+the default rule would look tidier but is a silent privacy leak: you only set this because
+your rules are *stricter* than the default, so a typo would quietly publish exactly the rooms
+you were withholding. A region page that suddenly lists no rooms is loud and diagnosable; one
+that lists secret rooms is not.
 
 Membership *counts* that would include hidden rooms are staff-only for the same reason —
 publishing a raw count tells a visitor how many rooms they are not being shown.
@@ -128,9 +143,11 @@ from evennia_regions.models import Region, RegionMembership
 # Create a region (fires the region_created signal):
 region = Region.create_region(name="The Ashfields", creator=character, description="Volcanic.")
 
-# Assign a room, first-ever membership is automatically primary:
-RegionMembership.objects.create(
-    region=region, room=room, room_name=room.key, created_by=character,
+# Assign a room. (region, room) is unique, so create() on an existing pair
+# raises IntegrityError — use create_link(), which get_or_creates and fills
+# in created_by/created_by_name from linked_by:
+membership, created = RegionMembership.create_link(
+    region, room, linked_by=character, room_name=room.key,
     is_primary=not RegionMembership.objects.filter(room=room).exists(),
 )
 

@@ -134,6 +134,10 @@ class RegionMembership(AbstractAuthoredLink):
     link_fields = ("region", "room")
 
     class Meta(AbstractAuthoredLink.Meta):
+        # AbstractAuthoredLink's contract requires the two link_fields be
+        # unique together, and member_count() double-counts without it —
+        # nothing else stops the same room joining the same region twice.
+        unique_together = [("region", "room")]  # noqa: RUF012
         constraints = [  # noqa: RUF012
             UniqueConstraint(
                 fields=["room"],

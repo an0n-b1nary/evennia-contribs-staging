@@ -7,6 +7,36 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.1] — 2026-08-02 — room-visibility hardening, unique memberships
+
+Review pass on the initial extraction. Both fixes are behaviour changes to the
+privacy path; neither affects the models' public API.
+
+- **`is_room_web_visible()` now reads room flags from a plain Evennia Attribute
+  as well as a typeclass attribute.** It previously used `getattr` alone, which
+  never consults the AttributeHandler — so a game that set
+  `room.db.room_type = "staff"` (the ordinary idiom) had every such room
+  published on the region page. Both sources are consulted and the *hidden*
+  answer wins, so a permissive class default cannot shadow an Attribute that
+  hides the room.
+- **`REGIONS_ROOM_VISIBILITY` now fails closed.** A path that cannot be
+  imported, resolves to `None`, or raises when called hides every room and logs
+  the failure, instead of silently reverting to the looser built-in rule. It
+  also catches `Exception` rather than `ImportError` alone — a valid module with
+  a mistyped attribute name previously raised `AttributeError` straight out of
+  the region detail view (HTTP 500), and a hook module that raised at import did
+  the same.
+- **`RegionMembership` gained `unique_together = [("region", "room")]`**
+  (migration `0002`). Nothing previously stopped a room joining the same region
+  twice, which made `member_count()` double-count it and left
+  `create_link()`'s `get_or_create` open to a race.
+- README: corrected the `REGIONS_ROOM_VISIBILITY` example, which was named and
+  written as an *is-hidden* predicate while the setting expects **True = visible**
+  — copying it would have inverted a game's room privacy. Also corrected the
+  programmatic membership example to `create_link(..., linked_by=...)`.
+
+---
+
 ## [0.1.0] — 2026-08-02 — initial extraction
 
 - `Region(AbstractArchived)` model: named geographic area, soft-archivable.
