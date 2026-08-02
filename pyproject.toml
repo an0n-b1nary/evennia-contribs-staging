@@ -29,6 +29,7 @@ ignore = [
 known-first-party = [
     "evennia_accessibility",
     "evennia_links",
+    "evennia_maps",
     "evennia_posing",
     "evennia_regions",
     "evennia_social",
