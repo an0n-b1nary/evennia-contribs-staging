@@ -9,28 +9,50 @@ Covers:
   partial unique constraint, and primary_for() resolution/fallback
 - CmdRegion switches end-to-end (bare list, /view, /here, /create,
   /add-room, /remove-room, /here-add, /primary, permission gates)
-- RegionListView and RegionDetailView web responses
+- RegionListView and RegionDetailView web responses, both as context and
+  fully rendered
 
 Uses:
     EvenniaTest            — base for model tests (provides char1/char2/room1)
     EvenniaCommandTest      — base for command tests (.call())
 
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
+
 Run:
     evennia test evennia_regions --settings settings.py
 """
 
+from importlib import import_module
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_regions.commands import CmdRegion
 from evennia_regions.models import Region, RegionMembership
 from evennia_regions.permissions import is_room_web_visible
 from evennia_regions.views import RegionDetailView, RegionListView
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# The region templates reverse their own routes through the evennia_regions
+# namespace, so they are mounted namespaced exactly as urls.py documents.
+# Evennia's own routes come along because website/base.html — which both
+# region templates extend — reverses "index" and the account routes.
+urlpatterns = [
+    path("regions/", include(("evennia_regions.urls", "evennia_regions"))),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -653,3 +675,93 @@ class TestRegionDetailView(EvenniaTest):
         with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"):
             response = RegionDetailView.as_view()(request, pk=r.pk)
         self.assertEqual(response.context_data["memberships"], [])
+
+
+# ---------------------------------------------------------------------------
+# Web pages: render for real
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render both region pages for real.
+
+    The two classes above stop at response.context_data, which compiles no
+    template: a ListView returns a lazy TemplateResponse, so a missing
+    partial, a typo'd template name or an unreversable URL surfaces only on
+    render. These cases call response.render(), against this module's own
+    URLconf.
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient trips an Evennia template-context RecursionError on
+    authenticated HTML pages.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.region = _make_region("Guarded Vale", description="Mist and old stone.")
+        # A distinctive room_name, not room1's default key ("Room"): the page's
+        # own static text contains "Rooms", so asserting on the key would pass
+        # even when the room itself is correctly withheld.
+        self.room_name = "Vale Gatehouse"
+        RegionMembership.objects.create(
+            region=self.region, room=self.room1, room_name=self.room_name, is_primary=True
+        )
+
+    def _render(self, view, *, path_="/regions/", user=None, **kwargs):
+        request = self.factory.get(path_)
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+    # -- region list --------------------------------------------------------
+
+    def test_region_list_renders_names_and_links(self):
+        html = self._render(RegionListView)
+        self.assertIn("Guarded Vale", html)
+        self.assertIn("Mist and old stone.", html)
+        self.assertIn(f'href="/regions/{self.region.pk}/"', html)
+
+    def test_region_list_renders_its_empty_state(self):
+        Region.objects.all().delete()
+        self.assertIn("No regions have been defined yet.", self._render(RegionListView))
+
+    def test_member_counts_are_withheld_from_non_staff(self):
+        # A raw count includes rooms the detail page hides, so publishing it
+        # tells a visitor exactly how many rooms they are not being shown.
+        self.assertNotIn('<th scope="col">Rooms</th>', self._render(RegionListView))
+
+    def test_member_counts_are_rendered_for_staff(self):
+        html = self._render(RegionListView, user=self.account)
+        self.assertIn('<th scope="col">Rooms</th>', html)
+
+    # -- region detail ------------------------------------------------------
+
+    def test_region_detail_renders_member_rooms(self):
+        html = self._render(
+            RegionDetailView, path_=f"/regions/{self.region.pk}/", pk=self.region.pk
+        )
+        self.assertIn("Guarded Vale", html)
+        self.assertIn(self.room_name, html)
+        self.assertIn("Primary", html)
+        self.assertIn("Member Rooms (1)", html)
+
+    def test_region_detail_omits_hidden_rooms_from_the_rendered_page(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"):
+            html = self._render(
+                RegionDetailView, path_=f"/regions/{self.region.pk}/", pk=self.region.pk
+            )
+        self.assertNotIn(self.room_name, html)
+        self.assertIn("No rooms have been assigned to this region yet.", html)
+        self.assertIn("Member Rooms (0)", html)
+
+    def test_region_detail_renders_without_a_description(self):
+        bare = _make_region("Nameless Waste", description="")
+        html = self._render(RegionDetailView, path_=f"/regions/{bare.pk}/", pk=bare.pk)
+        self.assertIn("(No description.)", html)

@@ -17,6 +17,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Surfaced while building `evennia-maps`' web surface, whose tests render templates
   rather than only inspecting view context.
 
+- **Added:** `TestWebPagesRender` — both region pages are now rendered for real via
+  `response.render()`. The existing view tests stop at `response.context_data`, which
+  compiles no template: a `ListView` returns a lazy `TemplateResponse`, so a missing
+  partial or an unreversable URL surfaces only on render. The privacy rules — member
+  counts withheld from non-staff, hidden rooms absent from the member list — are now
+  asserted against the rendered HTML as well as the context.
+
 ---
 
 ## [0.1.1] — 2026-08-02 — room-visibility hardening, unique memberships

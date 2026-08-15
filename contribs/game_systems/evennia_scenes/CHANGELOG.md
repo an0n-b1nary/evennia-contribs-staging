@@ -1,5 +1,24 @@
 # Changelog — evennia-scenes
 
+## [Unreleased]
+
+### Added
+- `TestWebPagesRender` — every scene page (archive, scene detail, log-entry edit
+  form, edit history, diff) is now rendered for real via `response.render()`.
+
+### Changed
+- The old `TestSceneTemplatesLoad` only called `get_template()` on each file, on
+  the stated reasoning that a contrib cannot full-render in isolation because the
+  templates extend the host's `website/base.html` and reverse the host-wired
+  `evennia_scenes:` namespace. That reasoning was wrong: Evennia ships both
+  `website/base.html` and its own urlpatterns, so a test module can mount this
+  contrib's routes itself and splat Evennia's in after them. Compiling a template
+  resolves no `{% extends %}` or `{% include %}` target and reverses no URL, so
+  the old check could not have caught the `NoReverseMatch` and missing-partial
+  faults that shipped in sibling contribs. Replaced with real renders.
+
+---
+
 ## [0.2.0] — 2026-08-01
 
 ### Added

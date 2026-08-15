@@ -7,19 +7,48 @@ Uses EvenniaTest which provides:
     self.char1 (key="Char"), self.char2 (key="Char2") — both in self.room1
     self.account, self.account2
 
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
+
 Run with:
     evennia test evennia_scenes --settings test_scenes_settings
 """
 
+from importlib import import_module
 from unittest.mock import patch
 
-from django.test import RequestFactory
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_scenes.capture import capture_to_scene, register_room_entry
 from evennia_scenes.display import render_scene_ref
 from evennia_scenes.models import LogEntry, LogEntryVersion, Scene, SceneParticipant
+from evennia_scenes.views import (
+    LogEntryDiffView,
+    LogEntryEditView,
+    LogEntryHistoryView,
+    SceneDetailView,
+    SceneListView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# The scene templates reverse their own routes through the evennia_scenes
+# namespace, so they are mounted namespaced exactly as urls.py documents.
+# Evennia's own routes come along because website/base.html — which every
+# scene template extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("", include(("evennia_scenes.urls", "evennia_scenes"))),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -714,33 +743,180 @@ class TestScenesAuthoringPermissionGate(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
-class TestSceneTemplatesLoad(EvenniaTest):
-    """Every shipped template compiles (catches missing files / syntax errors).
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render every scene page for real.
 
-    A lazy TemplateResponse masks a missing or malformed template — the view
-    returns fine and only blows up at render time. get_template() loads and
-    compiles each template, surfacing those failures at test time. (A full
-    .render() is not possible in isolation: the templates extend the host's
-    website/base.html and reverse the host-wired evennia_scenes: namespace,
-    neither of which the contrib can supply without coupling to a host — the
-    same reason the boards contrib does not full-render in its tests.)
+    This class used to only call get_template() on each file, on the reasoning
+    that a contrib cannot full-render in isolation: the templates extend the
+    host's website/base.html and reverse the host-wired evennia_scenes:
+    namespace. That reasoning was wrong. Evennia ships website/base.html and
+    its own urlpatterns, so a test module can mount this contrib's routes
+    itself and splat Evennia's in after them — which is what urlpatterns above
+    does. Compiling a template resolves no {% extends %} or {% include %}
+    target and reverses no URL, so the old check could not have caught the
+    NoReverseMatch and missing-partial faults that shipped in sibling contribs.
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient trips an Evennia template-context RecursionError on
+    authenticated HTML pages.
     """
 
-    TEMPLATES = (
-        "evennia_scenes/scene_list.html",
-        "evennia_scenes/scene_detail.html",
-        "evennia_scenes/log_edit_form.html",
-        "evennia_scenes/log_history.html",
-        "evennia_scenes/log_diff.html",
-    )
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.scene = _open_scene(self.room1, self.char1, title="Tavern Fight")
+        _add_participant(self.scene, self.char1)
+        self.entry = LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="An IC pose here.", log_type="pose"
+        )
+        self.scene.close(closer=self.char1)
 
-    def test_all_templates_compile(self):
-        from django.template.loader import get_template
+    def _render(self, view, *, path_="/scenes/", user=None, puppet=None, **kwargs):
+        request = self.factory.get(path_)
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if puppet is None:
+            response = view.as_view()(request, **kwargs)
+        else:
+            with patch.object(user, "get_all_puppets", return_value=[puppet]):
+                response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
 
-        for name in self.TEMPLATES:
-            with self.subTest(template=name):
-                # Raises TemplateDoesNotExist / TemplateSyntaxError on failure.
-                self.assertIsNotNone(get_template(name))
+    def _version(self, content="An older pose."):
+        return LogEntryVersion.create_version(parent=self.entry, content=content, editor=self.char1)
+
+    # -- scene archive ------------------------------------------------------
+
+    def test_scene_list_renders_closed_scenes(self):
+        html = self._render(SceneListView)
+        self.assertIn("Scene Archive", html)
+        self.assertIn("Tavern Fight", html)
+        self.assertIn(f'href="/scenes/{self.scene.pk}/"', html)
+
+    def test_scene_list_renders_its_empty_state(self):
+        Scene.objects.all().delete()
+        self.assertIn("No scenes have been archived yet.", self._render(SceneListView))
+
+    # -- scene detail -------------------------------------------------------
+
+    def test_scene_detail_renders_the_log_and_participants(self):
+        html = self._render(SceneDetailView, path_=f"/scenes/{self.scene.pk}/", pk=self.scene.pk)
+        self.assertIn("Tavern Fight", html)
+        self.assertIn("An IC pose here.", html)
+        self.assertIn(self.char1.key, html)
+
+    def test_scene_detail_hides_ooc_from_the_rendered_log_by_default(self):
+        LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="Some OOC chatter.", log_type="ooc"
+        )
+        html = self._render(SceneDetailView, path_=f"/scenes/{self.scene.pk}/", pk=self.scene.pk)
+        self.assertNotIn("Some OOC chatter.", html)
+        html = self._render(
+            SceneDetailView,
+            path_=f"/scenes/{self.scene.pk}/?include_ooc=1",
+            pk=self.scene.pk,
+        )
+        self.assertIn("Some OOC chatter.", html)
+
+    def test_scene_detail_offers_the_author_an_edit_link(self):
+        html = self._render(
+            SceneDetailView,
+            path_=f"/scenes/{self.scene.pk}/",
+            user=self.account,
+            puppet=self.char1,
+            pk=self.scene.pk,
+        )
+        self.assertIn(f"/scenes/{self.scene.pk}/log/{self.entry.pk}/edit/", html)
+
+    def test_scene_detail_renders_an_empty_log(self):
+        empty = _open_scene(self.room2, self.char1, title="Quiet Corner")
+        empty.close(closer=self.char1)
+        html = self._render(SceneDetailView, path_=f"/scenes/{empty.pk}/", pk=empty.pk)
+        self.assertIn("No log entries found for this scene.", html)
+
+    # -- log entry authoring / history --------------------------------------
+
+    def test_log_edit_form_renders_with_the_existing_content(self):
+        html = self._render(
+            LogEntryEditView,
+            path_=f"/scenes/{self.scene.pk}/log/{self.entry.pk}/edit/",
+            user=self.account,
+            puppet=self.char1,
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+        )
+        self.assertIn(f"Edit Log Entry #{self.entry.pk}", html)
+        self.assertIn("An IC pose here.", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_log_history_renders_versions(self):
+        self._version()
+        html = self._render(
+            LogEntryHistoryView,
+            path_=f"/scenes/{self.scene.pk}/log/{self.entry.pk}/history/",
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+        )
+        self.assertIn("An older pose.", html)
+        self.assertIn("An IC pose here.", html)
+
+    def test_log_history_offers_diff_links_to_staff_only(self):
+        version = self._version()
+        diff_url = f"/scenes/{self.scene.pk}/log/{self.entry.pk}/diff/{version.version_number}/"
+        history_path = f"/scenes/{self.scene.pk}/log/{self.entry.pk}/history/"
+        anon = self._render(
+            LogEntryHistoryView,
+            path_=history_path,
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+        )
+        self.assertNotIn(diff_url, anon)
+        staff = self._render(
+            LogEntryHistoryView,
+            path_=history_path,
+            user=self.account,
+            puppet=self.char1,
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+        )
+        self.assertIn(diff_url, staff)
+
+    def test_log_history_renders_its_empty_state(self):
+        html = self._render(
+            LogEntryHistoryView,
+            path_=f"/scenes/{self.scene.pk}/log/{self.entry.pk}/history/",
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+        )
+        self.assertIn("No edit history found for this entry.", html)
+
+    def test_log_diff_renders_both_sides(self):
+        version = self._version()
+        html = self._render(
+            LogEntryDiffView,
+            path_=f"/scenes/{self.scene.pk}/log/{self.entry.pk}/diff/{version.version_number}/",
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn("An older pose.", html)
+        self.assertIn("An IC pose here.", html)
+
+    def test_log_diff_reports_an_identical_version(self):
+        version = self._version(content=self.entry.content)
+        html = self._render(
+            LogEntryDiffView,
+            path_=f"/scenes/{self.scene.pk}/log/{self.entry.pk}/diff/{version.version_number}/",
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn("identical to the current content", html)
 
 
 class TestSceneDetailViewVisibility(EvenniaTest):
