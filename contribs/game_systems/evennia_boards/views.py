@@ -50,7 +50,9 @@ class BoardListView(ListView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Bulletin Boards"
         for board in context["boards"]:
-            board._post_count = board.posts.count()
+            # Not `_post_count`: Django's template engine refuses to
+            # resolve any variable whose name starts with an underscore.
+            board.post_count = board.posts.count()
         return context
 
 

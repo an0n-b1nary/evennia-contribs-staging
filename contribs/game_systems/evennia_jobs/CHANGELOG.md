@@ -7,6 +7,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Fixed:** the documentation comments at the top of `_empty_state.html` and
+  `_pagination.html` spanned multiple lines. Django's template tag regex is not
+  `DOTALL`, so a multi-line `{# ... #}` is not a comment — its text renders into the
+  page, and the usage example inside each partial was a live `{% include %}` of the
+  partial itself, recursing until the stack blew. Both are now `{% comment %}` blocks.
+  Surfaced while building `evennia-maps`' web surface, whose tests render templates
+  rather than only inspecting view context.
+
+- **Fixed:** `job_form.html` and `job_comment_form.html` passed their Cancel link as
+  `cancel_url="{% url 'job-list' %}"`. A tag nested inside a quoted argument does not
+  parse — the tokenizer ends the outer `{% include %}` at the first `%}` — so both
+  authoring forms were `TemplateSyntaxError`. Now resolved up front with
+  `{% url ... as cancel_url %}`, which also degrades to an empty string (hiding the
+  Cancel link) rather than raising when the routes are not mounted.
+
+---
+
 ## [0.1.0] — 2026-06-01 — initial extraction
 
 - `Job` model: staff ticket with status lifecycle (open → in_review → answered → closed),

@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Fixed:** the board list page raised `TemplateSyntaxError` on every request.
+  `BoardListView` attached the per-board post count as `board._post_count`, and
+  Django's template engine refuses to resolve any variable whose name begins with
+  an underscore. Renamed to `board.post_count`. No view test caught this because
+  building a view's context compiles no template; a template compile sweep
+  (`scripts/check_templates.py`) now runs in pre-commit and CI.
+
+---
+
 ## [0.1.1] — 2026-07-05 — fix README label example
 
 - `BOARDS_CALENDAR_APP_LABEL` README example corrected from `"calendar"` to

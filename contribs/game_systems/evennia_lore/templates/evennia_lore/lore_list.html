@@ -103,6 +103,10 @@
 {% endwith %}
 
 {% else %}
-{% include "evennia_lore/_empty_state.html" with message="No lore entries found{% if search_filter or tag_filter or theme_filter or region_filter %} matching your filters{% endif %}." action_url="/lore/new/" action_label="Submit the first entry" %}
+{% if search_filter or tag_filter or theme_filter or region_filter %}
+{% include "evennia_lore/_empty_state.html" with message="No lore entries found matching your filters." action_url="/lore/new/" action_label="Submit the first entry" %}
+{% else %}
+{% include "evennia_lore/_empty_state.html" with message="No lore entries found." action_url="/lore/new/" action_label="Submit the first entry" %}
+{% endif %}
 {% endif %}
 {% endblock %}

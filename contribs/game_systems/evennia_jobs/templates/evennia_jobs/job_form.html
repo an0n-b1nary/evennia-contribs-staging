@@ -25,6 +25,7 @@
     {% include "evennia_accessibility/_form_field.html" with field=form.title %}
     {% include "evennia_accessibility/_form_field.html" with field=form.description %}
   </fieldset>
-  {% include "evennia_accessibility/_form_actions.html" with cancel_url="{% url 'job-list' %}" submit_label="Submit" %}
+  {% url 'job-list' as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Submit" %}
 </form>
 {% endblock %}

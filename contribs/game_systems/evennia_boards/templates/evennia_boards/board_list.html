@@ -31,7 +31,7 @@
       <td>{{ forloop.counter }}</td>
       <td><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
       <td>{{ board.description }}</td>
-      <td>{{ board._post_count }}</td>
+      <td>{{ board.post_count }}</td>
       <td>{{ board.get_board_type_display }}</td>
     </tr>
     {% endfor %}

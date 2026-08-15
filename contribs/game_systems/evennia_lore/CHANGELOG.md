@@ -7,6 +7,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Fixed:** the documentation comments at the top of `_empty_state.html` and
+  `_pagination.html` spanned multiple lines. Django's template tag regex is not
+  `DOTALL`, so a multi-line `{# ... #}` is not a comment — its text renders into the
+  page, and the usage example inside each partial was a live `{% include %}` of the
+  partial itself, recursing until the stack blew. Both are now `{% comment %}` blocks.
+  Surfaced while building `evennia-maps`' web surface, whose tests render templates
+  rather than only inspecting view context.
+
+- **Fixed:** `lore_list.html` built its empty-state message as
+  `message="No lore entries found{% if ... %} matching your filters{% endif %}."`.
+  A tag nested inside a quoted argument does not parse, so the page 500'd whenever
+  the entry list was empty. Split into an `{% if %}`/`{% else %}` around two
+  `{% include %}` calls.
+
+---
+
 ## [0.1.3] — 2026-07-05 — fix app-label defaults and gate hardening
 
 - `LORE_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"`.

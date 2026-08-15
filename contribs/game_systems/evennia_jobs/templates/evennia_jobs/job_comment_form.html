@@ -20,6 +20,7 @@
     {% include "evennia_accessibility/_form_field.html" with field=form.is_staff_only %}
     {% endif %}
   </fieldset>
-  {% include "evennia_accessibility/_form_actions.html" with cancel_url="{% url 'job-detail' job.pk %}" submit_label="Post Comment" %}
+  {% url 'job-detail' job.pk as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Post Comment" %}
 </form>
 {% endblock %}
