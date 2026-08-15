@@ -1,4 +1,4 @@
-{#
+{% comment %}
   Render one form field: label + widget + error region + help text.
 
   Usage:
@@ -13,7 +13,7 @@
     Widget id:  id_<name>
     Error div:  id_<name>_errors
     Help div:   id_<name>_help
-#}
+{% endcomment %}
 <div class="form-group{% if field.errors %} has-error{% endif %}">
 
   {# Label — bold; required fields get an accessible asterisk. #}

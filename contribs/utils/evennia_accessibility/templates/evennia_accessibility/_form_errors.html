@@ -1,4 +1,4 @@
-{#
+{% comment %}
   Render form-level (non-field) errors in an accessible alert region.
 
   Usage:
@@ -11,7 +11,7 @@
 
   This partial handles __all__ errors (non_field_errors) only. Per-field
   errors are handled by _form_field.html.
-#}
+{% endcomment %}
 {% if form.non_field_errors %}
 <div id="form-errors-summary"
      class="alert alert-danger"

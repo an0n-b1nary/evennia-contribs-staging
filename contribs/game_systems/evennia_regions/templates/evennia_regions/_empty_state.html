@@ -1,4 +1,4 @@
-{#
+{% comment %}
   Empty state partial — shown when a list has no items.
 
   Variables (pass via "with"):
@@ -9,7 +9,7 @@
 
   Usage:
     {% include "evennia_regions/_empty_state.html" with message="No regions have been defined yet." %}
-#}
+{% endcomment %}
 <div class="text-center py-5">
   <p class="text-muted mb-1">{{ message }}</p>
   {% if action %}

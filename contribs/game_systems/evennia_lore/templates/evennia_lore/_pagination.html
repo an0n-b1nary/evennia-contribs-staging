@@ -1,4 +1,4 @@
-{#
+{% comment %}
   Accessible pagination partial.
 
   Requires page_obj in context (standard Django ListView CBV).
@@ -14,7 +14,7 @@
     - aria-current="page" on the active page number
     - Previous/Next use aria-label for screen readers
     - Disabled state uses aria-disabled="true"
-#}
+{% endcomment %}
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 <nav aria-label="Pagination" class="mt-4">
   <ul class="pagination justify-content-center">

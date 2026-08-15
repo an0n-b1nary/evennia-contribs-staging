@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Fixed:** the documentation comments at the top of `_empty_state.html` and
+  `_pagination.html` spanned multiple lines. Django's template tag regex is not
+  `DOTALL`, so a multi-line `{# ... #}` is not a comment — its text renders into the
+  page, and the usage example inside each partial was a live `{% include %}` of the
+  partial itself, recursing until the stack blew. Both are now `{% comment %}` blocks.
+  Surfaced while building `evennia-maps`' web surface, whose tests render templates
+  rather than only inspecting view context.
+
+---
+
 ## [0.1.1] — 2026-08-02 — room-visibility hardening, unique memberships
 
 Review pass on the initial extraction. Both fixes are behaviour changes to the

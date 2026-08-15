@@ -1,4 +1,4 @@
-{#
+{% comment %}
   Accessible pagination partial.
 
   Requires page_obj in context (standard Django ListView CBV).
@@ -6,7 +6,7 @@
 
   Usage:
     {% include "evennia_jobs/_pagination.html" %}
-#}
+{% endcomment %}
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 <nav aria-label="Pagination" class="mt-4">
   <ul class="pagination justify-content-center">
