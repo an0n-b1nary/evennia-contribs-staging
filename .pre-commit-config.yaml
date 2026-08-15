@@ -24,6 +24,12 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      - id: check-templates
+        name: django template sweep (compile every template)
+        entry: python scripts/check_templates.py
+        language: system
+        types: [html]
+
       - id: anonymity-push-guard
         name: anonymity guard (push remote <-> identity)
         entry: python scripts/anonymity_push_guard.py

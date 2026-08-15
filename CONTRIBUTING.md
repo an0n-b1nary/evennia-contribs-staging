@@ -89,14 +89,32 @@ pip install pre-commit ruff
 pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
-Then `git commit` will run the anonymity guards, Ruff format, and Ruff check automatically, and `git push` will run the anonymity push guard.
+Then `git commit` will run the anonymity guards, the template sweep, Ruff format, and Ruff check automatically, and `git push` will run the anonymity push guard.
+
+## Template sweep
+
+`scripts/check_templates.py` compiles every Django template in the repo and fails on
+three things: a template that does not compile, a multi-line `{# ... #}` comment, and a
+template that includes or extends itself.
+
+It exists because a broken template is invisible to a normal view test. Asserting on a
+view's context compiles no template at all, so a page can be a guaranteed 500 while its
+tests stay green — which is exactly how four such pages shipped here.
+
+The sweep needs Django importable but nothing else: no settings module, no database, no
+game directory. If Django is missing it prints a hint and passes, so a bare clone is not
+blocked; CI runs it with `--require-django` in the test job, where Django is installed.
+
+Note what it does *not* cover: compiling a template does not resolve `{% extends %}` or
+`{% include %}` targets, or run a single filter. If your contrib ships web pages, write
+at least one test per page that calls `response.render()`.
 
 ## CI
 
 Every push and PR runs two jobs:
 
 - **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check.
-- **test** (~5–8 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test`.
+- **test** (~5–8 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test`.
 
 A PR can't merge until both jobs pass.
 

@@ -50,6 +50,11 @@ jobs:
         # Pinned to the Evennia version the source project runs on.
         # Bump deliberately, in lockstep with the source project's runtime.
         run: pip install evennia==6.0.0
+      # The lint job installs no Django, so the pre-commit copy of this hook
+      # skips there. Run it here, where Django exists, and require it.
+      - name: Django template sweep
+        run: python scripts/check_templates.py --require-django
+
       - name: Initialize throwaway game directory
         run: evennia --init ci_game
       - name: Install all contribs and register their apps
