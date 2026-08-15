@@ -23,6 +23,31 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the entry list was empty. Split into an `{% if %}`/`{% else %}` around two
   `{% include %}` calls.
 
+- **Fixed:** `lore_detail.html` reversed its region, scene and plot links with a bare
+  `{% url %}`. evennia_regions, evennia_scenes and evennia_plots are soft dependencies —
+  a game can install the model side, so the links populate, without mounting the
+  partner's `urls.py`, or can mount it under different route names. Any of those turned
+  the whole detail page into a `NoReverseMatch` 500. Now resolved with
+  `{% url ... as var %}`, which assigns an empty string instead of raising; the partner's
+  name renders as plain text when its route is absent.
+
+- **Fixed:** `lore_list.html` tried to accumulate the active filters into a query string
+  with nested `{% with %}` blocks, so that paging could preserve them. That cannot work —
+  a `{% with %}` assignment dies at its own `{% endwith %}` — and the value was never
+  passed to the pagination partial either. Every page-2 link silently dropped the filter
+  and showed page 2 of the unfiltered list. `LoreListView` now supplies a urlencoded
+  `extra_params` (the request's query string minus `page`), which the template passes on.
+
+- **Fixed:** the usage examples inside `_pagination.html` and `_empty_state.html` named
+  `website/partials/...` paths that do not exist in this contrib, and `_pagination.html`
+  documented `extra_params` as needing a trailing `&` that the partial itself adds.
+
+- **Added:** `TestLoreListRenders` and friends — every lore page (list, detail,
+  compendium, approval queue, create/edit form, lean form, history, diff) is now
+  rendered for real via `response.render()`, with the test module doubling as a test
+  URLconf. The partner-link seam is tested from both sides, against a second URLconf
+  that mounts stub region/scene/plot routes.
+
 ---
 
 ## [0.1.3] — 2026-07-05 — fix app-label defaults and gate hardening

@@ -68,13 +68,21 @@
   </div>
 {% endif %}
 
+{% comment %}
+  Partner links resolve through "{% url ... as var %}", which assigns an empty
+  string on NoReverseMatch instead of raising. evennia_regions/scenes/plots are
+  soft dependencies: a game can install the model side (so these lists fill)
+  without mounting the partner's urls.py, or can mount it under different route
+  names. A bare {% url %} would turn that into a 500 on the detail page.
+{% endcomment %}
 <div class="row mt-4">
   {% if region_list %}
   <div class="col-md-4 mb-3">
     <h2 class="h6">Regions</h2>
     <ul class="list-unstyled small">
       {% for region in region_list %}
-      <li><a href="{% url 'region-detail' region.pk %}">{{ region.name }}</a></li>
+      {% url 'region-detail' region.pk as region_url %}
+      <li>{% if region_url %}<a href="{{ region_url }}">{{ region.name }}</a>{% else %}{{ region.name }}{% endif %}</li>
       {% endfor %}
     </ul>
   </div>
@@ -85,7 +93,8 @@
     <h2 class="h6">Linked Scenes</h2>
     <ul class="list-unstyled small">
       {% for scene in linked_scenes %}
-      <li><a href="{% url 'scene-detail' scene.pk %}">{{ scene.title|default:"Untitled Scene" }}</a></li>
+      {% url 'scene-detail' scene.pk as scene_url %}
+      <li>{% if scene_url %}<a href="{{ scene_url }}">{{ scene.title|default:"Untitled Scene" }}</a>{% else %}{{ scene.title|default:"Untitled Scene" }}{% endif %}</li>
       {% endfor %}
     </ul>
   </div>
@@ -96,7 +105,8 @@
     <h2 class="h6">Linked Plots</h2>
     <ul class="list-unstyled small">
       {% for thread in linked_plots %}
-      <li><a href="{% url 'plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+      {% url 'plot-detail' thread.pk as thread_url %}
+      <li>{% if thread_url %}<a href="{{ thread_url }}">{{ thread.name }}</a>{% else %}{{ thread.name }}{% endif %}</li>
       {% endfor %}
     </ul>
   </div>

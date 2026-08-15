@@ -94,13 +94,7 @@
 </table>
 </div>
 
-{% with extra=""%}
-  {% if search_filter %}{% with extra=extra|add:"&search="|add:search_filter %}{% endwith %}{% endif %}
-  {% if tag_filter %}{% with extra=extra|add:"&tag="|add:tag_filter %}{% endwith %}{% endif %}
-  {% if theme_filter %}{% with extra=extra|add:"&theme="|add:theme_filter %}{% endwith %}{% endif %}
-  {% if region_filter %}{% with extra=extra|add:"&region="|add:region_filter %}{% endwith %}{% endif %}
-  {% include "evennia_lore/_pagination.html" %}
-{% endwith %}
+{% include "evennia_lore/_pagination.html" with extra_params=extra_params %}
 
 {% else %}
 {% if search_filter or tag_filter or theme_filter or region_filter %}

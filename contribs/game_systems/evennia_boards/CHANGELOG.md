@@ -16,6 +16,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   building a view's context compiles no template; a template compile sweep
   (`scripts/check_templates.py`) now runs in pre-commit and CI.
 
+- **Added:** `TestWebPagesRender` — every board page (list, detail, new post, reply,
+  edit) is now rendered for real via `response.render()`, with the test module doubling
+  as a test URLconf. The template compile sweep added alongside the fix above is a
+  floor, not a substitute: compiling a template resolves no `{% extends %}` or
+  `{% include %}` target and reverses no URL.
+
 ---
 
 ## [0.1.1] — 2026-07-05 — fix README label example

@@ -2,12 +2,12 @@
   Accessible pagination partial.
 
   Requires page_obj in context (standard Django ListView CBV).
-  Optional: extra_params — additional query string params to preserve
-  (e.g., "?tag=combat&" — include the trailing "&").
+  Optional: extra_params — additional query string params to preserve, already
+  urlencoded, with no leading "?" and no trailing "&" (this partial adds both).
 
   Usage:
-    {% include "website/partials/_pagination.html" %}
-    {% include "website/partials/_pagination.html" with extra_params="tag=combat&" %}
+    {% include "evennia_lore/_pagination.html" %}
+    {% include "evennia_lore/_pagination.html" with extra_params="tag=combat" %}
 
   Accessibility:
     - <nav aria-label="Pagination"> landmark

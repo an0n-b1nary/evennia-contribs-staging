@@ -106,8 +106,36 @@ game directory. If Django is missing it prints a hint and passes, so a bare clon
 blocked; CI runs it with `--require-django` in the test job, where Django is installed.
 
 Note what it does *not* cover: compiling a template does not resolve `{% extends %}` or
-`{% include %}` targets, or run a single filter. If your contrib ships web pages, write
-at least one test per page that calls `response.render()`.
+`{% include %}` targets, run a single filter, or reverse a single URL. The sweep is a
+floor, not a substitute for rendering.
+
+## Render tests
+
+**If your contrib ships web pages, every page needs at least one test that calls
+`response.render()`.** A class-based view returns a lazy `TemplateResponse`, so a test
+that asserts on `response.context_data` never touches the template — which is how four
+guaranteed-500 pages shipped here under a green suite.
+
+The established pattern (see `evennia_maps`, `evennia_boards`, `evennia_jobs` and
+`evennia_lore` `tests.py`):
+
+- Make the test module double as a **test URLconf**: declare `urlpatterns` at module
+  level mounting your contrib's routes the way its `urls.py` documents, splatting in
+  `evennia.web.urls.urlpatterns` after them — `website/base.html` reverses Evennia's own
+  routes, and without them every render dies on an unrelated `NoReverseMatch`. Opt in
+  per class with `@override_settings(ROOT_URLCONF=__name__)`.
+- Drive views with `RequestFactory` and call them directly, not with Django's
+  `TestClient`: the `TestClient` trips an Evennia template-context `RecursionError` on
+  authenticated HTML pages.
+- Attach a session — `request.session = import_module(settings.SESSION_ENGINE).SessionStore()`.
+  Evennia's `general_context` processor reads `request.session["puppet"]` for any
+  authenticated user, and `RequestFactory` attaches no session.
+- Assert on rendered text, not just on a 200: an empty state's wording, a link that
+  should be there, a link that should *not* be there for the wrong viewer.
+- Outbound links to a soft-dependency contrib go through `{% url 'name' arg as var %}`,
+  which assigns `""` on `NoReverseMatch` instead of raising. Test both halves: the
+  degraded render under your own URLconf, and the linked render under a second URLconf
+  that mounts stub partner routes.
 
 ## CI
 

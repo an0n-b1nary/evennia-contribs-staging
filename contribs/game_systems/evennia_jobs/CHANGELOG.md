@@ -24,6 +24,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `{% url ... as cancel_url %}`, which also degrades to an empty string (hiding the
   Cancel link) rather than raising when the routes are not mounted.
 
+- **Added:** `TestWebPagesRender` — every jobs page (my tickets, the staff queue, ticket
+  detail, all three submission forms, the comment form) is now rendered for real via
+  `response.render()`, with the test module doubling as a test URLconf. Both fixes above
+  were compile-time failures that no context-only view test could see.
+
 ---
 
 ## [0.1.0] — 2026-06-01 — initial extraction

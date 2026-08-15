@@ -3,17 +3,27 @@
 """
 Tests for evennia_jobs.
 
-Covers models, commands (via EvenniaCommandTest), and API privacy logic
-(via rest_framework.test.APIRequestFactory).
+Covers models, commands (via EvenniaCommandTest), the web pages (rendered
+for real), and API privacy logic (via rest_framework.test.APIRequestFactory).
+
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
 
 Run:
     evennia test --settings test_jobs_settings.py evennia_jobs
 """
 
+from importlib import import_module
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_jobs.commands import (
     CmdBug,
@@ -24,6 +34,25 @@ from evennia_jobs.commands import (
     _format_job_detail,
 )
 from evennia_jobs.models import Job, JobComment, JobPriority, JobStatus, JobType
+from evennia_jobs.views import (
+    JobAllView,
+    JobCommentCreateView,
+    JobCreateView,
+    JobDetailView,
+    JobListView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# evennia_jobs mounts its routes without a namespace, exactly as its urls.py
+# documents. Evennia's own routes come along because website/base.html — which
+# every jobs template extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("jobs/", include("evennia_jobs.urls")),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -343,3 +372,129 @@ class TestJobAPIPrivacy(EvenniaTest):
         # char2's issue_job should be visible; discuss_job should not
         self.assertIn(self.issue_job.pk, pks)
         self.assertNotIn(discuss_job.pk, pks)
+
+
+# ---------------------------------------------------------------------------
+# Web pages: render for real
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render every jobs page for real.
+
+    A CBV returns a lazy TemplateResponse, so a test that only inspects
+    context_data never compiles the template — which is how both authoring
+    forms shipped as guaranteed TemplateSyntaxErrors under a green suite.
+    Each case here calls response.render().
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient triggers an Evennia template-context RecursionError
+    on authenticated HTML pages.
+
+    EvenniaTest defaults: account/char1 = Developer (staff); account2/char2 =
+    non-staff. Bare test accounts have no sessions, so get_all_puppets()
+    returns [] — every case that needs a character patches it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.job = _make_job(self.char2, title="Door is stuck", desc="It will not open.")
+        self.issue = _make_job(self.char2, job_type=JobType.ISSUE, title="Player conduct")
+
+    def _render(self, view, user=None, puppet=None, method="get", **kwargs):
+        request = getattr(self.factory, method)("/jobs/")
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if puppet is None:
+            response = view.as_view()(request, **kwargs)
+        else:
+            with patch.object(user, "get_all_puppets", return_value=[puppet]):
+                response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+    # -- ticket lists -------------------------------------------------------
+
+    def test_my_tickets_renders_the_submitters_own_tickets(self):
+        html = self._render(JobListView, user=self.account2, puppet=self.char2)
+        self.assertIn("My Tickets", html)
+        self.assertIn("Door is stuck", html)
+        # ISSUE tickets mask the reporter from non-staff, even their own.
+        self.assertIn("[anonymous]", html)
+        # Non-staff get no route into the full queue.
+        self.assertNotIn("All Open Tickets", html)
+
+    def test_queue_renders_for_staff_with_the_assignee_column(self):
+        html = self._render(JobAllView, user=self.account, puppet=self.char1)
+        self.assertIn("Ticket Queue", html)
+        self.assertIn("Assignee", html)
+        # Staff see the real reporter on an ISSUE.
+        self.assertIn(self.char2.key, html)
+
+    def test_empty_ticket_list_renders_its_empty_state(self):
+        Job.objects.all().delete()
+        html = self._render(JobListView, user=self.account2, puppet=self.char2)
+        self.assertIn("You have no open tickets.", html)
+        self.assertIn("+request", html)
+
+    # -- ticket detail ------------------------------------------------------
+
+    def test_ticket_detail_renders_description_and_comments(self):
+        JobComment.create_comment(job=self.job, author=self.char1, content="Looking into it.")
+        html = self._render(JobDetailView, user=self.account, puppet=self.char1, pk=self.job.pk)
+        self.assertIn(f"Ticket #{self.job.job_number}", html)
+        self.assertIn("It will not open.", html)
+        self.assertIn("Looking into it.", html)
+
+    def test_ticket_detail_marks_staff_only_notes(self):
+        JobComment.create_comment(
+            job=self.job, author=self.char1, content="Internal note.", is_staff_only=True
+        )
+        html = self._render(JobDetailView, user=self.account, puppet=self.char1, pk=self.job.pk)
+        self.assertIn("Internal note.", html)
+        self.assertIn("Staff-only", html)
+
+    def test_ticket_detail_renders_without_comments(self):
+        html = self._render(JobDetailView, user=self.account, puppet=self.char1, pk=self.job.pk)
+        self.assertIn("No comments yet.", html)
+
+    # -- authoring forms ----------------------------------------------------
+
+    def test_request_form_renders_with_a_working_cancel_link(self):
+        html = self._render(
+            JobCreateView, user=self.account2, puppet=self.char2, job_type="request"
+        )
+        self.assertIn("New Request", html)
+        self.assertIn("Request details", html)
+        # {% url 'job-list' as cancel_url %} — the Cancel link only appears
+        # once the route actually reverses.
+        self.assertIn('href="/jobs/"', html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_issue_form_warns_that_the_submission_is_anonymous(self):
+        html = self._render(JobCreateView, user=self.account2, puppet=self.char2, job_type="issue")
+        self.assertIn("Anonymous submission:", html)
+        self.assertIn("Issue details", html)
+
+    def test_bug_form_renders(self):
+        html = self._render(JobCreateView, user=self.account2, puppet=self.char2, job_type="bug")
+        self.assertIn("Bug details", html)
+
+    def test_comment_form_hides_the_staff_only_toggle_from_players(self):
+        html = self._render(
+            JobCommentCreateView, user=self.account2, puppet=self.char2, pk=self.job.pk
+        )
+        self.assertIn("Door is stuck", html)
+        self.assertIn(f'href="/jobs/{self.job.pk}/"', html)
+        self.assertNotIn("id_is_staff_only", html)
+
+    def test_comment_form_offers_the_staff_only_toggle_to_staff(self):
+        html = self._render(
+            JobCommentCreateView, user=self.account, puppet=self.char1, pk=self.job.pk
+        )
+        self.assertIn("id_is_staff_only", html)

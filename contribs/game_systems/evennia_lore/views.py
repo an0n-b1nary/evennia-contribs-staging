@@ -102,6 +102,13 @@ class LoreListView(ListView):
         context["theme_filter"] = self.request.GET.get("theme", "")
         context["region_filter"] = self.request.GET.get("region", "")
         context["search_filter"] = self.request.GET.get("search", "")
+        # Filters have to survive paging. The template used to try to build this
+        # inline with nested {% with %} blocks, which cannot work: a {% with %}
+        # assignment dies at its own {% endwith %}, so every page-2 link dropped
+        # the filter and showed page 2 of the unfiltered list instead.
+        page_params = self.request.GET.copy()
+        page_params.pop("page", None)
+        context["extra_params"] = page_params.urlencode()
         context["all_major_tags"] = LoreTag.objects.filter(is_major=True).order_by("name")
         context["is_staff"] = is_staff_user(self.request)
         character_id = get_character_id(self.request.user)

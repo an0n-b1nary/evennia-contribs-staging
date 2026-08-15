@@ -7,6 +7,10 @@ Uses EvenniaTest which provides:
     self.char1 (key="Char"), self.char2 (key="Char2") — both in self.room1
     self.account, self.account2
 
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
+
 Run with:
     evennia test evennia_boards --settings test_boards_settings
 """
@@ -14,12 +18,38 @@ Run with:
 import unittest
 from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
 from unittest.mock import patch
 
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_boards.models import Board, Post, PostCalendarLink, PostVersion, Subscription
+from evennia_boards.views import (
+    BoardDetailView,
+    BoardListView,
+    PostCreateView,
+    PostEditView,
+    PostReplyView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# Evennia's own routes come along because website/base.html — which every
+# board template extends — reverses "index" and the account routes. Rendering
+# against a URLconf without them fails with a NoReverseMatch that has nothing
+# to do with this contrib.
+urlpatterns = [
+    path("", include(("evennia_boards.urls", "evennia_boards"))),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -806,3 +836,109 @@ class TestAuthoringPermissionGate(EvenniaTest):
         self.assertEqual(post.title, "Original")
         self.assertEqual(post.content, "Untouched.")
         self.assertEqual(PostVersion.objects.filter(parent=post).count(), 0)
+
+
+# ---------------------------------------------------------------------------
+# Web pages: render for real
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render every board page for real.
+
+    A CBV returns a lazy TemplateResponse, so a test that only inspects
+    context_data never compiles the template — which is how a board list
+    that raised TemplateSyntaxError on every request shipped under a green
+    suite. Each case here calls response.render().
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient triggers an Evennia template-context RecursionError
+    on authenticated HTML pages.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.board = _make_board("Notices")
+        self.post = Post.create_post(
+            board=self.board, author=self.char1, title="First Post", content="Body text."
+        )
+        self.reply = Post.create_post(
+            board=self.board,
+            author=self.char2,
+            title="Re: First Post",
+            content="Reply text.",
+            parent_post=self.post,
+        )
+
+    def _render(self, view, user=None, **kwargs):
+        request = self.factory.get("/boards/")
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+    def _render_as_char1(self, view, **kwargs):
+        """Render an authoring page as account/char1 (staff, puppeted)."""
+        with patch.object(self.account, "get_all_puppets", return_value=[self.char1]):
+            return self._render(view, user=self.account, **kwargs)
+
+    # -- board list ---------------------------------------------------------
+
+    def test_board_list_renders_names_and_post_counts(self):
+        html = self._render(BoardListView)
+        self.assertIn("Notices", html)
+        # The count is attached as board.post_count. Django refuses to resolve
+        # any template variable starting with an underscore, so the earlier
+        # board._post_count made this page a guaranteed TemplateSyntaxError.
+        self.assertIn("<td>2</td>", html)
+
+    def test_board_list_renders_its_empty_state(self):
+        Board.objects.all().delete()
+        self.assertIn("No bulletin boards have been configured.", self._render(BoardListView))
+
+    # -- board detail -------------------------------------------------------
+
+    def test_board_detail_renders_posts_and_replies(self):
+        html = self._render(BoardDetailView, pk=self.board.pk)
+        self.assertIn("First Post", html)
+        self.assertIn("Reply text.", html)
+        self.assertIn(f"Re: #{self.post.post_number}", html)
+
+    def test_board_detail_offers_no_authoring_links_to_anonymous(self):
+        html = self._render(BoardDetailView, pk=self.board.pk)
+        self.assertNotIn(f"/boards/{self.board.pk}/new/", html)
+
+    def test_board_detail_offers_authoring_links_to_a_puppeted_account(self):
+        with patch.object(self.account, "get_all_puppets", return_value=[self.char1]):
+            html = self._render(BoardDetailView, user=self.account, pk=self.board.pk)
+        self.assertIn(f"/boards/{self.board.pk}/new/", html)
+        self.assertIn(f"/boards/{self.board.pk}/posts/{self.post.pk}/edit/", html)
+
+    def test_board_detail_renders_its_empty_state(self):
+        empty = _make_board("Silent", order=5)
+        self.assertIn("No posts on this board yet.", self._render(BoardDetailView, pk=empty.pk))
+
+    # -- authoring forms ----------------------------------------------------
+
+    def test_post_create_form_renders(self):
+        html = self._render_as_char1(PostCreateView, pk=self.board.pk)
+        self.assertIn("New Post on Notices", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+        self.assertIn(f'href="/boards/{self.board.pk}/"', html)
+
+    def test_post_reply_form_quotes_the_parent(self):
+        html = self._render_as_char1(PostReplyView, pk=self.board.pk, post_id=self.post.pk)
+        self.assertIn(f"Replying to #{self.post.post_number}", html)
+        self.assertIn("Body text.", html)
+
+    def test_post_edit_form_renders_with_the_existing_content(self):
+        html = self._render_as_char1(PostEditView, pk=self.board.pk, post_id=self.post.pk)
+        self.assertIn(f"Edit Post #{self.post.post_number}", html)
+        self.assertIn("Body text.", html)
+        self.assertIn("snapshot the current content in version history", html)

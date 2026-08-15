@@ -3,18 +3,35 @@
 """
 Tests for evennia_lore.
 
-Covers models, bridges, commands, trickle engine, and API privacy.
+Covers models, bridges, commands, trickle engine, the web pages (rendered
+for real), and API privacy.
+
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``. The default URLconf mounts
+*only* this contrib's routes — the realistic install where a game runs lore
+without evennia_regions/scenes/plots — so the outbound partner links have to
+degrade rather than raise. ``PartnerRoutesUrlConf`` is the other half of that
+pair, for cases that want the links present.
 
 Run:
     evennia test --settings test_lore_settings.py evennia_lore
 """
 
 from decimal import Decimal
+from importlib import import_module
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
-from django.test import override_settings
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, CmdShare
 from evennia_lore.models import (
@@ -27,6 +44,55 @@ from evennia_lore.models import (
     PlotLoreLink,
 )
 from evennia_lore.selection import _build_pool, _lean_matches, select_passive_lore
+from evennia_lore.views import (
+    LoreApprovalQueueView,
+    LoreCompendiumView,
+    LoreCreateView,
+    LoreDetailView,
+    LoreEditView,
+    LoreLeanView,
+    LoreListView,
+    LoreVersionDiffView,
+    LoreVersionHistoryView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconfs (see the module docstring)
+# ---------------------------------------------------------------------------
+
+
+def _stub_page(request, pk):
+    """Stand-in for a partner contrib's detail page."""
+    return HttpResponse(f"stub {pk}")
+
+
+# evennia_lore mounts its routes without a namespace, exactly as its urls.py
+# documents. Evennia's own routes come along because website/base.html — which
+# every lore template extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("lore/", include("evennia_lore.urls")),
+    *evennia_default_urlpatterns,
+]
+
+
+class PartnerRoutesUrlConf:
+    """
+    ROOT_URLCONF stand-in that also mounts region/scene/plot detail routes.
+
+    Django resolves a ROOT_URLCONF that is not a string by reading
+    ``urlpatterns`` straight off the object, so a bare class is enough — and
+    it keeps the partner routes out of this module's own ``urlpatterns``,
+    where their presence would hide the degradation the default case proves.
+    """
+
+    urlpatterns = [  # noqa: RUF012
+        path("lore/", include("evennia_lore.urls")),
+        path("regions/<int:pk>/", _stub_page, name="region-detail"),
+        path("scenes/<int:pk>/", _stub_page, name="scene-detail"),
+        path("plots/<int:pk>/", _stub_page, name="plot-detail"),
+        *evennia_default_urlpatterns,
+    ]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -585,3 +651,307 @@ class TestLoreAPIPrivacy(EvenniaTest):
         req.user.account = req.user
         data = LoreEntrySerializer(self.restricted, context={"request": req}).data
         self.assertEqual(data["body"], "classified")
+
+
+# ---------------------------------------------------------------------------
+# Web pages: render for real
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class LoreWebRenderTestCase(EvenniaTest):
+    """
+    Shared machinery for rendering lore pages for real.
+
+    A CBV returns a lazy TemplateResponse, so a test that only inspects
+    context_data never compiles the template — which is how a lore list that
+    raised TemplateSyntaxError on every empty result shipped under a green
+    suite. Every case below calls response.render().
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient triggers an Evennia template-context RecursionError
+    on authenticated HTML pages.
+
+    EvenniaTest defaults: account/char1 = Developer (staff); account2/char2 =
+    non-staff. Bare test accounts have no sessions, so get_all_puppets()
+    returns [] — every case that needs a character patches it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _request(self, path_="/lore/", user=None):
+        request = self.factory.get(path_)
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        return request
+
+    def _render(self, view, *, path_="/lore/", user=None, puppet=None, **kwargs):
+        request = self._request(path_, user)
+        if puppet is None:
+            response = view.as_view()(request, **kwargs)
+        else:
+            with patch.object(user, "get_all_puppets", return_value=[puppet]):
+                response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+
+class TestLoreListRenders(LoreWebRenderTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tag = _make_tag("Ruins", is_major=True)
+        self.entry = _make_entry(title="The Sunken Road", author=self.char1, summary="A road.")
+        self.entry.tags.add(self.tag)
+
+    def test_list_renders_entries_and_theme_badges(self):
+        html = self._render(LoreListView)
+        self.assertIn("The Sunken Road", html)
+        self.assertIn("Ruins", html)
+        self.assertIn(f'href="/lore/{self.entry.pk}/"', html)
+
+    def test_empty_list_renders_its_empty_state(self):
+        LoreEntry.objects.all().delete()
+        self.assertIn("No lore entries found.", self._render(LoreListView))
+
+    def test_empty_filtered_list_says_so(self):
+        # The message used to be built as message="...{% if %}...{% endif %}",
+        # which does not parse — a tag inside a quoted argument ends the outer
+        # tag at the first %}. Both branches are now separate includes.
+        html = self._render(LoreListView, path_="/lore/?search=nothing")
+        self.assertIn("No lore entries found matching your filters.", html)
+        self.assertIn("Clear", html)
+
+    def test_pagination_links_carry_the_active_filter(self):
+        # The template used to try to accumulate the query string with nested
+        # {% with %} blocks, which cannot work — a {% with %} assignment dies
+        # at its own {% endwith %} — so page 2 dropped the filter and showed
+        # page 2 of the unfiltered list.
+        for i in range(3):
+            _make_entry(title=f"Sunken Chapter {i}", author=self.char1)
+        request = self._request("/lore/?search=Sunken")
+        response = LoreListView.as_view(paginate_by=2)(request)
+        response.render()
+        html = response.content.decode()
+        self.assertIn('href="?search=Sunken&page=2"', html)
+
+    def test_staff_see_the_approval_queue_link(self):
+        html = self._render(LoreListView, user=self.account, puppet=self.char1)
+        self.assertIn('href="/lore/queue/"', html)
+
+    def test_anonymous_visitors_are_offered_no_authoring_links(self):
+        html = self._render(LoreListView)
+        self.assertNotIn('href="/lore/new/"', html)
+
+
+class TestLoreDetailRenders(LoreWebRenderTestCase):
+    def setUp(self):
+        super().setUp()
+        self.entry = _make_entry(
+            title="The Sunken Road",
+            author=self.char1,
+            body="It runs beneath the harbour.",
+            summary="A road.",
+        )
+
+    def test_detail_renders_the_body_of_a_public_entry(self):
+        html = self._render(LoreDetailView, pk=self.entry.pk)
+        self.assertIn("The Sunken Road", html)
+        self.assertIn("It runs beneath the harbour.", html)
+
+    def test_restricted_entry_renders_a_stub_instead_of_the_body(self):
+        restricted = _make_entry(
+            title="The Ninth Seal",
+            author=self.char1,
+            body="Secret text.",
+            summary="Something is sealed.",
+            privacy=LoreEntry.Privacy.RESTRICTED,
+        )
+        html = self._render(LoreDetailView, pk=restricted.pk)
+        self.assertIn("Restricted Content", html)
+        self.assertIn("Something is sealed.", html)
+        self.assertNotIn("Secret text.", html)
+
+    def test_author_is_offered_edit_and_history(self):
+        html = self._render(LoreDetailView, user=self.account, puppet=self.char1, pk=self.entry.pk)
+        self.assertIn(f'href="/lore/{self.entry.pk}/edit/"', html)
+        self.assertIn(f'href="/lore/{self.entry.pk}/history/"', html)
+
+    @override_settings(LORE_REQUIRE_APPROVAL=True)
+    def test_staff_are_offered_approve_and_reject_on_a_submitted_entry(self):
+        submitted = _make_entry(title="Draft Lore", author=self.char2)
+        self.assertEqual(submitted.status, LoreEntry.Status.SUBMITTED)
+        html = self._render(LoreDetailView, user=self.account, puppet=self.char1, pk=submitted.pk)
+        self.assertIn(f'action="/lore/{submitted.pk}/approve/"', html)
+        self.assertIn(f'action="/lore/{submitted.pk}/reject/"', html)
+
+    # -- partner links ------------------------------------------------------
+    #
+    # region_list / linked_scenes / linked_plots are populated by resolving
+    # evennia_regions, evennia_scenes and evennia_plots models at request time.
+    # None of the three is installed during a contrib-only run, so the lists
+    # are always empty here and the view can never reach those branches. The
+    # two cases below render the template directly against the real view
+    # context with stub partner objects spliced in — the one thing this
+    # environment cannot produce for itself.
+
+    def _detail_html(self, **extra):
+        request = self._request(f"/lore/{self.entry.pk}/")
+        view = LoreDetailView()
+        view.request = request
+        view.kwargs = {"pk": self.entry.pk}
+        view.object = self.entry
+        context = view.get_context_data()
+        context.update(extra)
+        return render_to_string("evennia_lore/lore_detail.html", context, request=request)
+
+    def _partners(self):
+        return {
+            "region_list": [SimpleNamespace(pk=7, name="The Harbour")],
+            "linked_scenes": [SimpleNamespace(pk=8, title="Low Tide")],
+            "linked_plots": [SimpleNamespace(pk=9, name="The Drowning")],
+        }
+
+    def test_partner_links_render_as_plain_text_when_routes_are_unmounted(self):
+        html = self._detail_html(**self._partners())
+        for name in ("The Harbour", "Low Tide", "The Drowning"):
+            self.assertIn(name, html)
+        # A bare {% url %} raised NoReverseMatch here, turning the whole detail
+        # page into a 500. {% url ... as %} assigns "" instead, so the partner
+        # name renders as plain text.
+        self.assertNotIn("/regions/7/", html)
+        self.assertNotIn("/scenes/8/", html)
+        self.assertNotIn("/plots/9/", html)
+
+    @override_settings(ROOT_URLCONF=PartnerRoutesUrlConf)
+    def test_partner_links_become_links_once_the_routes_are_mounted(self):
+        html = self._detail_html(**self._partners())
+        self.assertIn('href="/regions/7/"', html)
+        self.assertIn('href="/scenes/8/"', html)
+        self.assertIn('href="/plots/9/"', html)
+
+
+class TestLoreCompendiumRenders(LoreWebRenderTestCase):
+    def test_compendium_lists_acquired_entries(self):
+        entry = _make_entry(title="Tidebound", author=self.char1)
+        LoreAcquisition.objects.create(
+            entry=entry,
+            character=self.char2,
+            character_name=self.char2.key,
+            source=LoreAcquisition.Source.SHARED,
+        )
+        html = self._render(
+            LoreCompendiumView, path_="/lore/mine/", user=self.account2, puppet=self.char2
+        )
+        self.assertIn("Tidebound", html)
+        self.assertIn("Shared", html)
+
+    def test_empty_compendium_renders_its_empty_state(self):
+        html = self._render(
+            LoreCompendiumView, path_="/lore/mine/", user=self.account2, puppet=self.char2
+        )
+        self.assertIn("acquired any lore yet", html)
+
+
+class TestLoreQueueRenders(LoreWebRenderTestCase):
+    @override_settings(LORE_REQUIRE_APPROVAL=True)
+    def test_queue_lists_submitted_entries_with_review_actions(self):
+        entry = _make_entry(title="Pending Lore", author=self.char2)
+        html = self._render(
+            LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
+        )
+        self.assertIn("Pending Lore", html)
+        self.assertIn(f'action="/lore/{entry.pk}/approve/"', html)
+
+    def test_empty_queue_renders_its_empty_state(self):
+        html = self._render(
+            LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
+        )
+        self.assertIn("No entries awaiting approval.", html)
+
+
+class TestLoreFormsRender(LoreWebRenderTestCase):
+    def test_create_form_renders(self):
+        html = self._render(
+            LoreCreateView, path_="/lore/new/", user=self.account2, puppet=self.char2
+        )
+        self.assertIn("Submit Lore Entry", html)
+        self.assertIn("Entry details", html)
+        self.assertIn("id_title", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_edit_form_renders_with_the_existing_entry(self):
+        entry = _make_entry(title="Tidebound", author=self.char2, body="Old body.")
+        html = self._render(
+            LoreEditView,
+            path_=f"/lore/{entry.pk}/edit/",
+            user=self.account2,
+            puppet=self.char2,
+            pk=entry.pk,
+        )
+        self.assertIn("Edit: Tidebound", html)
+        self.assertIn("Old body.", html)
+        self.assertIn("Save Changes", html)
+
+    def test_lean_form_renders(self):
+        html = self._render(
+            LoreLeanView, path_="/lore/lean/", user=self.account2, puppet=self.char2
+        )
+        self.assertIn("Set Investigation Lean", html)
+        self.assertIn("id_lean_type", html)
+        self.assertIn("Save Lean", html)
+
+
+class TestLoreHistoryRenders(LoreWebRenderTestCase):
+    def setUp(self):
+        super().setUp()
+        self.entry = _make_entry(title="Tidebound", author=self.char1, body="New body.")
+
+    def test_history_lists_versions_with_diff_links(self):
+        version = LoreVersion.create_version(
+            parent=self.entry, content="Old body.", editor=self.char1
+        )
+        html = self._render(
+            LoreVersionHistoryView,
+            path_=f"/lore/{self.entry.pk}/history/",
+            pk=self.entry.pk,
+        )
+        self.assertIn(f"v{version.version_number}", html)
+        self.assertIn(f'href="/lore/{self.entry.pk}/diff/{version.version_number}/"', html)
+
+    def test_empty_history_renders_its_empty_state(self):
+        html = self._render(
+            LoreVersionHistoryView,
+            path_=f"/lore/{self.entry.pk}/history/",
+            pk=self.entry.pk,
+        )
+        self.assertIn("No version history yet.", html)
+
+    def test_diff_renders_added_and_removed_lines(self):
+        version = LoreVersion.create_version(
+            parent=self.entry, content="Old body.", editor=self.char1
+        )
+        html = self._render(
+            LoreVersionDiffView,
+            path_=f"/lore/{self.entry.pk}/diff/{version.version_number}/",
+            pk=self.entry.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn("Old body.", html)
+        self.assertIn("New body.", html)
+        self.assertIn("added lines", html)
+
+    def test_identical_version_renders_the_no_differences_notice(self):
+        version = LoreVersion.create_version(
+            parent=self.entry, content=self.entry.body, editor=self.char1
+        )
+        html = self._render(
+            LoreVersionDiffView,
+            path_=f"/lore/{self.entry.pk}/diff/{version.version_number}/",
+            pk=self.entry.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn("no differences", html)
