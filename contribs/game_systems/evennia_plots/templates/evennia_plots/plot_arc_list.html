@@ -88,10 +88,10 @@
 </table>
 </div>
 
-{% include "website/partials/_pagination.html" %}
+{% include "evennia_plots/_pagination.html" %}
 
 {% else %}
 {% url 'evennia_plots:plot-arc-create' as action_url %}
-{% include "website/partials/_empty_state.html" with message="No plot arcs found." action_url=action_url action_label="Create a new arc" %}
+{% include "evennia_plots/_empty_state.html" with message="No plot arcs found." action_url=action_url action_label="Create a new arc" %}
 {% endif %}
 {% endblock %}

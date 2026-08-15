@@ -7,18 +7,27 @@ Uses EvenniaTest which provides:
     self.char1 (key="Char"), self.char2 (key="Char2") — both in self.room1
     self.account, self.account2
 
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
+
 Run with:
     evennia test evennia_calendar --settings test_calendar_settings
 """
 
 import datetime
 import random
-from typing import ClassVar
+from importlib import import_module
 from unittest.mock import patch
 
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_calendar.models import (
     RSVP,
@@ -37,6 +46,35 @@ from evennia_calendar.scheduler import (
     run_cluster_lottery,
     run_lottery,
 )
+from evennia_calendar.views import (
+    CalendarEventDetailView,
+    CalendarListView,
+    CalendarMonthView,
+    ClusterCreateView,
+    ClusterDetailView,
+    ClusterEditView,
+    ClusterMembershipView,
+    EventCancelView,
+    EventCreateView,
+    EventEditView,
+    EventInviteView,
+    EventTagCreateView,
+    EventTagView,
+    ExclusionManageView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# The calendar templates reverse their own routes through the evennia_calendar
+# namespace, so they are mounted namespaced exactly as urls.py documents.
+# Evennia's own routes come along because website/base.html — which every
+# calendar template extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("calendar/", include(("evennia_calendar.urls", "evennia_calendar"))),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1079,35 +1117,236 @@ class TestClusterDetailViewCounts(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
-class TestTemplateCompile(EvenniaTest):
-    """Verify all 12 evennia_calendar templates load without error.
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render every calendar page for real.
 
-    Uses django.template.loader.get_template — host-independent (no server
-    required). This is the per-plan risk-#5 mitigation for the web surface.
+    This class used to only call get_template() on each of the twelve files.
+    Compiling a template resolves no {% extends %} or {% include %} target and
+    reverses no URL, so it could not have caught the NoReverseMatch and
+    unparseable-argument faults that shipped in sibling contribs — a page can
+    be a guaranteed 500 with every template compiling cleanly. Each case here
+    calls response.render() against this module's own URLconf.
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient trips an Evennia template-context RecursionError on
+    authenticated HTML pages.
+
+    EvenniaTest defaults: account/char1 = Developer (staff); account2/char2 =
+    non-staff. Bare test accounts have no sessions, so get_all_puppets()
+    returns [] — every case that needs a character patches it.
     """
 
-    TEMPLATES: ClassVar[list[str]] = [
-        "evennia_calendar/calendar_month.html",
-        "evennia_calendar/calendar_list.html",
-        "evennia_calendar/calendar_detail.html",
-        "evennia_calendar/calendar_cluster.html",
-        "evennia_calendar/event_form.html",
-        "evennia_calendar/event_cancel.html",
-        "evennia_calendar/event_invite_form.html",
-        "evennia_calendar/event_tag_form.html",
-        "evennia_calendar/event_tag_create_form.html",
-        "evennia_calendar/cluster_form.html",
-        "evennia_calendar/cluster_membership_form.html",
-        "evennia_calendar/exclusion_form.html",
-    ]
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.event = _make_event(self.char1, title="Harvest Revel", hours=48)
+        self.cluster = _make_cluster(self.char1, title="Midwinter Slate")
+        self.tag = EventTag.objects.create(name="Ritual")
 
-    def test_all_templates_compile(self):
-        from django.template.loader import get_template
+    def _render(self, view, *, path_="/calendar/", user=None, puppet=None, **kwargs):
+        request = self.factory.get(path_)
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if puppet is None:
+            response = view.as_view()(request, **kwargs)
+        else:
+            with patch.object(user, "get_all_puppets", return_value=[puppet]):
+                response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
 
-        for tname in self.TEMPLATES:
-            with self.subTest(template=tname):
-                t = get_template(tname)
-                self.assertIsNotNone(t, f"get_template returned None for {tname}")
+    def _as_owner(self, view, **kwargs):
+        """Render an authoring page as account/char1, who created the fixtures."""
+        return self._render(view, user=self.account, puppet=self.char1, **kwargs)
+
+    # -- read-only pages ----------------------------------------------------
+
+    def test_month_view_renders_the_grid_with_its_events(self):
+        html = self._render(CalendarMonthView, path_="/calendar/")
+        self.assertIn("Event Calendar", html)
+        # The fixture event is 48h out, which may land in the next month.
+        when = self.event.scheduled_time
+        html = self._render(
+            CalendarMonthView, path_=f"/calendar/?year={when.year}&month={when.month}"
+        )
+        self.assertIn("Harvest Revel", html)
+
+    def test_month_view_survives_a_junk_year_and_month(self):
+        html = self._render(CalendarMonthView, path_="/calendar/?year=abc&month=zz")
+        self.assertIn("Event Calendar", html)
+
+    def test_list_view_renders_upcoming_events(self):
+        html = self._render(CalendarListView, path_="/calendar/list/")
+        self.assertIn("Harvest Revel", html)
+        self.assertIn(f'href="/calendar/{self.event.pk}/"', html)
+
+    def test_list_view_renders_its_empty_state(self):
+        html = self._render(CalendarListView, path_="/calendar/list/?emphasis=combat")
+        self.assertIn("No events found matching those filters.", html)
+
+    def test_event_detail_renders_description_and_rsvps(self):
+        self.event.description = "A feast at the long tables."
+        self.event.save()
+        RSVP.objects.create(
+            event=self.event,
+            character=self.char2,
+            character_name=self.char2.key,
+            status=RSVP.Status.CONFIRMED,
+        )
+        html = self._render(
+            CalendarEventDetailView, path_=f"/calendar/{self.event.pk}/", pk=self.event.pk
+        )
+        self.assertIn("Harvest Revel", html)
+        self.assertIn("A feast at the long tables.", html)
+        self.assertIn(self.char2.key, html)
+
+    def test_event_detail_renders_without_rsvps(self):
+        html = self._render(
+            CalendarEventDetailView, path_=f"/calendar/{self.event.pk}/", pk=self.event.pk
+        )
+        self.assertIn("No RSVPs yet.", html)
+
+    def test_event_detail_offers_authoring_links_to_the_creator(self):
+        html = self._render(
+            CalendarEventDetailView,
+            path_=f"/calendar/{self.event.pk}/",
+            user=self.account,
+            puppet=self.char1,
+            pk=self.event.pk,
+        )
+        self.assertIn(f'href="/calendar/{self.event.pk}/edit/"', html)
+        self.assertIn(f'href="/calendar/{self.event.pk}/cancel/"', html)
+
+    def test_cluster_detail_renders_its_ranked_choice_form(self):
+        self.event.cluster = self.cluster
+        self.event.save()
+        html = self._render(
+            ClusterDetailView,
+            path_=f"/calendar/cluster/{self.cluster.pk}/",
+            pk=self.cluster.pk,
+        )
+        self.assertIn("Midwinter Slate", html)
+        self.assertIn("Member Events", html)
+        self.assertIn("Harvest Revel", html)
+
+    # -- event authoring ----------------------------------------------------
+
+    def test_event_create_form_renders(self):
+        html = self._as_owner(EventCreateView, path_="/calendar/new/")
+        self.assertIn("Create New Event", html)
+        self.assertIn("id_title", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_event_edit_form_renders_with_the_existing_event(self):
+        html = self._as_owner(
+            EventEditView, path_=f"/calendar/{self.event.pk}/edit/", pk=self.event.pk
+        )
+        self.assertIn("Edit Event: Harvest Revel", html)
+        self.assertIn(f'action="/calendar/{self.event.pk}/edit/"', html)
+
+    def test_cancel_confirmation_page_renders(self):
+        html = self._as_owner(
+            EventCancelView, path_=f"/calendar/{self.event.pk}/cancel/", pk=self.event.pk
+        )
+        self.assertIn("Cancel Event: Harvest Revel", html)
+        self.assertIn(f'action="/calendar/{self.event.pk}/cancel/"', html)
+        self.assertIn("No, go back", html)
+
+    def test_invite_form_renders_its_empty_roster(self):
+        html = self._as_owner(
+            EventInviteView, path_=f"/calendar/{self.event.pk}/invite/", pk=self.event.pk
+        )
+        self.assertIn("Invite to: Harvest Revel", html)
+        self.assertIn("No characters have been invited yet.", html)
+
+    def test_invite_form_lists_existing_invitations(self):
+        RSVP.objects.create(
+            event=self.event,
+            character=self.char2,
+            character_name=self.char2.key,
+            status=RSVP.Status.INVITED,
+        )
+        html = self._as_owner(
+            EventInviteView, path_=f"/calendar/{self.event.pk}/invite/", pk=self.event.pk
+        )
+        self.assertIn(self.char2.key, html)
+
+    # -- tags ---------------------------------------------------------------
+
+    def test_event_tag_form_renders_current_and_available_tags(self):
+        html = self._as_owner(
+            EventTagView, path_=f"/calendar/{self.event.pk}/tags/", pk=self.event.pk
+        )
+        self.assertIn("Manage Tags: Harvest Revel", html)
+        self.assertIn("No tags applied.", html)
+        self.assertIn("Ritual", html)
+
+    def test_tag_create_form_renders_the_existing_tag_list(self):
+        html = self._as_owner(EventTagCreateView, path_="/calendar/tags/new/")
+        self.assertIn("Create Event Tag", html)
+        self.assertIn("Ritual", html)
+
+    # -- exclusions ---------------------------------------------------------
+
+    def test_exclusion_form_renders_its_empty_state(self):
+        html = self._as_owner(
+            ExclusionManageView,
+            path_=f"/calendar/{self.event.pk}/exclusions/",
+            pk=self.event.pk,
+        )
+        self.assertIn("Manage Exclusions: Harvest Revel", html)
+        self.assertIn("No exclusions set.", html)
+
+    def test_exclusion_form_lists_excluded_events(self):
+        other = _make_event(self.char1, title="Winter Vigil", hours=50)
+        low, high = sorted([self.event.pk, other.pk])
+        EventExclusion.objects.create(
+            event_a_id=low, event_b_id=high, created_by=self.char1, creator_name=self.char1.key
+        )
+        html = self._as_owner(
+            ExclusionManageView,
+            path_=f"/calendar/{self.event.pk}/exclusions/",
+            pk=self.event.pk,
+        )
+        self.assertIn("Winter Vigil", html)
+
+    # -- clusters -----------------------------------------------------------
+
+    def test_cluster_create_form_renders(self):
+        html = self._as_owner(ClusterCreateView, path_="/calendar/cluster/new/")
+        self.assertIn("Create New Cluster", html)
+        self.assertIn('action="/calendar/cluster/new/"', html)
+
+    def test_cluster_edit_form_renders_with_the_existing_cluster(self):
+        html = self._as_owner(
+            ClusterEditView,
+            path_=f"/calendar/cluster/{self.cluster.pk}/edit/",
+            pk=self.cluster.pk,
+        )
+        self.assertIn("Edit Cluster: Midwinter Slate", html)
+
+    def test_cluster_membership_form_renders_its_empty_state(self):
+        html = self._as_owner(
+            ClusterMembershipView,
+            path_=f"/calendar/cluster/{self.cluster.pk}/members/",
+            pk=self.cluster.pk,
+        )
+        self.assertIn("Manage Events: Midwinter Slate", html)
+        self.assertIn("No member events yet.", html)
+
+    def test_cluster_membership_form_lists_member_events(self):
+        self.event.cluster = self.cluster
+        self.event.save()
+        html = self._as_owner(
+            ClusterMembershipView,
+            path_=f"/calendar/cluster/{self.cluster.pk}/members/",
+            pk=self.cluster.pk,
+        )
+        self.assertIn("Harvest Revel", html)
 
 
 # ---------------------------------------------------------------------------

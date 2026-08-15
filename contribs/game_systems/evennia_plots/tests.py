@@ -5,7 +5,11 @@ Tests for evennia_plots.
 
 Covers models (lifecycle, factories, bonus XP, permissions), bridges, listener,
 XP gating, anti-gaming sweep, XP collectors, commands, web privacy, API privacy,
-and template compile checks.
+and a full render of every shipped page.
+
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
 
 Run:
     evennia test --settings test_plots_settings evennia_plots
@@ -14,14 +18,19 @@ Run:
 import unittest
 from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
 from unittest.mock import MagicMock, patch
 
 from django.apps import apps
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
 from evennia_plots.integrations.antigaming import _flag_thread_gaming
@@ -40,6 +49,36 @@ from evennia_plots.models import (
     ScenePlotLink,
     ThreadLink,
 )
+from evennia_plots.views import (
+    PlotArcCreateView,
+    PlotArcDetailView,
+    PlotArcEditView,
+    PlotArcListView,
+    PlotCreateView,
+    PlotDetailView,
+    PlotEditView,
+    PlotInviteView,
+    PlotListView,
+    PlotTagCreateView,
+    PlotTagListView,
+    PlotUpdateCreateView,
+    PlotUpdateDiffView,
+    PlotUpdateEditView,
+    PlotUpdateHistoryView,
+)
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# The plot templates reverse their own routes through the evennia_plots
+# namespace, so they are mounted namespaced exactly as urls.py documents.
+# Evennia's own routes come along because website/base.html — which every
+# plot template extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("plots/", include(("evennia_plots.urls", "evennia_plots"))),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1123,32 +1162,228 @@ class TestWebPrivacy(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
-class TestTemplateCompile(EvenniaTest):
-    """All 14 shipped evennia_plots templates parse without error."""
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(EvenniaTest):
+    """
+    Render every plots page for real.
 
-    TEMPLATES = [  # noqa: RUF012
-        "evennia_plots/plot_list.html",
-        "evennia_plots/plot_detail.html",
-        "evennia_plots/plot_arc_list.html",
-        "evennia_plots/plot_arc_detail.html",
-        "evennia_plots/plot_tags.html",
-        "evennia_plots/plot_tag_create_form.html",
-        "evennia_plots/plot_form.html",
-        "evennia_plots/plot_edit_form.html",
-        "evennia_plots/plot_invite_form.html",
-        "evennia_plots/plot_update_form.html",
-        "evennia_plots/plot_update_edit_form.html",
-        "evennia_plots/plot_update_history.html",
-        "evennia_plots/plot_update_diff.html",
-        "evennia_plots/plot_arc_form.html",
-    ]
+    This class used to only call get_template() on each of the fourteen files.
+    Compiling a template resolves no {% extends %} or {% include %} target, so
+    all fourteen compiled cleanly while every one of them named partials under
+    "website/partials/" — paths this contrib does not ship, Evennia does not
+    ship, and no game is told to create. Every form page and every empty state
+    was a guaranteed TemplateDoesNotExist 500. Each case here calls
+    response.render(), which is the only check that would have caught it.
 
-    def test_all_templates_compile(self):
-        from django.template.loader import get_template
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient trips an Evennia template-context RecursionError on
+    authenticated HTML pages.
 
-        for name in self.TEMPLATES:
-            with self.subTest(template=name):
-                self.assertIsNotNone(get_template(name))
+    EvenniaTest defaults: account/char1 = Developer (staff); account2/char2 =
+    non-staff. Bare test accounts have no sessions, so get_all_puppets()
+    returns [] — every case that needs a character patches it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.thread = _make_thread("The Salt Road", creator=self.char1, status="active")
+        self.arc = _make_arc("Winter Campaign", creator=self.char1)
+        self.tag = PlotTag.objects.create(name="Intrigue", is_major=True)
+        self.update = PlotUpdate.create_update(
+            parent=self.thread, author=self.char1, content="The caravan set out."
+        )
+
+    def _render(self, view, *, path_="/plots/", user=None, puppet=None, **kwargs):
+        request = self.factory.get(path_)
+        request.user = AnonymousUser() if user is None else user
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if puppet is None:
+            response = view.as_view()(request, **kwargs)
+        else:
+            with patch.object(user, "get_all_puppets", return_value=[puppet]):
+                response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+    def _as_owner(self, view, **kwargs):
+        """Render an authoring page as account/char1, who created the fixtures."""
+        return self._render(view, user=self.account, puppet=self.char1, **kwargs)
+
+    # -- read-only pages ----------------------------------------------------
+
+    def test_thread_list_renders_active_threads(self):
+        html = self._render(PlotListView)
+        self.assertIn("Plot Threads", html)
+        self.assertIn("The Salt Road", html)
+        self.assertIn(f'href="/plots/{self.thread.pk}/"', html)
+
+    def test_thread_list_renders_its_empty_state(self):
+        PlotThread.objects.all().delete()
+        # The empty state is an {% include %} of a partial. Compiling the
+        # template never resolves that target; only rendering does.
+        self.assertIn("No active plot threads.", self._render(PlotListView))
+
+    def test_filtered_thread_list_renders_its_own_empty_state(self):
+        html = self._render(PlotListView, path_="/plots/?tag=nosuchtag")
+        self.assertIn("No active plot threads with that tag.", html)
+
+    def test_thread_detail_renders_updates(self):
+        html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)
+        self.assertIn("The Salt Road", html)
+        self.assertIn("The caravan set out.", html)
+
+    def test_thread_detail_renders_without_updates(self):
+        bare = _make_thread("Quiet Thread", creator=self.char1, status="active")
+        html = self._render(PlotDetailView, path_=f"/plots/{bare.pk}/", pk=bare.pk)
+        self.assertIn("No narrative updates yet.", html)
+
+    def test_arc_detail_renders_member_threads(self):
+        self.thread.arc = self.arc
+        self.thread.save()
+        html = self._render(PlotArcDetailView, path_=f"/plots/arc/{self.arc.pk}/", pk=self.arc.pk)
+        self.assertIn("Winter Campaign", html)
+        self.assertIn("The Salt Road", html)
+
+    def test_arc_detail_renders_its_empty_states(self):
+        html = self._render(PlotArcDetailView, path_=f"/plots/arc/{self.arc.pk}/", pk=self.arc.pk)
+        self.assertIn("No narrative updates yet.", html)
+        self.assertIn("No threads in this arc yet.", html)
+
+    def test_tag_index_renders_major_and_minor_tags(self):
+        PlotTag.objects.create(name="Smuggling", is_major=False)
+        html = self._render(PlotTagListView, path_="/plots/tags/")
+        self.assertIn("Plot Tags", html)
+        self.assertIn("Intrigue", html)
+        self.assertIn("Smuggling", html)
+
+    def test_tag_index_renders_its_empty_state(self):
+        PlotTag.objects.all().delete()
+        self.assertIn("No tags yet.", self._render(PlotTagListView, path_="/plots/tags/"))
+
+    # -- thread authoring ---------------------------------------------------
+
+    def test_thread_create_form_renders(self):
+        html = self._as_owner(PlotCreateView, path_="/plots/new/")
+        self.assertIn("Start a New Plot Thread", html)
+        self.assertIn("id_name", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_thread_edit_form_renders_with_the_existing_thread(self):
+        html = self._as_owner(
+            PlotEditView, path_=f"/plots/{self.thread.pk}/edit/", pk=self.thread.pk
+        )
+        self.assertIn("Edit Plot Thread: The Salt Road", html)
+        self.assertIn(f'action="/plots/{self.thread.pk}/edit/"', html)
+
+    def test_invite_form_renders_its_empty_roster(self):
+        html = self._as_owner(
+            PlotInviteView, path_=f"/plots/{self.thread.pk}/invite/", pk=self.thread.pk
+        )
+        self.assertIn("Manage Invites: The Salt Road", html)
+        self.assertIn("No characters are currently invited.", html)
+
+    def test_invite_form_lists_invited_characters(self):
+        self.thread.invited_characters.add(self.char2)
+        html = self._as_owner(
+            PlotInviteView, path_=f"/plots/{self.thread.pk}/invite/", pk=self.thread.pk
+        )
+        self.assertIn(self.char2.key, html)
+
+    # -- updates ------------------------------------------------------------
+
+    def test_update_create_form_renders(self):
+        html = self._as_owner(
+            PlotUpdateCreateView,
+            path_=f"/plots/{self.thread.pk}/updates/new/",
+            pk=self.thread.pk,
+        )
+        self.assertIn("id_content", html)
+        self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_update_edit_form_renders_with_the_existing_content(self):
+        html = self._as_owner(
+            PlotUpdateEditView,
+            path_=f"/plots/{self.thread.pk}/updates/{self.update.pk}/edit/",
+            pk=self.thread.pk,
+            update_id=self.update.pk,
+        )
+        self.assertIn("The caravan set out.", html)
+
+    def test_update_history_renders_its_empty_state(self):
+        html = self._render(
+            PlotUpdateHistoryView,
+            path_=f"/plots/{self.thread.pk}/updates/{self.update.pk}/history/",
+            pk=self.thread.pk,
+            update_id=self.update.pk,
+        )
+        self.assertIn("No edits recorded yet.", html)
+
+    def test_update_history_renders_versions_with_diff_links(self):
+        # The history table lists version metadata and links out to the diff;
+        # the snapshot text itself lives on the diff page.
+        version = PlotUpdateVersion.create_version(
+            parent=self.update, content="An earlier telling.", editor=self.char1
+        )
+        html = self._render(
+            PlotUpdateHistoryView,
+            path_=f"/plots/{self.thread.pk}/updates/{self.update.pk}/history/",
+            pk=self.thread.pk,
+            update_id=self.update.pk,
+        )
+        self.assertIn(f"v{version.version_number}", html)
+        self.assertIn(self.char1.key, html)
+        self.assertIn(
+            f"/plots/{self.thread.pk}/updates/{self.update.pk}/diff/{version.version_number}/",
+            html,
+        )
+
+    def test_update_diff_renders_both_sides(self):
+        version = PlotUpdateVersion.create_version(
+            parent=self.update, content="An earlier telling.", editor=self.char1
+        )
+        html = self._render(
+            PlotUpdateDiffView,
+            path_=(
+                f"/plots/{self.thread.pk}/updates/{self.update.pk}/diff/{version.version_number}/"
+            ),
+            pk=self.thread.pk,
+            update_id=self.update.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn("An earlier telling.", html)
+        self.assertIn("The caravan set out.", html)
+
+    # -- arcs and tags (staff) ----------------------------------------------
+
+    def test_arc_list_renders_for_staff(self):
+        html = self._as_owner(PlotArcListView, path_="/plots/arcs/")
+        self.assertIn("Plot Arcs", html)
+        self.assertIn("Winter Campaign", html)
+
+    def test_arc_list_renders_its_empty_state(self):
+        PlotArc.objects.all().delete()
+        self.assertIn("No plot arcs found.", self._as_owner(PlotArcListView, path_="/plots/arcs/"))
+
+    def test_arc_create_form_renders(self):
+        html = self._as_owner(PlotArcCreateView, path_="/plots/arc/new/")
+        self.assertIn("Create Plot Arc", html)
+        self.assertIn('action="/plots/arc/new/"', html)
+
+    def test_arc_edit_form_renders_with_the_existing_arc(self):
+        html = self._as_owner(
+            PlotArcEditView, path_=f"/plots/arc/{self.arc.pk}/edit/", pk=self.arc.pk
+        )
+        self.assertIn("Edit Arc: Winter Campaign", html)
+        # The arc form exposes the per-source XP multiplier overrides.
+        self.assertIn("id_xp_mult_rp_session", html)
+
+    def test_tag_create_form_renders_the_existing_major_tags(self):
+        html = self._as_owner(PlotTagCreateView, path_="/plots/tags/new/")
+        self.assertIn("Create Plot Tag (Major)", html)
+        self.assertIn("Intrigue", html)
 
 
 # ---------------------------------------------------------------------------

@@ -78,15 +78,15 @@
 </div>
 
 {% with tag_q=tag_filter|urlencode %}
-{% include "website/partials/_pagination.html" with extra_params="tag="|add:tag_q %}
+{% include "evennia_plots/_pagination.html" with extra_params="tag="|add:tag_q %}
 {% endwith %}
 
 {% else %}
 {% url 'evennia_plots:plot-create' as action_url %}
 {% if tag_filter %}
-{% include "website/partials/_empty_state.html" with message="No active plot threads with that tag." action_url=action_url action_label="Start a new thread" %}
+{% include "evennia_plots/_empty_state.html" with message="No active plot threads with that tag." action_url=action_url action_label="Start a new thread" %}
 {% else %}
-{% include "website/partials/_empty_state.html" with message="No active plot threads." action_url=action_url action_label="Start a new thread" %}
+{% include "evennia_plots/_empty_state.html" with message="No active plot threads." action_url=action_url action_label="Start a new thread" %}
 {% endif %}
 {% endif %}
 {% endblock %}

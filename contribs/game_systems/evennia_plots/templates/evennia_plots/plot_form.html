@@ -14,16 +14,16 @@
 {% block content %}
 <h1>{{ page_title }}</h1>
 
-{% include "website/partials/_form_errors.html" with form=form %}
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
 
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
   <fieldset class="cov-fieldset">
     <legend class="cov-legend">Thread details</legend>
-    {% include "website/partials/_form_field.html" with field=form.name %}
-    {% include "website/partials/_form_field.html" with field=form.description %}
-    {% include "website/partials/_form_field.html" with field=form.privacy %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.name %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.description %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.privacy %}
   </fieldset>
-  {% include "website/partials/_form_actions.html" with cancel_url=request.META.HTTP_REFERER|default:"" submit_label="Create Thread" %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=request.META.HTTP_REFERER|default:"" submit_label="Create Thread" %}
 </form>
 {% endblock %}

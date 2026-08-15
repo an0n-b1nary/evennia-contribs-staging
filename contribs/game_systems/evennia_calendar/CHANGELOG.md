@@ -7,6 +7,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+- `TestWebPagesRender` — all twelve pages (month grid, list, event detail,
+  cluster detail with its ranked-choice form, event create/edit/cancel/invite,
+  tag management and creation, cluster create/edit/membership, exclusions) are
+  now rendered for real via `response.render()`, with the test module doubling
+  as a test URLconf.
+
+### Changed
+- The old `TestTemplateCompile` asserted only that each of the twelve templates
+  loads. Compiling a template resolves no `{% extends %}` or `{% include %}`
+  target and reverses no URL, so it could not have caught the `NoReverseMatch`
+  and unparseable-argument faults that shipped in sibling contribs — a page can
+  be a guaranteed 500 with every template compiling cleanly. Replaced with real
+  renders. No product bugs found; every page rendered first time.
+
+---
+
 ## [0.1.2] — 2026-07-05 — fix app-label defaults and gate hardening
 
 - `CALENDAR_SCENES_APP_LABEL` default changed from `"scenes"` → `"evennia_scenes"` to

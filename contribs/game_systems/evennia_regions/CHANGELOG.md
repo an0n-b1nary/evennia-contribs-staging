@@ -24,6 +24,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   counts withheld from non-staff, hidden rooms absent from the member list — are now
   asserted against the rendered HTML as well as the context.
 
+- **Fixed:** `_pagination.html` documented `extra_params` as needing a trailing
+  `&` that the partial itself adds.
+
 ---
 
 ## [0.1.1] — 2026-08-02 — room-visibility hardening, unique memberships

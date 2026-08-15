@@ -7,6 +7,32 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Fixed:** every shipped template included its partials from
+  `website/partials/…` — `_form_errors.html`, `_form_field.html`,
+  `_form_actions.html`, `_empty_state.html` and `_pagination.html`. None of
+  those files exists: not in this contrib, not in Evennia, and no install step
+  tells a game to create them. Every authoring form and every empty state was a
+  guaranteed `TemplateDoesNotExist` 500 — that is the whole web surface. The
+  three form partials now come from `evennia_accessibility`, which this
+  contrib's `[web]` extra has always required; `_empty_state.html` and
+  `_pagination.html` are now shipped locally under `evennia_plots/`. The
+  leftover paths came from the source game, where those partials were global.
+
+- **Fixed:** `_pagination.html` documented `extra_params` as needing a trailing
+  `&` that the partial itself adds.
+
+- **Added:** `TestWebPagesRender` — all fourteen pages are now rendered for real
+  via `response.render()`, with the test module doubling as a test URLconf.
+
+- **Changed:** the old `TestTemplateCompile` asserted only that each of the
+  fourteen templates loads. All fourteen compiled cleanly for as long as the
+  broken includes shipped, because compiling a template resolves no
+  `{% include %}` target. Replaced with real renders.
+
+---
+
 ## [0.2.0] — 2026-07-05 — XP glue moved to integrations/ + app-label fixes
 
 ### Changed (breaking)

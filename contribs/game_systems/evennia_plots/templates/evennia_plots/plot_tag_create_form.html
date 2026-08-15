@@ -31,15 +31,15 @@
 </ul>
 {% endif %}
 
-{% include "website/partials/_form_errors.html" with form=form %}
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
 
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
   <fieldset class="cov-fieldset">
     <legend class="cov-legend">New major tag</legend>
-    {% include "website/partials/_form_field.html" with field=form.name %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.name %}
   </fieldset>
   {% url 'evennia_plots:plot-tags' as cancel_url %}
-  {% include "website/partials/_form_actions.html" with cancel_url=cancel_url submit_label="Create Major Tag" %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Create Major Tag" %}
 </form>
 {% endblock %}
