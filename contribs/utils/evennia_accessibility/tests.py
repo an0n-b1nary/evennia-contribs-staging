@@ -13,6 +13,7 @@ Objects available from EvenniaTest:
 from unittest import mock
 
 from django import forms
+from django.template.loader import render_to_string
 from evennia.utils.test_resources import EvenniaTest
 
 from evennia_accessibility.accessibility import (
@@ -256,3 +257,91 @@ class TestAccessibleModelFormWidgetAttrs(EvenniaTest):
         widget = self.form.fields["title"].widget
         described = widget.attrs.get("aria-describedby", "")
         self.assertIn("id_title_errors", described)
+
+
+# ---------------------------------------------------------------------------
+# Shipped partials: render for real
+# ---------------------------------------------------------------------------
+
+
+class TestFormPartialsRender(EvenniaTest):
+    """
+    Render the three shipped partials for real.
+
+    These files are not pages of this contrib's own — they have no
+    {% extends %} and reverse no URL — but evennia_jobs, evennia_lore and
+    evennia_plots all {% include %} them, so a change here breaks four
+    packages at once and only at render time. The tests above assert on
+    widget.attrs, which never touches the templates.
+
+    The aria contract these partials exist to provide is asserted directly:
+    the error region is always present so aria-describedby has a stable
+    target, and it only becomes role="alert" when there are errors to
+    announce.
+    """
+
+    def _field(self, name="name", bound=None):
+        form = bound if bound is not None else _SimpleForm()
+        return form[name]
+
+    def test_form_field_renders_label_widget_and_a_stable_error_region(self):
+        html = render_to_string("evennia_accessibility/_form_field.html", {"field": self._field()})
+        self.assertIn('for="id_name"', html)
+        self.assertIn("Name", html)
+        self.assertIn('id="id_name_errors"', html)
+        # No errors yet: the region exists but is silent, not an alert.
+        self.assertIn("sr-only", html)
+        self.assertNotIn('role="alert"', html)
+        # Required fields carry a visual marker plus a screen-reader word.
+        self.assertIn("(required)", html)
+
+    def test_form_field_renders_help_text(self):
+        html = render_to_string(
+            "evennia_accessibility/_form_field.html", {"field": self._field("note")}
+        )
+        self.assertIn("Optional context.", html)
+        self.assertIn('id="id_note_help"', html)
+
+    def test_form_field_announces_errors(self):
+        bound = _SimpleForm(data={"name": ""})
+        self.assertFalse(bound.is_valid())
+        html = render_to_string(
+            "evennia_accessibility/_form_field.html", {"field": self._field(bound=bound)}
+        )
+        self.assertIn("has-error", html)
+        self.assertIn('role="alert"', html)
+        self.assertIn("This field is required.", html)
+
+    def test_form_errors_renders_nothing_without_non_field_errors(self):
+        html = render_to_string("evennia_accessibility/_form_errors.html", {"form": _SimpleForm()})
+        self.assertNotIn('role="alert"', html)
+
+    def test_form_errors_renders_the_summary_alert(self):
+        form = _SimpleForm(data={"name": "ok"})
+        form.full_clean()
+        form.add_error(None, "Those two dates overlap.")
+        html = render_to_string("evennia_accessibility/_form_errors.html", {"form": form})
+        self.assertIn('role="alert"', html)
+        self.assertIn('id="form-errors-summary"', html)
+        self.assertIn("Those two dates overlap.", html)
+
+    def test_form_actions_defaults_to_submit_with_no_cancel_link(self):
+        html = render_to_string("evennia_accessibility/_form_actions.html", {})
+        self.assertIn('type="submit"', html)
+        self.assertIn("Submit", html)
+        self.assertNotIn("<a href", html)
+
+    def test_form_actions_renders_a_cancel_link_when_given_a_url(self):
+        html = render_to_string(
+            "evennia_accessibility/_form_actions.html",
+            {"submit_label": "Save Changes", "cancel_url": "/jobs/"},
+        )
+        self.assertIn("Save Changes", html)
+        self.assertIn('href="/jobs/"', html)
+        self.assertIn("Cancel", html)
+
+    def test_form_actions_hides_cancel_on_an_empty_url(self):
+        # Consumers resolve the target with "{% url 'name' as cancel_url %}",
+        # which assigns "" rather than raising when the route is not mounted.
+        html = render_to_string("evennia_accessibility/_form_actions.html", {"cancel_url": ""})
+        self.assertNotIn("<a href", html)

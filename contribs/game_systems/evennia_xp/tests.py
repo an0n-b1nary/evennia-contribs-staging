@@ -6,16 +6,24 @@ Tests for evennia_xp.
 Covers models, awards, batch engine (registry), gating seam, commands,
 web view, REST API, and Script.
 
+This module doubles as a **test URLconf** (see ``urlpatterns`` below). Cases
+that reverse a URL or render a template opt in with
+``@override_settings(ROOT_URLCONF=__name__)``.
+
 Run:
     evennia test --settings test_xp_settings.py evennia_xp
 """
 
 from datetime import UTC
 from decimal import Decimal
+from importlib import import_module
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
 from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_xp.awards import record_xp
 from evennia_xp.batch import (
@@ -27,6 +35,19 @@ from evennia_xp.batch import (
     run_weekly_batch,
 )
 from evennia_xp.models import CharacterXP, XPLog
+from evennia_xp.views import XPSummaryView
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+# evennia_xp mounts its route without a namespace, exactly as its urls.py
+# documents. Evennia's own routes come along because website/base.html — which
+# xp_summary.html extends — reverses "index" and the account routes.
+urlpatterns = [
+    path("xp/", include("evennia_xp.urls")),
+    *evennia_default_urlpatterns,
+]
 
 # ---------------------------------------------------------------------------
 # Module-level fixtures for registry tests (must be importable by dotted path)
@@ -776,3 +797,83 @@ class TestStandaloneImport(EvenniaTest):
         from evennia_xp import XPLog
 
         self.assertTrue(issubclass(XPLog, __import__("django.db.models", fromlist=["Model"]).Model))
+
+
+# ---------------------------------------------------------------------------
+# Web page: render for real
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestXPSummaryRenders(EvenniaTest):
+    """
+    Render the XP summary page for real.
+
+    XPSummaryView is a ListView, so it returns a lazy TemplateResponse: a test
+    that inspects context_data compiles no template and would not notice a
+    missing partial or an unreversable URL. Both of this page's states — the
+    award table and the empty state, each an {% include %} of a partial — are
+    rendered here.
+
+    RequestFactory + direct view invocation rather than Django's TestClient,
+    because the TestClient trips an Evennia template-context RecursionError on
+    authenticated HTML pages.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _render(self, *, path_="/xp/", screenreader=False):
+        request = self.factory.get(path_)
+        request.user = self.account
+        # Evennia's general_context processor reads request.session["puppet"]
+        # for any authenticated user, and RequestFactory attaches no session.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        with patch("evennia_xp.views.get_character_id", return_value=self.char1.pk):
+            response = XPSummaryView.as_view()(request)
+        response.render()
+        return response.content.decode()
+
+    def test_summary_renders_the_balance_and_award_log(self):
+        xp_row = CharacterXP.objects.create(
+            character_id=self.char1.pk,
+            character_name=self.char1.key,
+            current_balance=Decimal("12.50"),
+            total_earned=Decimal("20.00"),
+            total_spent=Decimal("7.50"),
+        )
+        record_xp(
+            character_id=self.char1.pk,
+            amount=Decimal("2.0"),
+            source_type=XPLog.SourceType.RP_SESSION,
+            source_ref_id=7001,
+            reason="A long scene.",
+        )
+        # record_xp credits the balance, so read it back rather than assuming.
+        xp_row.refresh_from_db()
+        html = self._render()
+        self.assertIn("My XP", html)
+        self.assertIn(self.char1.key, html)
+        self.assertIn(f"{xp_row.current_balance} XP", html)
+        self.assertIn("Award History", html)
+        self.assertIn("A long scene.", html)
+        self.assertIn("Lifetime Breakdown by Source", html)
+
+    def test_summary_renders_its_empty_state(self):
+        html = self._render()
+        self.assertIn("No XP has been awarded yet.", html)
+        self.assertNotIn("Lifetime Breakdown by Source", html)
+
+    def test_summary_renders_the_screenreader_layout(self):
+        record_xp(
+            character_id=self.char1.pk,
+            amount=Decimal("3.0"),
+            source_type=XPLog.SourceType.RP_SESSION,
+            source_ref_id=7002,
+        )
+        with patch("evennia_xp.views._accessibility_sr", return_value=True):
+            html = self._render()
+        # The linear-list branch replaces both tables with <ul aria-label=...>.
+        self.assertIn('aria-label="XP award log"', html)
+        self.assertNotIn('role="region" aria-label="XP award log"', html)

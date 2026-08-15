@@ -17,6 +17,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Surfaced while building `evennia-maps`' web surface, whose tests render templates
   rather than only inspecting view context.
 
+- **Added:** `TestXPSummaryRenders` — the XP summary page is now rendered for real
+  via `response.render()`, in all three of its states: the award table, the empty
+  state, and the screen-reader linear-list layout. The suite's existing
+  `response.render()` calls are DRF API renders, which compile no HTML template.
+
 ---
 
 ## [0.1.1] — 2026-07-05 — update future-ownership map in MIGRATION_NOTES

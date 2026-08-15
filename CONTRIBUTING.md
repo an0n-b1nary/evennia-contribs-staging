@@ -116,8 +116,11 @@ floor, not a substitute for rendering.
 that asserts on `response.context_data` never touches the template — which is how four
 guaranteed-500 pages shipped here under a green suite.
 
-The established pattern (see `evennia_maps`, `evennia_boards`, `evennia_jobs` and
-`evennia_lore` `tests.py`):
+Every contrib that ships pages now does this — boards, calendar, jobs, lore, maps,
+plots, regions, scenes and xp — and `evennia_accessibility` renders the three form
+partials the others include. Copy whichever is closest to your contrib's shape.
+
+The established pattern:
 
 - Make the test module double as a **test URLconf**: declare `urlpatterns` at module
   level mounting your contrib's routes the way its `urls.py` documents, splatting in
@@ -136,6 +139,12 @@ The established pattern (see `evennia_maps`, `evennia_boards`, `evennia_jobs` an
   which assigns `""` on `NoReverseMatch` instead of raising. Test both halves: the
   degraded render under your own URLconf, and the linked render under a second URLconf
   that mounts stub partner routes.
+- Include partials your own contrib ships, or ones from a package your `[web]` extra
+  requires. Never reach into the host game's template tree (`website/partials/...`) —
+  nothing puts those files there, and an `{% include %}` of a file that does not exist
+  is invisible until the page renders.
+- Render the *empty* state as well as the populated one. It is what a fresh install
+  shows first, and it is usually the branch that includes a partial.
 
 ## CI
 
