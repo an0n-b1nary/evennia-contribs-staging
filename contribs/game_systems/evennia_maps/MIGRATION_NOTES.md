@@ -2,10 +2,9 @@
 
 ## Source inventory
 
-Extracted from a private Evennia game project. This is the **core phase**
-of the extraction: models, geometry, commands, listeners, and the room
-mixin. The website/API surface and SVG/Leaflet static assets are a
-later phase — see "What's not shipped yet" below.
+Extracted from a private Evennia game project, in two phases: 0.1.0 covered
+models, geometry, commands, listeners and the room mixin; 0.2.0 adds the
+website, the REST API, the static assets and the tile-overlay seam.
 
 | Source module | Contrib module | Notes |
 |---|---|---|
@@ -20,17 +19,12 @@ later phase — see "What's not shipped yet" below.
 | `world/maps/admin.py` | `admin.py` | Copy; RUF012 noqa added |
 | `commands/maps.py` | `commands.py` | Copy; hardcoded `perm(Builder)` check replaced with `permissions.is_staff()` resolving `MAPS_STAFF_LOCK`, matching the `evennia-regions` convention; error strings changed from "Builder permissions" to "staff permissions" to match |
 | `typeclasses/rooms.py` (terrain slice) | `typeclasses.py` (`MapsRoomMixin`) | New module — the source game's Room typeclass declares `terrain_tags`/`set_terrain`/`has_terrain` directly; a contrib cannot patch the game's Room, so this ships as a mixin, the same shape as `evennia_posing.PosingRoomMixin` / `evennia_social.SocialRoomMixin` |
-| — | `permissions.py` | New module — `is_staff()` only, resolving `MAPS_STAFF_LOCK`. Mirrors `evennia_regions.permissions.is_staff()`. Web-facing helpers (`is_staff_user`, `is_room_web_visible` + `MAPS_ROOM_VISIBILITY`) land with the website phase |
-
-## What's not shipped yet
-
-The source game's `web/website/views/maps.py`, `web/api/views.py` (`PlaneViewSet`),
-templates, and `static/*/leaflet` assets are **not** part of this release. That surface —
-SVG rendering, the live Leaflet map, the DRF API, and the tile-overlay signal seam that
-lets `evennia-scenes`/`evennia-lore`/`evennia-calendar` light up overlays without
-`evennia-maps` importing any of them — is a separate phase of this extraction. Until then,
-`evennia-maps` is a fully functional in-game system (`+map`, auto-placement on `dig`,
-`+map/reflow`) with no web presence.
+| — | `permissions.py` | New module — `is_staff()` resolving `MAPS_STAFF_LOCK`, plus (0.2.0) `is_staff_user`, `is_room_web_visible` + `MAPS_ROOM_VISIBILITY`, and `read_room_attr`. Mirrors `evennia_regions.permissions` |
+| `web/website/views/maps.py` | `views.py` | Copy; the source game's direct `Region`/`Scene` imports replaced by the overlay seam (below). `PlaneListView`/`PlaneMapView` now hide archived planes |
+| `web/api/views.py` (`PlaneViewSet`), `serializers.py`, `filters.py`, `pagination.py` | `api/` | Split out of the source game's shared API modules into a self-contained package with its own auth/permission/pagination/filter classes |
+| `web/templates/website/plane_*.html`, `partials/_plane_svg.html` | `templates/evennia_maps/` | Copy; `cov-*` CSS classes renamed `evennia-maps-*`, breadcrumbs moved into the content block, sekizai `addtoblock` replaced (below) |
+| `web/static/website/{js/cov_map.js,css/cov_map.css}` + `cov.css` §15 | `static/evennia_maps/` | Merged: the source game kept the SVG map's styles in its global stylesheet and only the Leaflet styles in a separate file. The contrib ships both in one self-contained file with no CSS custom properties, since a contrib cannot assume a host game defines any |
+| — | `overlays.py` | New module — the `collect_tile_overlays` contract, the merge call, and the outbound-URL seam |
 
 ## Key divergences from source game
 
@@ -65,5 +59,50 @@ renamed to `evennia_maps_one_plane_per_elevation` for the same collision-avoidan
 `evennia-lore`/`evennia-regions` rename theirs.
 
 **FK dependency pinned to `("objects", "__first__")`.** Portable across Evennia installs.
+
+**Cross-domain glue became signal providers.** This is the largest divergence, and the
+one the whole web phase turns on. The source game's `PlaneViewSet.tiles()` imported
+`world.scenes`, `world.lore`, `world.calendar` and `world.regions` directly to build its
+six overlays. A standalone contrib cannot, and — more to the point — *should* not: five
+of the six carry a privacy rule only the owning domain can apply. So the contrib sends
+`collect_tile_overlays` once per render and merges whatever the installed partners answer.
+The source game was restructured the same way first (its overlay helpers now live in
+`world/<domain>/maps_integration.py` behind the same signal), so the two layouts mirror
+each other rather than diverging.
+
+The source game had no equivalent of the `primary_region` overlay key — it read
+`RegionMembership` inline. Here that is `evennia-regions`' contribution like any other
+partner's, which is what keeps `evennia-maps` and `evennia-regions` free of any dependency
+edge in either direction.
+
+**No sekizai `addtoblock`.** The source game's `base.html` renders a sekizai `"js"` block;
+Evennia's stock `website/base.html` loads `sekizai_tags` but renders no such block, so an
+`addtoblock` would have silently dropped the Leaflet and map scripts and the live map
+would never have initialized. The contrib's template loads them with plain `<script>` tags
+at the end of the content block instead.
+
+**Outbound links are configurable and fail soft.** The source game's templates hardcoded
+`{% url 'region-detail' %}` / `'scene-detail'` / `'calendar-event-detail'`. Those pages
+belong to other contribs that may not be installed, so the contrib reverses them through
+`MAPS_OVERLAY_URL_NAMES` and renders plain text where a route does not resolve. Same shape
+for the tile feed via `MAPS_TILES_URL_NAME`.
+
+**Archived planes are hidden everywhere.** The source game's list and detail web views
+served archived planes while its API filtered them out. The contrib filters everywhere —
+`AbstractArchived` exists to make a plane disappear, and a portal marker pointing at an
+archived plane would navigate to a 404 either way. Worth reconciling in the source game.
+
+**Terrain sprites namespaced.** `TERRAIN_TILESET` → `MAPS_TERRAIN_TILESET`, for the same
+reason `MAPS_TERRAIN_PRECEDENCE` and `MAPS_DIRECTION_OFFSETS` were namespaced in 0.1.0.
+
+**CSS classes renamed.** `cov-map-*` → `evennia-maps-*`, and the container id
+`#cov-live-map` → `#evennia-maps-live`.
+
+**Multi-line template comments fixed.** The source game's map templates carry the same
+multi-line `{# ... #}` documentation comments this repo's partials did. Django's tag regex
+has no `DOTALL` flag, so those are not comments: their text renders into the page, and any
+`{% %}` inside them is parsed as a live tag. Fixed here (and across the other contribs
+shipping copies of the same partials); the source game's own copies are worth the same
+sweep.
 
 ## v0.1.0 extracted from source MUSH project at commit: _see git tag in private repo_

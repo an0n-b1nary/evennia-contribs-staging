@@ -1,0 +1,39 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Map{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Map</h1>
+
+{% if planes %}
+<div class="table-responsive" role="region" aria-label="Planes" tabindex="0">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Stack</th>
+      {% if show_tile_counts %}<th scope="col">Rooms</th>{% endif %}
+      <th scope="col">Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for plane in planes %}
+    <tr>
+      <td><a href="{% url 'evennia_maps:plane-detail' plane.pk %}">{{ plane.name }}</a></td>
+      <td class="text-muted">
+        {% if plane.zstack %}{{ plane.zstack }} ({{ plane.elevation }}){% else %}&mdash;{% endif %}
+      </td>
+      {% if show_tile_counts %}<td>{{ plane.tile_count }}</td>{% endif %}
+      <td class="text-muted">{{ plane.description|truncatechars:80 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% include "evennia_maps/_pagination.html" %}
+
+{% else %}
+{% include "evennia_maps/_empty_state.html" with message="No map planes have been created yet." action="+map/place <plane>" %}
+{% endif %}
+{% endblock %}

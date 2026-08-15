@@ -1,0 +1,146 @@
+/*
+ * evennia_maps — styles for the static SVG map and the live Leaflet map.
+ *
+ * Self-contained: no CSS custom properties from a host game's stylesheet,
+ * since a contrib cannot assume any exist. Colours are plain values chosen
+ * to sit on Evennia's default dark website theme; override any rule from
+ * your own stylesheet, which loads after this one.
+ */
+
+/* ---------------------------------------------------------------
+   Static SVG map
+   --------------------------------------------------------------- */
+
+.evennia-maps-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: 70vh;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.evennia-maps-scroll:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+}
+
+.evennia-maps-svg {
+  display: block;
+}
+
+.evennia-maps-fallback {
+  fill: #6c757d;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1;
+}
+
+.evennia-maps-tile:hover .evennia-maps-fallback {
+  fill: #4a90d9;
+}
+
+.evennia-maps-legend-item {
+  display: inline-block;
+  margin: 0 1rem 0.25rem 0;
+}
+
+/* ---------------------------------------------------------------
+   Live Leaflet map
+   --------------------------------------------------------------- */
+
+.evennia-maps-live {
+  width: 100%;
+  height: 70vh;
+  min-height: 420px;
+  background: #1b1b1b;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.evennia-maps-tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #3a3a3a;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.evennia-maps-tile-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.evennia-maps-tile-icon.evennia-maps-tile-active {
+  border-color: #ffce54;
+  box-shadow: 0 0 4px 1px rgba(255, 206, 84, 0.8);
+}
+
+.evennia-maps-portal-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.1em;
+  color: #b39ddb;
+}
+
+.evennia-maps-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 128, 128, 0.4);
+  border-radius: 2px;
+  font-size: 0.9rem;
+}
+
+.evennia-maps-popup h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.evennia-maps-popup a {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.evennia-maps-popup ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+
+/* ---------------------------------------------------------------
+   Overlay markers
+   --------------------------------------------------------------- */
+
+.evennia-maps-heatmap-marker {
+  fill: #ff7043;
+  fill-opacity: 0.45;
+  stroke: #ff7043;
+  stroke-width: 1;
+}
+
+.evennia-maps-lore-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.1em;
+  color: #ffd54f;
+}
+
+.evennia-maps-hangout-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.85em;
+  font-weight: bold;
+  color: #1b1b1b;
+  background: #80cbc4;
+  border-radius: 50%;
+  box-sizing: border-box;
+}

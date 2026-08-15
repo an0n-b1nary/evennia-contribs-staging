@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-maps"
-version = "0.1.0"
+version = "0.2.0"
 description = "A 2D coordinate map of your game's rooms, auto-grown from canonical exits, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -19,14 +19,18 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-# Core: models, geometry, command, listeners, room mixin. No web/API deps
-# yet — this release is the core phase of a multi-phase extraction; the
-# [web] extra lands with the website/API phase.
-# evennia-links is HARD: MapPlane inherits AbstractArchived, and apps.py
-# wires terrain_changed through connect_on_ready.
+# Core: models, geometry, command, listeners, room mixin.
+# evennia-links is HARD: MapPlane inherits AbstractArchived, apps.py wires
+# terrain_changed through connect_on_ready, and the overlay seam merges
+# provider responses with collect_dicts().
 dependencies = ["evennia>=6.0", "evennia-links>=0.4"]
 
 [project.optional-dependencies]
+# [web] enables the website views (SVG + Leaflet) and the DRF API.
+web = [
+    "djangorestframework>=3.14",
+    "django-filter>=23",
+]
 test = ["pytest>=8.0"]
 
 [project.urls]
@@ -35,8 +39,16 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_maps", "evennia_maps.migrations"]
+packages = ["evennia_maps", "evennia_maps.migrations", "evennia_maps.api"]
 
 [tool.setuptools.package-dir]
 "evennia_maps" = "."
 "evennia_maps.migrations" = "migrations"
+"evennia_maps.api" = "api"
+
+[tool.setuptools.package-data]
+evennia_maps = [
+    "templates/evennia_maps/*.html",
+    "static/evennia_maps/css/*.css",
+    "static/evennia_maps/js/*.js",
+]

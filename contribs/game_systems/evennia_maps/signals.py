@@ -12,12 +12,18 @@ terrain_changed — fires when a room's terrain changes, so a placed tile's
                   denormalized terrain snapshot can be refreshed. Games
                   using MapsRoomMixin get this for free via set_terrain().
 
-collect_tile_overlays — reserved for a later phase of this extraction
-                  (web tile-overlay seam, sent once per tiles request with
-                  kwargs room_ids and staff, merged via
-                  evennia_links.collect_dicts()). Declared now so partner
-                  contribs can be written against a stable import path;
-                  nothing sends or connects to it yet.
+collect_tile_overlays — the web tile-overlay seam. Sent once per map
+                  render (never per tile) with kwargs room_ids (list[int])
+                  and staff (bool), sender=MapPlane. Each connected partner
+                  contrib returns {overlay_key: {room_id: value}} for the
+                  rooms it has data about, merged via
+                  evennia_links.collect_dicts() — which send_robust()s, so
+                  a provider that raises degrades its own overlay to absent
+                  rather than failing the request. Receiver order is not
+                  guaranteed and must not matter: providers write disjoint
+                  keys. Sent from evennia_maps.overlays.collect_overlays();
+                  see that module for the full key contract and for why
+                  these cannot simply be read off the partner models.
 """
 
 from django.dispatch import Signal

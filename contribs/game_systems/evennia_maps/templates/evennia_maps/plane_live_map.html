@@ -1,0 +1,64 @@
+{% extends "website/base.html" %}
+{% load static %}
+
+{% block titleblock %}{{ plane.name }} &mdash; Live Map{% endblock %}
+
+{% block header_ext %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="anonymous">
+<link rel="stylesheet" type="text/css" href="{% static 'evennia_maps/css/evennia_maps.css' %}">
+{% endblock %}
+
+{% block content %}
+<nav aria-label="Breadcrumb">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_maps:plane-list' %}">Map</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_maps:plane-detail' plane.pk %}">{{ plane.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Live</li>
+  </ol>
+</nav>
+
+<h1 class="mb-1">{{ plane.name }} &mdash; Live Map</h1>
+<p class="text-muted small mb-3">
+  {% if plane.zstack %}{{ plane.zstack }} stack &mdash; use the layer control to switch elevation.
+  {% else %}Standalone plane.{% endif %}
+</p>
+
+{% if tiles_url_template %}
+<div id="evennia-maps-live"
+     class="evennia-maps-live"
+     role="application"
+     aria-label="Interactive map of {{ plane.name }}"
+     data-plane-id="{{ plane.pk }}"
+     data-tiles-url-template="{{ tiles_url_template }}"
+     data-live-map-url-template="{% url 'evennia_maps:plane-live-map' 0 %}"
+     data-region-url-template="{{ region_url_template }}"
+     data-scene-url-template="{{ scene_url_template }}"
+     data-event-url-template="{{ event_url_template }}"
+     data-layers='[{% for layer in layers %}{"id": {{ layer.id }}, "name": "{{ layer.name|escapejs }}", "elevation": {{ layer.elevation }}, "is_current": {{ layer.is_current|yesno:"true,false" }}}{% if not forloop.last %},{% endif %}{% endfor %}]'>
+</div>
+{% else %}
+{% comment %} The tile feed is the whole page. Say why it is missing rather than
+   rendering an empty canvas — see evennia_maps.views.tiles_url_template. {% endcomment %}
+<div class="evennia-maps-error">
+  The map API is not mounted on this site, so live tiles cannot be loaded.
+</div>
+{% endif %}
+
+<p class="small mt-2">
+  <a href="{% url 'evennia_maps:plane-detail' plane.pk %}">Switch to the static map</a>
+</p>
+
+{% if tiles_url_template %}
+{% comment %} Plain script tags, not a sekizai addtoblock: Evennia's stock
+   website/base.html loads sekizai_tags but renders no "js" block, so an
+   addtoblock would silently drop these and the map would never initialize.
+   The container above is already in the document by this point, so loading
+   at the end of the content block is enough. {% endcomment %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="anonymous"></script>
+<script src="{% static 'evennia_maps/js/evennia_maps.js' %}"></script>
+{% endif %}
+{% endblock %}

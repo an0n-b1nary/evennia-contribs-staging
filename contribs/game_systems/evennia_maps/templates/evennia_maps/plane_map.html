@@ -1,0 +1,42 @@
+{% extends "website/base.html" %}
+{% load static %}
+
+{% block titleblock %}{{ plane.name }} &mdash; Map{% endblock %}
+
+{% block header_ext %}
+<link rel="stylesheet" type="text/css" href="{% static 'evennia_maps/css/evennia_maps.css' %}">
+{% endblock %}
+
+{% block content %}
+<nav aria-label="Breadcrumb">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_maps:plane-list' %}">Map</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ plane.name }}</li>
+  </ol>
+</nav>
+
+<h1 class="mb-1">{{ plane.name }}</h1>
+<p class="text-muted small mb-3">
+  {% if plane.zstack %}{{ plane.zstack }} stack, elevation {{ plane.elevation }} &mdash;{% endif %}
+  {{ tile_count }} room{{ tile_count|pluralize }} shown
+</p>
+
+{% if plane.description %}
+<p class="mb-4">{{ plane.description }}</p>
+{% endif %}
+
+{% if user.is_authenticated and has_live_map %}
+{% comment %} The live map's tiles come from the API, which requires an authenticated
+   account — don't offer logged-out visitors a link that renders empty.
+   has_live_map is false when the API router isn't mounted at all. {% endcomment %}
+<p class="small">
+  <a href="{% url 'evennia_maps:plane-live-map' plane.pk %}">View the interactive map</a>
+</p>
+{% endif %}
+
+{% if svg %}
+{% include "evennia_maps/_plane_svg.html" %}
+{% else %}
+{% include "evennia_maps/_empty_state.html" with message="No rooms are visible on this plane yet." %}
+{% endif %}
+{% endblock %}

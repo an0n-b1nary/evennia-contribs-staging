@@ -2,7 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
 Tests for evennia_maps: models, direction, placement, layout, listeners,
-and +map.
++map, and the whole web surface (views, templates, overlay seam, REST API).
 
 EvenniaTest's stock DefaultRoom carries no terrain_tags state, so every
 test case here sets room_typeclass to a local MapsTestRoom (MapsRoomMixin
@@ -11,23 +11,89 @@ SocialRoomMixin. Plain create.create_object() calls for extra rooms
 (room3, RoomA, etc.) use the same typeclass explicitly so terrain/mixin
 behaviour is available uniformly, not just on the two EvenniaTest fixture
 rooms.
+
+This module doubles as a **test URLconf**. Cases that need the contrib's
+own routes — anything reversing a URL, rendering a template, or driving
+the DRF API — opt in with ``@override_settings(ROOT_URLCONF=__name__)``.
+The stub partner routes below stand in for evennia_regions/scenes/calendar
+so the outbound-link seam can be exercised without installing any of them,
+which is the whole point of that seam.
+
+Web tests require the [web] extra (djangorestframework, django-filter).
+
+Run:
+    evennia test evennia_maps --settings settings.py
 """
 
 import contextlib
 
-from django.db import IntegrityError, transaction
+from django.contrib.auth.models import AnonymousUser
+from django.db import IntegrityError, connection, transaction
+from django.http import Http404, HttpResponse
+from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
+from django.urls import include, path
 from evennia.objects.objects import DefaultRoom
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
+from rest_framework.test import APIClient
 
 from evennia_maps import direction, layout, placement
 from evennia_maps.commands import CmdMap
 from evennia_maps.models import MapPlane, RoomTile
-from evennia_maps.permissions import is_staff
-from evennia_maps.signals import tile_placed
+from evennia_maps.overlays import (
+    DEFAULT_OVERLAY_URL_NAMES,
+    collect_overlays,
+    overlay_url_names,
+    overlay_url_templates,
+)
+from evennia_maps.permissions import is_room_web_visible, is_staff
+from evennia_maps.signals import collect_tile_overlays, tile_placed
 from evennia_maps.typeclasses import MapsRoomMixin
+from evennia_maps.views import (
+    PlaneListView,
+    PlaneLiveMapView,
+    PlaneMapView,
+    build_svg_context,
+    tile_hangout_type,
+    tiles_url_template,
+    visible_tiles_for_plane,
+)
 
 ROOM_TYPECLASS = "evennia_maps.tests.MapsTestRoom"
+
+
+# ---------------------------------------------------------------------------
+# Test URLconf (see the module docstring)
+# ---------------------------------------------------------------------------
+
+
+def _stub_page(request, pk):
+    """Stand-in for a partner contrib's detail page."""
+    return HttpResponse(f"stub {pk}")
+
+
+_STUB_URL_NAMES = {
+    "region": "stub-region-detail",
+    "scene": "stub-scene-detail",
+    "event": "stub-event-detail",
+}
+"""MAPS_OVERLAY_URL_NAMES pointing at the stub routes below."""
+
+
+# Evennia's own routes come along because website/base.html — which every
+# template here extends — reverses "index" and the account routes. Rendering
+# against a URLconf without them fails with a NoReverseMatch that has nothing
+# to do with this contrib.
+urlpatterns = [
+    path("map/", include(("evennia_maps.urls", "evennia_maps"))),
+    path("api/v1/", include("evennia_maps.api.urls")),
+    path("regions/<int:pk>/", _stub_page, name="stub-region-detail"),
+    path("scenes/<int:pk>/", _stub_page, name="stub-scene-detail"),
+    path("events/<int:pk>/", _stub_page, name="stub-event-detail"),
+    *evennia_default_urlpatterns,
+]
 
 
 class MapsTestRoom(MapsRoomMixin, DefaultRoom):
@@ -1453,3 +1519,703 @@ class TestCmdMapCheck(MapsCommandTestCase):
     def test_check_player_denied(self):
         result = self.call(CmdMap(), "/check", caller=self.char2)
         self.assertIn("staff permissions", result)
+
+
+# ---------------------------------------------------------------------------
+# Web layer: overlay seam
+# ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _provider(fn):
+    """Connect *fn* to collect_tile_overlays for the duration of the block."""
+    collect_tile_overlays.connect(fn, dispatch_uid="evennia_maps.tests.provider")
+    try:
+        yield
+    finally:
+        collect_tile_overlays.disconnect(fn, dispatch_uid="evennia_maps.tests.provider")
+
+
+def _full_provider(sender, room_ids, staff, **kwargs):
+    """A stand-in for the partner contribs, contributing every collected key."""
+    return {
+        "primary_region": {rid: {"id": 7, "name": "Testlands"} for rid in room_ids},
+        "has_active_scene": {rid: True for rid in room_ids},
+        "recent_scene_count": {rid: 3 for rid in room_ids},
+        "recent_scenes": {rid: [{"id": 11, "title": "A log"}] for rid in room_ids},
+        "has_lore": {rid: True for rid in room_ids},
+        "upcoming_events": {rid: [{"id": 22, "title": "A moot"}] for rid in room_ids},
+    }
+
+
+def _staff_only_provider(sender, room_ids, staff, **kwargs):
+    """Contributes only for staff callers — the shape every real provider has."""
+    if not staff:
+        return {}
+    return {"has_lore": {rid: True for rid in room_ids}}
+
+
+def _exploding_provider(sender, room_ids, staff, **kwargs):
+    raise RuntimeError("provider blew up")
+
+
+def _nondict_provider(sender, room_ids, staff, **kwargs):
+    return ["not", "a", "dict"]
+
+
+class TestCollectOverlays(MapsTestCase):
+    """collect_overlays() merges provider answers and degrades, never raises."""
+
+    def test_no_providers_returns_empty(self):
+        self.assertEqual(collect_overlays([self.room1.id], staff=False), {})
+
+    def test_provider_contribution_is_merged(self):
+        with _provider(_full_provider):
+            overlays = collect_overlays([self.room1.id], staff=False)
+        self.assertTrue(overlays["has_active_scene"][self.room1.id])
+        self.assertEqual(overlays["primary_region"][self.room1.id]["name"], "Testlands")
+
+    def test_staff_flag_reaches_the_provider(self):
+        with _provider(_staff_only_provider):
+            self.assertEqual(collect_overlays([self.room1.id], staff=False), {})
+            staff_overlays = collect_overlays([self.room1.id], staff=True)
+        self.assertTrue(staff_overlays["has_lore"][self.room1.id])
+
+    def test_raising_provider_degrades_to_absent(self):
+        with _provider(_exploding_provider):
+            self.assertEqual(collect_overlays([self.room1.id], staff=True), {})
+
+    def test_non_dict_response_is_skipped(self):
+        with _provider(_nondict_provider):
+            self.assertEqual(collect_overlays([self.room1.id], staff=True), {})
+
+    def test_empty_room_ids_short_circuits(self):
+        # No send at all — a provider must never be asked about nothing.
+        with _provider(_exploding_provider):
+            self.assertEqual(collect_overlays([], staff=True), {})
+
+
+class TestOverlayUrlTemplates(MapsTestCase):
+    """Outbound links resolve only when the owning contrib's routes exist."""
+
+    def test_unmounted_partners_are_absent(self):
+        # The default names are namespaced at evennia_regions/scenes/calendar,
+        # none of which the test URLconf mounts.
+        self.assertEqual(overlay_url_templates(), {})
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
+    def test_mounted_partners_resolve_with_a_placeholder_pk(self):
+        templates = overlay_url_templates()
+        self.assertEqual(templates["region"], "/regions/0/")
+        self.assertEqual(templates["scene"], "/scenes/0/")
+        self.assertEqual(templates["event"], "/events/0/")
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES={"scene": ""})
+    def test_blank_name_suppresses_one_link(self):
+        self.assertNotIn("scene", overlay_url_templates())
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_setting_is_merged_over_the_defaults_not_replacing_them(self):
+        with override_settings(MAPS_OVERLAY_URL_NAMES={"scene": "stub-scene-detail"}):
+            names = overlay_url_names()
+        self.assertEqual(names["scene"], "stub-scene-detail")
+        self.assertEqual(names["region"], DEFAULT_OVERLAY_URL_NAMES["region"])
+
+
+class TestTilesUrlTemplate(MapsTestCase):
+    def test_absent_when_the_api_is_not_mounted(self):
+        self.assertEqual(tiles_url_template(), "")
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_resolves_when_mounted(self):
+        self.assertEqual(tiles_url_template(), "/api/v1/planes/0/tiles/")
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_TILES_URL_NAME="")
+    def test_blank_setting_turns_the_live_map_off(self):
+        self.assertEqual(tiles_url_template(), "")
+
+
+# ---------------------------------------------------------------------------
+# Web layer: room visibility
+# ---------------------------------------------------------------------------
+
+
+def _always_hidden(room):
+    """MAPS_ROOM_VISIBILITY test stub: every room is hidden."""
+    return False
+
+
+def _always_visible(room):
+    """MAPS_ROOM_VISIBILITY test stub: every room is visible."""
+    return True
+
+
+def _exploding_rule(room):
+    """MAPS_ROOM_VISIBILITY test stub: raises when called."""
+    raise RuntimeError("visibility rule blew up")
+
+
+_NOT_CALLABLE = None
+"""MAPS_ROOM_VISIBILITY test stub: a dotted path that resolves to None."""
+
+
+class TestIsRoomWebVisible(MapsTestCase):
+    """The privacy predicate, including every fail-closed path."""
+
+    def test_ordinary_room_is_visible(self):
+        self.assertTrue(is_room_web_visible(self.room1))
+
+    def test_staff_room_type_is_hidden(self):
+        self.room1.db.room_type = "staff"
+        self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_secret_teleport_setting_is_hidden(self):
+        self.room1.db.allow_teleport = "secret"
+        self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_override_can_hide_everything(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="evennia_maps.tests._always_hidden"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_override_can_publish_a_room_the_default_rule_hides(self):
+        self.room1.db.allow_teleport = "secret"
+        with override_settings(MAPS_ROOM_VISIBILITY="evennia_maps.tests._always_visible"):
+            self.assertTrue(is_room_web_visible(self.room1))
+
+    def test_malformed_path_hides_rather_than_falling_back(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="not_a_dotted_path"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_missing_attribute_hides(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="evennia_maps.permissions.no_such_fn"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_missing_module_hides(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="no_such_module_at_all.rule"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_non_callable_target_hides(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="evennia_maps.tests._NOT_CALLABLE"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+    def test_raising_override_hides(self):
+        with override_settings(MAPS_ROOM_VISIBILITY="evennia_maps.tests._exploding_rule"):
+            self.assertFalse(is_room_web_visible(self.room1))
+
+
+class TestReadRoomAttr(MapsTestCase):
+    """hangout_type and friends must be readable however the game stores them."""
+
+    def test_reads_an_evennia_attribute_getattr_cannot_see(self):
+        self.room1.db.hangout_type = "bar"
+        self.assertEqual(tile_hangout_type(self.room1), "bar")
+
+    def test_absent_attribute_is_none(self):
+        self.assertIsNone(tile_hangout_type(self.room1))
+
+
+# ---------------------------------------------------------------------------
+# Website views
+# ---------------------------------------------------------------------------
+
+
+def _attach(request, user):
+    request.user = user
+    return request
+
+
+class MapsWebTestCase(MapsTestCase):
+    """
+    RequestFactory + direct view invocation.
+
+    Both because Django's TestClient triggers an Evennia template-context
+    RecursionError on authenticated HTML pages, and because a contrib's
+    urls.py is not in any ROOT_URLCONF during a contrib-only test run
+    unless a case opts in with override_settings(ROOT_URLCONF=__name__).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+
+class TestPlaneListView(MapsWebTestCase):
+    def _context(self, user):
+        view = PlaneListView()
+        view.request = _attach(self.factory.get("/map/"), user)
+        view.kwargs = {}
+        view.object_list = view.get_queryset()
+        return view.get_context_data()
+
+    def test_lists_planes(self):
+        plane = _make_plane("Web Plane")
+        context = self._context(AnonymousUser())
+        self.assertIn(plane, context["object_list"])
+
+    def test_archived_plane_is_not_listed(self):
+        plane = _make_plane("Gone")
+        plane.archive()
+        self.assertNotIn(plane, self._context(self.account)["object_list"])
+
+    def test_tile_counts_withheld_from_non_staff(self):
+        # A raw count includes tiles the privacy filter hides, so it tells a
+        # player exactly how many rooms they are not being shown.
+        self.assertFalse(self._context(AnonymousUser())["show_tile_counts"])
+
+    def test_tile_counts_shown_to_staff(self):
+        self.assertTrue(self._context(self.account)["show_tile_counts"])
+
+    def test_list_does_not_query_per_plane(self):
+        for i in range(3):
+            _make_plane(f"Plane {i}")
+        with CaptureQueriesContext(connection) as small:
+            list(self._context(self.account)["object_list"])
+        for i in range(5):
+            _make_plane(f"Extra {i}")
+        with CaptureQueriesContext(connection) as large:
+            list(self._context(self.account)["object_list"])
+        self.assertEqual(len(small), len(large))
+
+
+class TestPlaneMapView(MapsWebTestCase):
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane()
+
+    def _context(self, user):
+        view = PlaneMapView()
+        view.request = _attach(self.factory.get(f"/map/{self.plane.pk}/"), user)
+        view.kwargs = {"pk": self.plane.pk}
+        view.object = self.plane
+        return view.get_context_data()
+
+    def test_renders_public_tile(self):
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        context = self._context(AnonymousUser())
+        self.assertEqual(context["tile_count"], 1)
+        self.assertEqual(context["svg"]["tiles"][0]["room_id"], self.room1.id)
+
+    def test_empty_plane_has_no_svg(self):
+        context = self._context(AnonymousUser())
+        self.assertEqual(context["tile_count"], 0)
+        self.assertIsNone(context["svg"])
+
+    def test_hides_secret_room_from_non_staff(self):
+        self.room1.db.allow_teleport = "secret"
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        context = self._context(AnonymousUser())
+        self.assertEqual(context["tile_count"], 0)
+        self.assertIsNone(context["svg"])
+
+    def test_hides_staff_room_type_from_non_staff(self):
+        self.room1.db.room_type = "staff"
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        self.assertEqual(self._context(AnonymousUser())["tile_count"], 0)
+
+    def test_shows_secret_room_to_staff(self):
+        # self.account carries the Developer permission granted by
+        # EvenniaTest.create_accounts(), which satisfies perm(Builder).
+        self.room1.db.allow_teleport = "secret"
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        self.assertEqual(self._context(self.account)["tile_count"], 1)
+
+    def test_archived_plane_is_not_served(self):
+        self.plane.archive()
+        view = PlaneMapView()
+        view.request = _attach(self.factory.get("/map/1/"), AnonymousUser())
+        view.kwargs = {"pk": self.plane.pk}
+        with self.assertRaises(Http404):
+            view.get_object()
+
+    def test_tile_has_no_partner_data_without_providers(self):
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        tile = self._context(AnonymousUser())["svg"]["tiles"][0]
+        self.assertIsNone(tile["region"])
+        self.assertIsNone(tile["latest_scene"])
+        self.assertEqual(tile["region_url"], "")
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
+    def test_tile_links_out_when_a_provider_and_its_routes_are_present(self):
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        with _provider(_full_provider):
+            tile = self._context(AnonymousUser())["svg"]["tiles"][0]
+        self.assertEqual(tile["region"]["name"], "Testlands")
+        self.assertEqual(tile["region_url"], "/regions/7/")
+        self.assertEqual(tile["latest_scene_url"], "/scenes/11/")
+
+    def test_provider_data_renders_no_link_when_routes_are_unmounted(self):
+        # evennia_regions installed but its URLs not wired: name the region,
+        # don't link to a page that does not exist.
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        with _provider(_full_provider):
+            tile = self._context(AnonymousUser())["svg"]["tiles"][0]
+        self.assertEqual(tile["region"]["name"], "Testlands")
+        self.assertEqual(tile["region_url"], "")
+
+    def test_renders_without_a_terrain_tileset_setting(self):
+        # A host game need not define MAPS_TERRAIN_TILESET at all — the tile
+        # falls back to the plain swatch rather than raising.
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        self.assertEqual(self._context(AnonymousUser())["svg"]["tiles"][0]["sprite"], "")
+
+    @override_settings(
+        MAPS_TERRAIN_TILESET={"forest": "/static/forest.png"},
+        MAPS_TERRAIN_PRECEDENCE=["forest"],
+    )
+    def test_sprite_comes_from_the_tileset(self):
+        self.room1.set_terrain({"forest"})
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        tile = self._context(AnonymousUser())["svg"]["tiles"][0]
+        self.assertEqual(tile["terrain"], "forest")
+        self.assertEqual(tile["sprite"], "/static/forest.png")
+
+
+class TestSvgContextQueryCost(MapsWebTestCase):
+    """The overlay pass must be one send for the grid, not one per tile."""
+
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane()
+
+    def _render(self):
+        tiles = visible_tiles_for_plane(self.plane, staff=True)
+        with CaptureQueriesContext(connection) as ctx:
+            build_svg_context(tiles, staff=True)
+        return len(ctx)
+
+    def test_query_count_is_flat_in_tile_count(self):
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        with _provider(_full_provider):
+            small = self._render()
+            for i in range(5):
+                placement.place_tile(_make_room(f"Grid {i}"), self.plane, i + 1, 0)
+            large = self._render()
+        self.assertEqual(small, large)
+
+
+class TestPlaneLiveMapView(MapsWebTestCase):
+    def _context(self, plane, user=None):
+        view = PlaneLiveMapView()
+        view.request = _attach(self.factory.get("/map/"), user or AnonymousUser())
+        view.kwargs = {"pk": plane.pk}
+        view.object = plane
+        return view.get_context_data()
+
+    def test_standalone_plane_has_a_single_layer(self):
+        plane = _make_plane("Tavern")
+        layers = self._context(plane)["layers"]
+        self.assertEqual([layer["id"] for layer in layers], [plane.pk])
+        self.assertTrue(layers[0]["is_current"])
+
+    def test_stacked_plane_lists_siblings_by_descending_elevation(self):
+        sky = _make_plane("Sky", zstack="main", elevation=1)
+        surface = _make_plane("Surface", zstack="main", elevation=0)
+        under = _make_plane("Under", zstack="main", elevation=-1)
+        layers = self._context(surface)["layers"]
+        self.assertEqual([layer["id"] for layer in layers], [sky.pk, surface.pk, under.pk])
+
+    def test_archived_sibling_excluded(self):
+        surface = _make_plane("Surface", zstack="main", elevation=0)
+        under = _make_plane("Under", zstack="main", elevation=-1)
+        under.archive()
+        self.assertEqual([layer["id"] for layer in self._context(surface)["layers"]], [surface.pk])
+
+    def test_link_templates_absent_when_partners_are_unmounted(self):
+        context = self._context(_make_plane())
+        self.assertEqual(context["tiles_url_template"], "")
+        self.assertEqual(context["region_url_template"], "")
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
+    def test_link_templates_present_when_mounted(self):
+        context = self._context(_make_plane())
+        self.assertEqual(context["tiles_url_template"], "/api/v1/planes/0/tiles/")
+        self.assertEqual(context["event_url_template"], "/events/0/")
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestWebPagesRender(MapsWebTestCase):
+    """
+    Render the templates for real.
+
+    A CBV returns a lazy TemplateResponse, so a test that only inspects
+    context_data will not notice a NoReverseMatch, a missing include, or a
+    typo'd template name — the failure only surfaces on render.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane("Rendered")
+        placement.place_tile(self.room1, self.plane, 0, 0)
+
+    def _render(self, view, **kwargs):
+        request = _attach(self.factory.get("/map/"), AnonymousUser())
+        response = view.as_view()(request, **kwargs)
+        response.render()
+        return response.content.decode()
+
+    def test_plane_list_renders(self):
+        self.assertIn("Rendered", self._render(PlaneListView))
+
+    def test_plane_map_renders_the_grid_and_legend(self):
+        html = self._render(PlaneMapView, pk=self.plane.pk)
+        self.assertIn("evennia-maps-svg", html)
+        self.assertIn(self.room1.key, html)
+
+    def test_plane_map_offers_no_live_link_without_the_api(self):
+        with override_settings(MAPS_TILES_URL_NAME="no-such-route"):
+            html = self._render(PlaneMapView, pk=self.plane.pk)
+        self.assertNotIn(f"/map/{self.plane.pk}/live/", html)
+
+    def test_live_map_renders_its_container_and_script(self):
+        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        self.assertIn('id="evennia-maps-live"', html)
+        self.assertIn("/api/v1/planes/0/tiles/", html)
+        self.assertIn("evennia_maps/js/evennia_maps.js", html)
+
+    @override_settings(MAPS_TILES_URL_NAME="")
+    def test_live_map_explains_itself_when_the_api_is_off(self):
+        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        self.assertNotIn('id="evennia-maps-live"', html)
+        self.assertIn("map API is not mounted", html)
+
+    def test_empty_plane_renders_its_empty_state(self):
+        empty = _make_plane("Nothing Here")
+        html = self._render(PlaneMapView, pk=empty.pk)
+        self.assertIn("No rooms are visible on this plane yet.", html)
+
+
+# ---------------------------------------------------------------------------
+# REST API
+# ---------------------------------------------------------------------------
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class MapsApiTestCase(MapsTestCase):
+    """Shared setup: a staff, a player, and an anonymous APIClient."""
+
+    base = "/api/v1"
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.account)
+        self.client2 = APIClient()
+        self.client2.force_authenticate(user=self.account2)
+        self.anon = APIClient()
+
+
+class TestPlaneApi(MapsApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane("Overworld", zstack="main", elevation=0)
+        placement.place_tile(self.room1, self.plane, 0, 0)
+
+    def test_unauthenticated_is_refused(self):
+        r = self.anon.get(f"{self.base}/planes/", format="json")
+        self.assertIn(r.status_code, [401, 403])
+
+    def test_plane_list(self):
+        r = self.client.get(f"{self.base}/planes/", format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Overworld", [p["name"] for p in r.data["results"]])
+
+    def test_archived_plane_is_hidden(self):
+        _make_plane("Gone").archive()
+        r = self.client.get(f"{self.base}/planes/", format="json")
+        self.assertNotIn("Gone", [p["name"] for p in r.data["results"]])
+
+    def test_bounds_reflect_visible_tiles(self):
+        placement.place_tile(self.room2, self.plane, 3, -2)
+        r = self.client.get(f"{self.base}/planes/{self.plane.pk}/", format="json")
+        self.assertEqual(r.data["bounds"], {"min_x": 0, "max_x": 3, "min_y": -2, "max_y": 0})
+
+    def test_bounds_null_when_nothing_visible(self):
+        empty = _make_plane("Empty")
+        r = self.client.get(f"{self.base}/planes/{empty.pk}/", format="json")
+        self.assertIsNone(r.data["bounds"])
+
+    def test_bounds_exclude_secret_room_from_non_staff(self):
+        placement.place_tile(self.room2, self.plane, 3, -2)
+        self.room2.db.allow_teleport = "secret"
+        r = self.client2.get(f"{self.base}/planes/{self.plane.pk}/", format="json")
+        # A bounding box that hugged the hidden room would leak its extent.
+        self.assertEqual(r.data["bounds"], {"min_x": 0, "max_x": 0, "min_y": 0, "max_y": 0})
+
+    def test_list_bounds_cost_is_flat_in_plane_count(self):
+        """bounds walks each plane's tiles, so the list route must prefetch."""
+        url = f"{self.base}/planes/"
+        self.client.get(url, format="json")  # warm session/account lookups
+        with CaptureQueriesContext(connection) as small:
+            self.client.get(url, format="json")
+        for i in range(5):
+            plane = _make_plane(f"Extra {i}")
+            placement.place_tile(_make_room(f"Extra room {i}"), plane, 0, 0)
+            # Warm the idmapper/AttributeHandler cache as on a live server, so
+            # this measures the ORM lookups the route itself owns.
+            self.client.get(url, format="json")
+        with CaptureQueriesContext(connection) as large:
+            self.client.get(url, format="json")
+        self.assertEqual(len(small), len(large))
+
+
+class TestPlaneTilesApi(MapsApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane("Overworld")
+        placement.place_tile(self.room1, self.plane, 0, 0)
+
+    def _tiles(self, client):
+        r = client.get(f"{self.base}/planes/{self.plane.pk}/tiles/", format="json")
+        self.assertEqual(r.status_code, 200)
+        return r.data["results"]
+
+    def test_tile_shape(self):
+        tile = self._tiles(self.client)[0]
+        for key in (
+            "x",
+            "y",
+            "room_id",
+            "room_name",
+            "terrain",
+            "sprite_url",
+            "portal_plane_id",
+            "hangout_type",
+            "primary_region_id",
+            "has_active_scene",
+            "recent_scene_count",
+            "has_lore",
+            "recent_scenes",
+            "upcoming_events",
+        ):
+            self.assertIn(key, tile)
+        self.assertEqual(tile["room_id"], self.room1.id)
+
+    def test_overlay_fields_have_empty_values_with_no_providers(self):
+        # Every field is present whatever the game installed, so a frontend
+        # never has to know which partner contribs are around.
+        tile = self._tiles(self.client)[0]
+        self.assertIsNone(tile["primary_region_id"])
+        self.assertFalse(tile["has_active_scene"])
+        self.assertFalse(tile["has_lore"])
+        self.assertEqual(tile["recent_scene_count"], 0)
+        self.assertEqual(tile["recent_scenes"], [])
+        self.assertEqual(tile["upcoming_events"], [])
+
+    def test_provider_values_reach_the_payload(self):
+        with _provider(_full_provider):
+            tile = self._tiles(self.client)[0]
+        self.assertEqual(tile["primary_region_id"], 7)
+        self.assertTrue(tile["has_active_scene"])
+        self.assertEqual(tile["recent_scene_count"], 3)
+        self.assertEqual(tile["recent_scenes"], [{"id": 11, "title": "A log"}])
+        self.assertEqual(tile["upcoming_events"], [{"id": 22, "title": "A moot"}])
+
+    def test_a_broken_provider_does_not_break_the_map(self):
+        with _provider(_exploding_provider):
+            tile = self._tiles(self.client)[0]
+        self.assertFalse(tile["has_lore"])
+
+    def test_secret_room_hidden_from_non_staff(self):
+        self.room1.db.allow_teleport = "secret"
+        self.assertEqual(self._tiles(self.client2), [])
+
+    def test_secret_room_visible_to_staff(self):
+        self.room1.db.allow_teleport = "secret"
+        self.assertEqual(len(self._tiles(self.client)), 1)
+
+    def test_hangout_type_read_from_the_room(self):
+        self.room1.db.hangout_type = "bar"
+        self.assertEqual(self._tiles(self.client)[0]["hangout_type"], "bar")
+
+    def test_hangout_type_null_by_default(self):
+        self.assertIsNone(self._tiles(self.client)[0]["hangout_type"])
+
+    def test_tiles_are_paginated_and_next_walks_the_whole_set(self):
+        for i in range(4):
+            placement.place_tile(_make_room(f"Pager {i}"), self.plane, i + 1, 0)
+        url = f"{self.base}/planes/{self.plane.pk}/tiles/?page_size=2"
+        r = self.client.get(url, format="json")
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(len(r.data["results"]), 2)
+
+        # The JS recurses on payload.next, so following it must cover the
+        # whole plane without repeats.
+        seen = []
+        while url:
+            page = self.client.get(url, format="json")
+            seen.extend(tile["room_id"] for tile in page.data["results"])
+            url = page.data["next"]
+        self.assertEqual(len(seen), 5)
+        self.assertEqual(len(set(seen)), 5)
+
+    def test_overlay_query_count_is_flat_in_tile_count(self):
+        """
+        Every overlay is one bulk pass for the whole plane — the property
+        this whole design rests on, and the one a later "just look it up per
+        tile" edit would quietly break.
+        """
+        url = f"{self.base}/planes/{self.plane.pk}/tiles/"
+        with _provider(_full_provider):
+            self.client.get(url, format="json")  # warm session/account lookups
+            with CaptureQueriesContext(connection) as small:
+                self.client.get(url, format="json")
+            for i in range(5):
+                placement.place_tile(_make_room(f"Overlay room {i}"), self.plane, i + 1, 0)
+                # Warm the idmapper/AttributeHandler cache as on a live server.
+                self.client.get(url, format="json")
+            with CaptureQueriesContext(connection) as large:
+                self.client.get(url, format="json")
+        self.assertEqual(len(small), len(large))
+
+
+class TestPlaneTilesPortals(MapsApiTestCase):
+    """Portal-ness is inferred purely from exit geometry."""
+
+    def setUp(self):
+        super().setUp()
+        self.overworld = _make_plane("Overworld", zstack="main", elevation=0)
+        self.interior = _make_plane("Tavern")  # zstack="" == standalone
+        placement.place_tile(self.room1, self.overworld, 0, 0)
+
+    def _make_exit(self, key, location, destination):
+        return create.create_object(
+            self.exit_typeclass, key=key, location=location, destination=destination
+        )
+
+    def _tile_for(self, room, client=None):
+        r = (client or self.client).get(
+            f"{self.base}/planes/{self.overworld.pk}/tiles/", format="json"
+        )
+        return next(t for t in r.data["results"] if t["room_id"] == room.id)
+
+    def test_portal_set_for_exit_into_a_standalone_plane(self):
+        placement.place_tile(self.room2, self.interior, 0, 0)
+        self._make_exit("in", self.room1, self.room2)
+        self.assertEqual(self._tile_for(self.room1)["portal_plane_id"], self.interior.pk)
+
+    def test_no_portal_for_an_ordinary_in_plane_exit(self):
+        room3 = _make_room("Room3")
+        placement.place_tile(room3, self.overworld, 1, 0)
+        self._make_exit("e", self.room1, room3)
+        self.assertIsNone(self._tile_for(self.room1)["portal_plane_id"])
+
+    def test_no_portal_when_the_destination_has_no_tile(self):
+        # EvenniaTest's own setUp wires a default "out" exit room1 -> room2;
+        # room2 is left unplaced here.
+        self.assertIsNone(self._tile_for(self.room1)["portal_plane_id"])
+
+    def test_no_portal_into_an_archived_plane(self):
+        # The API hides archived planes, so a marker pointing at one would
+        # navigate to a 404.
+        placement.place_tile(self.room2, self.interior, 0, 0)
+        self._make_exit("in", self.room1, self.room2)
+        self.interior.archive()
+        self.assertIsNone(self._tile_for(self.room1)["portal_plane_id"])
+
+    def test_portal_hidden_when_the_destination_room_is_secret(self):
+        # The overworld tile itself stays visible; only the interior room is
+        # secret, so the portal must not name it by the back door.
+        placement.place_tile(self.room2, self.interior, 0, 0)
+        self.room2.db.allow_teleport = "secret"
+        self._make_exit("in", self.room1, self.room2)
+        self.assertIsNone(self._tile_for(self.room1, client=self.client2)["portal_plane_id"])

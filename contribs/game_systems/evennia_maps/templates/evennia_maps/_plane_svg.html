@@ -1,0 +1,64 @@
+{% comment %}
+  Renders one plane's SVG tile grid.
+
+  Variables:
+    svg — required — the dict built by evennia_maps.views.build_svg_context():
+      tiles      — [{x, y, room_id, room_name, terrain, sprite, region,
+                     region_url, latest_scene, latest_scene_url,
+                     svg_x, svg_y}]
+      tile_size  — pixel size of one tile
+      svg_width, svg_height — total SVG dimensions
+
+  region / latest_scene are only populated when the contribs that own them
+  (evennia_regions, evennia_scenes) are installed and providing overlays,
+  and their links only render when those contribs' URLs are mounted — see
+  evennia_maps/overlays.py. The grid itself never depends on either.
+
+  If svg is falsy (no visible tiles), the caller renders its own empty
+  state — this partial renders nothing.
+
+  Reusable: a game or contrib drawing a mini-map of some subset of tiles
+  can build its own context with build_svg_context() and include this.
+{% endcomment %}
+{% if svg %}
+<div class="evennia-maps-scroll" role="region" aria-label="Map" tabindex="0">
+  <svg class="evennia-maps-svg"
+       viewBox="0 0 {{ svg.svg_width }} {{ svg.svg_height }}"
+       width="{{ svg.svg_width }}" height="{{ svg.svg_height }}"
+       xmlns="http://www.w3.org/2000/svg">
+    {% for tile in svg.tiles %}
+    <g class="evennia-maps-tile" data-terrain="{{ tile.terrain|default:'plain' }}">
+      <title>{{ tile.room_name }}{% if tile.region %} &mdash; {{ tile.region.name }}{% endif %}</title>
+      {% if tile.sprite %}
+      <image href="{{ tile.sprite }}"
+             x="{{ tile.svg_x }}" y="{{ tile.svg_y }}"
+             width="{{ svg.tile_size }}" height="{{ svg.tile_size }}" />
+      {% else %}
+      <rect x="{{ tile.svg_x }}" y="{{ tile.svg_y }}"
+            width="{{ svg.tile_size }}" height="{{ svg.tile_size }}"
+            class="evennia-maps-fallback" />
+      {% endif %}
+    </g>
+    {% endfor %}
+  </svg>
+</div>
+
+<ul class="evennia-maps-legend list-unstyled small mt-2">
+  {% for tile in svg.tiles %}
+  <li class="evennia-maps-legend-item">
+    <span class="text-muted">({{ tile.x }}, {{ tile.y }})</span>
+    <strong>{{ tile.room_name }}</strong>
+    {% if tile.region %}
+      {% if tile.region_url %}
+      <a href="{{ tile.region_url }}" class="ms-1">{{ tile.region.name }}</a>
+      {% else %}
+      <span class="text-muted ms-1">{{ tile.region.name }}</span>
+      {% endif %}
+    {% endif %}
+    {% if tile.latest_scene_url %}
+    <a href="{{ tile.latest_scene_url }}" class="ms-1">Recent log</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

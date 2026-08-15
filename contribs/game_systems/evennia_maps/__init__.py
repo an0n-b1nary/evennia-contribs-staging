@@ -15,8 +15,9 @@ Signals (eagerly exported — plain Signal() objects, safe at app-load time):
     tile_placed
     tile_conflicted
     terrain_changed
-    collect_tile_overlays   — reserved for the web tile-overlay seam
-                              (a later phase of this extraction)
+    collect_tile_overlays   — the web tile-overlay seam: sent once per map
+                              render, answered by whichever partner
+                              contribs are installed (see overlays.py)
 
 Commands (import explicitly):
 
@@ -26,13 +27,15 @@ Room mixin (import explicitly, mix into your Room typeclass):
 
     from evennia_maps.typeclasses import MapsRoomMixin
 
-This is the core phase of the extraction: models, geometry (direction,
-terrain, placement, layout), commands, listeners, and the room mixin.
-Website views, the DRF API, and the SVG/Leaflet static assets land in a
-later phase — see MIGRATION_NOTES.md.
+Web surface (requires the [web] extra; import explicitly so a game running
+headless never pulls in Django REST Framework):
+
+    evennia_maps.urls        — website routes (/map/, /map/<pk>/, .../live/)
+    evennia_maps.api.urls    — DRF router (planes + nested tiles)
+    evennia_maps.overlays    — the collect_tile_overlays seam and its contract
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from evennia_maps.signals import (
     collect_tile_overlays,
