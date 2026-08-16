@@ -86,6 +86,35 @@ partner and its layer is simply absent. `world/sandbox/tests.py`
 (`TestMapOverlaySeam`) is the end-to-end proof, and it can only live here: no
 contrib's own suite installs the other three.
 
+### Playtester controls (`+sandbox`)
+
+`commands/sandbox.py` is the game's only local command, and it is demo-only
+glue no real game should copy: `+sandbox/builder on` adds the `Builder`
+permission to the caller's own account and puppet, `off` removes it.
+
+Every contrib defaults its staff lock to `perm(Builder)` (the `*_STAFF_LOCK`
+block in `server/conf/settings.py`), so this one toggle is the whole staff/
+player split. It is a toggle rather than a blanket promotion precisely
+because the player half — the lore approval queue seen from the submitting
+side, the anonymised job submitter, read-only boards, the `+plot`/`+arc`
+divide — is half of what there is to demo.
+
+Two things the command's own output says, worth repeating here:
+
+- **A superuser bypasses every lock**, so `+sandbox/builder off` will not
+  show Account #1 the player experience. `quell` first (`unquell` to
+  restore) — which is also why the toggle writes the permission to the puppet
+  as well as the account: under quell, Evennia's `perm()` takes the *minimum*
+  of the two.
+- **Only `+jobs`, `+discuss` and `+rptracker` are locked at the class level.**
+  Every other contrib is `cmd:all()` and checks its staff lock inside
+  `func()`, so those three are the ones that visibly appear and disappear
+  from `help` as the toggle flips.
+
+`+sandbox/reset` is held at `perm(Admin)` — deliberately above what the
+toggle hands out, since a Builder-level gate would be no gate at all when
+anyone can become a Builder. See [Resetting](#resetting).
+
 ---
 
 ## Local dry-run (before touching the droplet)
@@ -497,8 +526,13 @@ droplet" configuration:
 
 ## Resetting
 
-Two mechanisms, for two different needs:
+Three mechanisms, for three different needs:
 
+- **`+sandbox/reset`** (in-game, `perm(Admin)`) — runs `seed_sandbox`
+  in-process, so no restart and nobody is disconnected. Reports how many
+  rooms were made by hand and therefore survive the purge; anyone standing in
+  a purged room is sent home to the Sandbox Plaza. This is the one to use
+  during a playtest.
 - **`evennia seed_sandbox`** — content-only. Purges and rebuilds the default
   rooms/exits/board/calendar-event/lore/plot content plus the region, the map
   plane and its tiles, and the two scenes that light the tile overlays
@@ -520,29 +554,46 @@ Two mechanisms, for two different needs:
    errors: `+bb`, `+calendar`, `+request`, `+lore`, `+plot`, `+xp`,
    `+activity`, `+scene`, `+pot`, `+lastpose`, `+finger`, `+where`,
    `+hangouts`, `+region`, `+map`, `page`.
-4. **Seams fire** — pose in a seeded room; the pose fires evennia_posing's
+4. **A new account lands in the world** — register a fresh account (not
+   Account #1, which is a superuser and bypasses every lock) and confirm it
+   spawns in the Sandbox Plaza rather than stock Limbo, and that `+ooc` moves
+   it to the OOC Nexus. This is the whole `START_LOCATION`/`DEFAULT_HOME`/
+   `OOC_ROOM_DBREF` arrangement, end to end.
+5. **The Builder toggle flips both halves** — as that fresh account, run
+   `help` and note that `+jobs`, `+discuss` and `+rptracker` are absent; run
+   `+sandbox/builder on` and confirm all three appear and that
+   `+map/place`/`+region/create` stop refusing; run `@dig north=A New Room`
+   and confirm the map grew on its own, then `@dig gate=Another Room` and
+   confirm it did not. `+sandbox/builder off` puts it all back.
+6. **Seams fire** — pose in a seeded room; the pose fires evennia_posing's
    `pose_recorded` signal, which the listener in `world/sandbox/glue.py`
    fans out to `capture_to_scene` and `record_rp_activity` — confirm with
    `+activity` (shows a tracked RP session) and `+scene` after `+scene/open`
    (shows the auto-captured pose).
-5. **Seeder is idempotent** — run `evennia seed_sandbox` twice; no
+7. **Seeder is idempotent** — run `evennia seed_sandbox` twice; no
    duplicate rooms/boards/entries.
-6. **Golden reset works** — make a throwaway change, run
+8. **In-game reset works** — after step 5 dug a room or two, run
+   `+sandbox/reset` as staff: the seeded world comes back, your account and
+   character survive, and the reported count of hand-made rooms matches what
+   you dug.
+9. **Golden reset works** — make a throwaway change, run
    `scripts/reset_to_golden.sh`, confirm the world is back to default.
    (Requires the snapshot from step 6 above; see the note there.)
-7. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`;
-   `/map/<pk>/` draws the six seeded rooms as an SVG plus grid, with the
-   Archive north of the Plaza; `/map/<pk>/live/` loads Leaflet with the
-   elevation control. This is the one step no test replaces: a static SVG
-   page and a client-side Leaflet render fail in different ways.
-8. **Overlays light up and link out** — on the live map, toggle the overlay
-   controls: the Consulate Hall shows an active-scene pin and an upcoming
-   event, the Archive shows heat and a recent log, every tile is labelled
-   with `The Commons`. Click through a tile popup to the region, the scene
-   log and the event page.
-9. **A missing partner degrades, it does not break** — `pip uninstall
-   evennia-calendar`, drop it from `INSTALLED_APPS` and from
-   `web/website/urls.py`, restart, and confirm the map still renders with the
-   events overlay simply absent. This is the whole point of the signal gating
-   and no unit test covers it, because a test process cannot uninstall an
-   app. Reinstall afterwards.
+10. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`;
+    `/map/<pk>/` draws the six *mapped* rooms as an SVG plus grid, with the
+    Archive north of the Plaza. The OOC Nexus is deliberately absent: it hangs
+    off a direction-less flavor exit, so `layout.plan()` never reaches it.
+    `/map/<pk>/live/` loads Leaflet with the elevation control. This is the
+    one step no test replaces: a static SVG page and a client-side Leaflet
+    render fail in different ways.
+11. **Overlays light up and link out** — on the live map, toggle the overlay
+    controls: the Consulate Hall shows an active-scene pin and an upcoming
+    event, the Archive shows heat and a recent log, every tile is labelled
+    with `The Commons`. Click through a tile popup to the region, the scene
+    log and the event page.
+12. **A missing partner degrades, it does not break** — `pip uninstall
+    evennia-calendar`, drop it from `INSTALLED_APPS` and from
+    `web/website/urls.py`, restart, and confirm the map still renders with the
+    events overlay simply absent. This is the whole point of the signal gating
+    and no unit test covers it, because a test process cannot uninstall an
+    app. Reinstall afterwards.

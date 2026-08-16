@@ -24,6 +24,7 @@ from evennia_rptracker.commands import CmdActivity, CmdRPTrackerStaff
 from evennia_scenes.commands import CmdLog, CmdScene
 from evennia_xp.commands import CmdXp
 
+from commands.sandbox import CmdSandbox
 from evennia_maps.commands import CmdMap
 from evennia_posing.commands import (
     CmdEmit,
@@ -137,6 +138,11 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdIssue)
         self.add(CmdDiscuss)
         self.add(CmdJobs)
+
+        # Demo-only: lets a playtester promote themselves to Builder and back,
+        # so one account can see both halves of every contrib's staff lock.
+        # Not something to copy into a real game.
+        self.add(CmdSandbox)
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
