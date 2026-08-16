@@ -503,6 +503,58 @@ expires. Set a reminder.
 
 ---
 
+## Updating a live droplet
+
+Steps 0–8 are a first install. Once the service is running, a code update is
+this, as `contrib_sandbox`:
+
+```bash
+cd ~/sandbox/evennia-contribs-staging
+git pull
+```
+
+`server/conf/secret_settings.py` is gitignored, so the real hostname survives
+a pull untouched.
+
+Then `sudo systemctl restart evennia-sandbox`, plus whatever the pull actually
+touched:
+
+| What changed | What it needs first |
+|---|---|
+| Commands, typeclasses, anything under `world/` | Nothing — the restart is enough |
+| A contrib's `models.py` (a new migration) | `evennia migrate` |
+| A contrib's `pyproject.toml` (a new dependency) | `pip install -e contribs/<group>/<name>` |
+
+Restart rather than `evennia reload`, and the distinction is worth knowing
+because it is not the one people expect. Reload does start a *fresh* Server
+process, so Server-side settings are re-read — but the Portal is left running
+with the copy it loaded at boot, so anything the Portal owns (the telnet and
+webserver ports, `WEBSOCKET_CLIENT_URL`, SSL) keeps the old value. Under
+systemd the service's own `restart` cycles both, so it is never the wrong
+answer.
+
+Seed content last, from **inside the game** rather than the shell:
+
+```
++sandbox/reset
+```
+
+The in-game reset runs `seed_sandbox` in the Server's own process. The shell
+form (`evennia seed_sandbox`) opens a second connection to the same SQLite
+file while the server holds it, which can block on a write lock — and the
+running server would keep serving cached typeclass instances for rooms the
+other process just deleted. Neither problem exists in-process. Use the shell
+form only when the service is stopped.
+
+A reset that follows a `START_LOCATION` change will move players: characters
+standing in a purged room are sent to `DEFAULT_HOME`, which is the room the
+seeder re-dresses into the Plaza. That is the intended landing, not a bug.
+
+Confirm with `sudo systemctl status evennia-sandbox` (want `active (running)`)
+and by reconnecting; `journalctl -u evennia-sandbox -n 40` if not.
+
+---
+
 ## Troubleshooting (hard-won)
 
 Symptoms we actually hit deploying this, most in the "two Evennia games, one
