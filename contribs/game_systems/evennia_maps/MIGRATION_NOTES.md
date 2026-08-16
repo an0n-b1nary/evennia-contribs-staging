@@ -20,7 +20,7 @@ website, the REST API, the static assets and the tile-overlay seam.
 | `commands/maps.py` | `commands.py` | Copy; hardcoded `perm(Builder)` check replaced with `permissions.is_staff()` resolving `MAPS_STAFF_LOCK`, matching the `evennia-regions` convention; error strings changed from "Builder permissions" to "staff permissions" to match |
 | `typeclasses/rooms.py` (terrain slice) | `typeclasses.py` (`MapsRoomMixin`) | New module — the source game's Room typeclass declares `terrain_tags`/`set_terrain`/`has_terrain` directly; a contrib cannot patch the game's Room, so this ships as a mixin, the same shape as `evennia_posing.PosingRoomMixin` / `evennia_social.SocialRoomMixin` |
 | — | `permissions.py` | New module — `is_staff()` resolving `MAPS_STAFF_LOCK`, plus (0.2.0) `is_staff_user`, `is_room_web_visible` + `MAPS_ROOM_VISIBILITY`, and `read_room_attr`. Mirrors `evennia_regions.permissions` |
-| `web/website/views/maps.py` | `views.py` | Copy; the source game's direct `Region`/`Scene` imports replaced by the overlay seam (below). `PlaneListView`/`PlaneMapView` now hide archived planes |
+| `web/website/views/maps.py` | `views.py` | Copy; the source game's direct `Region`/`Scene` imports replaced by the overlay seam (below). The archive exclusion is written out explicitly rather than left to the default manager (below) |
 | `web/api/views.py` (`PlaneViewSet`), `serializers.py`, `filters.py`, `pagination.py` | `api/` | Split out of the source game's shared API modules into a self-contained package with its own auth/permission/pagination/filter classes |
 | `web/templates/website/plane_*.html`, `partials/_plane_svg.html` | `templates/evennia_maps/` | Copy; `cov-*` CSS classes renamed `evennia-maps-*`, breadcrumbs moved into the content block, sekizai `addtoblock` replaced (below) |
 | `web/static/website/{js/cov_map.js,css/cov_map.css}` + `cov.css` §15 | `static/evennia_maps/` | Merged: the source game kept the SVG map's styles in its global stylesheet and only the Leaflet styles in a separate file. The contrib ships both in one self-contained file with no CSS custom properties, since a contrib cannot assume a host game defines any |
@@ -88,10 +88,15 @@ belong to other contribs that may not be installed, so the contrib reverses them
 `MAPS_OVERLAY_URL_NAMES` and renders plain text where a route does not resolve. Same shape
 for the tile feed via `MAPS_TILES_URL_NAME`.
 
-**Archived planes are hidden everywhere.** The source game's list and detail web views
-served archived planes while its API filtered them out. The contrib filters everywhere —
-`AbstractArchived` exists to make a plane disappear, and a portal marker pointing at an
-archived plane would navigate to a 404 either way. Worth reconciling in the source game.
+**Archived planes are excluded explicitly, not left to the manager.** Every plane
+queryset in `views.py` and `api/` spells out `.filter(is_archived=False)`. Today that is
+redundant in both codebases — `AbstractArchived.objects` already excludes archived rows,
+in `evennia_links` exactly as in the source game's `world/utils/archiving.py` — and it is
+written out anyway because a contrib cannot see what a host game does to the model it
+installs. The cost is one clause on an indexed boolean; the failure it forecloses is a
+map that publishes planes the operator archived. The portal-marker code, which the source
+game has no equivalent of, additionally checks the *destination* plane, so a marker cannot
+route a visitor to an archived plane's 404.
 
 **Terrain sprites namespaced.** `TERRAIN_TILESET` → `MAPS_TERRAIN_TILESET`, for the same
 reason `MAPS_TERRAIN_PRECEDENCE` and `MAPS_DIRECTION_OFFSETS` were namespaced in 0.1.0.

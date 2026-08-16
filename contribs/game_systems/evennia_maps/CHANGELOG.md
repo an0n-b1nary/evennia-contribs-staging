@@ -40,6 +40,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   between this contrib and `evennia-regions` — and drops a stale note calling
   `collect_tile_overlays` unconnected, which stopped being true in 0.2.0.
 
+- **Docs, corrected:** `MIGRATION_NOTES.md` claimed the source game's plane list and
+  detail views served archived planes and only its API filtered them. They did not — its
+  `AbstractArchived` default manager excludes archived rows, the same as
+  `evennia_links`', and its `PlaneListView` docstring says so. The real divergence is
+  narrower: this contrib writes `.filter(is_archived=False)` out explicitly instead of
+  trusting a manager the host game is free to replace. Rewritten to say that instead.
+
 ---
 
 ## [0.2.0] — 2026-08-15 — web surface
