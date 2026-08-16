@@ -14,4 +14,24 @@ class ScenesConfig(AppConfig):
     verbose_name = "Evennia Scenes"
 
     def ready(self):
+        from django.apps import apps
+        from django.conf import settings
+
         import evennia_scenes.signals  # noqa: F401
+
+        # --- maps: offer the scene tile overlays ---
+        maps_label = getattr(settings, "SCENES_MAPS_APP_LABEL", "evennia_maps")
+        if apps.is_installed(maps_label) or any(
+            cfg.label == maps_label for cfg in apps.get_app_configs()
+        ):
+            # Imported inside the branch so a game without the map never
+            # imports evennia_maps. dispatch_uid rather than the plain
+            # connect_on_ready() helper: this is the wiring evennia_maps'
+            # own README documents for providers, and it keeps a reloaded
+            # module from registering the receiver twice.
+            from evennia_maps.signals import collect_tile_overlays
+            from evennia_scenes.integrations import maps as maps_overlays
+
+            collect_tile_overlays.connect(
+                maps_overlays.provide, dispatch_uid="evennia_scenes.tile_overlays"
+            )

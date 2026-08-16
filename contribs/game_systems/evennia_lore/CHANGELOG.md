@@ -7,7 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-08-15 — map tile overlay
+
+- **Added:** `integrations/maps.py` — the `has_lore` map tile overlay. With
+  `evennia-maps` installed, `LoreConfig.ready()` connects the provider to its
+  `collect_tile_overlays` signal and mapped rooms whose primary region has readable
+  lore gain a pin. Two queries for the whole grid; nothing to configure; nothing
+  imported when the map is absent. New `LORE_MAPS_APP_LABEL` setting (default
+  `"evennia_maps"`).
+
+  Lore attaches to *regions* and the map draws *rooms*, so the provider resolves the
+  room→region step itself through the existing `LORE_REGIONS_APP_LABEL` gate; with
+  regions absent the overlay is empty rather than broken. The pin uses the passive
+  pool's own eligibility — PUBLISHED + PUBLIC + not archived — for staff and visitors
+  alike: it names no entry, it is drawn on a public page, and widening it for staff
+  would only make the map disagree with the compendium. Lore attached to an archived
+  region does not light a tile, matching the region page's own 404.
 
 - **Fixed:** the documentation comments at the top of `_empty_state.html` and
   `_pagination.html` spanned multiple lines. Django's template tag regex is not

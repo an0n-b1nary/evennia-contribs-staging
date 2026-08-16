@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-regions"
-version = "0.1.1"
+version = "0.2.0"
 description = "Geographic grouping of rooms into named regions, with soft-archive and web views, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -38,11 +38,17 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_regions", "evennia_regions.migrations", "evennia_regions.api"]
+packages = [
+    "evennia_regions",
+    "evennia_regions.migrations",
+    "evennia_regions.integrations",
+    "evennia_regions.api",
+]
 
 [tool.setuptools.package-dir]
 "evennia_regions" = "."
 "evennia_regions.migrations" = "migrations"
+"evennia_regions.integrations" = "integrations"
 "evennia_regions.api" = "api"
 
 [tool.setuptools.package-data]

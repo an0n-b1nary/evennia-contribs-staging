@@ -66,3 +66,18 @@ class LoreConfig(AppConfig):
                 connect_soft_ref_cleanup(Region, LoreRegionLink, "region_id")
             except Exception:
                 pass
+
+        # --- maps: offer the has_lore tile overlay ---
+        maps_label = getattr(settings, "LORE_MAPS_APP_LABEL", "evennia_maps")
+        if _app_present(maps_label):
+            # Imported inside the branch so a game without the map never
+            # imports evennia_maps. dispatch_uid rather than the plain
+            # connect_on_ready() helper: this is the wiring evennia_maps'
+            # own README documents for providers, and it keeps a reloaded
+            # module from registering the receiver twice.
+            from evennia_lore.integrations import maps as maps_overlays
+            from evennia_maps.signals import collect_tile_overlays
+
+            collect_tile_overlays.connect(
+                maps_overlays.provide, dispatch_uid="evennia_lore.tile_overlays"
+            )

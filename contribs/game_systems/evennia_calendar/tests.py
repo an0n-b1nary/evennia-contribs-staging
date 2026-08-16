@@ -17,9 +17,11 @@ Run with:
 
 import datetime
 import random
+import unittest
 from importlib import import_module
 from unittest.mock import patch
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
@@ -29,6 +31,7 @@ from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
+from evennia_calendar.integrations import maps as maps_overlays
 from evennia_calendar.models import (
     RSVP,
     CalendarEvent,
@@ -38,6 +41,7 @@ from evennia_calendar.models import (
     EventExclusion,
     EventTag,
     PriorityToken,
+    SceneCalendarLink,
 )
 from evennia_calendar.scheduler import (
     expire_unconfirmed,
@@ -1409,4 +1413,135 @@ class TestCalendarEventViewSet(EvenniaTest):
             required_fields,
             declared,
             f"Serializer fields mismatch. Missing: {required_fields - declared}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Maps integration: the upcoming_events tile overlay
+# ---------------------------------------------------------------------------
+
+
+@unittest.skipUnless(apps.is_installed("evennia_scenes"), "requires evennia_scenes")
+class TestMapsOverlayProvider(EvenniaTest):
+    """
+    The upcoming_events overlay.
+
+    Behaviour is tested by calling provide() directly, so these cases run
+    whether or not evennia_maps is installed — the provider module imports
+    nothing from it. They do need evennia_scenes: an event has no room of
+    its own and reaches the map only through a linked scene, which is its
+    own case below.
+    """
+
+    def _scene_in(self, room, *, title="Harbour Watch"):
+        Scene = apps.get_model("evennia_scenes", "Scene")
+        return Scene.objects.create(
+            title=title,
+            room=room,
+            room_name=room.key,
+            creator=self.char1,
+            creator_name=self.char1.key,
+        )
+
+    def _linked_event(self, room, *, title="Midsummer Fair", **kwargs):
+        event = _make_event(self.char1, title=title, **kwargs)
+        SceneCalendarLink.objects.create(event=event, scene_id=self._scene_in(room).pk)
+        return event
+
+    def _provide(self, *rooms, staff=False):
+        rooms = rooms or (self.room1,)
+        return maps_overlays.provide(sender=None, room_ids=[room.id for room in rooms], staff=staff)
+
+    def test_upcoming_event_reaches_the_room_through_its_scene(self):
+        event = self._linked_event(self.room1)
+        self.assertEqual(
+            self._provide()["upcoming_events"][self.room1.id],
+            [{"id": event.pk, "title": "Midsummer Fair"}],
+        )
+
+    def test_event_with_no_linked_scene_is_absent(self):
+        _make_event(self.char1)
+        self.assertEqual(self._provide()["upcoming_events"], {})
+
+    def test_event_in_another_room_is_absent(self):
+        self._linked_event(self.room2)
+        self.assertEqual(self._provide(self.room1)["upcoming_events"], {})
+
+    def test_past_event_is_absent(self):
+        self._linked_event(self.room1, hours=-2)
+        self.assertEqual(self._provide()["upcoming_events"], {})
+
+    def test_cancelled_event_is_absent(self):
+        event = self._linked_event(self.room1)
+        event.is_cancelled = True
+        event.save()
+        self.assertEqual(self._provide()["upcoming_events"], {})
+
+    def test_staff_event_is_withheld_from_visitors(self):
+        # is_staff_event exists to stop staff-run events being
+        # visible-but-unjoinable to everyone; a map pin would undo that.
+        event = _make_staff_event(self.char1)
+        SceneCalendarLink.objects.create(event=event, scene_id=self._scene_in(self.room1).pk)
+        self.assertEqual(self._provide()["upcoming_events"], {})
+        self.assertEqual(
+            self._provide(staff=True)["upcoming_events"][self.room1.id],
+            [{"id": event.pk, "title": "Staff Event"}],
+        )
+
+    def test_events_are_listed_soonest_first(self):
+        later = self._linked_event(self.room1, title="Later", hours=72)
+        sooner = self._linked_event(self.room1, title="Sooner", hours=12)
+        self.assertEqual(
+            [entry["id"] for entry in self._provide()["upcoming_events"][self.room1.id]],
+            [sooner.pk, later.pk],
+        )
+
+    def test_empty_room_ids_returns_nothing(self):
+        self.assertEqual(maps_overlays.provide(sender=None, room_ids=[], staff=False), {})
+
+    def test_query_count_is_flat_in_room_count(self):
+        # The whole overlay design rests on this: one map render, a fixed
+        # number of queries, no matter how big the plane.
+        self._linked_event(self.room1)
+        self._linked_event(self.room2, title="Elsewhere")
+        with self.assertNumQueries(2):
+            self._provide(self.room1)
+        with self.assertNumQueries(2):
+            self._provide(self.room1, self.room2)
+
+
+class TestMapsOverlayWithoutScenes(EvenniaTest):
+    """With no scenes app an event has no way to reach a room."""
+
+    def test_provider_returns_an_empty_overlay(self):
+        _make_event(self.char1)
+        with patch.object(maps_overlays, "_scene_model", return_value=None):
+            overlays = maps_overlays.provide(sender=None, room_ids=[self.room1.id], staff=False)
+        self.assertEqual(overlays, {"upcoming_events": {}})
+
+
+@unittest.skipUnless(
+    apps.is_installed("evennia_maps") and apps.is_installed("evennia_scenes"),
+    "requires evennia_maps and evennia_scenes",
+)
+class TestMapsOverlayWiring(EvenniaTest):
+    """CalendarConfig.ready() connected the provider to the map's collector."""
+
+    def test_map_collects_the_event_overlay(self):
+        from evennia_maps.overlays import collect_overlays
+
+        Scene = apps.get_model("evennia_scenes", "Scene")
+        scene = Scene.objects.create(
+            title="Harbour Watch",
+            room=self.room1,
+            room_name=self.room1.key,
+            creator=self.char1,
+            creator_name=self.char1.key,
+        )
+        event = _make_event(self.char1, title="Midsummer Fair")
+        SceneCalendarLink.objects.create(event=event, scene_id=scene.pk)
+        overlays = collect_overlays([self.room1.id], staff=False)
+        self.assertEqual(
+            overlays["upcoming_events"][self.room1.id],
+            [{"id": event.pk, "title": "Midsummer Fair"}],
         )

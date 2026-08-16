@@ -1527,13 +1527,31 @@ class TestCmdMapCheck(MapsCommandTestCase):
 
 
 @contextlib.contextmanager
-def _provider(fn):
-    """Connect *fn* to collect_tile_overlays for the duration of the block."""
-    collect_tile_overlays.connect(fn, dispatch_uid="evennia_maps.tests.provider")
+def _provider(*fns):
+    """
+    Run the block with *exactly* ``fns`` connected to collect_tile_overlays.
+
+    Not merely "connect this one as well". Any partner contrib installed in
+    the same game connected its real provider at startup, and a real
+    provider answers every collect — with empty dicts when it has no data
+    for those rooms. These cases are about the seam itself, so they detach
+    whatever the host game wired up and restore it afterwards. Written the
+    other way, a maps suite asserting on the shape of the whole merge would
+    go red the moment a partner ships, which is the opposite of what the
+    seam is for.
+
+    Called with no arguments it isolates the block from every provider.
+    """
+    saved = collect_tile_overlays.receivers
+    collect_tile_overlays.receivers = []
+    collect_tile_overlays.sender_receivers_cache.clear()
     try:
+        for fn in fns:
+            collect_tile_overlays.connect(fn, dispatch_uid=f"evennia_maps.tests.{fn.__name__}")
         yield
     finally:
-        collect_tile_overlays.disconnect(fn, dispatch_uid="evennia_maps.tests.provider")
+        collect_tile_overlays.receivers = saved
+        collect_tile_overlays.sender_receivers_cache.clear()
 
 
 def _full_provider(sender, room_ids, staff, **kwargs):
@@ -1567,7 +1585,8 @@ class TestCollectOverlays(MapsTestCase):
     """collect_overlays() merges provider answers and degrades, never raises."""
 
     def test_no_providers_returns_empty(self):
-        self.assertEqual(collect_overlays([self.room1.id], staff=False), {})
+        with _provider():
+            self.assertEqual(collect_overlays([self.room1.id], staff=False), {})
 
     def test_provider_contribution_is_merged(self):
         with _provider(_full_provider):
@@ -1829,7 +1848,8 @@ class TestPlaneMapView(MapsWebTestCase):
 
     def test_tile_has_no_partner_data_without_providers(self):
         placement.place_tile(self.room1, self.plane, 0, 0)
-        tile = self._context(AnonymousUser())["svg"]["tiles"][0]
+        with _provider():
+            tile = self._context(AnonymousUser())["svg"]["tiles"][0]
         self.assertIsNone(tile["region"])
         self.assertIsNone(tile["latest_scene"])
         self.assertEqual(tile["region_url"], "")
@@ -1891,6 +1911,18 @@ class TestSvgContextQueryCost(MapsWebTestCase):
                 placement.place_tile(_make_room(f"Grid {i}"), self.plane, i + 1, 0)
             large = self._render()
         self.assertEqual(small, large)
+
+    def test_query_count_is_flat_with_the_real_providers_installed(self):
+        # The case above proves the *map* asks once. This one proves the
+        # answer stays flat with whatever partner contribs this game
+        # actually installed and wired up — the fake provider cannot show
+        # that, and an N+1 introduced inside a real provider is exactly the
+        # regression the seam is most exposed to.
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        small = self._render()
+        for i in range(5):
+            placement.place_tile(_make_room(f"Real grid {i}"), self.plane, i + 1, 0)
+        self.assertEqual(small, self._render())
 
 
 class TestPlaneLiveMapView(MapsWebTestCase):
@@ -2093,7 +2125,8 @@ class TestPlaneTilesApi(MapsApiTestCase):
     def test_overlay_fields_have_empty_values_with_no_providers(self):
         # Every field is present whatever the game installed, so a frontend
         # never has to know which partner contribs are around.
-        tile = self._tiles(self.client)[0]
+        with _provider():
+            tile = self._tiles(self.client)[0]
         self.assertIsNone(tile["primary_region_id"])
         self.assertFalse(tile["has_active_scene"])
         self.assertFalse(tile["has_lore"])

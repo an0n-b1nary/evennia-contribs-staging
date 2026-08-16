@@ -164,6 +164,26 @@ gated on `LORE_REGIONS_APP_LABEL` (default `"evennia_regions"`) — no configura
 the regions side. Other partner contribs may connect to the `region_created` signal
 (`from evennia_regions import region_created`), which ships with zero receivers.
 
+### The map tile overlay
+
+Install `evennia-maps` alongside this contrib and every mapped room gains a region label
+linking to its region page. There is nothing to configure: `RegionsConfig.ready()` sees the
+map, connects `evennia_regions.integrations.maps.provide` to its `collect_tile_overlays`
+signal, and answers with
+
+```python
+{"primary_region": {room_id: {"id": ..., "name": ...}}}
+```
+
+one query for the whole grid. Without `evennia-maps` installed nothing is imported and
+nothing is connected.
+
+The answer follows `RegionMembership.primary_for()` — flagged primary first, then earliest
+membership — with **one deliberate difference: archived regions are skipped**. A region's
+detail page 404s once it is archived, so a room whose flagged primary is archived falls
+through to its next visible membership rather than linking the map to a dead page. Set
+`REGIONS_MAPS_APP_LABEL` if your game registers the maps app under a different label.
+
 ---
 
 ## Version history

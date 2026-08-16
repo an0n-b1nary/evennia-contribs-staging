@@ -24,9 +24,11 @@ Run:
     evennia test evennia_regions --settings settings.py
 """
 
+import unittest
 from importlib import import_module
 from unittest.mock import patch
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
@@ -37,6 +39,7 @@ from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_regions.commands import CmdRegion
+from evennia_regions.integrations import maps as maps_overlays
 from evennia_regions.models import Region, RegionMembership
 from evennia_regions.permissions import is_room_web_visible
 from evennia_regions.views import RegionDetailView, RegionListView
@@ -765,3 +768,110 @@ class TestWebPagesRender(EvenniaTest):
         bare = _make_region("Nameless Waste", description="")
         html = self._render(RegionDetailView, path_=f"/regions/{bare.pk}/", pk=bare.pk)
         self.assertIn("(No description.)", html)
+
+
+# ---------------------------------------------------------------------------
+# Maps integration: the primary_region tile overlay
+# ---------------------------------------------------------------------------
+
+
+class TestMapsOverlayProvider(EvenniaTest):
+    """
+    The primary_region overlay provider.
+
+    Behaviour is tested by calling provide() directly, so these cases run
+    whether or not evennia_maps is installed — the provider module imports
+    nothing from it. The wiring is asserted separately below.
+    """
+
+    def _provide(self, *rooms, staff=False):
+        return maps_overlays.provide(sender=None, room_ids=[room.id for room in rooms], staff=staff)
+
+    def test_room_with_a_membership_gets_its_region(self):
+        region = _make_region("The Grasslands")
+        RegionMembership.objects.create(region=region, room=self.room1)
+        overlays = self._provide(self.room1)
+        self.assertEqual(
+            overlays["primary_region"][self.room1.id],
+            {"id": region.pk, "name": "The Grasslands"},
+        )
+
+    def test_room_without_a_membership_is_absent(self):
+        _make_region("The Grasslands")
+        self.assertEqual(self._provide(self.room1), {"primary_region": {}})
+
+    def test_flagged_primary_wins_over_an_earlier_membership(self):
+        first = _make_region("The Kingdom")
+        second = _make_region("The Fief")
+        RegionMembership.objects.create(region=first, room=self.room1)
+        RegionMembership.objects.create(region=second, room=self.room1, is_primary=True)
+        overlays = self._provide(self.room1)
+        self.assertEqual(overlays["primary_region"][self.room1.id]["id"], second.pk)
+
+    def test_answer_agrees_with_primary_for(self):
+        # The bulk path and primary_for() must not drift apart; that they
+        # order identically is the only reason a scalar consumer and the map
+        # ever name the same region.
+        first = _make_region("The Kingdom")
+        second = _make_region("The Fief")
+        RegionMembership.objects.create(region=first, room=self.room1)
+        RegionMembership.objects.create(region=second, room=self.room1)
+        overlays = self._provide(self.room1)
+        self.assertEqual(
+            overlays["primary_region"][self.room1.id]["id"],
+            RegionMembership.primary_for(self.room1.id).region_id,
+        )
+
+    def test_archived_region_is_skipped_for_the_next_visible_one(self):
+        # An archived region 404s on its own detail page, so linking a tile
+        # to it would be worse than showing the room's other region.
+        archived = _make_region("Sunken Vale")
+        visible = _make_region("The Grasslands")
+        RegionMembership.objects.create(region=archived, room=self.room1, is_primary=True)
+        RegionMembership.objects.create(region=visible, room=self.room1)
+        # While it is visible the flagged primary wins, as primary_for() says.
+        overlays = self._provide(self.room1)
+        self.assertEqual(overlays["primary_region"][self.room1.id]["id"], archived.pk)
+        archived.archive()
+        overlays = self._provide(self.room1)
+        self.assertEqual(overlays["primary_region"][self.room1.id]["id"], visible.pk)
+
+    def test_room_whose_only_region_is_archived_is_absent(self):
+        archived = _make_region("Sunken Vale")
+        RegionMembership.objects.create(region=archived, room=self.room1)
+        archived.archive()
+        self.assertEqual(self._provide(self.room1), {"primary_region": {}})
+
+    def test_staff_flag_does_not_change_the_answer(self):
+        region = _make_region("The Grasslands")
+        RegionMembership.objects.create(region=region, room=self.room1)
+        self.assertEqual(
+            self._provide(self.room1, staff=False), self._provide(self.room1, staff=True)
+        )
+
+    def test_empty_room_ids_returns_nothing(self):
+        self.assertEqual(maps_overlays.provide(sender=None, room_ids=[], staff=False), {})
+
+    def test_query_count_is_flat_in_room_count(self):
+        # The whole overlay design rests on this: one map render, one query
+        # per overlay, no matter how big the plane.
+        region = _make_region("The Grasslands")
+        RegionMembership.objects.create(region=region, room=self.room1)
+        RegionMembership.objects.create(region=region, room=self.room2)
+        with self.assertNumQueries(1):
+            self._provide(self.room1)
+        with self.assertNumQueries(1):
+            self._provide(self.room1, self.room2)
+
+
+@unittest.skipUnless(apps.is_installed("evennia_maps"), "requires evennia_maps")
+class TestMapsOverlayWiring(EvenniaTest):
+    """RegionsConfig.ready() connected the provider to the map's collector."""
+
+    def test_map_collects_the_region_overlay(self):
+        from evennia_maps.overlays import collect_overlays
+
+        region = _make_region("The Grasslands")
+        RegionMembership.objects.create(region=region, room=self.room1)
+        overlays = collect_overlays([self.room1.id], staff=False)
+        self.assertEqual(overlays["primary_region"][self.room1.id]["name"], "The Grasslands")

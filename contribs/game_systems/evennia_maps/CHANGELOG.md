@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Changed:** the overlay tests now run with *exactly* the providers they connect,
+  detaching whatever the host game wired up for the duration. They previously asserted
+  on the shape of the whole merged dict, which was only ever true in a maps-only
+  install: a real partner contrib answers every collect, with empty dicts when it has
+  no data, so four cases went red the moment `evennia-scenes`, `-lore`, `-regions` and
+  `-calendar` shipped their providers. A maps suite that breaks when the seam is used
+  is testing the wrong thing.
+
+- **Added:** `test_query_count_is_flat_with_the_real_providers_installed` — the existing
+  guard proves the *map* asks once per render, using a fake provider. This one proves
+  the answer stays flat with whatever partners the game actually installed, which is
+  where an N+1 would really come from.
+
+---
+
 ## [0.2.0] — 2026-08-15 — web surface
 
 Adds the whole web half of the contrib. No schema change; `evennia-maps` 0.1.x installs

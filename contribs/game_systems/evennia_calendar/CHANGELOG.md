@@ -7,9 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-08-15 — map tile overlay
 
 ### Added
+- `integrations/maps.py` — the `upcoming_events` map tile overlay. With
+  `evennia-maps` installed, `CalendarConfig.ready()` connects the provider to its
+  `collect_tile_overlays` signal and mapped rooms list their upcoming events,
+  soonest first, in the tile popup. Two queries for the whole grid; nothing to
+  configure; nothing imported when the map is absent. New
+  `CALENDAR_MAPS_APP_LABEL` setting (default `"evennia_maps"`).
+
+  An event has no room of its own — it reaches the map only through a linked
+  `Scene`, so the provider resolves the scenes app through the existing
+  `CALENDAR_SCENES_APP_LABEL` gate and the overlay is empty without it.
+  Staff-only events are withheld from non-staff, the rule the calendar's own web
+  views already apply: `is_staff_event` exists to stop staff-run events being
+  visible-but-unjoinable, and a map pin advertising one would undo that.
 - `TestWebPagesRender` — all twelve pages (month grid, list, event detail,
   cluster detail with its ranked-choice form, event create/edit/cancel/invite,
   tag management and creation, cluster create/edit/membership, exclusions) are

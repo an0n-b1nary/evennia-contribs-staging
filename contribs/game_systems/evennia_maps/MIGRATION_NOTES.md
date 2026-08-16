@@ -25,6 +25,7 @@ website, the REST API, the static assets and the tile-overlay seam.
 | `web/templates/website/plane_*.html`, `partials/_plane_svg.html` | `templates/evennia_maps/` | Copy; `cov-*` CSS classes renamed `evennia-maps-*`, breadcrumbs moved into the content block, sekizai `addtoblock` replaced (below) |
 | `web/static/website/{js/cov_map.js,css/cov_map.css}` + `cov.css` §15 | `static/evennia_maps/` | Merged: the source game kept the SVG map's styles in its global stylesheet and only the Leaflet styles in a separate file. The contrib ships both in one self-contained file with no CSS custom properties, since a contrib cannot assume a host game defines any |
 | — | `overlays.py` | New module — the `collect_tile_overlays` contract, the merge call, and the outbound-URL seam |
+| `world/{scenes,lore,calendar}/maps_integration.py` | *(shipped in the partner contribs)* | The four providers live in `evennia_{regions,scenes,lore,calendar}/integrations/maps.py`, not here — same split as the source game's, which had already moved this glue into its owning domains before extraction |
 
 ## Key divergences from source game
 

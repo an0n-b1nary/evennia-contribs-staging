@@ -161,6 +161,27 @@ All signals are exported from `evennia_calendar` (safe to import at app-load tim
 | `cluster_drawn` | cluster lottery completed | `cluster`, `results` |
 | `cluster_seat_assigned` | individual player assigned to event | `cluster`, `cluster_rsvp`, `event` |
 
+## Map tile overlay (optional partner: evennia-maps)
+
+Install `evennia-maps` alongside this contrib and mapped rooms show what is about to happen
+there. `CalendarConfig.ready()` connects `evennia_calendar.integrations.maps.provide` to the
+map's `collect_tile_overlays` signal — no settings, no wiring. Set `CALENDAR_MAPS_APP_LABEL`
+if your game registers the maps app under a different label.
+
+```python
+{"upcoming_events": {room_id: [{"id": ..., "title": ...}, ...]}}   # soonest first
+```
+
+Two queries for the whole grid. An event has no room of its own: it reaches the map only
+once a `Scene` is linked to it via `SceneCalendarLink`, so the scenes app is resolved
+through `CALENDAR_SCENES_APP_LABEL` exactly as the soft-ref cleanup hook already resolves
+it. With `evennia-scenes` absent the overlay is empty.
+
+Staff-only events are withheld from non-staff, the same rule the calendar's own web views
+apply — `is_staff_event` exists to stop staff-run events being visible-but-unjoinable to
+everyone, and a map pin advertising one would undo that.
+
+
 ## Programmatic API
 
 ```python

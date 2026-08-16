@@ -31,3 +31,20 @@ class CalendarConfig(AppConfig):
                 connect_soft_ref_cleanup(Scene, SceneCalendarLink, "scene_id")
             except Exception:
                 pass
+
+        # --- maps: offer the upcoming_events tile overlay ---
+        maps_label = getattr(settings, "CALENDAR_MAPS_APP_LABEL", "evennia_maps")
+        if apps.is_installed(maps_label) or any(
+            cfg.label == maps_label for cfg in apps.get_app_configs()
+        ):
+            # Imported inside the branch so a game without the map never
+            # imports evennia_maps. dispatch_uid rather than the plain
+            # connect_on_ready() helper: this is the wiring evennia_maps'
+            # own README documents for providers, and it keeps a reloaded
+            # module from registering the receiver twice.
+            from evennia_calendar.integrations import maps as maps_overlays
+            from evennia_maps.signals import collect_tile_overlays
+
+            collect_tile_overlays.connect(
+                maps_overlays.provide, dispatch_uid="evennia_calendar.tile_overlays"
+            )

@@ -167,6 +167,28 @@ The trickle and bridge cleanup register only when the partner app is present:
 | `LORE_SCENES_APP_LABEL` | Register `connect_soft_ref_cleanup` for Scene→LoreSceneLink | LoreSceneLink rows orphaned on hard-delete (rare; harmless) |
 | `LORE_PLOTS_APP_LABEL` | Register cleanup for PlotThread→PlotLoreLink | Same |
 | `LORE_REGIONS_APP_LABEL` | Register cleanup for Region→LoreRegionLink | Same |
+| `LORE_MAPS_APP_LABEL` | Offer the `has_lore` map tile overlay | No overlay; nothing imported |
+
+### The map tile overlay
+
+Install `evennia-maps` (and `evennia-regions`) alongside this contrib and mapped rooms gain a
+lore pin. `LoreConfig.ready()` connects `evennia_lore.integrations.maps.provide` to the map's
+`collect_tile_overlays` signal, which answers with
+
+```python
+{"has_lore": {room_id: True}}
+```
+
+in two queries for the whole grid — one to resolve each room's primary region, one to ask
+which of those regions have readable lore.
+
+Lore attaches to *regions* and the map draws *rooms*, so this resolves the room→region step
+itself through `LORE_REGIONS_APP_LABEL`; with regions absent the overlay is simply empty.
+The pin uses the same eligibility as the passive pool — PUBLISHED + PUBLIC + not archived —
+**regardless of whether the viewer is staff**. A pin does not name an entry; it says "there
+is lore here" on a public page, and widening it for staff would only make the map disagree
+with the compendium.
+
 
 ---
 

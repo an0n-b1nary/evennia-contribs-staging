@@ -15,9 +15,12 @@ Run with:
     evennia test evennia_scenes --settings test_scenes_settings
 """
 
+import unittest
+from datetime import timedelta
 from importlib import import_module
 from unittest.mock import patch
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, override_settings
@@ -28,6 +31,7 @@ from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_scenes.capture import capture_to_scene, register_room_entry
 from evennia_scenes.display import render_scene_ref
+from evennia_scenes.integrations import maps as maps_overlays
 from evennia_scenes.models import LogEntry, LogEntryVersion, Scene, SceneParticipant
 from evennia_scenes.views import (
     LogEntryDiffView,
@@ -1166,3 +1170,162 @@ class TestLazyExports(EvenniaTest):
 
         with self.assertRaises(AttributeError):
             _ = evennia_scenes.DoesNotExist
+
+
+# ---------------------------------------------------------------------------
+# Maps integration: the scene tile overlays
+# ---------------------------------------------------------------------------
+
+
+class TestMapsOverlayProvider(EvenniaTest):
+    """
+    The has_active_scene / recent_scene_count / recent_scenes overlays.
+
+    Behaviour is tested by calling provide() directly, so these cases run
+    whether or not evennia_maps is installed — the provider module imports
+    nothing from it. The wiring is asserted separately below.
+
+    The privacy cases are the point of the whole seam: a map that read
+    Scene.room_id for itself would pin every view-private scene for every
+    anonymous visitor.
+    """
+
+    def _provide(self, *rooms, staff=False):
+        rooms = rooms or (self.room1,)
+        return maps_overlays.provide(sender=None, room_ids=[room.id for room in rooms], staff=staff)
+
+    def _closed_scene(self, room, *, privacy=Scene.Privacy.PUBLIC, title="Low Tide", ended=None):
+        scene = _open_scene(room, self.char1, title=title)
+        scene.privacy = privacy
+        scene.status = Scene.Status.CLOSED
+        scene.ended_at = ended or timezone.now()
+        scene.save()
+        return scene
+
+    # --- has_active_scene ---
+
+    def test_open_public_scene_lights_the_tile(self):
+        _open_scene(self.room1, self.char1)
+        self.assertTrue(self._provide()["has_active_scene"][self.room1.id])
+
+    def test_active_scene_lights_the_tile(self):
+        scene = _open_scene(self.room1, self.char1)
+        scene.status = Scene.Status.ACTIVE
+        scene.save()
+        self.assertTrue(self._provide()["has_active_scene"][self.room1.id])
+
+    def test_closed_scene_does_not_light_the_tile(self):
+        self._closed_scene(self.room1)
+        self.assertEqual(self._provide()["has_active_scene"], {})
+
+    def test_view_private_scene_is_withheld_from_visitors(self):
+        scene = _open_scene(self.room1, self.char1)
+        scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        scene.save()
+        self.assertEqual(self._provide()["has_active_scene"], {})
+
+    def test_view_private_scene_is_shown_to_staff(self):
+        scene = _open_scene(self.room1, self.char1)
+        scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        scene.save()
+        self.assertTrue(self._provide(staff=True)["has_active_scene"][self.room1.id])
+
+    def test_pose_private_scene_is_shown_to_visitors(self):
+        # Pose-private is web-readable: only posing is restricted.
+        scene = _open_scene(self.room1, self.char1)
+        scene.privacy = Scene.Privacy.POSE_PRIVATE
+        scene.save()
+        self.assertTrue(self._provide()["has_active_scene"][self.room1.id])
+
+    # --- recent_scene_count (the heatmap) ---
+
+    def test_heatmap_counts_recently_closed_scenes(self):
+        self._closed_scene(self.room1, title="One")
+        self._closed_scene(self.room1, title="Two")
+        self.assertEqual(self._provide()["recent_scene_count"][self.room1.id], 2)
+
+    def test_heatmap_ignores_scenes_older_than_the_window(self):
+        self._closed_scene(self.room1, ended=timezone.now() - timedelta(days=91))
+        self.assertEqual(self._provide()["recent_scene_count"], {})
+
+    def test_heatmap_hides_private_scenes_from_visitors_but_counts_them_for_staff(self):
+        # Deliberately out of step with recent_scenes below: staff need the
+        # heatmap to show where play actually happens.
+        self._closed_scene(self.room1, privacy=Scene.Privacy.VIEW_PRIVATE)
+        self.assertEqual(self._provide()["recent_scene_count"], {})
+        self.assertEqual(self._provide(staff=True)["recent_scene_count"][self.room1.id], 1)
+
+    # --- recent_scenes (the popup links) ---
+
+    def test_recent_scenes_lists_newest_first_with_titles(self):
+        older = self._closed_scene(
+            self.room1, title="Older", ended=timezone.now() - timedelta(days=2)
+        )
+        newer = self._closed_scene(self.room1, title="Newer")
+        self.assertEqual(
+            self._provide()["recent_scenes"][self.room1.id],
+            [{"id": newer.pk, "title": "Newer"}, {"id": older.pk, "title": "Older"}],
+        )
+
+    def test_recent_scenes_is_capped_at_three(self):
+        for i in range(5):
+            self._closed_scene(
+                self.room1, title=f"Scene {i}", ended=timezone.now() - timedelta(hours=i)
+            )
+        self.assertEqual(len(self._provide()["recent_scenes"][self.room1.id]), 3)
+
+    def test_untitled_scene_falls_back_to_its_str_label(self):
+        scene = self._closed_scene(self.room1, title="")
+        self.assertEqual(
+            self._provide()["recent_scenes"][self.room1.id],
+            [{"id": scene.pk, "title": f"Scene #{scene.pk}"}],
+        )
+
+    def test_recent_scenes_stays_public_tier_even_for_staff(self):
+        # These render as links to log pages, so a staff-only entry would
+        # leak by URL to anyone the link is pasted to.
+        self._closed_scene(self.room1, privacy=Scene.Privacy.VIEW_PRIVATE)
+        self.assertEqual(self._provide(staff=True)["recent_scenes"], {})
+
+    def test_archived_scene_is_not_listed(self):
+        scene = self._closed_scene(self.room1)
+        scene.archive()
+        self.assertEqual(self._provide()["recent_scenes"], {})
+
+    # --- shape and cost ---
+
+    def test_rooms_are_kept_apart(self):
+        _open_scene(self.room1, self.char1)
+        self._closed_scene(self.room2, title="Elsewhere")
+        overlays = self._provide(self.room1, self.room2)
+        self.assertEqual(list(overlays["has_active_scene"]), [self.room1.id])
+        self.assertEqual(list(overlays["recent_scenes"]), [self.room2.id])
+
+    def test_empty_room_ids_returns_nothing(self):
+        self.assertEqual(maps_overlays.provide(sender=None, room_ids=[], staff=False), {})
+
+    def test_query_count_is_flat_in_room_count(self):
+        # The whole overlay design rests on this: one map render, a fixed
+        # number of queries, no matter how big the plane. Both rooms are
+        # given the same kind of data so the comparison isolates room
+        # count — the fourth query (scene labels) is skipped entirely when
+        # no room in the request has a recent log to label.
+        _open_scene(self.room1, self.char1)
+        self._closed_scene(self.room1, title="Here")
+        self._closed_scene(self.room2, title="Elsewhere")
+        with self.assertNumQueries(4):
+            self._provide(self.room1)
+        with self.assertNumQueries(4):
+            self._provide(self.room1, self.room2)
+
+
+@unittest.skipUnless(apps.is_installed("evennia_maps"), "requires evennia_maps")
+class TestMapsOverlayWiring(EvenniaTest):
+    """ScenesConfig.ready() connected the provider to the map's collector."""
+
+    def test_map_collects_the_scene_overlays(self):
+        from evennia_maps.overlays import collect_overlays
+
+        _open_scene(self.room1, self.char1)
+        overlays = collect_overlays([self.room1.id], staff=False)
+        self.assertTrue(overlays["has_active_scene"][self.room1.id])

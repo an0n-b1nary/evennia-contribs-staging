@@ -1,8 +1,25 @@
 # Changelog — evennia-scenes
 
-## [Unreleased]
+## [0.3.0] — 2026-08-15 — map tile overlays
 
 ### Added
+- `integrations/maps.py` — the `has_active_scene`, `recent_scene_count` and
+  `recent_scenes` map tile overlays. With `evennia-maps` installed,
+  `ScenesConfig.ready()` connects the provider to its `collect_tile_overlays`
+  signal: live scenes highlight their tile, closed scenes drive an activity
+  heatmap, and the three newest public logs link out of the tile popup. Four
+  queries for the whole grid; nothing to configure; nothing imported when the
+  map is absent. New `SCENES_MAPS_APP_LABEL` setting (default `"evennia_maps"`).
+
+  Each overlay applies `WEB_READABLE_PRIVACY` itself. That is the reason the seam
+  is a signal at all: `Scene.room_id` is a bare pk with no privacy dimension, so a
+  map reading it directly would pin every view-private scene for every anonymous
+  visitor. `recent_scenes` stays public-tier even for staff — it renders as links
+  to log pages, which leak by URL — while `recent_scene_count` widens for staff,
+  who need the heatmap to show where play actually happens.
+- `recent_public_scene_ids_by_room()` is public in that module: any surface needing
+  "the newest readable logs for these rooms" should ask for it rather than
+  re-deriving the privacy rule.
 - `TestWebPagesRender` — every scene page (archive, scene detail, log-entry edit
   form, edit history, diff) is now rendered for real via `response.render()`.
 

@@ -210,6 +210,30 @@ default.
 
 ---
 
+## Map tile overlays (optional partner: evennia-maps)
+
+Install `evennia-maps` alongside this contrib and the map lights up with where play is
+happening. `ScenesConfig.ready()` connects `evennia_scenes.integrations.maps.provide` to the
+map's `collect_tile_overlays` signal — no settings, no wiring. Set `SCENES_MAPS_APP_LABEL`
+if your game registers the maps app under a different label.
+
+| Overlay key | Value | Visibility |
+|---|---|---|
+| `has_active_scene` | `{room_id: True}` for open/active scenes | Web-readable tiers only, unless staff |
+| `recent_scene_count` | `{room_id: int}`, closed scenes in the last 90 days | Web-readable tiers only, unless staff |
+| `recent_scenes` | `{room_id: [{"id", "title"}, …]}`, 3 newest closed | Web-readable tiers **always**, staff included |
+
+This has to be a provider rather than something the map reads for itself: `Scene.room_id` is
+a bare pk with no privacy dimension, and a map pinning tiles from it directly would announce
+every view-private scene to every anonymous visitor. Only this contrib knows
+`WEB_READABLE_PRIVACY`.
+
+`recent_scene_count` and `recent_scenes` are deliberately out of step for staff. The heatmap
+is only useful to staff if it shows where play actually happens, while the log list renders
+as links — a staff-only entry there would leak by URL to anyone the link reaches. So a staff
+tile can read "5 recent scenes" and list fewer public logs beneath it.
+
+
 ## License
 
 BSD-3-Clause. See `LICENSE`.

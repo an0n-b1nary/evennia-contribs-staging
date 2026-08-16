@@ -11,6 +11,7 @@ Extracted from a private Evennia game project.
 | `world/lore/apps.py` | `apps.py` | Rewritten for contrib: partner-label gating, cleanup hooks, trickle listener |
 | `world/lore/admin.py` | `admin.py` | Rewritten; RUF012 noqa added |
 | `world/lore/selection.py` | `selection.py` | Rebased; `_resolve_context()` provider seam added (A4 from source game) |
+| `world/lore/maps_integration.py` | `integrations/maps.py` | Copied (v0.2.0); receiver renamed `provide_tile_overlays` → `provide` to match the seam evennia-maps documents; the room→region lookup resolves `RegionMembership` through `apps.get_model` under `LORE_REGIONS_APP_LABEL` instead of importing `world.regions` directly, and now excludes archived regions |
 | `world/lore/providers.py` | _not shipped_ | source game-specific cross-domain context provider; consumers write their own |
 | `commands/editing.py` | _deleted in v0.1.1_ | `EditingMixin` hoisted into `evennia-links>=0.3`; imported from there |
 | `commands/lore.py` | `commands.py` | All 5 commands rebased; `is_staff` from `LORE_STAFF_LOCK`; partner app imports lazy via `_get_model()` helper; `uses_screenreader` optional-import fallback |

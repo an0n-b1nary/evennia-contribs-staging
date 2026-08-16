@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-scenes"
-version = "0.2.0"
+version = "0.3.0"
 description = "Scene logging system (+scene/+log) with web UI and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -42,12 +42,14 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 packages = [
     "evennia_scenes",
     "evennia_scenes.migrations",
+    "evennia_scenes.integrations",
     "evennia_scenes.api",
 ]
 
 [tool.setuptools.package-dir]
 "evennia_scenes" = "."
 "evennia_scenes.migrations" = "migrations"
+"evennia_scenes.integrations" = "integrations"
 "evennia_scenes.api" = "api"
 
 [tool.setuptools.package-data]

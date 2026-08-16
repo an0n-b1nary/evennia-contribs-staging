@@ -12,6 +12,19 @@ the old app.
 
 ---
 
+## Map tile overlays (added in v0.3.0)
+
+`integrations/maps.py` is the source game's `world/scenes/maps_integration.py`, carried
+over essentially unchanged: the receiver is renamed `provide_tile_overlays` → `provide`
+to match the seam `evennia-maps` documents, and `recent_public_scene_ids_by_room()`
+stays public because the source game's SVG map imported it directly. In the contrib the
+map gets it through the `recent_scenes` overlay instead and imports nothing from here.
+
+The provider is connected from `ScenesConfig.ready()` behind a `SCENES_MAPS_APP_LABEL`
+gate. The source game had no gate — both domains were always present — so the import of
+`evennia_maps.signals` sitting *inside* the branch is new, and load-bearing: a game
+without the map must never import it.
+
 ## Divergences from source `world.scenes`
 
 ### Abstract base imports

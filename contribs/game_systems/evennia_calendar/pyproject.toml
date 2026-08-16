@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-calendar"
-version = "0.1.2"
+version = "0.2.0"
 description = "Event calendar system (+calendar/+rsvp) with cluster lottery, priority tokens, web UI, and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -43,12 +43,14 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 packages = [
     "evennia_calendar",
     "evennia_calendar.migrations",
+    "evennia_calendar.integrations",
     "evennia_calendar.api",
 ]
 
 [tool.setuptools.package-dir]
 "evennia_calendar" = "."
 "evennia_calendar.migrations" = "migrations"
+"evennia_calendar.integrations" = "integrations"
 "evennia_calendar.api" = "api"
 
 [tool.setuptools.package-data]

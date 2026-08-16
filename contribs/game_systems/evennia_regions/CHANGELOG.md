@@ -7,7 +7,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-08-15 — map tile overlay
+
+- **Added:** `integrations/maps.py` — the `primary_region` map tile overlay. With
+  `evennia-maps` installed, `RegionsConfig.ready()` connects the provider to its
+  `collect_tile_overlays` signal and every mapped room gains a region label linking to
+  its region page. One query for the whole grid; nothing to configure; nothing imported
+  when the map is absent. New `REGIONS_MAPS_APP_LABEL` setting (default `"evennia_maps"`)
+  for games registering the maps app under another label.
+
+  This is the first time regions reaches *out* to another contrib rather than being read
+  by one, so `RegionsConfig` gains a `ready()` — the docstring saying it had nothing to
+  wire up is no longer true.
+
+- **Changed:** the overlay answer follows `RegionMembership.primary_for()` but **skips
+  archived regions**, falling through to the room's next visible membership. `Region`'s
+  default manager excludes archived rows, so `RegionDetailView` 404s on one — and a
+  filter on `RegionMembership` does not apply that manager to the joined table, which is
+  how the source game's map came to link tiles at pages that no longer resolve.
 
 - **Fixed:** the documentation comments at the top of `_empty_state.html` and
   `_pagination.html` spanned multiple lines. Django's template tag regex is not

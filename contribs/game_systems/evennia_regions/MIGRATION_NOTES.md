@@ -20,6 +20,7 @@ Extracted from a private Evennia game project.
 | `web/api/filters.py` (`RegionFilter`) | `api/filters.py` | Direct copy |
 | `web/api/views.py` (`RegionViewSet`) | `api/views.py` | Self-contained: explicit pagination/auth/permission/filter classes, matching the `evennia-lore`/`evennia-calendar` API convention (the source game instead relies on one shared `REST_FRAMEWORK` config for all viewsets) |
 | `web/api/urls.py` (region registration) | `api/urls.py` | Extracted |
+| `web/website/views/maps.py::primary_regions_by_room` | `integrations/maps.py` | Moved to the owning domain and reshaped as a `collect_tile_overlays` provider — in the source game the map imported `RegionMembership` directly. Now also excludes archived regions (below) |
 
 ## Key divergences from source game
 
@@ -32,6 +33,15 @@ the simplest contribs to extract. Neither integration has a signal-based seam to
 (unlike the maps `collect_tile_overlays` pattern used by scenes/lore/calendar) — adding
 one is future work, not invented here per the standing rule against building an
 unused extension point.
+
+**The map overlay skips archived regions; the source game's did not.**
+`primary_regions_by_room()` there joined through `RegionMembership` with no archive
+filter, so a tile could name — and link to — a region whose own detail page 404s
+(`Region.objects` excludes archived rows, and a filter on the membership table does not
+apply that manager to the joined one). The provider filters `region__is_archived=False`,
+which also means a room whose *flagged primary* is archived falls through to its next
+visible membership rather than going blank. This is a deliberate divergence from
+`RegionMembership.primary_for()`, whose answer stays the flagged one.
 
 **Staff permission configurable via `REGIONS_STAFF_LOCK`.** The source game hardcoded
 `perm(Builder)` in `commands/regions.py` (there was no staff-lock setting for regions at

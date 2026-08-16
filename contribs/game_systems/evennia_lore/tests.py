@@ -18,11 +18,13 @@ Run:
     evennia test --settings test_lore_settings.py evennia_lore
 """
 
+import unittest
 from decimal import Decimal
 from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
@@ -34,6 +36,7 @@ from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, CmdShare
+from evennia_lore.integrations import maps as maps_overlays
 from evennia_lore.models import (
     LoreAcquisition,
     LoreEntry,
@@ -955,3 +958,139 @@ class TestLoreHistoryRenders(LoreWebRenderTestCase):
             version_number=version.version_number,
         )
         self.assertIn("no differences", html)
+
+
+# ---------------------------------------------------------------------------
+# Maps integration: the has_lore tile overlay
+# ---------------------------------------------------------------------------
+
+
+def _membership_model():
+    """RegionMembership, or None when evennia_regions is not installed."""
+    try:
+        return apps.get_model("evennia_regions", "RegionMembership")
+    except LookupError:
+        return None
+
+
+@unittest.skipUnless(apps.is_installed("evennia_regions"), "requires evennia_regions")
+class TestMapsOverlayProvider(EvenniaTest):
+    """
+    The has_lore overlay: lore attaches to regions, the map draws rooms.
+
+    Behaviour is tested by calling provide() directly, so these cases run
+    whether or not evennia_maps is installed — the provider module imports
+    nothing from it. They do need evennia_regions: with no regions app there
+    is nothing for lore to hang off, which is its own case below.
+    """
+
+    def setUp(self):
+        super().setUp()
+        Region = apps.get_model("evennia_regions", "Region")
+        self.region = Region.objects.create(name="The Drowned Coast")
+        _membership_model().objects.create(region=self.region, room=self.room1)
+
+    def _provide(self, *rooms, staff=False):
+        rooms = rooms or (self.room1,)
+        return maps_overlays.provide(sender=None, room_ids=[room.id for room in rooms], staff=staff)
+
+    def _link(self, entry, region=None):
+        return LoreRegionLink.objects.create(entry=entry, region_id=(region or self.region).pk)
+
+    def test_published_public_entry_lights_the_room(self):
+        self._link(_make_entry("Tidal Rites", author=self.char1))
+        self.assertTrue(self._provide()["has_lore"][self.room1.id])
+
+    def test_room_without_a_region_is_absent(self):
+        self._link(_make_entry("Tidal Rites", author=self.char1))
+        self.assertEqual(self._provide(self.room2)["has_lore"], {})
+
+    def test_region_without_lore_is_absent(self):
+        self.assertEqual(self._provide()["has_lore"], {})
+
+    def test_restricted_entry_does_not_light_the_room(self):
+        self._link(
+            _make_entry("Tidal Rites", author=self.char1, privacy=LoreEntry.Privacy.RESTRICTED)
+        )
+        self.assertEqual(self._provide()["has_lore"], {})
+
+    def test_unpublished_entry_does_not_light_the_room(self):
+        entry = _make_entry("Tidal Rites", author=self.char1)
+        entry.status = LoreEntry.Status.DRAFT
+        entry.save()
+        self.assertEqual(self._provide()["has_lore"], {})
+
+    def test_archived_entry_does_not_light_the_room(self):
+        entry = _make_entry("Tidal Rites", author=self.char1)
+        self._link(entry)
+        entry.archive()
+        self.assertEqual(self._provide()["has_lore"], {})
+
+    def test_staff_see_exactly_what_visitors_see(self):
+        # A pin is not a link to one entry — it says "there is lore here" on
+        # a public page. Widening it for staff would only make the map
+        # disagree with the compendium.
+        self._link(
+            _make_entry("Tidal Rites", author=self.char1, privacy=LoreEntry.Privacy.RESTRICTED)
+        )
+        self.assertEqual(self._provide(staff=True)["has_lore"], {})
+
+    def test_lore_on_an_archived_region_does_not_light_the_room(self):
+        # The tile would claim lore the visitor cannot navigate to: an
+        # archived region 404s on its own detail page.
+        self._link(_make_entry("Tidal Rites", author=self.char1))
+        self.region.archive()
+        self.assertEqual(self._provide()["has_lore"], {})
+
+    def test_only_the_primary_region_is_consulted(self):
+        Region = apps.get_model("evennia_regions", "Region")
+        other = Region.objects.create(name="The Salt Flats")
+        _membership_model().objects.create(region=other, room=self.room1, is_primary=True)
+        self._link(_make_entry("Tidal Rites", author=self.char1))
+        self.assertEqual(self._provide()["has_lore"], {})
+        self._link(_make_entry("Salt Rites", author=self.char1), region=other)
+        self.assertTrue(self._provide()["has_lore"][self.room1.id])
+
+    def test_empty_room_ids_returns_nothing(self):
+        self.assertEqual(maps_overlays.provide(sender=None, room_ids=[], staff=False), {})
+
+    def test_query_count_is_flat_in_room_count(self):
+        # The whole overlay design rests on this: one map render, a fixed
+        # number of queries, no matter how big the plane.
+        _membership_model().objects.create(region=self.region, room=self.room2)
+        self._link(_make_entry("Tidal Rites", author=self.char1))
+        with self.assertNumQueries(2):
+            self._provide(self.room1)
+        with self.assertNumQueries(2):
+            self._provide(self.room1, self.room2)
+
+
+class TestMapsOverlayWithoutRegions(EvenniaTest):
+    """With no regions app there is nothing to attach lore to."""
+
+    def test_provider_returns_an_empty_overlay(self):
+        with patch.object(maps_overlays, "_regions_model", return_value=None):
+            overlays = maps_overlays.provide(sender=None, room_ids=[self.room1.id], staff=False)
+        self.assertEqual(overlays, {"has_lore": {}})
+
+
+@unittest.skipUnless(
+    apps.is_installed("evennia_maps") and apps.is_installed("evennia_regions"),
+    "requires evennia_maps and evennia_regions",
+)
+class TestMapsOverlayWiring(EvenniaTest):
+    """LoreConfig.ready() connected the provider to the map's collector."""
+
+    def test_map_collects_the_lore_overlay(self):
+        from evennia_maps.overlays import collect_overlays
+
+        Region = apps.get_model("evennia_regions", "Region")
+        region = Region.objects.create(name="The Drowned Coast")
+        apps.get_model("evennia_regions", "RegionMembership").objects.create(
+            region=region, room=self.room1
+        )
+        LoreRegionLink.objects.create(
+            entry=_make_entry("Tidal Rites", author=self.char1), region_id=region.pk
+        )
+        overlays = collect_overlays([self.room1.id], staff=False)
+        self.assertTrue(overlays["has_lore"][self.room1.id])

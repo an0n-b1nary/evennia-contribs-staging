@@ -102,6 +102,20 @@ Hard-deletion of a Scene is compensated by a `connect_soft_ref_cleanup()` hook
 registered in `CalendarConfig.ready()` when the scenes app is present
 (`CALENDAR_SCENES_APP_LABEL`, default `"evennia_scenes"`).
 
+## Map tile overlay (added in v0.2.0)
+
+`integrations/maps.py` is the source game's `world/calendar/maps_integration.py` with two
+changes: the receiver is renamed `provide_tile_overlays` → `provide` to match the seam
+`evennia-maps` documents, and the `Scene` lookup resolves through `apps.get_model` under
+`CALENDAR_SCENES_APP_LABEL` rather than importing `world.scenes.models` — the same soft
+edge `SceneCalendarLink.scene_id` already is. With `evennia-scenes` absent the overlay is
+empty instead of raising at import.
+
+The provider is connected from `CalendarConfig.ready()` behind a `CALENDAR_MAPS_APP_LABEL`
+gate. The source game had no gate — both domains were always present — so the import of
+`evennia_maps.signals` sitting *inside* the branch is new, and load-bearing: a game
+without the map must never import it.
+
 ## CalendarMaintenanceScript — manual hook required
 
 The source registered `ensure_calendar_script_running()` via a project-level
