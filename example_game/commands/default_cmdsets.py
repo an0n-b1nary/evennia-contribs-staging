@@ -24,6 +24,7 @@ from evennia_rptracker.commands import CmdActivity, CmdRPTrackerStaff
 from evennia_scenes.commands import CmdLog, CmdScene
 from evennia_xp.commands import CmdXp
 
+from evennia_maps.commands import CmdMap
 from evennia_posing.commands import (
     CmdEmit,
     CmdHighlight,
@@ -33,6 +34,7 @@ from evennia_posing.commands import (
     CmdPot,
     CmdSemipose,
 )
+from evennia_regions.commands import CmdRegion
 from evennia_social.commands import (
     CmdFinger,
     CmdHangouts,
@@ -118,6 +120,13 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdPlot)
         self.add(CmdArc)
         self.add(CmdHook)
+
+        # Regions and maps. Both are open at the command-lock level
+        # (locks = "cmd:all()") and self-enforce REGIONS_STAFF_LOCK /
+        # MAPS_STAFF_LOCK inside the switches that write — players get the
+        # read-only switches (+map, +region), builders get the rest.
+        self.add(CmdRegion)
+        self.add(CmdMap)
 
         # XP
         self.add(CmdXp)

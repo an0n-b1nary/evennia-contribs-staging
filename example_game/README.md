@@ -6,8 +6,8 @@ together every contrib in this repo. It exists for two reasons:
 1. **Reference integration.** It's the "how do these 12 contribs actually get
    wired into a real game" example this repo otherwise lacks — settings,
    cmdsets, server hooks, and the typeclass seams that can't auto-wire.
-2. **A living sandbox to hand-test against**, as new contribs (Regions, Maps,
-   crafting) get extracted and land here.
+2. **A living sandbox to hand-test against**, as new contribs (crafting) get
+   extracted and land here.
 
 Full design background is tracked separately (local-only planning docs, not
 part of this repo).
@@ -16,14 +16,14 @@ part of this repo).
 
 ## What's wired up
 
-All 12 current contribs, in dependency order — `evennia_links` first, then
-the five apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
-`evennia_boards`, `evennia_lore`, `evennia_plots`), then the four standalone
-apps (`evennia_calendar`, `evennia_jobs`, `evennia_xp`,
-`evennia_accessibility`), then the pose/social layer (`evennia_posing`
-before `evennia_social` — social hard-depends on posing). See
-`server/conf/settings.py` for the full `INSTALLED_APPS` list and every
-XP/rptracker/lore/boards/plots/posing/social setting.
+All 14 current contribs, in dependency order — `evennia_links` first, then
+the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
+`evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
+`evennia_maps`), then the standalone apps (`evennia_calendar`,
+`evennia_jobs`, `evennia_xp`, `evennia_accessibility`), then the pose/social
+layer (`evennia_posing` before `evennia_social` — social hard-depends on
+posing). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
+every XP/rptracker/lore/boards/plots/regions/maps/posing/social setting.
 
 **Settings hooks point at the contribs' own shipped integration functions**
 (`evennia_*.integrations.*`), not at hand-written glue — except the
@@ -40,9 +40,10 @@ deliberately omitted):
 
 **Typeclass seams.** `typeclasses/characters.py` and `typeclasses/rooms.py`
 mix in `SocialCharacterMixin`/`PosingCharacterMixin` and
-`SocialRoomMixin`/`PosingRoomMixin` (social before posing, so ignore-
-filtering runs before header/highlight in the cooperative `msg()` chain —
-see both contribs' READMEs). Pose/say/emit activity reaches
+`MapsRoomMixin`/`SocialRoomMixin`/`PosingRoomMixin` (social before posing, so
+ignore-filtering runs before header/highlight in the cooperative `msg()`
+chain — see both contribs' READMEs; `MapsRoomMixin` takes no part in that
+chain, so its position is free). Pose/say/emit activity reaches
 `evennia_rptracker` and `evennia_scenes` through `evennia_posing`'s
 `pose_recorded` signal: `world/sandbox/apps.py` connects it, at server
 start, to the single ordered listener in `world/sandbox/glue.py`, which
@@ -51,8 +52,39 @@ can't auto-wire is `Room.at_object_receive` → `evennia_scenes`'
 `register_room_entry`, per that contrib's README ("Evennia ships no
 room-receive signal; you must call this manually").
 
-Not yet extracted as contribs: Regions, Maps, crafting. This sandbox will
-grow to cover them as they land.
+Not yet extracted as contribs: crafting. This sandbox will grow to cover it
+as it lands.
+
+### The map, and the web surface
+
+This is the first sandbox wiring that mounts contrib **web** routes.
+`web/website/urls.py` mounts four of them and `web/urls.py` mounts the two
+DRF routers:
+
+| Route | Contrib | What it is |
+|---|---|---|
+| `/map/`, `/map/<pk>/`, `/map/<pk>/live/` | `evennia_maps` | Plane list, static SVG grid, Leaflet live map |
+| `/regions/`, `/regions/<pk>/` | `evennia_regions` | Region list and detail |
+| `/scenes/…`, `/calendar/…` | `evennia_scenes`, `evennia_calendar` | Mounted because the **map links out to them** — see below |
+| `/api/v1/planes/…`, `/api/v1/regions/…` | both | Read-only DRF feeds; the live map pulls tiles from the first |
+
+Scenes and calendar are mounted for a specific reason:
+`evennia_maps.overlays.overlay_url_templates()` reverses
+`evennia_scenes:scene-detail` and `evennia_calendar:calendar-event-detail`
+and silently drops whichever does not resolve, so without those two includes
+the tile popups would list recent logs and upcoming events as plain text. The
+remaining web surfaces (boards, lore, plots, jobs, xp) stay unmounted for now.
+
+**Six tile overlays, zero overlay settings.** `evennia_maps` knows where rooms
+are and nothing else. Once per map render it sends `collect_tile_overlays`,
+and `evennia_regions` (`primary_region`), `evennia_scenes`
+(`has_active_scene`, `recent_scene_count`, `recent_scenes`), `evennia_lore`
+(`has_lore`) and `evennia_calendar` (`upcoming_events`) each answer for the
+rooms they know about, from providers they connect themselves in their own
+`AppConfig.ready()`. Nothing in `settings.py` configures this — uninstall a
+partner and its layer is simply absent. `world/sandbox/tests.py`
+(`TestMapOverlaySeam`) is the end-to-end proof, and it can only live here: no
+contrib's own suite installs the other three.
 
 ---
 
@@ -72,6 +104,8 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_boards \
          contribs/game_systems/evennia_lore \
          contribs/game_systems/evennia_plots \
+         contribs/game_systems/evennia_regions \
+         contribs/game_systems/evennia_maps \
          contribs/game_systems/evennia_calendar \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
@@ -195,6 +229,8 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_boards \
          contribs/game_systems/evennia_lore \
          contribs/game_systems/evennia_plots \
+         contribs/game_systems/evennia_regions \
+         contribs/game_systems/evennia_maps \
          contribs/game_systems/evennia_calendar \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
@@ -255,7 +291,15 @@ git add server/evennia_default.db3 && git commit -m "chore: snapshot golden sand
 evennia start
 ```
 
-Re-snapshot after every `evennia migrate`.
+Re-snapshot after every `evennia migrate` — including the regions/maps
+migrations, which are the most recent.
+
+> **The golden snapshot is not currently in the tree.** `server/evennia_default.db3`
+> is whitelisted in `example_game/.gitignore` (the one deliberate exception to
+> `*.db3`) but has never been committed, so `scripts/reset_to_golden.sh` has
+> nothing to restore from. It is deliberately not regenerated here: a golden DB
+> is only meaningful when snapshotted from the deployed sandbox after a real
+> boot and seed, which is exactly this step. Take the snapshot on the droplet.
 
 ### 7. systemd (as root / via sudo)
 
@@ -456,8 +500,10 @@ droplet" configuration:
 Two mechanisms, for two different needs:
 
 - **`evennia seed_sandbox`** — content-only. Purges and rebuilds the default
-  rooms/board/calendar-event/lore/plot content (tagged/name-matched, so
-  reruns don't duplicate). Keeps accounts and characters.
+  rooms/exits/board/calendar-event/lore/plot content plus the region, the map
+  plane and its tiles, and the two scenes that light the tile overlays
+  (tagged/name-matched, so reruns don't duplicate). Keeps accounts and
+  characters.
 - **`scripts/reset_to_golden.sh`** — full wipe. Stops the server, swaps in
   the committed `server/evennia_default.db3`, restarts. Wipes accounts too.
   Re-snapshot the golden file after every `evennia migrate` (see step 6).
@@ -473,7 +519,7 @@ Two mechanisms, for two different needs:
 3. **Every contrib runs** — one command each, no import/lock/settings
    errors: `+bb`, `+calendar`, `+request`, `+lore`, `+plot`, `+xp`,
    `+activity`, `+scene`, `+pot`, `+lastpose`, `+finger`, `+where`,
-   `+hangouts`, `page`.
+   `+hangouts`, `+region`, `+map`, `page`.
 4. **Seams fire** — pose in a seeded room; the pose fires evennia_posing's
    `pose_recorded` signal, which the listener in `world/sandbox/glue.py`
    fans out to `capture_to_scene` and `record_rp_activity` — confirm with
@@ -483,3 +529,20 @@ Two mechanisms, for two different needs:
    duplicate rooms/boards/entries.
 6. **Golden reset works** — make a throwaway change, run
    `scripts/reset_to_golden.sh`, confirm the world is back to default.
+   (Requires the snapshot from step 6 above; see the note there.)
+7. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`;
+   `/map/<pk>/` draws the six seeded rooms as an SVG plus grid, with the
+   Archive north of the Plaza; `/map/<pk>/live/` loads Leaflet with the
+   elevation control. This is the one step no test replaces: a static SVG
+   page and a client-side Leaflet render fail in different ways.
+8. **Overlays light up and link out** — on the live map, toggle the overlay
+   controls: the Consulate Hall shows an active-scene pin and an upcoming
+   event, the Archive shows heat and a recent log, every tile is labelled
+   with `The Commons`. Click through a tile popup to the region, the scene
+   log and the event page.
+9. **A missing partner degrades, it does not break** — `pip uninstall
+   evennia-calendar`, drop it from `INSTALLED_APPS` and from
+   `web/website/urls.py`, restart, and confirm the map still renders with the
+   events overlay simply absent. This is the whole point of the signal gating
+   and no unit test covers it, because a test process cannot uninstall an
+   app. Reinstall afterwards.

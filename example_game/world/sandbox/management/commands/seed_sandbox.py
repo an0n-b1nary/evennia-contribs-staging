@@ -15,8 +15,21 @@ contrib-sandbox-server plan's note on batchprocessors.py), so this command
 does the purge/rebuild itself rather than replaying a .ev/.py batch file.
 
 Non-Evennia (plain Django) content — boards, posts, calendar events, lore
-entries, plot threads/arcs — has no tag mechanism, so it's purged by a fixed,
-recognizable name/title before recreating.
+entries, plot threads/arcs, the region, the map plane, scenes — has no tag
+mechanism, so it's purged by a fixed, recognizable name/title before
+recreating.
+
+The seeded world is deliberately *mappable*: the four original rooms plus two
+more are linked by exits whose keys stay flavorful ("archive", "garden") but
+which each carry a canonical direction as an alias, since evennia_maps'
+layout only walks exits it can resolve to a direction (key **or** alias).
+That is what lets this command place one origin tile and then let
+layout.plan() derive the other five positions, rather than hardcoding six
+coordinate pairs.
+
+The seeded scenes/lore/event exist to light up all six tile overlays, so a
+fresh sandbox can be hand-checked at /map/<pk>/ and /map/<pk>/live/ without
+first creating content by hand.
 
 Usage:
     evennia seed_sandbox
@@ -29,12 +42,50 @@ SANDBOX_TAG = "sandbox_default"
 SANDBOX_TAG_CATEGORY = "sandbox"
 
 # Fixed names/titles used both to purge prior runs and to recreate content.
-ROOM_NAMES = ["Sandbox Plaza", "The Archive", "Consulate Hall", "Staff Lounge"]
+ROOM_NAMES = [
+    "Sandbox Plaza",
+    "The Archive",
+    "Consulate Hall",
+    "Staff Lounge",
+    "Garden Walk",
+    "The Overlook",
+]
 BOARD_NAMES = ["General", "Cutscenes"]
 LORE_TITLES = ["The Founding of the Sandbox", "Rumors from the Archive"]
 PLOT_ARC_NAME = "Sandbox Genesis"
 PLOT_THREAD_NAME = "The Founding Storm"
 CALENDAR_EVENT_TITLE = "Sandbox Kickoff"
+REGION_NAME = "The Commons"
+PLANE_NAME = "Sandbox Overworld"
+SCENE_TITLES = ["Kickoff Rehearsal", "A Quiet Hour in the Archive"]
+
+# Terrain tags, resolved to a single tile terrain by MAPS_TERRAIN_PRECEDENCE
+# (server/conf/settings.py). Set through Room.set_terrain() so the mixin fires
+# terrain_changed and the tile snapshot follows.
+ROOM_TERRAIN = {
+    "Sandbox Plaza": {"urban"},
+    "The Archive": {"urban"},
+    "Consulate Hall": {"urban"},
+    "Staff Lounge": {"urban"},
+    "Garden Walk": {"forest"},
+    "The Overlook": {"hills"},
+}
+
+# (from, to, (exit key, direction alias), (return key, return alias)).
+# The direction alias is what makes the exit visible to evennia_maps' layout;
+# the key is what a player types. Laid out as a plus around the Plaza with one
+# room beyond the Archive, so the derived grid is not a trivial straight line.
+ROOM_LINKS = [
+    ("Sandbox Plaza", "The Archive", ("archive", "north"), ("plaza", "south")),
+    ("Sandbox Plaza", "Consulate Hall", ("hall", "east"), ("plaza", "west")),
+    ("Sandbox Plaza", "Staff Lounge", ("lounge", "south"), ("plaza", "north")),
+    ("Sandbox Plaza", "Garden Walk", ("garden", "west"), ("plaza", "east")),
+    ("The Archive", "The Overlook", ("overlook", "north"), ("archive", "south")),
+]
+
+# The room the map is anchored on: the one tile this command places by hand,
+# from which layout.plan() derives the rest.
+ORIGIN_ROOM_NAME = "Sandbox Plaza"
 
 
 class Command(BaseCommand):
@@ -50,18 +101,26 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        # Django passes verbosity to every management command; honouring it
+        # keeps world/sandbox/tests.py (which runs this command for real,
+        # once per test) from burying the test output in seed reports.
+        self.quiet = options.get("verbosity", 1) == 0
         mode = "DRY RUN" if dry_run else "LIVE"
-        self.stdout.write(self.style.NOTICE(f"seed_sandbox [{mode}]"))
+        self._say(self.style.NOTICE(f"seed_sandbox [{mode}]"))
 
         purged = self._purge(dry_run)
-        self.stdout.write(f"Purged: {purged}")
+        self._say(f"Purged: {purged}")
 
         if dry_run:
-            self.stdout.write(self.style.WARNING("[DRY RUN] Skipping rebuild."))
+            self._say(self.style.WARNING("[DRY RUN] Skipping rebuild."))
             return
 
         created = self._rebuild()
-        self.stdout.write(self.style.SUCCESS(f"Created: {created}"))
+        self._say(self.style.SUCCESS(f"Created: {created}"))
+
+    def _say(self, message):
+        if not self.quiet:
+            self.stdout.write(message)
 
     # ------------------------------------------------------------------
     # Purge
@@ -124,6 +183,31 @@ class Command(BaseCommand):
         if not dry_run:
             arcs.delete()
 
+        # all_objects (not objects): both models are AbstractArchived, whose
+        # default manager hides archived rows — a previously-archived seed
+        # region or plane would otherwise survive the purge and then collide
+        # with the rebuild's unique name.
+        from evennia_regions.models import Region
+
+        regions = Region.all_objects.filter(name=REGION_NAME)
+        counts["regions"] = regions.count()
+        if not dry_run:
+            regions.delete()  # cascades to RegionMembership
+
+        from evennia_maps.models import MapPlane
+
+        planes = MapPlane.all_objects.filter(name=PLANE_NAME)
+        counts["map_planes"] = planes.count()
+        if not dry_run:
+            planes.delete()  # cascades to RoomTile
+
+        from evennia_scenes.models import Scene
+
+        scenes = Scene.all_objects.filter(title__in=SCENE_TITLES)
+        counts["scenes"] = scenes.count()
+        if not dry_run:
+            scenes.delete()
+
         return counts
 
     # ------------------------------------------------------------------
@@ -137,9 +221,20 @@ class Command(BaseCommand):
         counts["exits"] = self._create_exits(rooms)
         counts["objects"] = self._create_objects(rooms)
         counts["boards"] = self._create_boards()
-        counts["calendar_events"] = self._create_calendar_event()
-        counts["lore_entries"] = self._create_lore()
+        event = self._create_calendar_event()
+        counts["calendar_events"] = 1
+        entries = self._create_lore()
+        counts["lore_entries"] = len(entries)
         counts["plot_arcs"], counts["plot_threads"] = self._create_plot()
+
+        # Regions and maps come after the rooms and exits they describe, and
+        # before the scenes/links that light the tile overlays.
+        region = self._create_region(rooms)
+        counts["region_memberships"] = region.member_count()
+        counts["map_tiles"] = self._create_map(rooms)
+        scenes, live_scene = self._create_scenes(rooms)
+        counts["scenes"] = scenes
+        counts["overlay_links"] = self._link_overlays(region, entries, event, live_scene)
         return counts
 
     def _tag(self, obj):
@@ -157,6 +252,15 @@ class Command(BaseCommand):
             room.db.desc = f"{name}. Default sandbox content — safe to explore and pose in."
             if name == "Staff Lounge":
                 room.room_type = "ooc"
+            # MapsRoomMixin (typeclasses/rooms.py). set_terrain() rather than
+            # assigning terrain_tags, so terrain_changed fires and any tile
+            # already placed for this room refreshes its snapshot. Here the
+            # tiles do not exist yet, so it is place_tile() that reads these
+            # — the call still goes through the mixin so the seeded world
+            # matches what a builder typing the same thing would produce.
+            terrain = ROOM_TERRAIN.get(name)
+            if terrain:
+                room.set_terrain(terrain)
             self._tag(room)
             rooms[name] = room
         return rooms
@@ -164,25 +268,30 @@ class Command(BaseCommand):
     def _create_exits(self, rooms):
         from evennia.utils import create
 
-        # A simple hub-and-spoke layout, each spoke bidirectional.
-        links = [
-            ("Sandbox Plaza", "The Archive", "archive", "plaza"),
-            ("Sandbox Plaza", "Consulate Hall", "hall", "plaza"),
-            ("Sandbox Plaza", "Staff Lounge", "lounge", "plaza"),
-        ]
+        # A plus-shaped layout around the Plaza, each link bidirectional.
+        # Every exit carries a canonical direction as an alias (see
+        # ROOM_LINKS): evennia_maps' layout walks only exits it can resolve
+        # to a direction, and it matches the key *or* any alias — so "go
+        # archive" still works while the map still knows the Archive is
+        # north. Exits are created before any tile exists, so the
+        # auto-placement listener (evennia_maps.listeners) deliberately
+        # no-ops here; _create_map() derives the whole grid in one pass
+        # instead.
         count = 0
-        for a_name, b_name, a_to_b, b_to_a in links:
+        for a_name, b_name, (a_key, a_dir), (b_key, b_dir) in ROOM_LINKS:
             a, b = rooms[a_name], rooms[b_name]
             exit_a = create.create_object(
                 "typeclasses.exits.Exit",
-                key=a_to_b,
+                key=a_key,
+                aliases=[a_dir],
                 location=a,
                 destination=b,
             )
             self._tag(exit_a)
             exit_b = create.create_object(
                 "typeclasses.exits.Exit",
-                key=b_to_a,
+                key=b_key,
+                aliases=[b_dir],
                 location=b,
                 destination=a,
             )
@@ -242,31 +351,37 @@ class Command(BaseCommand):
 
         from evennia_calendar.models import CalendarEvent
 
-        CalendarEvent.create_event(
+        # Returned (not counted) because _link_overlays() attaches it to a
+        # scene: that link is the only path an event has to a room, and so the
+        # only way it reaches the map's upcoming_events overlay.
+        return CalendarEvent.create_event(
             creator=None,
             title=CALENDAR_EVENT_TITLE,
             scheduled_time=datetime.now(UTC) + timedelta(days=7),
             description="A seeded open event — RSVP with +rsvp.",
             emphasis=CalendarEvent.Emphasis.FREEFORM,
         )
-        return 1
 
     def _create_lore(self):
         from evennia_lore.models import LoreEntry
 
-        LoreEntry.create_entry(
-            title=LORE_TITLES[0],
-            author=None,
-            body="In the beginning, a handful of rooms and a brass plaque...",
-            privacy=LoreEntry.Privacy.PUBLIC,
-        )
-        LoreEntry.create_entry(
-            title=LORE_TITLES[1],
-            author=None,
-            body="Some say the Archive holds every seed this sandbox has ever grown.",
-            privacy=LoreEntry.Privacy.PUBLIC,
-        )
-        return 2
+        # Returned so _link_overlays() can attach these to the region — lore
+        # hangs off regions, never off rooms, which is why the has_lore overlay
+        # resolves each room's primary region before it can answer.
+        return [
+            LoreEntry.create_entry(
+                title=LORE_TITLES[0],
+                author=None,
+                body="In the beginning, a handful of rooms and a brass plaque...",
+                privacy=LoreEntry.Privacy.PUBLIC,
+            ),
+            LoreEntry.create_entry(
+                title=LORE_TITLES[1],
+                author=None,
+                body="Some say the Archive holds every seed this sandbox has ever grown.",
+                privacy=LoreEntry.Privacy.PUBLIC,
+            ),
+        ]
 
     def _create_plot(self):
         from django.db.models import Max
@@ -292,3 +407,118 @@ class Command(BaseCommand):
             description="A seeded thread — link scenes/posts/events to it and conclude it.",
         )
         return 1, 1
+
+    # ------------------------------------------------------------------
+    # Regions and maps
+    # ------------------------------------------------------------------
+
+    def _create_region(self, rooms):
+        """Put every seeded room in one region, each flagged primary.
+
+        Mirrors what +region/add-room does, including the is_primary flag on a
+        room's first membership: the map's primary_region overlay, the region
+        page's room list, and lore's has_lore overlay all read that one
+        deterministic answer per room.
+        """
+        from evennia_regions.models import Region, RegionMembership
+
+        region = Region.create_region(
+            name=REGION_NAME,
+            creator=None,
+            description="Everything within a short walk of the Sandbox Plaza.",
+        )
+        for name, room in rooms.items():
+            RegionMembership.objects.create(
+                region=region,
+                room=room,
+                room_name=name,
+                is_primary=True,
+            )
+        return region
+
+    def _create_map(self, rooms):
+        """Place the origin tile, then let layout derive the other five.
+
+        Only one coordinate pair is written by hand. layout.plan() walks the
+        canonical-direction exits out from the origin and returns the moves
+        that are mutually safe to write; placement.apply_plan() writes exactly
+        that set. Seeding it this way rather than with six literal (x, y) pairs
+        means the seed exercises the same code path a builder's +map/reflow
+        does, and a broken direction alias in ROOM_LINKS surfaces as a missing
+        tile rather than a silently wrong-but-placed grid.
+        """
+        from evennia_maps import layout, placement
+        from evennia_maps.models import MapPlane, RoomTile
+
+        plane = MapPlane.objects.create(
+            name=PLANE_NAME,
+            zstack="overworld",
+            elevation=0,
+            description="The surface layer of the sandbox's one and only continent.",
+        )
+        origin = rooms[ORIGIN_ROOM_NAME]
+        # Pinned: the origin anchors the derived grid, so a later +map/reflow
+        # started from somewhere else must not move it.
+        placement.place_tile(origin, plane, 0, 0, pinned=True)
+        placement.apply_plan(layout.plan(origin))
+        return RoomTile.objects.filter(plane=plane).count()
+
+    def _create_scenes(self, rooms):
+        """One live scene and one closed one, positioned to light the overlays.
+
+        The live scene sits in the Consulate Hall (has_active_scene, and — once
+        _link_overlays() attaches the event to it — upcoming_events); the
+        closed one sits in the Archive, which is what the heatmap
+        (recent_scene_count) and the popup's log links (recent_scenes) read.
+        Both are PUBLIC, so they show for anonymous web visitors rather than
+        for staff only. Returns (count, the live scene) — _link_overlays()
+        needs the live one, since a calendar event reaches a room only through
+        a scene.
+        """
+        from evennia_scenes.models import Scene
+
+        hall = rooms["Consulate Hall"]
+        live = Scene.objects.create(
+            title=SCENE_TITLES[0],
+            description="Doors open early; someone is already blocking out the staging.",
+            room=hall,
+            room_name=hall.key,
+            privacy=Scene.Privacy.PUBLIC,
+            status=Scene.Status.OPEN,
+        )
+        # The room-side half of evennia_scenes' integration contract (see
+        # typeclasses/rooms.py): consumers read the pk off the room without
+        # importing the contrib.
+        hall.active_scene_id = live.pk
+
+        archive = rooms["The Archive"]
+        closed = Scene.objects.create(
+            title=SCENE_TITLES[1],
+            description="Two archivists, one disputed shelf-mark, no witnesses.",
+            room=archive,
+            room_name=archive.key,
+            privacy=Scene.Privacy.PUBLIC,
+            status=Scene.Status.OPEN,
+        )
+        # close() rather than status=CLOSED at creation: close() is what stamps
+        # ended_at, and the heatmap window filters on ended_at — a hand-set
+        # status would produce a closed scene the map never counts.
+        closed.close()
+        return 2, live
+
+    def _link_overlays(self, region, entries, event, live_scene):
+        """The cross-domain links the tile overlays are actually driven by."""
+        from evennia_calendar.models import SceneCalendarLink
+        from evennia_lore.models import LoreRegionLink
+
+        count = 0
+        # Lore attaches to the region, not to a room: has_lore lights every
+        # room whose primary region has at least one published public entry.
+        for entry in entries:
+            LoreRegionLink.objects.create(entry=entry, region_id=region.pk)
+            count += 1
+        # An event reaches the map only through a scene — there is no
+        # CalendarEvent -> Room field anywhere in the calendar.
+        SceneCalendarLink.objects.create(event=event, scene_id=live_scene.pk)
+        count += 1
+        return count

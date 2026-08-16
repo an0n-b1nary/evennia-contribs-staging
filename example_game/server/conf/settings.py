@@ -55,6 +55,14 @@ INSTALLED_APPS += [
     "evennia_lore",
     "evennia_plots",
     "evennia_calendar",
+    # Regions/maps sit after the three overlay partners above (scenes, lore,
+    # calendar) purely for readability: each of those connects a tile-overlay
+    # provider from its own ready(), gated on evennia_maps being installed,
+    # and listing them in that order makes the gates read top-down. Django
+    # populates the whole app registry before any ready() runs, so
+    # apps.is_installed() in those gates does not actually depend on order.
+    "evennia_regions",
+    "evennia_maps",
     "evennia_jobs",
     "evennia_xp",
     "evennia_accessibility",
@@ -286,12 +294,41 @@ LORE_PASSIVE_LEAN_MULTIPLIER = Decimal("2.0")
 LORE_RPTRACKER_APP_LABEL = "evennia_rptracker"
 LORE_SCENES_APP_LABEL = "evennia_scenes"
 LORE_PLOTS_APP_LABEL = "evennia_plots"
-# evennia_regions does not exist in this repo yet (Maps/Regions haven't been
-# extracted). Left at the code default ("evennia_regions") — since that app
-# is never installed, region weighting simply stays inert (weight-0 signal),
-# which is harmless per the contrib's soft-partner matrix.
+# Regions is installed now, so this edge is live: lore's region weighting in
+# the passive trickle, its soft-ref cleanup on region deletion, and its
+# has_lore map overlay all resolve RegionMembership through this label.
+LORE_REGIONS_APP_LABEL = "evennia_regions"
 
 LORE_SESSION_CONTEXT_PROVIDER = "world.sandbox.glue.lore_session_context_provider"
+
+######################################################################
+# Regions configuration
+######################################################################
+
+REGIONS_STAFF_LOCK = "cmd:perm(Builder)"
+
+# REGIONS_MAPS_APP_LABEL is left unset: its code default ("evennia_maps")
+# already matches this game's maps app label, so the primary_region tile
+# overlay connects itself with no configuration at all.
+
+######################################################################
+# Maps configuration
+######################################################################
+
+MAPS_STAFF_LOCK = "cmd:perm(Builder)"
+
+# Ordered: the first tag present on a room's terrain_tags wins as the tile's
+# denormalized terrain. A room whose tags are all absent from this list
+# renders as a plain swatch, which is the intended fallback.
+MAPS_TERRAIN_PRECEDENCE = ["water", "forest", "hills", "urban"]
+
+# Deliberately absent: every overlay setting. The six overlay layers
+# (primary_region, has_active_scene, recent_scene_count, recent_scenes,
+# has_lore, upcoming_events) light up purely from which partner contribs are
+# in INSTALLED_APPS — that is the whole point of the collect_tile_overlays
+# signal design, and configuring it here would defeat it. MAPS_OVERLAY_URL_NAMES
+# is likewise left at its defaults, which already name the routes this game
+# mounts in web/website/urls.py.
 
 ######################################################################
 # Plots configuration
@@ -303,9 +340,16 @@ PLOTS_CALENDAR_APP_LABEL = "evennia_calendar"
 PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 
 ######################################################################
-# REST API — off by default in the sandbox (no urls.py wiring below);
-# flip on and wire web/urls.py if you want the browsable web surfaces.
+# REST API
 ######################################################################
+
+# Nothing to configure here. Evennia's settings_default already ships both
+# "rest_framework" and "django_filters" in INSTALLED_APPS and a REST_FRAMEWORK
+# block, and the contrib viewsets declare their own authentication,
+# permission, pagination and filter classes rather than relying on the
+# project-wide defaults — so mounting their routers (web/urls.py) is the only
+# step. REST_API_ENABLED stays False: that flag gates *Evennia's own* /api/
+# routes (objects, accounts, scripts), which this sandbox does not expose.
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

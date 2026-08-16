@@ -4,6 +4,14 @@ Room
 Rooms are simple containers that has no location of their own.
 
 Contrib sandbox extensions (mixin-based, no hand-rolled hooks):
+- `MapsRoomMixin` (evennia_maps) — terrain tags (`terrain_tags`) and
+  `set_terrain()`, which fires `terrain_changed` so a placed tile's
+  denormalized `RoomTile.terrain` stays in sync. Unlike the two mixins
+  below it takes no part in the cooperative `msg()`/appearance chain, so
+  its position in the MRO is free; it goes first to match the contrib's
+  own README example. Without it the map still works — nothing would call
+  `set_terrain()`, so tile terrain would just stay blank until a builder
+  ran `+map/check`.
 - `SocialRoomMixin` (evennia_social) — hangout-directory designation
   (`hangout_type`) and per-room teleport access control (`allow_teleport`),
   read by `+hangouts`/`+where`/`@tel`.
@@ -30,13 +38,14 @@ mixin):
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
 
+from evennia_maps.typeclasses import MapsRoomMixin
 from evennia_posing import PosingRoomMixin
 from evennia_social import SocialRoomMixin
 
 from .objects import ObjectParent
 
 
-class Room(SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom):
+class Room(MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom):
     """
     Rooms are like any Object, except their location is None
     (which is default). They also use basetype_setup() to

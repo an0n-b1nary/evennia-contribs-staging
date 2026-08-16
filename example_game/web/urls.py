@@ -26,6 +26,16 @@ urlpatterns = [
     path("webclient/", include("web.webclient.urls")),
     # web admin
     path("admin/", include("web.admin.urls")),
+    # Contrib REST API routers. Both are DRF DefaultRouters and are mounted
+    # at the same prefix, which is what each contrib's README documents:
+    # their route names (api-plane-*, api-region-*) are already distinct, and
+    # the maps live map finds its tile feed by reversing "api-plane-tiles"
+    # (MAPS_TILES_URL_NAME), so mounting either under a namespace would break
+    # that lookup. The one shared name is DRF's own "api-root" — the
+    # browsable index at /api/v1/ therefore lists only the first router's
+    # entry point; /api/v1/regions/ is reachable regardless.
+    path("api/v1/", include("evennia_maps.api.urls")),
+    path("api/v1/", include("evennia_regions.api.urls")),
     # add any extra urls here:
     # path("mypath/", include("path.to.my.urls.file")),
 ]
