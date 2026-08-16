@@ -9,7 +9,7 @@ website, the REST API, the static assets and the tile-overlay seam.
 | Source module | Contrib module | Notes |
 |---|---|---|
 | `world/maps/models.py` | `models.py` | Copied; `AbstractArchived` rebased from `evennia_links` (source game's own `world/utils/archiving.py`) |
-| `world/maps/signals.py` | `signals.py` | Copied; `collect_tile_overlays` carried over as a declared-but-unconnected signal — the web tile-overlay seam is a later phase |
+| `world/maps/signals.py` | `signals.py` | Copied. `collect_tile_overlays` shipped in 0.1.0 declared but unconnected; 0.2.0 sends it once per render and the partner contribs answer it (see "Cross-domain glue became signal providers" below) |
 | `world/maps/direction.py` | `direction.py` | Direct copy |
 | `world/maps/terrain.py` | `terrain.py` | Direct copy |
 | `world/maps/placement.py` | `placement.py` | Direct copy; import paths rebased to `evennia_maps.*` |
@@ -105,5 +105,27 @@ has no `DOTALL` flag, so those are not comments: their text renders into the pag
 `{% %}` inside them is parsed as a live tag. Fixed here (and across the other contribs
 shipping copies of the same partials); the source game's own copies are worth the same
 sweep.
+
+**Commands ship inside the package, not in a `commands/` folder.** The source game keeps
+every command module in one top-level `commands/` package (`commands/maps.py`,
+`commands/regions.py`, …) and its cmdsets import from there. A contrib has no such folder
+to put anything in — a game installs `evennia_maps`, so `CmdMap` has to be importable as
+`evennia_maps.commands.CmdMap`. This is the same shape every other contrib in this repo
+uses, and the reason the install instructions read
+`from evennia_maps.commands import CmdMap` rather than pointing at a game-local module.
+A game moving from the source layout deletes its `commands/maps.py` and changes one
+import in its `CharacterCmdSet`; the command's syntax, switches and lock are unchanged.
+
+**`is_room_web_visible()` is duplicated with `evennia-regions`, deliberately.** Both
+contribs publish room names on a web page, and both therefore need the same question
+answered — is this room fit to show a logged-out visitor? In the source game that lived
+once, in a shared `web/website/permissions.py`. Sharing it here would mean one of these
+two contribs depending on the other purely for a visibility predicate, and the pair is
+otherwise dependency-free in both directions — which is the property that lets a game
+install either one alone. So each ships the rule with its own settings hook
+(`MAPS_ROOM_VISIBILITY` / `REGIONS_ROOM_VISIBILITY`), and a game that overrides one and
+not the other gets exactly what it asked for. Keep the two implementations in step: the
+`getattr`-plus-AttributeHandler read and the fail-closed override resolution are both
+security-relevant, and a fix to one is a fix owed to the other.
 
 ## v0.1.0 extracted from source MUSH project at commit: _see git tag in private repo_

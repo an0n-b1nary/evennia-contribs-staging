@@ -184,6 +184,15 @@ detail page 404s once it is archived, so a room whose flagged primary is archive
 through to its next visible membership rather than linking the map to a dead page. Set
 `REGIONS_MAPS_APP_LABEL` if your game registers the maps app under a different label.
 
+The **label** appears as soon as the app is installed; the **link** needs this contrib's
+website URLconf mounted as well. `evennia-maps` reverses `evennia_regions:region-detail`
+and silently drops the role when it does not resolve, so a map in a game that installed
+regions but never mounted `evennia_regions.urls` labels its tiles with plain, unlinked
+region names and reports no error. See `example_game/` in this repo for the reference
+wiring — it installs this contrib beside `evennia-maps`, `-scenes`, `-lore` and
+`-calendar`, and `world/sandbox/tests.py::TestMapOverlaySeam` there is the end-to-end
+proof that all four providers answer one collect.
+
 ---
 
 ## Version history

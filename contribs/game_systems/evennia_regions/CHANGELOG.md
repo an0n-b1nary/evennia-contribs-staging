@@ -7,6 +7,29 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.1] — 2026-08-15 — docs
+
+Documentation only; no code, schema or behaviour change.
+
+- **Docs:** README's map-overlay section now separates the two halves of the integration.
+  The region *label* appears as soon as the app is installed; the *link* additionally
+  needs `evennia_regions.urls` mounted, because `evennia-maps` reverses
+  `evennia_regions:region-detail` and silently drops the role when it does not resolve.
+  The failure mode is unlinked tile labels and no error — worth stating outright.
+
+- **Docs:** both READMEs now point at `example_game/` in this repo as the reference
+  wiring: this contrib installed beside `evennia-maps`, `-scenes`, `-lore` and
+  `-calendar`, with `world/sandbox/tests.py::TestMapOverlaySeam` proving all four
+  providers answer a single `collect_tile_overlays`. No contrib's own suite can show
+  that, because none of them installs the other three.
+
+- **Docs:** `MIGRATION_NOTES.md` records the commands module's location as an explicit
+  divergence (`evennia_regions.commands` here, `commands/regions.py` in the source game),
+  and the `is_room_web_visible()` duplication note is updated now that `evennia-maps`
+  actually ships the matching seam rather than being expected to.
+
+---
+
 ## [0.2.0] — 2026-08-15 — map tile overlay
 
 - **Added:** `integrations/maps.py` — the `primary_region` map tile overlay. With

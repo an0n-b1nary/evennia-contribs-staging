@@ -7,7 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.1] — 2026-08-15 — overlay tests against real providers
 
 - **Changed:** the overlay tests now run with *exactly* the providers they connect,
   detaching whatever the host game wired up for the duration. They previously asserted
@@ -21,6 +21,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   guard proves the *map* asks once per render, using a fake provider. This one proves
   the answer stays flat with whatever partners the game actually installed, which is
   where an N+1 would really come from.
+
+- **Docs:** the README now names a worked example. `example_game/` in this repo installs
+  this contrib alongside `evennia-regions`, `-scenes`, `-lore` and `-calendar`, seeds a
+  six-room plane from one hand-placed origin tile, and proves all six overlay keys come
+  back from one collect (`world/sandbox/tests.py::TestMapOverlaySeam`). That test cannot
+  live here: this contrib's own suite has no partner contribs to install.
+
+- **Docs:** README "Overlays" now says outright that an outbound overlay link needs the
+  partner's **website URLconf mounted**, not merely its app installed.
+  `overlay_url_templates()` reverses each role and silently drops the ones that do not
+  resolve, so a game that installs `evennia-scenes` but never mounts
+  `evennia_scenes.urls` gets tile popups listing recent logs as unlinked text, with no
+  error anywhere to explain it.
+
+- **Docs:** `MIGRATION_NOTES.md` records two divergences it had left implicit — the
+  commands module's location, and the deliberate duplication of `is_room_web_visible()`
+  between this contrib and `evennia-regions` — and drops a stale note calling
+  `collect_tile_overlays` unconnected, which stopped being true in 0.2.0.
 
 ---
 

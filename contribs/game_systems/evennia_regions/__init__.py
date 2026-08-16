@@ -23,7 +23,7 @@ Web/API surface (requires [web] extra):
     from evennia_regions.api.views import RegionViewSet
 """
 
-__version__ = "0.1.1"
+__version__ = "0.2.1"
 
 from evennia_regions.signals import region_created
 

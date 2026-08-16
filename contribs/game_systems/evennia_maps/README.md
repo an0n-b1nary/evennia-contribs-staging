@@ -255,6 +255,33 @@ still renders. Outbound links are reversed from `MAPS_OVERLAY_URL_NAMES` (defaul
 `evennia_calendar:calendar-event-detail`); a name that does not resolve renders as
 plain text instead of a broken link.
 
+**Installing a partner is not the same as mounting it.** The overlay data arrives as
+soon as the partner app is in `INSTALLED_APPS` — the *link* out of the tile popup needs
+that partner's website URLconf mounted too, because `overlay_url_templates()` reverses
+each role and silently drops the ones that do not resolve. Install `evennia-scenes`
+without mounting `evennia_scenes.urls` and recent logs render as unlinked text, with no
+error anywhere to explain it. If you want the links, mount the pages.
+
+---
+
+## A worked example
+
+`example_game/` in this repo is the reference wiring, and the only place the whole seam
+can be shown working: it installs this contrib together with `evennia-regions`,
+`-scenes`, `-lore` and `-calendar`, so all four overlay providers are present at once.
+
+| What | Where |
+|---|---|
+| Settings, staff lock, terrain precedence — and **no overlay settings at all** | `server/conf/settings.py` |
+| The four website includes and the two DRF routers | `web/website/urls.py`, `web/urls.py` |
+| `MapsRoomMixin` on the game's Room typeclass | `typeclasses/rooms.py` |
+| A seeded plane: one hand-placed origin tile, five more derived by `layout.plan()` | `world/sandbox/management/commands/seed_sandbox.py` |
+| Proof that one collect returns all six overlay keys, from four different contribs | `world/sandbox/tests.py::TestMapOverlaySeam` |
+
+That last one cannot live in this contrib's own suite, which has no partner contribs to
+install — its overlay tests connect fakes instead, and deliberately detach whatever the
+host game connected so they keep testing the map rather than the ecosystem.
+
 ---
 
 ## Version history

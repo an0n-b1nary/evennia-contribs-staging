@@ -35,7 +35,7 @@ headless never pulls in Django REST Framework):
     evennia_maps.overlays    — the collect_tile_overlays seam and its contract
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from evennia_maps.signals import (
     collect_tile_overlays,

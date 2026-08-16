@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-maps"
-version = "0.2.0"
+version = "0.2.1"
 description = "A 2D coordinate map of your game's rooms, auto-grown from canonical exits, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

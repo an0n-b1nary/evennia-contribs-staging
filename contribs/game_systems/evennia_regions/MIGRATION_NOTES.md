@@ -55,8 +55,11 @@ the API.
 `room_type`/`allow_teleport` attribute names that come from another contrib
 (`evennia-social`'s `SocialRoomMixin`). The contrib ships the same default rule but
 exposes a dotted-path override for games with a different hiding convention. This is a
-deliberate two-line duplication rather than a dependency edge — `evennia-maps` is
-expected to ship the identical seam (`MAPS_ROOM_VISIBILITY`) rather than share one.
+deliberate duplication rather than a dependency edge: `evennia-maps` now ships the
+identical seam (`MAPS_ROOM_VISIBILITY`), which is what keeps the two contribs free of a
+dependency in either direction and lets a game install either one alone. Keep them in
+step — the AttributeHandler fallback and the fail-closed override resolution are both
+security-relevant, so a fix to one is a fix owed to the other.
 
 **The flag reads consult the AttributeHandler, not just `getattr`.** The source game reads
 `getattr(room, "room_type", "ic")`, which works there only because its own Room typeclass
@@ -85,5 +88,13 @@ renamed to `evennia_regions_one_primary_per_room` for the same collision-avoidan
 `evennia-lore` renames its constraints.
 
 **FK dependency pinned to `("objects", "__first__")`.** Portable across Evennia installs.
+
+**Commands ship inside the package, not in a `commands/` folder.** The source game keeps
+every command module in one top-level `commands/` package and its cmdsets import from
+there; a contrib has no such folder, so `CmdRegion` is importable as
+`evennia_regions.commands.CmdRegion` — the shape every contrib in this repo uses.
+`evennia-maps` made the same move for the same reason. A game moving from the source
+layout deletes its `commands/regions.py` and changes one import in its `CharacterCmdSet`;
+syntax, switches and lock are unchanged.
 
 ## v0.1.0 extracted from source MUSH project at commit: _see git tag in private repo_

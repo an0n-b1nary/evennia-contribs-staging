@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-regions"
-version = "0.2.0"
+version = "0.2.1"
 description = "Geographic grouping of rooms into named regions, with soft-archive and web views, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
