@@ -31,12 +31,20 @@ The seeded scenes/lore/event exist to light up all six tile overlays, so a
 fresh sandbox can be hand-checked at /map/<pk>/ and /map/<pk>/live/ without
 first creating content by hand.
 
+One room is deliberately *not* created: the Sandbox Plaza. The settings that
+name a spawn point (START_LOCATION, DEFAULT_HOME) have to hold dbrefs, because
+Evennia resolves them with ObjectDB.objects.get_id(), which does not take
+names. A Plaza created fresh on every run would move out from under them and
+strand each new character. So the room already living at that dbref - Limbo,
+made once by `evennia migrate` and never deleted - is re-dressed into the Plaza
+instead, and left untagged so the purge cannot remove it. See _origin_room().
+
 Usage:
     evennia seed_sandbox
     evennia seed_sandbox --dry-run
 """
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 SANDBOX_TAG = "sandbox_default"
 SANDBOX_TAG_CATEGORY = "sandbox"
@@ -49,7 +57,19 @@ ROOM_NAMES = [
     "Staff Lounge",
     "Garden Walk",
     "The Overlook",
+    "OOC Nexus",
 ]
+
+# The OOC hub, resolved by evennia_social from settings.OOC_ROOM_DBREF by
+# *name* (search_object matches names as well as dbrefs), which is what lets
+# this command purge and recreate it without the setting going stale.
+OOC_ROOM_NAME = "OOC Nexus"
+
+# Rooms that take a map tile - everything but the OOC hub, which hangs off a
+# direction-less flavor exit and so is never reached by layout.plan(). Tests
+# count against this rather than ROOM_NAMES so "not every room is mapped"
+# stays an asserted property instead of an off-by-one.
+MAPPED_ROOM_NAMES = [n for n in ROOM_NAMES if n != OOC_ROOM_NAME]
 BOARD_NAMES = ["General", "Cutscenes"]
 LORE_TITLES = ["The Founding of the Sandbox", "Rumors from the Archive"]
 PLOT_ARC_NAME = "Sandbox Genesis"
@@ -86,6 +106,16 @@ ROOM_LINKS = [
 # The room the map is anchored on: the one tile this command places by hand,
 # from which layout.plan() derives the rest.
 ORIGIN_ROOM_NAME = "Sandbox Plaza"
+
+# Exits carrying no direction alias. layout.plan() walks only exits it can
+# resolve to a canonical direction, so these deliberately do *not* extend the
+# map - which is why the OOC Nexus, reachable only through one of them, never
+# takes a tile. It doubles as the honest demo of the thing players trip on:
+# `@dig north=X` grows the map, `@dig gate=X` does not.
+# (from, to, exit key, return key)
+FLAVOR_LINKS = [
+    (ORIGIN_ROOM_NAME, OOC_ROOM_NAME, "nexus", "plaza"),
+]
 
 
 class Command(BaseCommand):
@@ -240,17 +270,51 @@ class Command(BaseCommand):
     def _tag(self, obj):
         obj.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
 
+    def _origin_room(self):
+        """Return the permanent room settings.START_LOCATION points at.
+
+        This is the one room the seeder re-dresses rather than creates, and the
+        reason is that START_LOCATION/DEFAULT_HOME must be dbrefs: Evennia
+        resolves them with ObjectDB.objects.get_id(), which does not accept
+        names. A Plaza created fresh each run would take a new dbref every time
+        and leave those settings pointing at a deleted room, so every new
+        character would spawn nowhere.
+
+        Limbo (#2) is created once by `evennia migrate` and never deleted, so it
+        is the only dbref stable across both a reseed and a golden-DB restore.
+        The room is left deliberately untagged so _purge() cannot remove it.
+        """
+        from django.conf import settings
+        from evennia.objects.models import ObjectDB
+
+        dbref = getattr(settings, "START_LOCATION", None)
+        room = ObjectDB.objects.get_id(dbref) if dbref else None
+        if room is None:
+            raise CommandError(
+                f"settings.START_LOCATION ({dbref!r}) resolves to no object. It must be "
+                "the dbref of an existing room - normally '#2', Limbo."
+            )
+        return room
+
     def _create_rooms(self):
         from evennia.utils import create
 
         rooms = {}
         for name in ROOM_NAMES:
-            room = create.create_object(
-                "typeclasses.rooms.Room",
-                key=name,
-            )
+            if name == ORIGIN_ROOM_NAME:
+                room = self._origin_room()
+                room.key = name
+                # Reset rather than assume: this room survives every purge, so
+                # anything a builder changed on it last session is still here.
+                room.room_type = "ic"
+            else:
+                room = create.create_object(
+                    "typeclasses.rooms.Room",
+                    key=name,
+                )
+                self._tag(room)
             room.db.desc = f"{name}. Default sandbox content — safe to explore and pose in."
-            if name == "Staff Lounge":
+            if name in ("Staff Lounge", OOC_ROOM_NAME):
                 room.room_type = "ooc"
             # MapsRoomMixin (typeclasses/rooms.py). set_terrain() rather than
             # assigning terrain_tags, so terrain_changed fires and any tile
@@ -259,9 +323,11 @@ class Command(BaseCommand):
             # — the call still goes through the mixin so the seeded world
             # matches what a builder typing the same thing would produce.
             terrain = ROOM_TERRAIN.get(name)
-            if terrain:
+            if terrain or name == ORIGIN_ROOM_NAME:
+                # set_terrain() replaces, so calling it unconditionally for the
+                # surviving origin room clears last run's terrain instead of
+                # letting it accumulate.
                 room.set_terrain(terrain)
-            self._tag(room)
             rooms[name] = room
         return rooms
 
@@ -297,6 +363,18 @@ class Command(BaseCommand):
             )
             self._tag(exit_b)
             count += 2
+
+        for a_name, b_name, a_key, b_key in FLAVOR_LINKS:
+            a, b = rooms[a_name], rooms[b_name]
+            for source, destination, key in ((a, b, a_key), (b, a, b_key)):
+                flavor_exit = create.create_object(
+                    "typeclasses.exits.Exit",
+                    key=key,
+                    location=source,
+                    destination=destination,
+                )
+                self._tag(flavor_exit)
+                count += 1
         return count
 
     def _create_objects(self, rooms):
@@ -428,6 +506,11 @@ class Command(BaseCommand):
             description="Everything within a short walk of the Sandbox Plaza.",
         )
         for name, room in rooms.items():
+            if name == OOC_ROOM_NAME:
+                # An OOC hub is not IC geography. No tile, no membership - so
+                # the primary_region overlay and the region page's room list
+                # both stay honestly in-character.
+                continue
             RegionMembership.objects.create(
                 region=region,
                 room=room,
