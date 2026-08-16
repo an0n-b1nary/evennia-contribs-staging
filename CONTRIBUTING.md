@@ -38,12 +38,14 @@ This repo is primarily a one-way extraction channel from upstream consumers, not
 
 ## Maintainer setup (anonymity guards)
 
-This repo ships three coordinated anonymity guards. All read from the same gitignored `.anonymity-patterns` file, so the public repo never reveals what is being blocked.
+This repo ships five coordinated anonymity guards. All read from the same gitignored `.anonymity-patterns` file, so the public repo never reveals what is being blocked.
 
 | Guard | Stage | Catches |
 | --- | --- | --- |
 | `anonymity-guard` | pre-commit | Forbidden strings in **file contents** of staged files. |
 | `anonymity-identity-guard` | pre-commit | Forbidden strings in `git config user.name`/`user.email` or `GIT_{AUTHOR,COMMITTER}_*` env vars. |
+| `file_issue.py` | before `gh` | Forbidden strings in an **issue title or body** you are about to publish. Not a hook — a wrapper you call instead of `gh issue create`. |
+| `anonymity-issues.yml` | GitHub Actions | Forbidden strings in any issue or comment, however it was filed. Redacts, labels `anonymity-hold`, closes and locks; deletes an offending comment. |
 | `anonymity-push-guard` | pre-push | Pushes to `github.com/<handle>/*` (where `<handle>` is `git config anonymity.expected-gh-account`) where any commit's author/committer matches a forbidden pattern, OR where the active `gh` account does not equal that handle. If the config key is unset, the guard is inactive — external clones and forks are unaffected by default. |
 
 One-time setup per clone:
@@ -75,6 +77,37 @@ pre-commit run --all-files --hook-stage pre-commit
 ```
 
 If `.anonymity-patterns` is missing, every guard skips with a warning rather than failing — that way external contributors aren't blocked by maintainer-only config.
+
+### Issues are not covered by the pre-commit hooks
+
+Nothing about an issue passes through git, so the pre-commit guards never see
+one. File through the wrapper instead of `gh` directly:
+
+```bash
+python scripts/file_issue.py create --title "..." --body-file draft.md --label bug
+python scripts/file_issue.py comment 7 --body-file reply.md
+
+# scan without publishing:
+python scripts/file_issue.py create --title "..." --body-file draft.md --dry-run
+```
+
+Unlike the pre-commit hook — which *skips* when `.anonymity-patterns` is absent,
+so external clones are not blocked by config they were never given — the wrapper
+**fails closed**. A missing patterns file at commit time means "not the
+maintainer's clone"; at publish time it means "about to publish, with no idea
+what is forbidden".
+
+`.github/workflows/anonymity-issues.yml` sweeps every issue and comment
+server-side, so the web UI and the API are covered too. Be clear about what that
+buys: it runs after publication. GitHub emails watchers the original text on
+submit and exposes it on the public events firehose, and no amount of editing
+recalls either. The sweep closes the web-visible copy and raises an alarm; it
+does not un-publish anything. The wrapper is the control that actually prevents.
+
+The sweep never logs what it matched. Actions logs on a public repo are
+world-readable, so printing the offending line — or even the pattern that caught
+it — would republish the leak somewhere more durable than the issue. It reports
+counts only.
 
 ## Code style
 

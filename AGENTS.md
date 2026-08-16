@@ -18,6 +18,21 @@ source project", "an upstream MUSH game". The pre-commit anonymity guard
 import-statement forms of source-tree paths (`from world.<app> …`), and it
 must pass on every commit. `PLAN.md` is gitignored and must stay that way.
 
+**Issues and comments are not commits, so no hook protects them.** Never call
+`gh issue create` or `gh issue comment` against this repo directly. Use:
+
+```bash
+python scripts/file_issue.py create --title "..." --body-file draft.md --label chore
+python scripts/file_issue.py comment 7 --body-file reply.md
+python scripts/file_issue.py create --title "..." --body-file draft.md --dry-run
+```
+
+It scans the title and the body, fails closed when `.anonymity-patterns` is
+absent, and calls `gh` only once both are clean. A server-side sweep
+(`.github/workflows/anonymity-issues.yml`) redacts anything that gets in by
+another route, but it runs *after* GitHub has already emailed the original to
+every watcher — treat it as an incident alarm, not as cover.
+
 ## Layout
 
 - `contribs/{base_systems,game_systems,utils}/<name>/` — the packages, each

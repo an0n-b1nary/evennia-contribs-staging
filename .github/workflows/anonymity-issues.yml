@@ -1,0 +1,51 @@
+# Anonymity sweep for issues and issue comments.
+#
+# The pre-commit anonymity guards protect files on their way into git. Issues
+# never touch git, so nothing protects them — this workflow is that backstop,
+# and it covers the web UI, the mobile app and the API alike.
+#
+# It runs *after* publication and cannot undo the notification emails GitHub
+# has already sent, so it is a net under the local wrapper
+# (`scripts/file_issue.py`), not a replacement for it. See the module docstring
+# in scripts/anonymity_issue_guard.py.
+name: Anonymity sweep (issues)
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+
+# The sweep rewrites issues and deletes comments; it reads no code beyond this
+# repo's own scripts.
+permissions:
+  issues: write
+  contents: read
+
+# Serialize per issue so an edit landing mid-redaction cannot race it.
+concurrency:
+  group: anonymity-issues-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Same secret the lint job uses. If it is unset the file lands empty,
+      # require_patterns() raises, and the job fails — which is the intended
+      # behaviour: a sweep that checks nothing must not report success.
+      - name: Write anonymity patterns from secret
+        env:
+          ANONYMITY_PATTERNS: ${{ secrets.ANONYMITY_PATTERNS }}
+        run: printf '%s\n' "$ANONYMITY_PATTERNS" > .anonymity-patterns
+
+      - name: Scan and redact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/anonymity_issue_guard.py
