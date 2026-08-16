@@ -110,7 +110,105 @@ class TestContribSettings(EvenniaTestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestSeededMapWorld(EvenniaTest):
+class SeededSandboxMixin:
+    """Run seed_sandbox with START_LOCATION pointed at a room that exists.
+
+    In a live game START_LOCATION is "#2" - Limbo, which `evennia migrate`
+    creates and nothing deletes. That is the whole reason the seeder re-dresses
+    that room rather than making a Plaza whose dbref would drift (see
+    seed_sandbox.py::_origin_room). Evennia's test fixtures never run
+    initial_setup, so in a test database #2 is whichever object the fixture
+    happened to create second - quite possibly a Character, which has no
+    set_terrain().
+
+    Overriding the setting to room1 for the duration of each test lets the
+    seeder take its real path here instead of some test-only fallback, and it
+    leaves char1 standing in the Plaza, which is what a real player sees.
+    """
+
+    def setUp(self):
+        super().setUp()
+        origin = self.settings(START_LOCATION=f"#{self.room1.id}")
+        origin.enable()
+        self.addCleanup(origin.disable)
+        call_command("seed_sandbox", verbosity=0)
+
+
+def _search_room(key):
+    from evennia.utils.search import search_object
+
+    matches = search_object(key)
+    assert matches, f"no room named {key!r}"
+    return matches[0]
+
+
+class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
+    """A new character lands in the seeded world, not in stock Limbo.
+
+    These pin the arrangement documented in settings.py's "Spawn points" block.
+    They fail if someone repoints START_LOCATION at a room the seeder creates
+    (whose dbref moves on every rebuild), or renames the OOC hub without
+    updating OOC_ROOM_DBREF.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_spawn_settings_are_dbrefs(self):
+        # Not cosmetic: ObjectDB.objects.get_id() accepts a dbref and nothing
+        # else, so a room name here resolves to None and strands the character.
+        self.assertTrue(settings.DEFAULT_HOME.startswith("#"))
+        self.assertTrue(settings.START_LOCATION.startswith("#"))
+
+    def test_start_location_resolves_to_the_plaza(self):
+        from evennia.objects.models import ObjectDB
+
+        from world.sandbox.management.commands.seed_sandbox import ORIGIN_ROOM_NAME
+
+        room = ObjectDB.objects.get_id(settings.START_LOCATION)
+        self.assertIsNotNone(room)
+        self.assertEqual(room.key, ORIGIN_ROOM_NAME)
+
+    def test_the_origin_room_survives_a_reseed(self):
+        # The point of the whole arrangement: reseeding must not move the room
+        # the spawn settings name.
+        from evennia.objects.models import ObjectDB
+
+        from world.sandbox.management.commands.seed_sandbox import ORIGIN_ROOM_NAME
+
+        before = ObjectDB.objects.get_id(settings.START_LOCATION).id
+        call_command("seed_sandbox", verbosity=0)
+        after = ObjectDB.objects.get_id(settings.START_LOCATION)
+        self.assertIsNotNone(after)
+        self.assertEqual(before, after.id)
+        self.assertEqual(after.key, ORIGIN_ROOM_NAME)
+
+    def test_ooc_room_setting_resolves_by_name(self):
+        # OOC_ROOM_DBREF holds a *name*; evennia_social resolves it with
+        # search_object(), which is what lets the hub be recreated each seed.
+        from evennia_social.commands.navigation import _resolve_ooc_room
+        from world.sandbox.management.commands.seed_sandbox import OOC_ROOM_NAME
+
+        room = _resolve_ooc_room()
+        self.assertIsNotNone(room)
+        self.assertEqual(room.key, OOC_ROOM_NAME)
+
+    def test_the_ooc_hub_is_reachable_but_unmapped(self):
+        # Joined by a flavor exit carrying no direction alias, so layout.plan()
+        # never walks to it: reachable on foot, absent from the grid.
+        from evennia_maps.models import RoomTile
+        from world.sandbox.management.commands.seed_sandbox import (
+            OOC_ROOM_NAME,
+            ORIGIN_ROOM_NAME,
+        )
+
+        nexus = _search_room(OOC_ROOM_NAME)
+        plaza = _search_room(ORIGIN_ROOM_NAME)
+        self.assertIn(nexus, [ex.destination for ex in plaza.exits])
+        self.assertFalse(RoomTile.objects.filter(room=nexus).exists())
+
+
+class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
     """seed_sandbox builds a real, mapped world.
 
     Running the management command rather than hand-building rows: the seed is
@@ -122,20 +220,19 @@ class TestSeededMapWorld(EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
 
-    def setUp(self):
-        super().setUp()
-        call_command("seed_sandbox", verbosity=0)
-
-    def test_every_seeded_room_gets_a_tile(self):
+    def test_every_mapped_room_gets_a_tile(self):
         from evennia_maps.models import MapPlane, RoomTile
-        from world.sandbox.management.commands.seed_sandbox import PLANE_NAME, ROOM_NAMES
+        from world.sandbox.management.commands.seed_sandbox import (
+            MAPPED_ROOM_NAMES,
+            PLANE_NAME,
+        )
 
         plane = MapPlane.objects.get(name=PLANE_NAME)
         tiles = RoomTile.objects.filter(plane=plane)
-        self.assertEqual(tiles.count(), len(ROOM_NAMES))
+        self.assertEqual(tiles.count(), len(MAPPED_ROOM_NAMES))
         self.assertEqual(
             {tile.room_name for tile in tiles},
-            set(ROOM_NAMES),
+            set(MAPPED_ROOM_NAMES),
         )
 
     def test_the_grid_matches_the_exits_it_was_derived_from(self):
@@ -173,16 +270,16 @@ class TestSeededMapWorld(EvenniaTest):
         # here rather than quietly doubling the world.
         from evennia_maps.models import MapPlane, RoomTile
         from evennia_regions.models import RegionMembership
-        from world.sandbox.management.commands.seed_sandbox import ROOM_NAMES
+        from world.sandbox.management.commands.seed_sandbox import MAPPED_ROOM_NAMES
 
         call_command("seed_sandbox", verbosity=0)
 
         self.assertEqual(MapPlane.objects.count(), 1)
-        self.assertEqual(RoomTile.objects.count(), len(ROOM_NAMES))
-        self.assertEqual(RegionMembership.objects.count(), len(ROOM_NAMES))
+        self.assertEqual(RoomTile.objects.count(), len(MAPPED_ROOM_NAMES))
+        self.assertEqual(RegionMembership.objects.count(), len(MAPPED_ROOM_NAMES))
 
 
-class TestMapOverlaySeam(EvenniaTest):
+class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
     """All six overlay layers light up, from four different contribs.
 
     This is the end-to-end proof the extraction plan asks for: evennia_maps
@@ -196,7 +293,6 @@ class TestMapOverlaySeam(EvenniaTest):
 
     def setUp(self):
         super().setUp()
-        call_command("seed_sandbox", verbosity=0)
         from evennia_maps.models import RoomTile
 
         self.tiles = list(RoomTile.objects.select_related("plane").all())
@@ -285,7 +381,7 @@ class TestMapOverlaySeam(EvenniaTest):
         self.assertEqual(few, many)
 
 
-class TestMapWebSurface(EvenniaTest):
+class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
     """The routes this game mounts, rendered and reversed for real.
 
     Both halves catch faults no contrib test can see. A contrib's own suite
@@ -299,7 +395,6 @@ class TestMapWebSurface(EvenniaTest):
 
     def setUp(self):
         super().setUp()
-        call_command("seed_sandbox", verbosity=0)
         self.factory = RequestFactory()
 
     def _render(self, view, path_, **kwargs):

@@ -124,12 +124,36 @@ OPTIONS_ACCOUNT_DEFAULT["highlight_others_color"] = (
 )
 
 ######################################################################
+# Spawn points - where a new character starts, and falls back to
+######################################################################
+
+# Both must stay *dbrefs*. Evennia resolves them with
+# ObjectDB.objects.get_id() (evennia/accounts/accounts.py:962), which accepts a
+# dbref and nothing else - a room name here yields no location at all and
+# strands the new character. That rules out pointing them at a room the seeder
+# creates, whose dbref changes on every rebuild.
+#
+# #2 is Limbo: created once by `evennia migrate` and never deleted, it is the
+# one dbref that survives both a reseed and a golden-DB restore. So rather than
+# chase a moving dbref, `evennia seed_sandbox` re-dresses #2 *into* the Sandbox
+# Plaza instead of creating the Plaza fresh (see seed_sandbox.py::_origin_room).
+# These two match Evennia's own defaults and are spelled out only because the
+# seeder now depends on them.
+START_LOCATION = "#2"
+DEFAULT_HOME = "#2"
+
+######################################################################
 # Social (evennia-social) — see its README §"Register the settings this
 # contrib reads".
 ######################################################################
 
-# Dbref of the OOC hub room. Required for +ooc and +home's fallback.
-OOC_ROOM_DBREF = "#2"
+# The OOC hub. Required for +ooc and +home's fallback. Despite the setting's
+# name, evennia_social resolves it with search_object()
+# (evennia_social/commands/navigation.py:_resolve_ooc_room), which matches a
+# room *name* as happily as a dbref — and a name is what we want here, because
+# the OOC Nexus is purged and recreated on every `evennia seed_sandbox`, so its
+# dbref drifts while its name does not.
+OOC_ROOM_DBREF = "OOC Nexus"
 
 # "visited" restricts player @tel to rooms they've visited or control;
 # "open" allows any public room.
