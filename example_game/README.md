@@ -57,23 +57,39 @@ as it lands.
 
 ### The map, and the web surface
 
-This is the first sandbox wiring that mounts contrib **web** routes.
-`web/website/urls.py` mounts four of them and `web/urls.py` mounts the two
-DRF routers:
+**Every contrib web surface is mounted.** `web/website/urls.py` mounts all
+nine; `web/urls.py` mounts the two DRF routers:
 
 | Route | Contrib | What it is |
 |---|---|---|
 | `/map/`, `/map/<pk>/`, `/map/<pk>/live/` | `evennia_maps` | Plane list, static SVG grid, Leaflet live map |
 | `/regions/`, `/regions/<pk>/` | `evennia_regions` | Region list and detail |
-| `/scenes/…`, `/calendar/…` | `evennia_scenes`, `evennia_calendar` | Mounted because the **map links out to them** — see below |
-| `/api/v1/planes/…`, `/api/v1/regions/…` | both | Read-only DRF feeds; the live map pulls tiles from the first |
+| `/scenes/…` | `evennia_scenes` | Scene list, detail, logs |
+| `/calendar/…` | `evennia_calendar` | Event list and detail |
+| `/plots/…` | `evennia_plots` | Plot list, detail, updates, tags |
+| `/boards/…` | `evennia_boards` | Board list, posts, post history |
+| `/lore/…` | `evennia_lore` | Compendium, approval queue, version diffs |
+| `/jobs/…` | `evennia_jobs` | The queue you triage `+bug` and `+request` from |
+| `/xp/` | `evennia_xp` | XP summary |
+| `/api/v1/planes/…`, `/api/v1/regions/…` | maps, regions | Read-only DRF feeds; the live map pulls tiles from the first |
 
-Scenes and calendar are mounted for a specific reason:
+**Namespacing differs per contrib, and the wrong choice breaks pages rather
+than failing quietly.** `evennia_maps`, `-regions`, `-calendar` and `-plots`
+declare `app_name`, so a bare `include()` namespaces them. `evennia_scenes` and
+`evennia_boards` reverse through a namespace but declare no `app_name`, so it
+is supplied here as an explicit `(module, namespace)` 2-tuple. `evennia_lore`,
+`-jobs` and `-xp` reverse their routes **bare** (`{% url 'lore-list' %}`) and
+must be mounted *without* a namespace — wrapping them would make every link in
+their templates a `NoReverseMatch`. `TestEveryWebSurfaceIsMounted` in
+`world/sandbox/tests.py` reverses and fetches all nine landing pages, which is
+the only place that can catch a wrong choice: a contrib's own suite mounts a
+URLconf containing that contrib alone.
+
+Scenes and calendar would earn their mounts even if nothing else did:
 `evennia_maps.overlays.overlay_url_templates()` reverses
 `evennia_scenes:scene-detail` and `evennia_calendar:calendar-event-detail`
 and silently drops whichever does not resolve, so without those two includes
-the tile popups would list recent logs and upcoming events as plain text. The
-remaining web surfaces (boards, lore, plots, jobs, xp) stay unmounted for now.
+the tile popups would list recent logs and upcoming events as plain text.
 
 **Six tile overlays, zero overlay settings.** `evennia_maps` knows where rooms
 are and nothing else. Once per map render it sends `collect_tile_overlays`,
@@ -85,6 +101,76 @@ rooms they know about, from providers they connect themselves in their own
 partner and its layer is simply absent. `world/sandbox/tests.py`
 (`TestMapOverlaySeam`) is the end-to-end proof, and it can only live here: no
 contrib's own suite installs the other three.
+
+### The seeded world: an OOC wing and an IC grid
+
+The world is in two halves, and the split is the tutorial.
+
+**The OOC wing** is eight rooms, hub-and-spoke off the **Arrival Hall**, which
+is also where new characters spawn and where `+ooc` returns you. Each spoke
+carries one command family and one brass plaque naming its commands:
+
+| Room | Contribs | Commands |
+|---|---|---|
+| Arrival Hall | — | `+sandbox`, `+sandbox/builder` |
+| Posing Studio | `evennia_posing` | `+pot`, `emit`, `semipose`, `+poseheader`, `+highlight`, `+lastpose` |
+| Scene Room | `-scenes`, `-rptracker` | `+scene`, `+log`, `+rptracker`, `+activity` |
+| Social Commons | `-social` | `page`, `+finger`, `+where`, `+hangouts`, `+join`, `+summon`, `+home`, `+ooc`, `+ignore`, `+roomconfig`, `+roulette`, `@tel` |
+| Story Office | `-plots`, `-calendar` | `+plot`, `+arc`, `+hook`, `+calendar`, `+rsvp` |
+| Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
+| Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
+| Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
+
+`evennia_accessibility` and `evennia_links` get no room: the first has no
+commands at all (it is web/MXP-side, and shows up in the account options and
+the site), the second is a pure seam library.
+
+**The IC world** is reached through the single direction-less `grid` exit from
+the hall. Those rooms are mapped, region-membered, and carry no plaques — they
+are meant to read as setting and to demonstrate the map structurally, through
+terrain and overlay data rather than by explaining themselves.
+
+**Three things keep the wing off the map**, and the redundancy is deliberate:
+every wing exit is direction-less (so `layout.plan()`, a *read* path, never
+walks in); every wing room is `room_type="ooc"` and
+`MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)` (so the auto-placement listener, a
+*write* path, refuses even when somebody digs a real direction); and no wing
+room is given a region membership.
+
+**The Drafting Room is the one exception, on purpose.** It holds a pinned tile
+on a second plane, `Sandbox Scratch`, because `evennia_maps`' auto-placement
+listener only fires when the room being dug *from* is already mapped — an
+unmapped drafting room would make `@dig north=X` a silent no-op, which is the
+exact trap the room exists to teach around. A separate plane means playtester
+experiments never collide with the IC grid. `+map/check` reports that tile,
+which is the honest outcome: the setting guards the listener, not the explicit
+write path the seeder uses.
+
+**Two rooms and one plane survive `+sandbox/reset`.** The Arrival Hall (it is
+dbref `#2`, which is what `START_LOCATION` must point at) and the Drafting Room
+plus its scratch plane — because rooms a playtester digs hang off that room,
+and purging it would cascade their exits away and orphan everything they built.
+They carry `STABLE_TAG` rather than `SANDBOX_TAG`, and `_stray_rooms()` in
+`commands/sandbox.py` counts against both tags so the "rooms made by hand"
+number still reads zero on an untouched sandbox.
+
+### Editing what the demo says
+
+**All player-visible prose lives in `world/sandbox/content.py`**, keyed by
+stable slug. `seed_sandbox.py` imports from it and contains no prose at all.
+
+The split exists because the two halves have different lifetimes. The seeder
+purges Evennia objects by *tag*, but plain Django rows — regions, planes, lore,
+boards, scenes — have no tag handler and are purged by *name*, which makes a
+name a de-facto primary key: rename a region between runs and the second run
+cannot find the first run's row, so the seed stops being idempotent. Slugs are
+the stable identity; names and descriptions are free to change.
+
+Every description, plaque and the connection screen ships as `[Placeholder]`
+plus a one-line summary of what it should convey. Room *names* and the
+`commands` lists are not placeholders — the first are signposts a playtester
+has to be able to guess, the second are literal command names, so both are
+documentation rather than voice.
 
 ### Playtester controls (`+sandbox`)
 
@@ -583,7 +669,7 @@ Three mechanisms, for three different needs:
 - **`+sandbox/reset`** (in-game, `perm(Admin)`) — runs `seed_sandbox`
   in-process, so no restart and nobody is disconnected. Reports how many
   rooms were made by hand and therefore survive the purge; anyone standing in
-  a purged room is sent home to the Sandbox Plaza. This is the one to use
+  a purged room is sent home to the Arrival Hall. This is the one to use
   during a playtest.
 - **`evennia seed_sandbox`** — content-only. Purges and rebuilds the default
   rooms/exits/board/calendar-event/lore/plot content plus the region, the map
@@ -602,21 +688,26 @@ Three mechanisms, for three different needs:
    collision.
 2. **Reachability** — `https://sandbox.YOURDOMAIN/` (webclient) and
    `telnet sandbox.YOURDOMAIN 4100` both connect.
-3. **Every contrib runs** — one command each, no import/lock/settings
-   errors: `+bb`, `+calendar`, `+request`, `+lore`, `+plot`, `+xp`,
-   `+activity`, `+scene`, `+pot`, `+lastpose`, `+finger`, `+where`,
-   `+hangouts`, `+region`, `+map`, `page`.
+3. **Every contrib runs** — walk the OOC wing and run what each plaque
+   names. Eight rooms, hub-and-spoke off the Arrival Hall, covering all ~42
+   commands: Posing Studio, Scene Room, Social Commons, Story Office, Lore
+   Archive, Help Desk, Drafting Room. No import/lock/settings errors.
 4. **A new account lands in the world** — register a fresh account (not
    Account #1, which is a superuser and bypasses every lock) and confirm it
-   spawns in the Sandbox Plaza rather than stock Limbo, and that `+ooc` moves
-   it to the OOC Nexus. This is the whole `START_LOCATION`/`DEFAULT_HOME`/
-   `OOC_ROOM_DBREF` arrangement, end to end.
+   spawns in the Arrival Hall rather than stock Limbo, and that `+ooc` from
+   one of the spokes brings it back there. This is the whole
+   `START_LOCATION`/`DEFAULT_HOME`/`OOC_ROOM_DBREF` arrangement, end to end.
 5. **The Builder toggle flips both halves** — as that fresh account, run
    `help` and note that `+jobs`, `+discuss` and `+rptracker` are absent; run
    `+sandbox/builder on` and confirm all three appear and that
-   `+map/place`/`+region/create` stop refusing; run `@dig north=A New Room`
-   and confirm the map grew on its own, then `@dig gate=Another Room` and
-   confirm it did not. `+sandbox/builder off` puts it all back.
+   `+map/place`/`+region/create` stop refusing; then **from the Drafting
+   Room** run `@dig north=A New Room` and confirm the map grew on its own,
+   and `@dig gate=Another Room` and confirm it did not. The Drafting Room is
+   where this works because it is the one OOC room holding a tile — the
+   auto-placement listener only fires from an already-mapped source, so the
+   same commands typed in any other wing room do nothing at all, silently.
+   Confirm the new rooms landed on `Sandbox Scratch`, not on the IC plane.
+   `+sandbox/builder off` puts it all back.
 6. **Seams fire** — pose in a seeded room; the pose fires evennia_posing's
    `pose_recorded` signal, which the listener in `world/sandbox/glue.py`
    fans out to `capture_to_scene` and `record_rp_activity` — confirm with
@@ -627,14 +718,19 @@ Three mechanisms, for three different needs:
 8. **In-game reset works** — after step 5 dug a room or two, run
    `+sandbox/reset` as staff: the seeded world comes back, your account and
    character survive, and the reported count of hand-made rooms matches what
-   you dug.
+   you dug. Then confirm the rooms you dug are **still reachable from the
+   Drafting Room** and still hold their scratch-plane tiles — that room and
+   the scratch plane are both exempt from the purge precisely so the reset
+   cannot orphan what a playtester built.
 9. **Golden reset works** — make a throwaway change, run
    `scripts/reset_to_golden.sh`, confirm the world is back to default.
    (Requires the snapshot from step 6 above; see the note there.)
-10. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`;
-    `/map/<pk>/` draws the six *mapped* rooms as an SVG plus grid, with the
-    Archive north of the Plaza. The OOC Nexus is deliberately absent: it hangs
-    off a direction-less flavor exit, so `layout.plan()` never reaches it.
+10. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`
+    and `Sandbox Scratch`; `/map/<pk>/` draws the five *mapped* IC rooms as an
+    SVG plus grid, with the Archive north of the Plaza. The whole OOC wing is
+    deliberately absent, and doubly so: its exits carry no direction aliases,
+    and `MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)` stops the auto-placer mapping
+    those rooms even if somebody digs a real direction into one.
     `/map/<pk>/live/` loads Leaflet with the elevation control. This is the
     one step no test replaces: a static SVG page and a client-side Leaflet
     render fail in different ways.

@@ -147,13 +147,20 @@ DEFAULT_HOME = "#2"
 # contrib reads".
 ######################################################################
 
-# The OOC hub. Required for +ooc and +home's fallback. Despite the setting's
-# name, evennia_social resolves it with search_object()
-# (evennia_social/commands/navigation.py:_resolve_ooc_room), which matches a
-# room *name* as happily as a dbref — and a name is what we want here, because
-# the OOC Nexus is purged and recreated on every `evennia seed_sandbox`, so its
-# dbref drifts while its name does not.
-OOC_ROOM_DBREF = "OOC Nexus"
+# The OOC hub, which is the Arrival Hall - the room new characters spawn into
+# and the middle of the OOC wing's hub-and-spoke. Required for +ooc and +home's
+# fallback. Despite the setting's name, evennia_social resolves it with
+# search_object() (evennia_social/commands/navigation.py:_resolve_ooc_room),
+# which matches a room *name* as happily as a dbref.
+#
+# Pointing +ooc at the room a player is already standing in would make the
+# command demo as a no-op, so the wing puts the commands it teaches out on the
+# spokes and keeps the hub as the place they all return to.
+#
+# Kept as a name, not "#2", even though the Arrival Hall *is* #2: the name is
+# what world/sandbox/content.py owns, and a future world could move the hub
+# without touching this file. Rename it there and this keeps resolving.
+OOC_ROOM_DBREF = "Arrival Hall"
 
 # "visited" restricts player @tel to rooms they've visited or control;
 # "open" allows any public room.
