@@ -159,8 +159,20 @@ DEFAULT_HOME = "#2"
 #
 # Kept as a name, not "#2", even though the Arrival Hall *is* #2: the name is
 # what world/sandbox/content.py owns, and a future world could move the hub
-# without touching this file. Rename it there and this keeps resolving.
-OOC_ROOM_DBREF = "Arrival Hall"
+# without touching this file.
+#
+# Read from content.py rather than restated, because restating it made this
+# the one place a rename could silently break: every other reference to a room
+# name in this game is derived from that file, and a stale literal here would
+# leave +ooc searching for a room that no longer exists. Importing it at
+# settings time is safe - content.py imports nothing but dataclasses, and both
+# package __init__ files are empty - and it is the only settings value that
+# needs it. START_LOCATION and DEFAULT_HOME below cannot be derived the same
+# way: Evennia resolves those with ObjectDB.objects.get_id(), which takes a
+# dbref and not a name.
+from world.sandbox import content as _sandbox_content
+
+OOC_ROOM_DBREF = _sandbox_content.OOC_ROOMS_BY_SLUG[_sandbox_content.ARRIVAL_SLUG].name
 
 # "visited" restricts player @tel to rooms they've visited or control;
 # "open" allows any public room.
@@ -350,8 +362,30 @@ MAPS_STAFF_LOCK = "cmd:perm(Builder)"
 
 # Ordered: the first tag present on a room's terrain_tags wins as the tile's
 # denormalized terrain. A room whose tags are all absent from this list
-# renders as a plain swatch, which is the intended fallback.
-MAPS_TERRAIN_PRECEDENCE = ["water", "forest", "hills", "urban"]
+# resolves to no terrain at all, which is a different state from having a
+# terrain with no sprite - see the tileset below.
+#
+# "water" leads so that the seeded Harbor Steps, which carries both "water"
+# and "urban", resolves to one deterministic answer. That precedence exists to
+# be exercised, not just declared.
+MAPS_TERRAIN_PRECEDENCE = ["water", "forest", "hills", "scrub", "urban"]
+
+# {terrain key: sprite URL} for the web map. The four sprites are 32x32 flat
+# colour swatches in web/static/sandbox/terrain/ - placeholders standing in
+# for real tile art, and safe to replace with anything of the same size.
+#
+# "scrub" is deliberately absent even though it is a perfectly valid terrain
+# above. A terrain with no sprite renders as the map's plain fallback swatch,
+# and the seeded Causeway carries it so that fallback appears on the grid
+# beside real sprites rather than only in the contrib's test suite. Deleting
+# this setting entirely is also a supported state: the map then draws every
+# tile as a fallback swatch.
+MAPS_TERRAIN_TILESET = {
+    "water": "/static/sandbox/terrain/water.png",
+    "forest": "/static/sandbox/terrain/forest.png",
+    "hills": "/static/sandbox/terrain/hills.png",
+    "urban": "/static/sandbox/terrain/urban.png",
+}
 
 # The OOC wing is not part of the physical world, so its rooms must never
 # take a cell on the grid. Without this, `@dig north=<somewhere OOC>` from a
