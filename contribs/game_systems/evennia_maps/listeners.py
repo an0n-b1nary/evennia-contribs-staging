@@ -19,6 +19,11 @@ Two independent listeners, both wired from MapsConfig.ready():
   dig/tunnel/open commands themselves. A mapping failure here must never
   break building, so the body is wrapped in a broad try/except.
 
+  This is also the one placement path a builder never asked for: the
+  tile is a side effect of digging an exit, not a thing anyone typed.
+  MAPS_UNMAPPABLE_ROOM_TYPES is honoured *here and only here* for that
+  reason — see _is_unmappable().
+
 - on_terrain_changed (evennia_maps.signals.terrain_changed): refreshes a
   placed tile's denormalized terrain snapshot. A game using
   MapsRoomMixin gets this via Room.set_terrain(); a game that doesn't
@@ -27,10 +32,61 @@ Two independent listeners, both wired from MapsConfig.ready():
 
 import logging
 
+from django.conf import settings
 from django.dispatch import receiver
 from evennia.server.signals import SIGNAL_OBJECT_POST_CREATE
 
 logger = logging.getLogger("evennia")
+
+
+def _is_unmappable(room):
+    """Return True if the game has declared *room*'s room_type off-map.
+
+    Games routinely keep rooms that are not part of the physical world at
+    all — an OOC lounge, a character-generation suite, a staff office —
+    and those have no business taking a cell on a spatial grid. Listing
+    their room_type in MAPS_UNMAPPABLE_ROOM_TYPES keeps the auto-placer
+    from annexing one the moment somebody digs a directional exit into it.
+
+    Deliberately *not* a privacy rule and deliberately *not* consulted by
+    the explicit +map/place path:
+
+    - Not privacy. is_room_web_visible() hides a tile that exists; this
+      stops the tile existing. Hiding is the wrong tool here — the row
+      would still hold its cell under the (plane, x, y) unique
+      constraint, layout.plan() would still route around it, and
+      +map/check would still report it, leaving an invisible occupied
+      hole in the grid. Privacy flags ("staff", "secret") stay hardcoded
+      and fail-closed in permissions.py; this one is game cosmology, so
+      it is configuration and defaults to empty.
+
+    - Not the command. A builder who types +map/place on such a room
+      meant it, and refusing them would be this contrib overruling the
+      game's own staff. +map/check reports the result instead, which is
+      the honest split: block the accident, report the decision.
+
+    Reads through room_attr_values() so a game that stores room_type as a
+    plain Evennia Attribute (room.db.room_type) is seen, not just one
+    using an AttributeProperty descriptor. Failure is *not* swallowed to
+    a permissive answer here the way a cosmetic read would be: a room
+    whose flags cannot be read is treated as unmappable, matching the
+    fail-closed direction the rest of this contrib takes.
+    """
+    unmappable = getattr(settings, "MAPS_UNMAPPABLE_ROOM_TYPES", ())
+    if not unmappable:
+        return False
+    from evennia_maps.permissions import room_attr_values
+
+    try:
+        room_types = room_attr_values(room, "room_type")
+    except Exception:
+        logger.exception(
+            "evennia_maps.listeners: could not read room_type for room #%s; "
+            "treating as unmappable",
+            getattr(room, "id", None),
+        )
+        return True
+    return bool(set(room_types) & set(unmappable))
 
 
 @receiver(SIGNAL_OBJECT_POST_CREATE, dispatch_uid="evennia_maps.on_object_post_create")
@@ -47,6 +103,9 @@ def on_object_post_create(sender, **kwargs):
 
     source_room = new_object.location
     if source_room is None:
+        return
+
+    if _is_unmappable(destination):
         return
 
     try:

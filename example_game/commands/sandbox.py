@@ -32,28 +32,27 @@ def _stray_rooms():
     by hand is untagged and survives. Reporting the count is the honest way to
     present that: the gap is visible instead of surprising.
 
-    The origin room is excluded because it is untagged *by design* - it is the
-    permanent room at START_LOCATION that the seeder re-dresses rather than
-    creates (seed_sandbox._origin_room). Counting it would put a floor of 1
-    under a number that should read zero on an untouched sandbox.
+    Rooms the seeder deliberately keeps across a purge - the Arrival Hall and
+    the Drafting Room - are excluded. They carry STABLE_TAG rather than
+    SANDBOX_TAG precisely so they survive, and counting them would put a
+    permanent floor under a number that should read zero on an untouched
+    sandbox. Counting by tag rather than naming them here means the two sets
+    cannot drift.
     """
-    from django.conf import settings
-    from evennia.objects.models import ObjectDB
     from evennia.objects.objects import DefaultRoom
     from evennia.utils.search import search_tag
 
-    # Imported lazily, and from the seeder rather than re-declared, so the tag
-    # this counts against cannot drift from the tag the purge acts on.
+    # Imported lazily, and from the seeder rather than re-declared, so the tags
+    # this counts against cannot drift from the tags the purge acts on.
     from world.sandbox.management.commands.seed_sandbox import (
         SANDBOX_TAG,
         SANDBOX_TAG_CATEGORY,
+        STABLE_TAG,
     )
 
-    known = {obj.id for obj in search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)}
-    dbref = getattr(settings, "START_LOCATION", None)
-    origin = ObjectDB.objects.get_id(dbref) if dbref else None
-    if origin is not None:
-        known.add(origin.id)
+    known = set()
+    for tag in (SANDBOX_TAG, STABLE_TAG):
+        known |= {obj.id for obj in search_tag(tag, category=SANDBOX_TAG_CATEGORY)}
     return [room for room in DefaultRoom.objects.all_family() if room.id not in known]
 
 

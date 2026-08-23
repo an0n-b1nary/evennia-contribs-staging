@@ -115,15 +115,16 @@ class SeededSandboxMixin:
 
     In a live game START_LOCATION is "#2" - Limbo, which `evennia migrate`
     creates and nothing deletes. That is the whole reason the seeder re-dresses
-    that room rather than making a Plaza whose dbref would drift (see
-    seed_sandbox.py::_origin_room). Evennia's test fixtures never run
+    that room rather than making a hall whose dbref would drift (see
+    seed_sandbox.py::_spawn_room). Evennia's test fixtures never run
     initial_setup, so in a test database #2 is whichever object the fixture
     happened to create second - quite possibly a Character, which has no
     set_terrain().
 
     Overriding the setting to room1 for the duration of each test lets the
     seeder take its real path here instead of some test-only fallback, and it
-    leaves char1 standing in the Plaza, which is what a real player sees.
+    leaves char1 standing in the Arrival Hall, which is what a real player
+    sees on their first connect.
     """
 
     def setUp(self):
@@ -160,28 +161,53 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
         self.assertTrue(settings.DEFAULT_HOME.startswith("#"))
         self.assertTrue(settings.START_LOCATION.startswith("#"))
 
-    def test_start_location_resolves_to_the_plaza(self):
+    def test_start_location_resolves_to_the_arrival_hall(self):
+        # The spawn room and the map origin are two different rooms now: a new
+        # player lands in the OOC hub, which is deliberately unmapped, while
+        # the grid is anchored on the IC entry room.
         from evennia.objects.models import ObjectDB
 
-        from world.sandbox.management.commands.seed_sandbox import ORIGIN_ROOM_NAME
+        from world.sandbox.management.commands.seed_sandbox import (
+            OOC_ROOM_NAME,
+            ORIGIN_ROOM_NAME,
+        )
 
         room = ObjectDB.objects.get_id(settings.START_LOCATION)
         self.assertIsNotNone(room)
-        self.assertEqual(room.key, ORIGIN_ROOM_NAME)
+        self.assertEqual(room.key, OOC_ROOM_NAME)
+        self.assertNotEqual(OOC_ROOM_NAME, ORIGIN_ROOM_NAME)
 
-    def test_the_origin_room_survives_a_reseed(self):
+    def test_the_spawn_room_survives_a_reseed(self):
         # The point of the whole arrangement: reseeding must not move the room
         # the spawn settings name.
         from evennia.objects.models import ObjectDB
 
-        from world.sandbox.management.commands.seed_sandbox import ORIGIN_ROOM_NAME
+        from world.sandbox.management.commands.seed_sandbox import OOC_ROOM_NAME
 
         before = ObjectDB.objects.get_id(settings.START_LOCATION).id
         call_command("seed_sandbox", verbosity=0)
         after = ObjectDB.objects.get_id(settings.START_LOCATION)
         self.assertIsNotNone(after)
         self.assertEqual(before, after.id)
-        self.assertEqual(after.key, ORIGIN_ROOM_NAME)
+        self.assertEqual(after.key, OOC_ROOM_NAME)
+
+    def test_the_drafting_room_survives_a_reseed(self):
+        # It is the one other room the purge spares, and for a reason a test
+        # should hold onto: rooms a playtester digs hang off it, so deleting it
+        # would cascade their exits away and orphan everything they built.
+        from evennia_maps.models import RoomTile
+
+        drafting = _search_room("Drafting Room")
+        before = drafting.id
+        before_tile = RoomTile.objects.get(room_id=before).id
+
+        call_command("seed_sandbox", verbosity=0)
+
+        after = _search_room("Drafting Room")
+        self.assertEqual(before, after.id)
+        # And its scratch-plane tile with it - the tile is what a dug room is
+        # positioned relative to.
+        self.assertEqual(RoomTile.objects.get(room_id=after.id).id, before_tile)
 
     def test_ooc_room_setting_resolves_by_name(self):
         # OOC_ROOM_DBREF holds a *name*; evennia_social resolves it with
@@ -193,19 +219,94 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
         self.assertIsNotNone(room)
         self.assertEqual(room.key, OOC_ROOM_NAME)
 
-    def test_the_ooc_hub_is_reachable_but_unmapped(self):
-        # Joined by a flavor exit carrying no direction alias, so layout.plan()
-        # never walks to it: reachable on foot, absent from the grid.
+    def test_the_hub_reaches_the_ic_world_but_is_not_on_the_map(self):
+        # The single boundary between the two halves, and it carries no
+        # direction alias, so layout.plan() never walks from the IC grid back
+        # into the wing: reachable on foot, absent from the grid.
         from evennia_maps.models import RoomTile
         from world.sandbox.management.commands.seed_sandbox import (
             OOC_ROOM_NAME,
             ORIGIN_ROOM_NAME,
         )
 
-        nexus = _search_room(OOC_ROOM_NAME)
+        hub = _search_room(OOC_ROOM_NAME)
         plaza = _search_room(ORIGIN_ROOM_NAME)
-        self.assertIn(nexus, [ex.destination for ex in plaza.exits])
-        self.assertFalse(RoomTile.objects.filter(room=nexus).exists())
+        self.assertIn(plaza, [ex.destination for ex in hub.exits])
+        self.assertIn(hub, [ex.destination for ex in plaza.exits])
+        self.assertFalse(RoomTile.objects.filter(room=hub).exists())
+
+    def test_every_spoke_hangs_off_the_hub_with_no_direction(self):
+        # Hub-and-spoke, so two moves reaches anything - and every one of those
+        # exits is direction-less, which is what keeps the whole wing outside
+        # the reach of layout.plan() independently of the room-type guard.
+        from evennia_maps.direction import resolve as resolve_direction
+        from world.sandbox import content
+        from world.sandbox.management.commands.seed_sandbox import OOC_ROOM_NAME
+
+        hub = _search_room(OOC_ROOM_NAME)
+        destinations = {ex.destination.db.sandbox_slug for ex in hub.exits}
+        self.assertTrue(set(content.OOC_SPOKE_SLUGS).issubset(destinations))
+        for ex in hub.exits:
+            self.assertIsNone(resolve_direction(ex), f"{ex.key} resolves to a direction")
+
+    def test_a_directional_exit_into_an_ooc_room_still_does_not_map_it(self):
+        # The flavor-exit trick above is a *convention*: it keeps the hub off
+        # the grid only for as long as nobody digs a directional exit to it.
+        # MAPS_UNMAPPABLE_ROOM_TYPES is what makes it a rule, and this is the
+        # case that tells the two apart - the exit here carries a canonical
+        # direction from a mapped room, which is precisely the input the
+        # auto-placement listener exists to act on.
+        from evennia.utils import create
+
+        from evennia_maps.models import RoomTile
+        from world.sandbox.management.commands.seed_sandbox import (
+            OOC_ROOM_NAME,
+            ORIGIN_ROOM_NAME,
+        )
+
+        hub = _search_room(OOC_ROOM_NAME)
+        plaza = _search_room(ORIGIN_ROOM_NAME)
+        self.assertEqual(hub.room_type, "ooc")
+        self.assertTrue(RoomTile.objects.filter(room=plaza).exists())
+
+        create.create_object("typeclasses.exits.Exit", key="north", location=plaza, destination=hub)
+        self.assertFalse(RoomTile.objects.filter(room=hub).exists())
+
+    def test_no_ooc_room_reaches_the_ic_grid(self):
+        # The invariant the setting buys, asserted across the whole seed rather
+        # than on the one room we happen to remember.
+        #
+        # Scoped to the *overworld* plane, because there is exactly one
+        # deliberate exception and it lives on another one: the Drafting Room
+        # holds a pinned tile on the scratch plane, since the auto-placement
+        # listener only fires when the room being dug *from* is already mapped.
+        # An unmapped drafting room would make `@dig north=X` a silent no-op,
+        # which is the trap that room exists to teach around. The exception is
+        # allowed because MAPS_UNMAPPABLE_ROOM_TYPES guards the listener, not
+        # the explicit write path the seeder uses.
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        mapped_ooc = [
+            tile.room_name
+            for tile in RoomTile.objects.select_related("plane").filter(
+                plane__name=content.PLANE_NAME
+            )
+            if getattr(tile.room, "room_type", None) == "ooc"
+        ]
+        self.assertEqual(mapped_ooc, [])
+
+    def test_the_drafting_room_is_the_only_ooc_tile_anywhere(self):
+        # Pins the exception itself, so a second one cannot appear without
+        # somebody deciding to change this line.
+        from evennia_maps.models import RoomTile
+
+        mapped_ooc = {
+            tile.room_name
+            for tile in RoomTile.objects.select_related("plane")
+            if getattr(tile.room, "room_type", None) == "ooc"
+        }
+        self.assertEqual(mapped_ooc, {"Drafting Room"})
 
 
 class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
@@ -247,7 +348,6 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(by_name["The Archive"], (0, 1))
         self.assertEqual(by_name["The Overlook"], (0, 2))
         self.assertEqual(by_name["Consulate Hall"], (1, 0))
-        self.assertEqual(by_name["Staff Lounge"], (0, -1))
         self.assertEqual(by_name["Garden Walk"], (-1, 0))
 
     def test_terrain_snapshot_follows_the_room_mixin(self):
@@ -265,17 +365,32 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
         self.assertTrue(RoomTile.objects.get(room_name="Sandbox Plaza").pinned)
 
     def test_seeding_twice_is_idempotent(self):
-        # The purge half has to know about the plane, region and scenes now,
-        # and MapPlane.name is unique — a purge that missed one would raise
-        # here rather than quietly doubling the world.
+        # The purge half has to know about the plane, region and scenes, and
+        # MapPlane.name is unique — a purge that missed one would raise here
+        # rather than quietly doubling the world.
+        #
+        # Two planes, not one: the overworld is purged and rebuilt, the scratch
+        # plane is get_or_create-d and deliberately survives. That second one
+        # is the case a count of 1 would have caught as a bug and a count of 2
+        # asserts as the design.
         from evennia_maps.models import MapPlane, RoomTile
         from evennia_regions.models import RegionMembership
+        from world.sandbox import content
         from world.sandbox.management.commands.seed_sandbox import MAPPED_ROOM_NAMES
 
         call_command("seed_sandbox", verbosity=0)
 
-        self.assertEqual(MapPlane.objects.count(), 1)
-        self.assertEqual(RoomTile.objects.count(), len(MAPPED_ROOM_NAMES))
+        self.assertEqual(
+            set(MapPlane.objects.values_list("name", flat=True)),
+            {content.PLANE_NAME, content.DRAFTING_PLANE_NAME},
+        )
+        self.assertEqual(
+            RoomTile.objects.filter(plane__name=content.PLANE_NAME).count(),
+            len(MAPPED_ROOM_NAMES),
+        )
+        self.assertEqual(
+            RoomTile.objects.filter(plane__name=content.DRAFTING_PLANE_NAME).count(), 1
+        )
         self.assertEqual(RegionMembership.objects.count(), len(MAPPED_ROOM_NAMES))
 
 
@@ -295,7 +410,15 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
         super().setUp()
         from evennia_maps.models import RoomTile
 
-        self.tiles = list(RoomTile.objects.select_related("plane").all())
+        # The overworld plane only. The scratch plane the Drafting Room sits
+        # on carries no region membership, no lore and no scenes by design, so
+        # including it would make every "every tile is answered" assertion
+        # below fail for a room that was never meant to be in the IC world.
+        from world.sandbox import content
+
+        self.tiles = list(
+            RoomTile.objects.select_related("plane").filter(plane__name=content.PLANE_NAME)
+        )
         self.plane = self.tiles[0].plane
         self.room_ids = [tile.room_id for tile in self.tiles]
         self.tile_by_name = {tile.room_name: tile for tile in self.tiles}
@@ -482,3 +605,58 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
         html = self._render(RegionDetailView.as_view(), f"/regions/{region.pk}/", pk=region.pk)
         self.assertIn(REGION_NAME, html)
         self.assertIn("Sandbox Plaza", html)
+
+
+class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
+    """All nine contrib web surfaces resolve, and their landing pages render.
+
+    This is the check the wiring rule exists for. Each contrib already renders
+    its own pages in its own suite, against a test URLconf that mounts that
+    contrib alone. What no contrib suite can show is that *this* game mounted
+    the routes, at the right prefix, under the right namespace - and namespace
+    is the part that differs per contrib for real reasons (see
+    web/website/urls.py). A wrong choice there is a NoReverseMatch on a page
+    nobody visits until a playtester does.
+
+    Anonymous, because that is who arrives from a link.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    # (reverse name, the URL prefix it must land under). Names carry a
+    # namespace exactly where web/website/urls.py supplies one; the bare ones
+    # are bare on purpose and would break if wrapped.
+    LANDING_ROUTES = (
+        ("evennia_maps:plane-list", "/map/"),
+        ("evennia_regions:region-list", "/regions/"),
+        ("evennia_calendar:calendar-list", "/calendar/"),
+        ("evennia_plots:plot-list", "/plots/"),
+        ("evennia_scenes:scene-list", "/scenes/"),
+        ("evennia_boards:board-list", "/boards/"),
+        ("lore-list", "/lore/"),
+        ("job-list", "/jobs/"),
+        ("xp-summary", "/xp/"),
+    )
+
+    def test_every_landing_route_reverses_under_its_prefix(self):
+        from django.urls import reverse
+
+        for name, prefix in self.LANDING_ROUTES:
+            with self.subTest(route=name):
+                self.assertTrue(reverse(name).startswith(prefix))
+
+    def test_every_landing_page_responds(self):
+        # Through the test client rather than a RequestFactory: the client
+        # resolves the URL itself, so a route that reverses but is mounted
+        # under a URLconf this game does not actually use still fails here.
+        #
+        # A redirect counts as mounted. Several of these surfaces send an
+        # anonymous visitor to the login page, which is the contrib deciding
+        # who may read it - not this game failing to wire it up.
+        from django.urls import reverse
+
+        for name, _prefix in self.LANDING_ROUTES:
+            with self.subTest(route=name):
+                response = self.client.get(reverse(name))
+                self.assertIn(response.status_code, (200, 302))

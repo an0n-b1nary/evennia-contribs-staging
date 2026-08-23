@@ -26,6 +26,7 @@ Run:
 """
 
 import contextlib
+from unittest import mock
 
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, connection, transaction
@@ -1130,6 +1131,80 @@ class TestExitCreationListener(MapsTestCase):
         self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
 
 
+class TestUnmappableRoomTypes(MapsTestCase):
+    """MAPS_UNMAPPABLE_ROOM_TYPES keeps the auto-placer out of off-map rooms.
+
+    The setting exists because a tile on an OOC lounge is not a privacy
+    problem to hide, it is a tile that should never have been written: it
+    holds a cell under the (plane, x, y) unique constraint whether or not
+    anything renders it. So the guard belongs on the write path, and
+    specifically on the *implicit* write path — digging an exit is the one
+    way a builder gets a tile they never asked for.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane()
+        placement.place_tile(self.room1, self.plane, 0, 0)
+
+    def _dig_north(self):
+        create.create_object(
+            self.exit_typeclass, key="north", location=self.room1, destination=self.room2
+        )
+
+    def test_unset_setting_maps_every_room_type(self):
+        # The default is empty, so an install that never heard of this
+        # setting behaves exactly as it did before it existed.
+        self.room2.db.room_type = "ooc"
+        self._dig_north()
+        self.assertTrue(RoomTile.objects.filter(room=self.room2).exists())
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_declared_room_type_is_not_auto_placed(self):
+        self.room2.db.room_type = "ooc"
+        self._dig_north()
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_undeclared_room_type_is_still_auto_placed(self):
+        self.room2.db.room_type = "ic"
+        self._dig_north()
+        self.assertTrue(RoomTile.objects.filter(room=self.room2).exists())
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_room_type_from_a_class_attribute_is_seen(self):
+        # room_attr_values reads the descriptor/class value as well as the
+        # Attribute, so a game declaring room_type as an AttributeProperty
+        # (which example_game does) is covered by the same guard.
+        self.room2.db.room_type = None
+        with mock.patch.object(type(self.room2), "room_type", "ooc", create=True):
+            self._dig_north()
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_explicit_place_still_works(self):
+        # The command path is deliberately NOT guarded: a builder who
+        # types +map/place on an OOC room meant it, and this contrib does
+        # not get to overrule the game's own staff. /check reports it.
+        self.room2.db.room_type = "ooc"
+        tile = placement.place_tile(self.room2, self.plane, 3, 3)
+        self.assertIsInstance(tile, RoomTile)
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_unreadable_room_type_is_treated_as_unmappable(self):
+        # Fail closed, matching the direction the rest of the contrib
+        # takes: a room whose flags cannot be read does not get a tile.
+        self.room2.db.room_type = "ic"
+        with (
+            mock.patch(
+                "evennia_maps.permissions.room_attr_values", side_effect=RuntimeError("boom")
+            ),
+            self.assertLogs("evennia", level="ERROR"),
+        ):
+            self._dig_north()
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+
 class TestTerrainChangedListener(MapsTestCase):
     def test_set_terrain_refreshes_tile_snapshot(self):
         plane = _make_plane()
@@ -1515,6 +1590,35 @@ class TestCmdMapCheck(MapsCommandTestCase):
         placement.place_tile(self.room2, plane, 0, 1)
         result = self.call(CmdMap(), "/check", caller=self.char1)
         self.assertIn("Unmapped neighbors (canonical exit, no destination tile): 0", result)
+
+    def test_check_is_silent_about_off_map_types_when_unset(self):
+        # No setting, no section: a game that never declared any off-map
+        # room types should not see a line about them at all.
+        plane = _make_plane()
+        placement.place_tile(self.room1, plane, 0, 0)
+        result = self.call(CmdMap(), "/check", caller=self.char1)
+        self.assertNotIn("declared off-map", result)
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_check_reports_a_tile_on_an_off_map_room_type(self):
+        # The listener would have refused this one, so the only way it can
+        # exist is a deliberate +map/place, a tile predating the setting,
+        # or a room re-typed after it was mapped. All three are exactly
+        # what this lint is for.
+        plane = _make_plane()
+        self.room2.db.room_type = "ooc"
+        placement.place_tile(self.room1, plane, 0, 0)
+        placement.place_tile(self.room2, plane, 1, 0)
+        result = self.call(CmdMap(), "/check", caller=self.char1)
+        self.assertIn("Tiles on room types declared off-map (ooc): 1", result)
+        self.assertIn(f"#{self.room2.id} {self.room2.key}", result)
+
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=("ooc",))
+    def test_check_reports_zero_when_no_tile_is_off_map(self):
+        plane = _make_plane()
+        placement.place_tile(self.room1, plane, 0, 0)
+        result = self.call(CmdMap(), "/check", caller=self.char1)
+        self.assertIn("Tiles on room types declared off-map (ooc): 0", result)
 
     def test_check_player_denied(self):
         result = self.call(CmdMap(), "/check", caller=self.char2)
