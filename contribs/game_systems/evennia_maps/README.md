@@ -89,6 +89,7 @@ doesn't matter — `MapsRoomMixin` doesn't override `msg()` or any hook they tou
 | `MAPS_DIRECTION_OFFSETS` | `{}` | Merged over `direction.DEFAULT_DIRECTION_OFFSETS` — add or override individual directions without redeclaring the whole table |
 | `MAPS_TERRAIN_PRECEDENCE` | `[]` | Ordered list of terrain tag names; the first one present on a room's `terrain_tags` wins as `RoomTile.terrain` |
 | `MAPS_TERRAIN_TILESET` | `{}` | `{terrain_key: sprite_url}` for the web map. A terrain with no sprite renders as a plain swatch |
+| `MAPS_UNMAPPABLE_ROOM_TYPES` | `()` | `room_type` values the auto-placer must never map — an OOC lounge, a chargen suite. Digging a directional exit into one places nothing; `+map/place` still honours an explicit request, and `/check` reports the result. **Not a privacy setting** — see below |
 | `MAPS_ROOM_VISIBILITY` | unset | Dotted path to a `callable(room) -> bool` replacing the default room-hiding rule. **Fails closed** — see below |
 | `MAPS_OVERLAY_URL_NAMES` | see below | Route names the map links out to, merged over the defaults |
 | `MAPS_TILES_URL_NAME` | `"api-plane-tiles"` | Route name of the tile feed. Set to `""` to turn the live map off |
@@ -181,6 +182,25 @@ shown. `MAPS_ROOM_VISIBILITY` replaces the rule wholesale; a configured-but-unus
 value **hides every room** rather than falling back to the default, because a game only
 overrides this when its rules are *stricter*, and silently reverting on a typo would
 publish exactly what the operator was trying to withhold.
+
+### Off-map room types
+
+`MAPS_UNMAPPABLE_ROOM_TYPES` and `MAPS_ROOM_VISIBILITY` sound similar and do
+opposite things. Visibility **hides a tile that exists**; this setting **stops the
+tile existing**. For a room that is not part of the physical world at all — an OOC
+lounge, a chargen suite — hiding is the wrong tool: the row still holds its cell
+under the `(plane, x, y)` unique constraint, `layout.plan()` still routes around
+it, and `+map/check` still reports it, leaving an invisible occupied hole in the
+grid.
+
+It is enforced on exactly one path, the exit-creation listener, because that is
+the one placement nobody asked for — the tile is a side effect of `dig`. A builder
+who types `+map/place` on such a room meant it, so the command is left alone and
+`+map/check` reports the tile instead. Block the accident, report the decision.
+
+This is game cosmology, not privacy, which is why it is configuration and defaults
+to empty while the `"staff"` / `"secret"` privacy flags stay hardcoded and
+fail-closed.
 
 If you also run `evennia-regions`, point `MAPS_ROOM_VISIBILITY` and
 `REGIONS_ROOM_VISIBILITY` at the same callable. The two contribs deliberately keep

@@ -19,15 +19,19 @@ Add to your CharacterCmdSet::
 
 Settings:
     MAPS_STAFF_LOCK — lock string for staff operations (default "cmd:perm(Builder)").
+    MAPS_UNMAPPABLE_ROOM_TYPES — room_type values the auto-placer must never
+        map (default (), i.e. every room is mappable). /check reports any tile
+        that sits on one anyway; /place still honours an explicit request.
 """
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_maps import layout, placement
 from evennia_maps.direction import resolve as resolve_direction
 from evennia_maps.models import MapPlane, RoomTile
-from evennia_maps.permissions import is_staff
+from evennia_maps.permissions import is_staff, room_attr_values
 
 
 def _room_ref(caller, ref):
@@ -82,7 +86,8 @@ class CmdMap(MuxCommand):
                                            pinned tile; a move blocked by one
                                            doesn't stop the rest of the map)
         +map/check                      - Lint: unmapped neighbors, missing
-                                           terrain snapshots
+                                           terrain snapshots, tiles on room
+                                           types declared off-map
     """
 
     key = "+map"
@@ -330,6 +335,19 @@ class CmdMap(MuxCommand):
                 if dest and dest.id not in placed_room_ids:
                     gaps.append((tile, exit_obj, dest))
 
+        # The listener refuses to auto-place these, but it can only stop
+        # tiles it is asked to create *after* the setting is in place. A
+        # tile placed by hand, placed before the game declared the type
+        # off-map, or belonging to a room re-typed afterwards is invisible
+        # to that guard and can only be found by looking - which is what a
+        # lint command is for.
+        unmappable = set(getattr(settings, "MAPS_UNMAPPABLE_ROOM_TYPES", ()) or ())
+        offmap = []
+        if unmappable:
+            for tile in RoomTile.objects.select_related("plane").all():
+                if set(room_attr_values(tile.room, "room_type")) & unmappable:
+                    offmap.append(tile)
+
         lines = ["|wMap check|n"]
         lines.append(f"Tiles missing terrain: {missing_terrain.count()}")
         for t in missing_terrain[:10]:
@@ -337,4 +355,11 @@ class CmdMap(MuxCommand):
         lines.append(f"Unmapped neighbors (canonical exit, no destination tile): {len(gaps)}")
         for tile, exit_obj, dest in gaps[:10]:
             lines.append(f"  {tile.room_name} --{exit_obj.key}--> {dest.key} (unmapped)")
+        if unmappable:
+            lines.append(
+                "Tiles on room types declared off-map "
+                f"({', '.join(sorted(unmappable))}): {len(offmap)}"
+            )
+            for t in offmap[:10]:
+                lines.append(f"  #{t.room_id} {t.room_name} on {t.plane.name}")
         self.caller.msg("\n".join(lines))

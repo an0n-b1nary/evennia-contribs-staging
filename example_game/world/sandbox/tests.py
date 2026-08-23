@@ -207,6 +207,43 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
         self.assertIn(nexus, [ex.destination for ex in plaza.exits])
         self.assertFalse(RoomTile.objects.filter(room=nexus).exists())
 
+    def test_a_directional_exit_into_an_ooc_room_still_does_not_map_it(self):
+        # The flavor-exit trick above is a *convention*: it keeps the hub off
+        # the grid only for as long as nobody digs a directional exit to it.
+        # MAPS_UNMAPPABLE_ROOM_TYPES is what makes it a rule, and this is the
+        # case that tells the two apart - the exit here carries a canonical
+        # direction from a mapped room, which is precisely the input the
+        # auto-placement listener exists to act on.
+        from evennia.utils import create
+
+        from evennia_maps.models import RoomTile
+        from world.sandbox.management.commands.seed_sandbox import (
+            OOC_ROOM_NAME,
+            ORIGIN_ROOM_NAME,
+        )
+
+        nexus = _search_room(OOC_ROOM_NAME)
+        plaza = _search_room(ORIGIN_ROOM_NAME)
+        self.assertEqual(nexus.room_type, "ooc")
+        self.assertTrue(RoomTile.objects.filter(room=plaza).exists())
+
+        create.create_object(
+            "typeclasses.exits.Exit", key="north", location=plaza, destination=nexus
+        )
+        self.assertFalse(RoomTile.objects.filter(room=nexus).exists())
+
+    def test_no_seeded_ooc_room_takes_a_tile(self):
+        # The invariant the setting buys, asserted across the whole seed
+        # rather than on the one room we happen to remember.
+        from evennia_maps.models import RoomTile
+
+        mapped_ooc = [
+            tile.room_name
+            for tile in RoomTile.objects.select_related("plane")
+            if getattr(tile.room, "room_type", None) == "ooc"
+        ]
+        self.assertEqual(mapped_ooc, [])
+
 
 class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
     """seed_sandbox builds a real, mapped world.
@@ -247,7 +284,6 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(by_name["The Archive"], (0, 1))
         self.assertEqual(by_name["The Overlook"], (0, 2))
         self.assertEqual(by_name["Consulate Hall"], (1, 0))
-        self.assertEqual(by_name["Staff Lounge"], (0, -1))
         self.assertEqual(by_name["Garden Walk"], (-1, 0))
 
     def test_terrain_snapshot_follows_the_room_mixin(self):

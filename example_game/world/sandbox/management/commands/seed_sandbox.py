@@ -19,13 +19,15 @@ entries, plot threads/arcs, the region, the map plane, scenes — has no tag
 mechanism, so it's purged by a fixed, recognizable name/title before
 recreating.
 
-The seeded world is deliberately *mappable*: the four original rooms plus two
-more are linked by exits whose keys stay flavorful ("archive", "garden") but
-which each carry a canonical direction as an alias, since evennia_maps'
-layout only walks exits it can resolve to a direction (key **or** alias).
-That is what lets this command place one origin tile and then let
-layout.plan() derive the other five positions, rather than hardcoding six
-coordinate pairs.
+The seeded world is deliberately *mappable*: the IC rooms are linked by exits
+whose keys stay flavorful ("archive", "garden") but which each carry a
+canonical direction as an alias, since evennia_maps' layout only walks exits
+it can resolve to a direction (key **or** alias). That is what lets this
+command place one origin tile and then let layout.plan() derive the rest,
+rather than hardcoding a coordinate pair per room.
+
+The OOC rooms are the deliberate exception and are kept off the grid two ways
+at once - see OOC_ROOM_NAMES.
 
 The seeded scenes/lore/event exist to light up all six tile overlays, so a
 fresh sandbox can be hand-checked at /map/<pk>/ and /map/<pk>/live/ without
@@ -65,11 +67,20 @@ ROOM_NAMES = [
 # this command purge and recreate it without the setting going stale.
 OOC_ROOM_NAME = "OOC Nexus"
 
-# Rooms that take a map tile - everything but the OOC hub, which hangs off a
-# direction-less flavor exit and so is never reached by layout.plan(). Tests
+# Rooms outside the physical world. They are typed room_type="ooc", which
+# settings.MAPS_UNMAPPABLE_ROOM_TYPES declares off-map, so evennia_maps'
+# auto-placement listener refuses to give them a tile no matter how they are
+# linked. They are *also* joined by direction-less flavor exits, which is
+# belt and braces on purpose: the flavor exit keeps them out of layout.plan()
+# (a read path the setting does not touch), and the setting keeps them out of
+# the listener (a write path a flavor exit stops protecting the moment
+# somebody digs a real direction).
+OOC_ROOM_NAMES = ("Staff Lounge", OOC_ROOM_NAME)
+
+# Rooms that take a map tile - everything but the OOC rooms above. Tests
 # count against this rather than ROOM_NAMES so "not every room is mapped"
 # stays an asserted property instead of an off-by-one.
-MAPPED_ROOM_NAMES = [n for n in ROOM_NAMES if n != OOC_ROOM_NAME]
+MAPPED_ROOM_NAMES = [n for n in ROOM_NAMES if n not in OOC_ROOM_NAMES]
 BOARD_NAMES = ["General", "Cutscenes"]
 LORE_TITLES = ["The Founding of the Sandbox", "Rumors from the Archive"]
 PLOT_ARC_NAME = "Sandbox Genesis"
@@ -86,7 +97,6 @@ ROOM_TERRAIN = {
     "Sandbox Plaza": {"urban"},
     "The Archive": {"urban"},
     "Consulate Hall": {"urban"},
-    "Staff Lounge": {"urban"},
     "Garden Walk": {"forest"},
     "The Overlook": {"hills"},
 }
@@ -98,7 +108,6 @@ ROOM_TERRAIN = {
 ROOM_LINKS = [
     ("Sandbox Plaza", "The Archive", ("archive", "north"), ("plaza", "south")),
     ("Sandbox Plaza", "Consulate Hall", ("hall", "east"), ("plaza", "west")),
-    ("Sandbox Plaza", "Staff Lounge", ("lounge", "south"), ("plaza", "north")),
     ("Sandbox Plaza", "Garden Walk", ("garden", "west"), ("plaza", "east")),
     ("The Archive", "The Overlook", ("overlook", "north"), ("archive", "south")),
 ]
@@ -115,6 +124,7 @@ ORIGIN_ROOM_NAME = "Sandbox Plaza"
 # (from, to, exit key, return key)
 FLAVOR_LINKS = [
     (ORIGIN_ROOM_NAME, OOC_ROOM_NAME, "nexus", "plaza"),
+    (ORIGIN_ROOM_NAME, "Staff Lounge", "lounge", "plaza"),
 ]
 
 
@@ -314,7 +324,7 @@ class Command(BaseCommand):
                 )
                 self._tag(room)
             room.db.desc = f"{name}. Default sandbox content — safe to explore and pose in."
-            if name in ("Staff Lounge", OOC_ROOM_NAME):
+            if name in OOC_ROOM_NAMES:
                 room.room_type = "ooc"
             # MapsRoomMixin (typeclasses/rooms.py). set_terrain() rather than
             # assigning terrain_tags, so terrain_changed fires and any tile
@@ -506,10 +516,11 @@ class Command(BaseCommand):
             description="Everything within a short walk of the Sandbox Plaza.",
         )
         for name, room in rooms.items():
-            if name == OOC_ROOM_NAME:
-                # An OOC hub is not IC geography. No tile, no membership - so
+            if name in OOC_ROOM_NAMES:
+                # An OOC room is not IC geography. No tile, no membership - so
                 # the primary_region overlay and the region page's room list
-                # both stay honestly in-character.
+                # both stay honestly in-character. The same set the map treats
+                # as off-limits, for the same reason.
                 continue
             RegionMembership.objects.create(
                 region=region,

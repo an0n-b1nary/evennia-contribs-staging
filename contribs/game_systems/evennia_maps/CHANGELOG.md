@@ -7,6 +7,32 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] — 2026-08-23 — off-map room types
+
+- **Added:** `MAPS_UNMAPPABLE_ROOM_TYPES`, a tuple of `room_type` values the
+  exit-creation listener must never auto-place. Default `()`, so an existing install
+  behaves exactly as before. A game with rooms outside the physical world — an OOC
+  lounge, a chargen suite — can now say so, and digging a directional exit into one
+  places nothing instead of quietly annexing it onto the grid.
+
+  Deliberately *not* implemented as a visibility rule. `MAPS_ROOM_VISIBILITY` hides a
+  tile that exists; the row still holds its cell under the `(plane, x, y)` unique
+  constraint, `layout.plan()` still routes around it, and `+map/check` still reports
+  it. Hiding leaves an invisible occupied hole in the grid, so the guard belongs on
+  the write path.
+
+  Enforced on the listener only. That is the one placement a builder never asked for
+  — the tile is a side effect of `dig`. `+map/place` on such a room is a decision and
+  is left alone; `/check` reports the result rather than the contrib overruling the
+  game's own staff.
+
+- **Added:** `+map/check` reports tiles sitting on a room type declared off-map. The
+  listener guard can only refuse placements made *after* the setting is in place; a
+  tile placed by hand, placed before the declaration, or on a room re-typed afterwards
+  is invisible to it and can only be found by looking.
+
+---
+
 ## [0.2.1] — 2026-08-15 — overlay tests against real providers
 
 - **Changed:** the overlay tests now run with *exactly* the providers they connect,

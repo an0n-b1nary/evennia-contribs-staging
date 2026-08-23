@@ -346,6 +346,14 @@ MAPS_STAFF_LOCK = "cmd:perm(Builder)"
 # renders as a plain swatch, which is the intended fallback.
 MAPS_TERRAIN_PRECEDENCE = ["water", "forest", "hills", "urban"]
 
+# The OOC wing is not part of the physical world, so its rooms must never
+# take a cell on the grid. Without this, `@dig north=<somewhere OOC>` from a
+# mapped room would annex one silently - the tile is a side effect of digging
+# an exit, not something anyone asked for, which is exactly why the contrib
+# enforces this on the listener and leaves an explicit +map/place alone.
+# `+map/check` reports any tile that ends up on one of these anyway.
+MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)
+
 # Deliberately absent: every overlay setting. The six overlay layers
 # (primary_region, has_active_scene, recent_scene_count, recent_scenes,
 # has_lore, upcoming_events) light up purely from which partner contribs are
