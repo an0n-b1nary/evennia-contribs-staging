@@ -126,9 +126,65 @@ commands at all (it is web/MXP-side, and shows up in the account options and
 the site), the second is a pure seam library.
 
 **The IC world** is reached through the single direction-less `grid` exit from
-the hall. Those rooms are mapped, region-membered, and carry no plaques — they
-are meant to read as setting and to demonstrate the map structurally, through
-terrain and overlay data rather than by explaining themselves.
+the hall: seventeen rooms on three planes, mapped, region-membered, and
+carrying no plaques. They are meant to read as setting and to demonstrate the
+map structurally — through terrain, elevation, region membership and overlay
+data — rather than by explaining themselves.
+
+| Plane | zstack / elev | Rooms | What it exists to show |
+|---|---|---|---|
+| `Sandbox Overworld` | `overworld` / `0` | 9 | The main grid: terrain variety, hangouts, scenes, the staff room |
+| `Sandbox Undercroft` | `overworld` / `-1` | 4 | Two planes in one zstack, which is what makes Leaflet draw its base-layer control at all |
+| `Consulate Interior` | `""` / `0` | 4 | A standalone plane reached through a portal, and cross-plane click-through |
+
+**Almost nothing in that grid has a coordinate written for it.** The seeder
+places two tiles by hand — one origin per walk — and derives everything else by
+walking canonical-direction exit aliases with `layout.plan()` /
+`apply_plan()`. The undercroft comes along for free, because `down` is a
+*vertical* direction and the same walk crosses into the adjacent elevation at
+the same `(x, y)`. Seeding this way means a broken alias shows up as a missing
+tile rather than as a silently wrong-but-placed grid, and it exercises the same
+code path a builder's `+map/reflow` does.
+
+**The interior is a second, separate walk**, because nothing reaches it by
+direction: the `doors` from Consulate Hall are a plain exit. That is the entire
+definition of a portal as far as the map is concerned — an exit onto a plane
+whose zstack is blank. There is no portal flag anywhere.
+
+#### The deliberate defects
+
+A map with nothing wrong with it demonstrates none of the tools that find
+things wrong with maps. Four things are wrong with this one on purpose, and
+`world/sandbox/content.py` indexes them under "Deliberate map defects":
+
+- **The undercroft is misaligned.** Three tiles sit at coordinates the walk
+  disagrees with, with the squatter pinned, so `+map/reflow` from the Cistern
+  reports a two-step cascade rather than silently rearranging: the Service
+  Tunnel is `blocked_by_pinned`, and the Vault is `blocked_by_blocked` because
+  the Tunnel that holds its target cannot vacate. The second step is the part
+  worth seeing — a single validation pass would call the Vault's move safe.
+- **The Study has no tile**, though a canonical `east` exit reaches it from the
+  mapped Lobby. That is the ordinary state of a room dug before anyone drew a
+  map, and it is what `+map/check`'s unmapped-neighbour lint is for.
+- **The Warren has no terrain**, which is the other thing `+map/check` lints.
+  The Causeway has a terrain (`scrub`) with no sprite in
+  `MAPS_TERRAIN_TILESET`, so it draws the plain fallback swatch beside real
+  sprites. Those two absences look identical on a rendered grid unless you know
+  to tell them apart, so the tests assert them apart.
+- **The Undercity region is archived**, and the undercroft rooms' *flagged*
+  primary membership is in it. `RegionMembership.primary_for()` still answers
+  "the Undercity"; the map's overlay deliberately diverges, skips archived
+  regions and falls through to the Waterfront — because a tile label is a link,
+  and `RegionDetailView` resolves through `Region.objects`, so honouring the
+  flag would render a link straight to a 404.
+
+Two more arrangements are worth knowing about. **Harbor Steps carries two
+terrain tags** (`water` and `urban`), which is the only room that makes
+`MAPS_TERRAIN_PRECEDENCE` do any work. **The Warren is `room_type="staff"`** —
+unlike the OOC wing it *is* placed on the grid, and it is the read side that
+withholds it, so a playtester can watch a room appear by running
+`+sandbox/builder on`. That is the most direct demonstration of the fail-closed
+visibility rule there is.
 
 **Three things keep the wing off the map**, and the redundancy is deliberate:
 every wing exit is direction-less (so `layout.plan()`, a *read* path, never
@@ -154,6 +210,19 @@ They carry `STABLE_TAG` rather than `SANDBOX_TAG`, and `_stray_rooms()` in
 `commands/sandbox.py` counts against both tags so the "rooms made by hand"
 number still reads zero on an untouched sandbox.
 
+#### Terrain sprites
+
+`web/static/sandbox/terrain/` holds four 32×32 flat-colour PNGs, ~100 bytes
+each, named by `MAPS_TERRAIN_TILESET` in `server/conf/settings.py`. **They are
+placeholders, not art** — they exist so the map has something to draw that is
+visibly *not* the fallback swatch, which is the only way to demonstrate the
+tileset does anything. Replace them with real tile art of the same dimensions
+and nothing else changes. Deleting the setting entirely is also supported: the
+map then draws every tile as a fallback swatch.
+
+There is deliberately no `scrub.png`, so one tile on the grid always renders
+the fallback. Adding one would remove that demonstration.
+
 ### Editing what the demo says
 
 **All player-visible prose lives in `world/sandbox/content.py`**, keyed by
@@ -171,6 +240,20 @@ plus a one-line summary of what it should convey. Room *names* and the
 `commands` lists are not placeholders — the first are signposts a playtester
 has to be able to guess, the second are literal command names, so both are
 documentation rather than voice.
+
+**Renaming rooms is safe; renaming the Django rows is not.** Every room lookup
+in the seeder and its tests goes through a slug, and the few name-derived
+constants (`MAPPED_ROOM_NAMES`, `ORIGIN_ROOM_NAME`, `OOC_ROOM_DBREF`) are all
+*computed* from `content.py` rather than restated, so a rename follows through
+on the next reseed. Region, plane, board, lore, scene, plot and event **names**
+are the exception: those rows have no tag handler and the purge finds them by
+name, so renaming one without reseeding first leaves the old row behind and the
+next run collides on a unique name. Change the name, reseed, done.
+
+Two smaller consequences of renaming a room *in-game* rather than in
+`content.py`: `RoomTile.room_name` and `RegionMembership.room_name` are
+denormalized display snapshots that only refresh when the tile or membership is
+rewritten, so the web map keeps showing the old name until the next reseed.
 
 ### Playtester controls (`+sandbox`)
 
@@ -725,21 +808,40 @@ Three mechanisms, for three different needs:
 9. **Golden reset works** — make a throwaway change, run
    `scripts/reset_to_golden.sh`, confirm the world is back to default.
    (Requires the snapshot from step 6 above; see the note there.)
-10. **The map renders, in a browser** — `/map/` lists `Sandbox Overworld`
-    and `Sandbox Scratch`; `/map/<pk>/` draws the five *mapped* IC rooms as an
-    SVG plus grid, with the Archive north of the Plaza. The whole OOC wing is
-    deliberately absent, and doubly so: its exits carry no direction aliases,
-    and `MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)` stops the auto-placer mapping
-    those rooms even if somebody digs a real direction into one.
-    `/map/<pk>/live/` loads Leaflet with the elevation control. This is the
-    one step no test replaces: a static SVG page and a client-side Leaflet
-    render fail in different ways.
+10. **The map renders, in a browser** — `/map/` lists four planes:
+    `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior` and
+    `Sandbox Scratch`. `/map/<pk>/` for the overworld draws eight tiles as an
+    SVG plus grid (nine rooms, less the staff-only Warren), with the Archive
+    north of the Plaza, sprites on four of them and the plain fallback swatch
+    on the Causeway. The whole OOC wing is deliberately absent, and doubly so:
+    its exits carry no direction aliases, and
+    `MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)` stops the auto-placer mapping those
+    rooms even if somebody digs a real direction into one. `/map/<pk>/live/`
+    loads Leaflet with the **base-layer control** offering Overworld and
+    Undercroft — that control only appears because two planes share the
+    `overworld` zstack. This is the one step no test replaces: a static SVG
+    page and a client-side Leaflet render fail in different ways.
 11. **Overlays light up and link out** — on the live map, toggle the overlay
     controls: the Consulate Hall shows an active-scene pin and an upcoming
-    event, the Archive shows heat and a recent log, every tile is labelled
-    with `The Commons`. Click through a tile popup to the region, the scene
-    log and the event page.
-12. **A missing partner degrades, it does not break** — `pip uninstall
+    event, the Archive shows the heaviest heat (three closed scenes against
+    Market Row's one) and recent logs, three rooms show different hangout
+    letters, and tiles are labelled `The Commons` *or* `The Waterfront` rather
+    than all the same. Click through a tile popup to the region, the scene log
+    and the event page. Then click the **portal marker** on Consulate Hall and
+    confirm it navigates to the `Consulate Interior` plane.
+12. **The staff room and the staff event appear only for staff** — as the
+    fresh account from step 4, confirm the Warren is absent from the map, from
+    `/regions/` and from `+where`, and that Market Row shows no upcoming event.
+    Run `+sandbox/builder on` and confirm all four appear. This is the
+    fail-closed visibility rule and the `is_staff_event` rule, both end to end.
+13. **`+map/check` and `+map/reflow` have something to report** — as staff, run
+    `+map/check`: it should name the Study as an unmapped neighbour of the
+    Lobby, the Warren as a blank-terrain tile, and the Drafting Room as a tile
+    on an off-map room type. Then run `+map/reflow` from the Cistern as a dry
+    run and confirm the two-step cascade: Service Tunnel `blocked_by_pinned`,
+    Vault `blocked_by_blocked`. Do **not** apply it — the misalignment is the
+    demo.
+14. **A missing partner degrades, it does not break** — `pip uninstall
     evennia-calendar`, drop it from `INSTALLED_APPS` and from
     `web/website/urls.py`, restart, and confirm the map still renders with the
     events overlay simply absent. This is the whole point of the signal gating

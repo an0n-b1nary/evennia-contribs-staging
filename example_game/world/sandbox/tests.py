@@ -322,33 +322,92 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
     room_typeclass = Room
 
     def test_every_mapped_room_gets_a_tile(self):
-        from evennia_maps.models import MapPlane, RoomTile
+        # Across all three IC planes, not one: the surface, the undercroft
+        # under it and the standalone interior are placed by three different
+        # mechanisms (a derived walk, the vertical step inside that same walk,
+        # and a second walk from its own anchor), and counting only the
+        # surface would leave two of the three untested.
+        from evennia_maps.models import RoomTile
         from world.sandbox.management.commands.seed_sandbox import (
             MAPPED_ROOM_NAMES,
-            PLANE_NAME,
+            PLANE_NAMES,
         )
 
-        plane = MapPlane.objects.get(name=PLANE_NAME)
-        tiles = RoomTile.objects.filter(plane=plane)
+        tiles = RoomTile.objects.filter(plane__name__in=PLANE_NAMES)
         self.assertEqual(tiles.count(), len(MAPPED_ROOM_NAMES))
         self.assertEqual(
             {tile.room_name for tile in tiles},
             set(MAPPED_ROOM_NAMES),
         )
 
+    def test_the_three_ic_planes_have_the_geometry_they_claim(self):
+        # zstack and elevation are not decoration. Two planes sharing a
+        # non-blank zstack is the entire condition for Leaflet drawing a
+        # base-layer control, and a blank zstack is the entire definition of
+        # a plane reached by portal rather than by walking.
+        from evennia_maps.models import MapPlane
+        from world.sandbox import content
+
+        by_name = {p.name: p for p in MapPlane.objects.all()}
+        for name, zstack, elevation, _desc in content.IC_PLANES:
+            with self.subTest(plane=name):
+                self.assertEqual(by_name[name].zstack, zstack)
+                self.assertEqual(by_name[name].elevation, elevation)
+        # Said as a property rather than left implicit in the table above.
+        stacked = [p for p in by_name.values() if p.zstack == content.ZSTACK]
+        self.assertEqual(len(stacked), 2)
+
+    def test_the_undercroft_is_derived_by_walking_down(self):
+        # No coordinate is written for any undercroft room. A `down` exit is
+        # a vertical direction, so the same walk that lays out the surface
+        # crosses into the adjacent elevation at the same (x, y) - which is
+        # why the Cistern lands under the Plaza and not merely somewhere.
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        cistern = RoomTile.objects.get(room_name="The Cistern")
+        plaza = RoomTile.objects.get(room_name="Sandbox Plaza")
+        self.assertEqual(cistern.plane.name, content.UNDERCROFT_PLANE_NAME)
+        self.assertEqual((cistern.x, cistern.y), (plaza.x, plaza.y))
+
+    def test_the_interior_is_its_own_walk_on_a_standalone_plane(self):
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        lobby = RoomTile.objects.get(room_name="Consulate Lobby")
+        gallery = RoomTile.objects.get(room_name="The Gallery")
+        self.assertEqual(lobby.plane.name, content.INTERIOR_PLANE_NAME)
+        self.assertEqual((lobby.x, lobby.y), (0, 0))
+        self.assertTrue(lobby.pinned)
+        # Derived from the lobby by the same walk machinery, one plane over.
+        self.assertEqual((gallery.x, gallery.y), (0, 1))
+
     def test_the_grid_matches_the_exits_it_was_derived_from(self):
-        # Only (0, 0) was written by hand; the other five positions come from
-        # walking canonical-direction exit aliases. Asserting the shape here
-        # is what makes an alias typo a failure rather than a missing tile
+        # Only two coordinates in the whole IC world are written by hand, and
+        # both are origins. Every position below comes from walking canonical
+        # direction aliases out from the plaza. Asserting the shape here is
+        # what makes an alias typo a failure rather than a missing tile
         # nobody notices.
         from evennia_maps.models import RoomTile
+        from world.sandbox import content
 
-        by_name = {t.room_name: (t.x, t.y) for t in RoomTile.objects.all()}
-        self.assertEqual(by_name["Sandbox Plaza"], (0, 0))
-        self.assertEqual(by_name["The Archive"], (0, 1))
-        self.assertEqual(by_name["The Overlook"], (0, 2))
-        self.assertEqual(by_name["Consulate Hall"], (1, 0))
-        self.assertEqual(by_name["Garden Walk"], (-1, 0))
+        by_name = {
+            t.room_name: (t.x, t.y) for t in RoomTile.objects.filter(plane__name=content.PLANE_NAME)
+        }
+        self.assertEqual(
+            by_name,
+            {
+                "Sandbox Plaza": (0, 0),
+                "The Archive": (0, 1),
+                "The Overlook": (0, 2),
+                "Consulate Hall": (1, 0),
+                "Market Row": (1, 1),
+                "Garden Walk": (-1, 0),
+                "The Warren": (-1, 1),
+                "Harbor Steps": (0, -1),
+                "The Causeway": (1, -1),
+            },
+        )
 
     def test_terrain_snapshot_follows_the_room_mixin(self):
         # MapsRoomMixin.set_terrain() -> terrain_changed -> tile snapshot,
@@ -359,39 +418,197 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(RoomTile.objects.get(room_name="Garden Walk").terrain, "forest")
         self.assertEqual(RoomTile.objects.get(room_name="The Overlook").terrain, "hills")
 
+    def test_two_terrain_tags_resolve_to_one_by_precedence(self):
+        # Harbor Steps carries both "water" and "urban". The precedence list
+        # exists to turn a set into one deterministic answer, and this is the
+        # only seeded room that makes it do any work.
+        from evennia_maps.models import RoomTile
+
+        room = RoomTile.objects.get(room_name="Harbor Steps").room
+        self.assertEqual(set(room.terrain_tags), {"water", "urban"})
+        self.assertEqual(RoomTile.objects.get(room_name="Harbor Steps").terrain, "water")
+
+    def test_a_valid_terrain_can_still_have_no_sprite(self):
+        # Two different absences that look identical on a rendered grid unless
+        # you know to tell them apart, so they are asserted apart here:
+        #
+        #   The Causeway has a terrain ("scrub") with no entry in
+        #   MAPS_TERRAIN_TILESET, so the tile draws the fallback swatch.
+        #   The Warren has no terrain at all, which is what +map/check lints.
+        from evennia_maps.models import RoomTile
+        from evennia_maps.views import tile_sprite
+
+        causeway = RoomTile.objects.get(room_name="The Causeway")
+        self.assertEqual(causeway.terrain, "scrub")
+        self.assertEqual(tile_sprite(causeway.terrain), "")
+
+        warren = RoomTile.objects.get(room_name="The Warren")
+        self.assertEqual(warren.terrain, "")
+
+    def test_every_sprited_terrain_has_a_file_on_disk(self):
+        # The tileset names URLs under /static/, and a typo there is a broken
+        # image on the live map that no view test would notice: tile_sprite()
+        # happily returns a URL to nothing.
+        from pathlib import Path
+
+        from django.conf import settings
+
+        static_dir = Path(settings.STATICFILES_DIRS[0])
+        for terrain, url in settings.MAPS_TERRAIN_TILESET.items():
+            with self.subTest(terrain=terrain):
+                self.assertTrue(url.startswith("/static/"))
+                self.assertTrue((static_dir / url[len("/static/") :]).is_file())
+
+    def test_hangout_types_differ_across_rooms(self):
+        # The one overlay with no table behind it: evennia_maps reads the bare
+        # attribute duck-typed. Three distinct values, because a layer where
+        # every marker is the same letter proves only that the layer draws.
+        from evennia_maps.models import RoomTile
+        from evennia_maps.views import tile_hangout_type
+        from world.sandbox import content
+
+        found = {
+            tile.room_name: tile_hangout_type(tile.room)
+            for tile in RoomTile.objects.filter(plane__name=content.PLANE_NAME)
+        }
+        named = {name: value for name, value in found.items() if value}
+        self.assertEqual(len(named), len(content.HANGOUTS))
+        self.assertEqual(len(set(named.values())), len(content.HANGOUTS))
+
+        from evennia_social import HANGOUT_TYPES
+
+        for name, value in named.items():
+            with self.subTest(room=name):
+                self.assertIn(value, HANGOUT_TYPES)
+
+    def test_the_portal_is_inferred_from_geometry_alone(self):
+        # There is no portal flag anywhere. Consulate Hall gets a portal
+        # marker purely because one of its exits lands on a plane whose zstack
+        # is blank - and the plain "doors" exit that does it carries no
+        # direction alias, so the walk that laid out the surface never
+        # followed it.
+        from evennia_maps.api.views import portal_target_planes_by_room
+        from evennia_maps.models import MapPlane, RoomTile
+        from world.sandbox import content
+
+        interior = MapPlane.objects.get(name=content.INTERIOR_PLANE_NAME)
+        surface = MapPlane.objects.get(name=content.PLANE_NAME)
+        tiles = RoomTile.objects.filter(plane=surface)
+        portals = portal_target_planes_by_room(
+            [tile.room_id for tile in tiles], exclude_plane_id=surface.pk, staff=True
+        )
+        hall = RoomTile.objects.get(room_name="Consulate Hall").room_id
+        self.assertEqual(portals, {hall: interior.pk})
+
     def test_the_origin_tile_is_pinned(self):
         from evennia_maps.models import RoomTile
 
         self.assertTrue(RoomTile.objects.get(room_name="Sandbox Plaza").pinned)
+
+    def test_a_reachable_room_is_deliberately_left_off_the_map(self):
+        # +map/check's unmapped-neighbour lint needs something to lint. The
+        # Study is reached from the Lobby by a canonical `east` exit and still
+        # has no tile, which is the ordinary state of a room dug before
+        # anybody drew a map.
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        for slug in content.UNMAPPED_SLUGS:
+            spec = content.IC_ROOMS_BY_SLUG[slug]
+            with self.subTest(room=spec.name):
+                self.assertFalse(RoomTile.objects.filter(room_name=spec.name).exists())
+
+    def test_the_unmapped_room_is_reachable_by_a_direction_from_a_mapped_one(self):
+        # The lint's precondition, which is the half this game owns. Whether
+        # +map/check phrases it correctly is evennia_maps' own test; whether
+        # the seeded world gives it anything to find is this one. A flavor
+        # exit here would leave the lint permanently silent.
+        from evennia_maps.direction import resolve
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        for slug in content.UNMAPPED_SLUGS:
+            target = content.IC_ROOMS_BY_SLUG[slug].name
+            with self.subTest(room=target):
+                reached_from_mapped = [
+                    exit_obj
+                    for tile in RoomTile.objects.all()
+                    for exit_obj in tile.room.exits
+                    if exit_obj.destination.key == target and resolve(exit_obj) is not None
+                ]
+                self.assertTrue(reached_from_mapped)
+
+    def test_the_undercroft_reflow_reports_a_two_step_blocked_cascade(self):
+        # The whole reason MISPLACED_TILES exists. A reflow of a map that has
+        # been hand-edited must report rather than silently rearrange, and the
+        # interesting half is the *second* step: the Vault looks safe to move
+        # until you know the Tunnel that holds its target cannot vacate.
+        from evennia_maps import layout
+        from evennia_maps.models import RoomTile
+
+        plan = layout.plan(RoomTile.objects.get(room_name="The Cistern").room)
+        blocked = {entry.room.key: entry.reason for entry in plan.blocked}
+
+        self.assertEqual(blocked.get("Service Tunnel"), layout.BLOCKED_BY_PINNED)
+        self.assertEqual(blocked.get("The Vault"), layout.BLOCKED_BY_BLOCKED)
+        # The pinned squatter is skipped, not blocked - a different outcome
+        # with a different list, and conflating them would hide the cascade.
+        self.assertIn("The Sump", {room.key for room, _p, _x, _y in plan.pinned_skips})
+
+    def test_the_squatting_tile_is_pinned_so_the_cascade_is_stable(self):
+        # If the Sump were not pinned it would simply move and the whole
+        # cascade above would evaporate on the first reflow.
+        from evennia_maps.models import RoomTile
+        from world.sandbox import content
+
+        for slug, x, y, pinned in content.MISPLACED_TILES:
+            spec = content.IC_ROOMS_BY_SLUG[slug]
+            with self.subTest(room=spec.name):
+                tile = RoomTile.objects.get(room_name=spec.name)
+                self.assertEqual((tile.x, tile.y), (x, y))
+                self.assertEqual(tile.pinned, pinned)
 
     def test_seeding_twice_is_idempotent(self):
         # The purge half has to know about the plane, region and scenes, and
         # MapPlane.name is unique — a purge that missed one would raise here
         # rather than quietly doubling the world.
         #
-        # Two planes, not one: the overworld is purged and rebuilt, the scratch
-        # plane is get_or_create-d and deliberately survives. That second one
-        # is the case a count of 1 would have caught as a bug and a count of 2
-        # asserts as the design.
+        # Four planes: the three IC ones are purged and rebuilt, the scratch
+        # plane is get_or_create-d and deliberately survives. That last one is
+        # the case a count of three would have caught as a bug and a count of
+        # four asserts as the design.
+        #
+        # Region membership is counted through all_objects because one of the
+        # three regions is archived on purpose - the default manager would
+        # hide it, and a purge that missed an archived region would collide on
+        # the unique name on the very next run rather than here.
         from evennia_maps.models import MapPlane, RoomTile
-        from evennia_regions.models import RegionMembership
+        from evennia_regions.models import Region, RegionMembership
         from world.sandbox import content
-        from world.sandbox.management.commands.seed_sandbox import MAPPED_ROOM_NAMES
+        from world.sandbox.management.commands.seed_sandbox import (
+            MAPPED_ROOM_NAMES,
+            PLANE_NAMES,
+        )
+
+        expected_memberships = sum(
+            1 + len(secondary) for _primary, secondary in content.IC_REGION_MEMBERSHIPS.values()
+        )
 
         call_command("seed_sandbox", verbosity=0)
 
         self.assertEqual(
-            set(MapPlane.objects.values_list("name", flat=True)),
-            {content.PLANE_NAME, content.DRAFTING_PLANE_NAME},
+            set(MapPlane.all_objects.values_list("name", flat=True)),
+            {*PLANE_NAMES, content.DRAFTING_PLANE_NAME},
         )
         self.assertEqual(
-            RoomTile.objects.filter(plane__name=content.PLANE_NAME).count(),
+            RoomTile.objects.filter(plane__name__in=PLANE_NAMES).count(),
             len(MAPPED_ROOM_NAMES),
         )
         self.assertEqual(
             RoomTile.objects.filter(plane__name=content.DRAFTING_PLANE_NAME).count(), 1
         )
-        self.assertEqual(RegionMembership.objects.count(), len(MAPPED_ROOM_NAMES))
+        self.assertEqual(Region.all_objects.count(), len(content.REGIONS))
+        self.assertEqual(RegionMembership.objects.count(), expected_memberships)
 
 
 class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
@@ -445,36 +662,122 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
         )
 
     def test_regions_names_every_tile(self):
-        from world.sandbox.management.commands.seed_sandbox import REGION_NAME
+        from world.sandbox import content
 
         primary = self._overlays()["primary_region"]
         self.assertEqual(set(primary), set(self.room_ids))
+        # Two of the three regions on the surface, not one: an overlay whose
+        # every value is identical cannot distinguish "resolved correctly"
+        # from "hardcoded".
+        visible = {
+            content.REGIONS_BY_SLUG["commons"]["name"],
+            content.REGIONS_BY_SLUG["waterfront"]["name"],
+        }
+        self.assertEqual({entry["name"] for entry in primary.values()}, visible)
+
+    def test_a_room_can_hold_a_primary_and_a_secondary_membership(self):
+        from evennia_regions.models import RegionMembership
+        from world.sandbox import content
+
+        room_id = self.tile_by_name["Market Row"].room_id
+        memberships = {
+            m.region.name: m.is_primary
+            for m in RegionMembership.objects.select_related("region").filter(room_id=room_id)
+        }
         self.assertEqual(
-            {entry["name"] for entry in primary.values()},
-            {REGION_NAME},
+            memberships,
+            {
+                content.REGIONS_BY_SLUG["commons"]["name"]: True,
+                content.REGIONS_BY_SLUG["waterfront"]["name"]: False,
+            },
+        )
+        # One deterministic answer on the tile despite two memberships.
+        self.assertEqual(
+            self._overlays()["primary_region"][room_id]["name"],
+            content.REGIONS_BY_SLUG["commons"]["name"],
         )
 
-    def test_scenes_pin_the_live_room_and_heat_the_closed_one(self):
+    def test_an_archived_primary_region_falls_through_to_a_visible_one(self):
+        # The undercroft rooms' *flagged* primary is the archived Undercity.
+        # primary_for() still answers with it; the map's overlay deliberately
+        # diverges and skips archived regions, because the tile label is a
+        # link and RegionDetailView resolves through Region.objects - so
+        # honouring the flag here would render a link straight to a 404.
+        from evennia_maps.models import RoomTile
+        from evennia_maps.overlays import collect_overlays
+        from evennia_regions.models import RegionMembership
+        from world.sandbox import content
+
+        cistern = RoomTile.objects.get(room_name="The Cistern")
+        flagged = RegionMembership.objects.get(room_id=cistern.room_id, is_primary=True)
+        self.assertEqual(flagged.region.name, content.REGIONS_BY_SLUG["undercity"]["name"])
+        self.assertTrue(flagged.region.is_archived)
+
+        overlays = collect_overlays([cistern.room_id], staff=False)
+        self.assertEqual(
+            overlays["primary_region"][cistern.room_id]["name"],
+            content.REGIONS_BY_SLUG["waterfront"]["name"],
+        )
+
+    def test_scenes_pin_the_live_room_and_heat_the_closed_ones(self):
+        # The heatmap radius is min(4 + 2n, 16), so an even distribution shows
+        # only that the layer draws. Three against one is what makes the
+        # difference visible, and asserting the exact counts is what stops a
+        # later edit flattening it back out without anyone noticing.
         overlays = self._overlays()
         hall = self.tile_by_name["Consulate Hall"].room_id
         archive = self.tile_by_name["The Archive"].room_id
+        market = self.tile_by_name["Market Row"].room_id
 
         self.assertEqual(set(overlays["has_active_scene"]), {hall})
-        self.assertEqual(overlays["recent_scene_count"], {archive: 1})
-        self.assertEqual(len(overlays["recent_scenes"][archive]), 1)
+        self.assertEqual(overlays["recent_scene_count"], {archive: 3, market: 1})
+        self.assertEqual(len(overlays["recent_scenes"][archive]), 3)
+        self.assertGreater(
+            overlays["recent_scene_count"][archive], overlays["recent_scene_count"][market]
+        )
 
-    def test_lore_lights_the_whole_region(self):
-        # has_lore is answered per room but decided per region: every seeded
-        # room shares one primary region, and that region has public lore.
-        self.assertEqual(set(self._overlays()["has_lore"]), set(self.room_ids))
+    def test_lore_lights_one_region_and_not_the_others(self):
+        # has_lore is answered per room but decided per region. Lore is
+        # attached to the Commons alone, so the Waterfront rooms stay dark -
+        # an overlay that is true everywhere is indistinguishable from one
+        # that is broken.
+        from world.sandbox import content
+
+        lit = set(self._overlays()["has_lore"])
+        commons = {
+            self.tile_by_name[content.IC_ROOMS_BY_SLUG[slug].name].room_id
+            for slug, (primary, _secondary) in content.IC_REGION_MEMBERSHIPS.items()
+            if primary == content.LORE_REGION_SLUG
+            and content.IC_ROOMS_BY_SLUG[slug].name in self.tile_by_name
+        }
+        self.assertEqual(lit, commons)
+        self.assertTrue(set(self.room_ids) - lit)
 
     def test_calendar_reaches_a_room_through_the_scene(self):
-        from world.sandbox.management.commands.seed_sandbox import CALENDAR_EVENT_TITLE
+        from world.sandbox import content
 
         hall = self.tile_by_name["Consulate Hall"].room_id
         events = self._overlays()["upcoming_events"]
         self.assertEqual(set(events), {hall})
-        self.assertEqual(events[hall][0]["title"], CALENDAR_EVENT_TITLE)
+        self.assertEqual(
+            events[hall][0]["title"], content.CALENDAR_EVENTS_BY_SLUG["kickoff"]["title"]
+        )
+
+    def test_a_staff_only_event_is_withheld_from_players(self):
+        # is_staff_event exists to stop staff-run events being
+        # visible-but-unjoinable, and a map pin advertising one would undo
+        # that. This is the pair a playtester watches change when they run
+        # +sandbox/builder on.
+        from world.sandbox import content
+
+        market = self.tile_by_name["Market Row"].room_id
+        briefing = content.CALENDAR_EVENTS_BY_SLUG["briefing"]["title"]
+
+        as_player = self._overlays(staff=False)["upcoming_events"]
+        self.assertNotIn(market, as_player)
+
+        as_staff = self._overlays(staff=True)["upcoming_events"]
+        self.assertEqual([e["title"] for e in as_staff[market]], [briefing])
 
     def test_the_collect_is_one_signal_not_one_per_tile(self):
         # The invariant the whole design rests on: overlay cost is flat in
@@ -550,16 +853,35 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
     def test_svg_map_page_renders_with_its_overlays(self):
         from evennia_maps.models import MapPlane
         from evennia_maps.views import PlaneMapView
-        from world.sandbox.management.commands.seed_sandbox import PLANE_NAME, REGION_NAME
+        from world.sandbox import content
 
-        plane = MapPlane.objects.get(name=PLANE_NAME)
+        plane = MapPlane.objects.get(name=content.PLANE_NAME)
         html = self._render(PlaneMapView.as_view(), f"/map/{plane.pk}/", pk=plane.pk)
         self.assertIn("Sandbox Plaza", html)
         self.assertIn("The Overlook", html)
-        # The region link is an overlay value turned into a URL — its presence
+        # The region link is an overlay value turned into a URL - its presence
         # proves the collect ran and evennia_regions' route is mounted.
-        self.assertIn(REGION_NAME, html)
+        self.assertIn(content.REGIONS_BY_SLUG["commons"]["name"], html)
         self.assertIn("/regions/", html)
+        # A sprite URL from MAPS_TERRAIN_TILESET, which only reaches the page
+        # through tile_sprite() resolving a real terrain snapshot.
+        self.assertIn("/static/sandbox/terrain/", html)
+
+    def test_the_staff_room_is_withheld_from_an_anonymous_visitor(self):
+        # The most direct demonstration of the fail-closed visibility rule
+        # there is, because what changes is whether a room exists at all as
+        # far as the page is concerned. Unlike the OOC wing, the Warren *is*
+        # placed on the grid - it is the read side that withholds it.
+        from evennia_maps.models import MapPlane, RoomTile
+        from evennia_maps.views import PlaneMapView
+        from world.sandbox import content
+
+        warren = content.IC_ROOMS_BY_SLUG[content.STAFF_ROOM_SLUG]
+        self.assertTrue(RoomTile.objects.filter(room_name=warren.name).exists())
+
+        plane = MapPlane.objects.get(name=content.PLANE_NAME)
+        html = self._render(PlaneMapView.as_view(), f"/map/{plane.pk}/", pk=plane.pk)
+        self.assertNotIn(warren.name, html)
 
     def test_both_api_routers_are_reachable_under_one_prefix(self):
         # web/urls.py mounts two DRF routers at the same "api/v1/" prefix.
@@ -599,12 +921,17 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
     def test_region_page_renders_its_member_rooms(self):
         from evennia_regions.models import Region
         from evennia_regions.views import RegionDetailView
-        from world.sandbox.management.commands.seed_sandbox import REGION_NAME
+        from world.sandbox import content
 
-        region = Region.objects.get(name=REGION_NAME)
+        name = content.REGIONS_BY_SLUG["commons"]["name"]
+        region = Region.objects.get(name=name)
         html = self._render(RegionDetailView.as_view(), f"/regions/{region.pk}/", pk=region.pk)
-        self.assertIn(REGION_NAME, html)
+        self.assertIn(name, html)
         self.assertIn("Sandbox Plaza", html)
+        # The staff room is a member and is still withheld: the region page
+        # applies the same visibility rule the map does, which is the point of
+        # having it in one place rather than per-view.
+        self.assertNotIn(content.IC_ROOMS_BY_SLUG[content.STAFF_ROOM_SLUG].name, html)
 
 
 class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
