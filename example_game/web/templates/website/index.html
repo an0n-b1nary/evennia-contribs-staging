@@ -1,0 +1,66 @@
+{% extends "website/base.html" %}
+
+{% comment %}
+Overrides Evennia's stock index. Stock shows accounts / recently-connected /
+database-stats; this sandbox shows what is happening, what happened lately, and
+an inventory of the contribs themselves.
+
+Dropped from stock: accounts-widget and database-stats-widget. Both are counts a
+developer reading this page does not need, and the systems widget below answers
+the "what is installed here" question they were standing in for. Kept:
+recently-connected (a sandbox that looks inhabited is more useful to a
+playtester) and the Evennia credit.
+
+Every widget renders its own empty state, so this page is correct on a freshly
+migrated database with nothing in it.
+{% endcomment %}
+
+{% block titleblock %}Home{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col">
+    <div class="card text-center">
+      <div class="card-body">
+        {% include "website/homepage/main-content.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr />
+
+<div class="row widget-row">
+  <div class="col-12 col-md-4 mb-3">
+    {% include "website/homepage/happening-now-widget.html" %}
+  </div>
+  <div class="col-12 col-md-4 mb-3">
+    {% include "website/homepage/upcoming-events-widget.html" %}
+  </div>
+  <div class="col-12 col-md-4 mb-3">
+    {% include "website/homepage/map-widget.html" %}
+  </div>
+</div>
+
+<div class="row widget-row">
+  <div class="col-12 col-md-8 mb-3">
+    {% include "website/homepage/recent-activity-widget.html" %}
+  </div>
+  <div class="col-12 col-md-4 mb-3">
+    {% include "website/homepage/current-arc-widget.html" %}
+    {% include "website/homepage/recently-connected-widget.html" %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="col mb-3">
+    {% include "website/homepage/systems-widget.html" %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="col">
+    {% include "website/homepage/evennia-widget.html" %}
+  </div>
+</div>
+{% endblock %}

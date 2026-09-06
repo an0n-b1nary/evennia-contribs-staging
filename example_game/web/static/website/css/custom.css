@@ -74,3 +74,10 @@
   font-style: italic;
   padding: 1rem;
 }
+
+/* Wide tables scroll inside their own container rather than making the page
+ * scroll sideways. tabindex makes the scroll area keyboard-reachable, which is
+ * why it carries a role and a label too. */
+.widget-table-scroll {
+  overflow-x: auto;
+}

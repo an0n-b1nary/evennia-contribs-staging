@@ -1148,3 +1148,150 @@ class TestBaseTemplateOverride(SeededSandboxMixin, EvenniaTest):
         for label in ("Setting", "Events", "Community"):
             with self.subTest(group=label):
                 self.assertIn(f">{label}</a>", html)
+
+
+class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
+    """The home page: it renders, it stays correct when empty, and it does not leak.
+
+    Anonymous throughout, because that is who arrives from a link - and because
+    the leak cases only mean anything for a viewer with no permissions at all.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def _index(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def test_index_renders_every_widget(self):
+        html = self._index()
+
+        for heading in (
+            "Happening Now",
+            "Upcoming Events",
+            "The Map",
+            "Recent Activity",
+            "Systems on this sandbox",
+        ):
+            with self.subTest(widget=heading):
+                self.assertIn(heading, html)
+
+    def test_index_does_not_leak_a_view_private_scene(self):
+        """The fail-closed case. VIEW_PRIVATE is outside WEB_READABLE_PRIVACY.
+
+        Both a running scene (Happening Now) and a closed one (Recent Activity)
+        are seeded, because the two widgets reach the model by different paths
+        and only one of them copies SceneListView.
+        """
+        from django.utils import timezone
+        from evennia_scenes.models import Scene
+
+        Scene.objects.create(
+            title="Secret Conclave",
+            status=Scene.Status.ACTIVE,
+            privacy=Scene.Privacy.VIEW_PRIVATE,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+        )
+        Scene.objects.create(
+            title="Secret Aftermath",
+            status=Scene.Status.CLOSED,
+            privacy=Scene.Privacy.VIEW_PRIVATE,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+            ended_at=timezone.now(),
+        )
+
+        html = self._index()
+
+        self.assertNotIn("Secret Conclave", html)
+        self.assertNotIn("Secret Aftermath", html)
+
+    def test_index_shows_a_public_scene(self):
+        """The other half of the previous test: the filter is not simply hiding everything."""
+        from django.utils import timezone
+        from evennia_scenes.models import Scene
+
+        Scene.objects.create(
+            title="Open Market Day",
+            status=Scene.Status.ACTIVE,
+            privacy=Scene.Privacy.PUBLIC,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+        )
+
+        self.assertIn("Open Market Day", self._index())
+
+    def test_index_hides_unpublished_lore(self):
+        """Mirrors LoreListView: only PUBLISHED, non-archived entries are public."""
+        from django.db.models import Max
+        from evennia_lore.models import LoreEntry
+
+        # entry_number is a required unique column with no default; the contrib
+        # assigns it on the authoring path, which this test bypasses.
+        next_number = (
+            LoreEntry.objects.aggregate(Max("entry_number"))["entry_number__max"] or 0
+        ) + 1
+        LoreEntry.objects.create(
+            entry_number=next_number,
+            title="Draft Secret",
+            body="...",
+            status=LoreEntry.Status.DRAFT,
+        )
+
+        self.assertNotIn("Draft Secret", self._index())
+
+    def test_index_hides_a_cancelled_event(self):
+        """Mirrors CalendarListView's is_cancelled=False."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from evennia_calendar.models import CalendarEvent
+
+        CalendarEvent.objects.create(
+            title="Called Off",
+            scheduled_time=timezone.now() + timedelta(days=1),
+            is_cancelled=True,
+        )
+
+        self.assertNotIn("Called Off", self._index())
+
+    def test_index_lists_the_in_game_only_contribs(self):
+        """The systems widget is honest about the contribs with no web surface."""
+        html = self._index()
+
+        for app_label in ("evennia_rptracker", "evennia_posing", "evennia_social"):
+            with self.subTest(contrib=app_label):
+                self.assertIn(app_label, html)
+        self.assertIn("in-game only", html)
+
+    def test_index_survives_an_empty_database(self):
+        """No widget raises, and each renders its own empty state.
+
+        A freshly migrated game with nothing in it is the first thing an adopter
+        sees, so it has to be a correct page rather than a stack trace.
+        """
+        from evennia_boards.models import Board
+        from evennia_calendar.models import CalendarEvent
+        from evennia_lore.models import LoreEntry
+        from evennia_plots.models import PlotThread
+        from evennia_scenes.models import Scene
+
+        from evennia_maps.models import MapPlane
+
+        for model in (Scene, LoreEntry, CalendarEvent, Board, PlotThread, MapPlane):
+            model.objects.all().delete()
+
+        html = self._index()
+
+        self.assertIn("No scenes are running right now.", html)
+        self.assertIn("Nothing on the calendar yet.", html)
+        self.assertIn("No map planes exist yet.", html)
+        self.assertIn("Nothing has happened here in the last month.", html)
