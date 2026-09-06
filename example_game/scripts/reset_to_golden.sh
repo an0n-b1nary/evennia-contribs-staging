@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 # Full wipe-to-default reset for the example_game contrib sandbox.
 #
+# ---------------------------------------------------------------------
+# SHELVED. There is deliberately no golden snapshot in the tree, so this
+# script exits 1 and does nothing. That is the intended state, not a bug.
+#
+# The snapshot has to be retaken and recommitted after every `evennia
+# migrate`, or it restores a schema the code no longer matches. While the
+# contribs are still churning through migrations that cost outweighs the
+# benefit, and a stale golden DB is worse than none - it looks like a
+# safety net and isn't. Use `+sandbox/reset` or `evennia seed_sandbox`
+# for content resets; neither touches accounts.
+#
+# To bring it back once migrations settle, follow README step 6. Generate
+# it locally, never from the droplet: a droplet-born snapshot publishes
+# that server's superuser email and password hash, and a golden reset
+# restores those rows, making the published hash the live admin
+# credential. See issue #6.
+# ---------------------------------------------------------------------
+#
 # Stops the server, swaps the live database for the committed golden
 # snapshot (server/evennia_default.db3), and restarts. This resets
 # EVERYTHING — accounts, characters, and content — not just seeded content.

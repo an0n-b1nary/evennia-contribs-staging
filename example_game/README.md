@@ -480,7 +480,14 @@ cannot be left to the service — do it now, then hand the running game to syste
 evennia seed_sandbox   # rerunnable; idempotent
 ```
 
-### 6. Snapshot the golden DB
+### 6. Snapshot the golden DB — *shelved*
+
+> **Skip this step for now.** No golden snapshot is committed, and
+> `scripts/reset_to_golden.sh` fails closed without one. The snapshot must be
+> retaken after every `evennia migrate`; while the contribs are still churning
+> through migrations that upkeep outweighs the benefit, and a stale golden DB is
+> worse than none. Use `+sandbox/reset` or `evennia seed_sandbox` for content
+> resets — neither touches accounts. Revive this step when migrations settle.
 
 **The golden snapshot is generated locally, not on the droplet, and the droplet
 never pushes.** It is committed as `server/evennia_default.db3`; the droplet only
@@ -795,7 +802,8 @@ Three mechanisms, for three different needs:
   plane and its tiles, and the two scenes that light the tile overlays
   (tagged/name-matched, so reruns don't duplicate). Keeps accounts and
   characters.
-- **`scripts/reset_to_golden.sh`** — full wipe. Stops the server, swaps in
+- **`scripts/reset_to_golden.sh`** — *shelved; see step 6.* Full wipe when
+  revived. Stops the server, swaps in
   the committed `server/evennia_default.db3`, restarts. Wipes accounts too.
   Re-snapshot the golden file after every `evennia migrate` (see step 6).
 
@@ -841,10 +849,10 @@ Three mechanisms, for three different needs:
    Drafting Room** and still hold their scratch-plane tiles — that room and
    the scratch plane are both exempt from the purge precisely so the reset
    cannot orphan what a playtester built.
-9. **Golden reset works** — make a throwaway change, run
-   `scripts/reset_to_golden.sh`, confirm the world is back to default.
-   (Requires the committed snapshot from step 6, which the droplet gets by
-   pulling — it is not generated there.)
+9. **Golden reset works** — *skipped while step 6 is shelved.* With no
+   snapshot committed, `scripts/reset_to_golden.sh` should exit 1 with
+   "no golden snapshot at ..." and change nothing. That clean refusal is
+   the only thing to verify here for now.
 10. **The map renders, in a browser** — `/map/` lists four planes:
     `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior` and
     `Sandbox Scratch`. `/map/<pk>/` for the overworld draws eight tiles as an
