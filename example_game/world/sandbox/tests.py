@@ -987,3 +987,164 @@ class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
             with self.subTest(route=name):
                 response = self.client.get(reverse(name))
                 self.assertIn(response.status_code, (200, 302))
+
+
+class TestNavCoversEveryWebSurface(EvenniaTest):
+    """The navbar reaches every surface this game mounts, and cannot 500 the site.
+
+    TestEveryWebSurfaceIsMounted proves the nine contrib routes are wired. That
+    is necessary and not sufficient: for most of this game's life all nine were
+    mounted and none appeared in the menu, so a playtester had to type URLs. This
+    class is the other half - what is mounted is reachable by clicking.
+
+    The coverage test reads LANDING_ROUTES off that class rather than restating
+    the list, so mounting a tenth contrib without adding it to the menu fails
+    here instead of shipping an invisible page.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _request(self, path="/", user=None):
+        request = self.factory.get(path)
+        request.user = user if user is not None else AnonymousUser()
+        return request
+
+    def test_every_landing_route_is_reachable_from_the_nav(self):
+        from web.website.nav import ACCOUNT_LINKS, NAV_GROUPS
+
+        in_menu = {name for _label, table in NAV_GROUPS for _lbl, name, _gate in table}
+        in_menu |= {name for _label, name, _gate in ACCOUNT_LINKS}
+
+        for name, _prefix in TestEveryWebSurfaceIsMounted.LANDING_ROUTES:
+            with self.subTest(route=name):
+                self.assertIn(name, in_menu)
+
+    def test_nav_drops_unresolvable_routes(self):
+        """A route that does not reverse costs one entry, not the whole site.
+
+        This is the contract the menu exists for: it is included from base.html,
+        so a NoReverseMatch here would be a 500 on every page. Same behaviour as
+        evennia_maps.overlays.overlay_url_templates().
+        """
+        from web.website import nav
+
+        broken = (("Setting", (("Nowhere", "no-such-route-name", nav.PUBLIC),)),)
+        with mock.patch.object(nav, "NAV_GROUPS", broken):
+            menu = nav.build_menu(self._request())
+
+        self.assertEqual(menu["groups"], [])
+
+    def test_nav_hides_gated_entries_from_anonymous(self):
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request())
+        labels = [item["label"] for group in menu["groups"] for item in group["items"]]
+
+        self.assertIn("Map", labels)
+        self.assertIn("Lore", labels)
+        self.assertEqual(menu["account"]["personal"], [])
+        self.assertEqual(menu["account"]["staff"], [])
+
+    def test_nav_shows_personal_but_not_staff_entries_to_a_player(self):
+        from web.website.nav import build_menu
+
+        self.account.is_staff = False
+        menu = build_menu(self._request(user=self.account))
+
+        self.assertEqual(
+            [item["label"] for item in menu["account"]["personal"]],
+            ["My XP", "My Tickets", "My Lore"],
+        )
+        self.assertEqual(menu["account"]["staff"], [])
+
+    def test_nav_shows_staff_entries_to_staff(self):
+        from web.website.nav import build_menu
+
+        self.account.is_staff = True
+        menu = build_menu(self._request(user=self.account))
+
+        self.assertEqual(
+            [item["label"] for item in menu["account"]["staff"]],
+            ["Lore Queue", "All Jobs", "Plot Arcs"],
+        )
+
+    def test_nav_marks_the_active_group(self):
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request(path="/scenes/"))
+        active = [group["label"] for group in menu["groups"] if group["active"]]
+
+        self.assertEqual(active, ["Events"])
+
+    def test_a_detail_page_activates_its_section(self):
+        """Prefix matching, so /scenes/12/ lights up Scenes and not just /scenes/."""
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request(path="/scenes/12/"))
+        active = [
+            item["label"] for group in menu["groups"] for item in group["items"] if item["active"]
+        ]
+
+        self.assertEqual(active, ["Scenes"])
+
+    def test_longest_prefix_wins_across_menus(self):
+        """/lore/mine/ activates "My Lore" only - not "Lore" as well.
+
+        Both /lore/ and /lore/mine/ prefix-match the path, which is why the
+        active entry is chosen across the whole menu at once rather than
+        per-list.
+        """
+        from web.website.nav import build_menu
+
+        self.account.is_staff = False
+        menu = build_menu(self._request(path="/lore/mine/", user=self.account))
+
+        active = [
+            item["label"] for group in menu["groups"] for item in group["items"] if item["active"]
+        ]
+        active += [item["label"] for item in menu["account"]["personal"] if item["active"]]
+
+        self.assertEqual(active, ["My Lore"])
+
+
+class TestBaseTemplateOverride(SeededSandboxMixin, EvenniaTest):
+    """The two assets this game's base.html override brings back to life.
+
+    Both were shipped-but-inert before it existed, and neither is visible to any
+    contrib's own suite: a contrib renders against a test URLconf with stock
+    base.html, where its breadcrumb block simply has nowhere to go.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_breadcrumbs_render_on_a_contrib_page(self):
+        """46 contrib templates define {% block breadcrumbs %}; stock base.html has none."""
+        from django.urls import reverse
+
+        response = self.client.get(reverse("evennia_scenes:scene-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('aria-label="Breadcrumb"', response.content.decode())
+
+    def test_accessibility_stylesheet_is_linked(self):
+        """evennia_accessibility ships this CSS; nothing referenced it before."""
+        from django.urls import reverse
+
+        response = self.client.get(reverse("evennia_scenes:scene-list"))
+
+        self.assertIn("evennia_accessibility/css/accessibility.css", response.content.decode())
+
+    def test_the_grouped_menu_renders(self):
+        from django.urls import reverse
+
+        html = self.client.get(reverse("evennia_scenes:scene-list")).content.decode()
+
+        for label in ("Setting", "Events", "Community"):
+            with self.subTest(group=label):
+                self.assertIn(f">{label}</a>", html)

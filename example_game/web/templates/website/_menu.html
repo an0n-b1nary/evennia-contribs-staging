@@ -1,0 +1,134 @@
+{% comment %}
+This game's primary navigation, overriding Evennia's stock website/_menu.html.
+
+The route names are NOT written here. They live in web/website/nav.py and reach
+this template through the site_menu context processor, already reversed. That is
+deliberate: this file is included from base.html on every page, so a {% templatetag openblock %} url ... {% templatetag closeblock %}
+that fails to reverse is a NoReverseMatch on the entire site rather than on one
+page -- and the nine contrib surfaces this game mounts use three different
+reverse forms, so getting one wrong is easy. nav.py reverses defensively and
+drops what does not resolve; see its docstring.
+
+The account dropdown keeps Evennia's character-switcher entries verbatim and
+adds two sections from nav.py: the viewer's own pages, and staff pages.
+{% endcomment %}
+{% load static %}
+<nav class="navbar navbar-dark font-weight-bold navbar-expand-md" aria-label="Primary">
+  <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#menu-content"
+    aria-controls="menu-content" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <a class="navbar-brand" href="{% url 'index' %}">
+    <div class="media">
+      <img class="d-flex navbar-brand-logo mx-3" src="{% static "website/images/evennia_logo.png" %}"
+        alt="" />
+      <div class="media-body">
+        {{ game_name }}<br />
+        <small>{{ game_slogan }}</small>
+      </div>
+    </div>
+  </a>
+
+  <div class="collapse navbar-collapse" id="menu-content">
+    <ul class="navbar-nav">
+
+      {% comment %}
+      Grouped by kind of thing -- Setting, Events, Community -- rather than by
+      in-character vs out-of-character. evennia_boards is why: Board.board_type
+      is ic/ooc per board, so Boards is one surface serving both, and an IC/OOC
+      axis would have to split or misfile it. The board list shows each board's
+      type per row, so that distinction surfaces one click in.
+      {% endcomment %}
+      {% for group in nav_groups %}
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle{% if group.active %} active{% endif %}" href="#"
+           id="nav-{{ group.label|lower }}" role="button" data-toggle="dropdown"
+           aria-haspopup="true" aria-expanded="false">{{ group.label }}</a>
+        <div class="dropdown-menu" aria-labelledby="nav-{{ group.label|lower }}">
+          {% for item in group.items %}
+          <a class="dropdown-item{% if item.active %} active{% endif %}" href="{{ item.url }}"
+             {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+          {% endfor %}
+        </div>
+      </li>
+      {% endfor %}
+
+      <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
+
+      {% if webclient_enabled %}
+      <li class="nav-item"><a class="nav-link" href="{% url 'webclient:index' %}">Play Online</a></li>
+      {% endif %}
+    </ul>
+
+    <ul class="nav navbar-nav ml-auto w-120 justify-content-end">
+      {% if account %}
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="user_options"
+           role="button" aria-haspopup="true" aria-expanded="false">
+          {% if puppet %}
+          Welcome, {{ puppet }}! <span class="text-muted">({{ account.username }})</span> <span class="caret"></span>
+          {% else %}
+          Logged in as {{ account.username }} <span class="caret"></span>
+          {% endif %}
+        </a>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="user_options">
+
+          {% comment %}
+          XP, Tickets and the lore compendium are account state rather than
+          places to browse -- all three redirect or 403 without a login, so they
+          belong here rather than in the public menu.
+          {% endcomment %}
+          {% for item in nav_account.personal %}
+          <a class="dropdown-item{% if item.active %} active{% endif %}" href="{{ item.url }}"
+             {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+          {% endfor %}
+          {% if nav_account.personal %}<div class="dropdown-divider" role="separator"></div>{% endif %}
+
+          {% comment %}
+          Admin hangs off user.is_staff alone, not off nav_account.staff: the
+          three contrib staff routes can all fail to resolve (contribs unmounted)
+          and a staff user must still reach the admin.
+          {% endcomment %}
+          {% if nav_account.staff or user.is_staff %}
+          <h6 class="dropdown-header">Staff</h6>
+          {% for item in nav_account.staff %}
+          <a class="dropdown-item{% if item.active %} active{% endif %}" href="{{ item.url }}"
+             {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+          {% endfor %}
+          {% if user.is_staff %}
+          <a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a>
+          {% if rest_api_enabled %}<a class="dropdown-item" href="/api">API</a>{% endif %}
+          {% endif %}
+          <div class="dropdown-divider" role="separator"></div>
+          {% endif %}
+
+          <a class="dropdown-item" href="{% url 'character-create' %}">Create Character</a>
+          <a class="dropdown-item" href="{% url 'character-manage' %}">Manage Characters</a>
+          <div class="dropdown-divider" role="separator"></div>
+          {% for character in account.characters|slice:"10" %}
+          <a class="dropdown-item" href="{{ character.web_get_puppet_url }}?next={{ request.path }}">{{ character }}</a>
+          {% empty %}
+          <span class="dropdown-item text-muted">No characters found</span>
+          {% endfor %}
+          <div class="dropdown-divider" role="separator"></div>
+          <a class="dropdown-item" href="{% url 'password_change' %}">Change Password</a>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item">Log Out</button>
+          </form>
+        </div>
+      </li>
+      {% else %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'login' %}?next={{ request.path }}">Log In</a>
+      </li>
+      {% if register_enabled %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'register' %}">Register</a>
+      </li>
+      {% endif %}
+      {% endif %}
+    </ul>
+  </div>
+</nav>
