@@ -411,12 +411,45 @@ back to the system Python, and `evennia>=6.0` will look uninstallable ("no
 matching distribution") only because that system Python is too old. Re-run
 `source ~/sandbox/venv/bin/activate` and check `python --version`.
 
-### 2. Clone this repo
+### 2. Clone this repo — pull-only, and make it structurally so
 
 ```bash
 git clone https://github.com/an0n-b1nary/evennia-contribs-staging.git ~/sandbox/evennia-contribs-staging
 cd ~/sandbox/evennia-contribs-staging
+git config pull.ff only
+git remote set-url --push origin DISABLED-pull-only
 ```
+
+**The droplet never authors anything.** It pulls; it does not commit and does not
+push. If something here needs to change, change it in a local clone and pull the
+result. Genuinely machine-specific state is the exception, which is why
+`server/conf/secret_settings.py` is gitignored — that is the pattern to follow for
+anything else local to this box.
+
+Those two config lines are what make the rule hold on its own:
+
+- `pull.ff only` makes `git pull` refuse anything that isn't a fast-forward. Without
+  it, a single commit made here quietly turns every later pull into a merge, and the
+  branches diverge further each time. With it, you find out on the first pull.
+- `set-url --push` breaks pushes at the remote level. Fetch and pull keep working;
+  `git push` fails immediately instead of prompting for credentials that shouldn't be
+  on this machine anyway. (GitHub dropped password auth for Git in 2021, so an
+  interactive push here fails regardless — this just makes it fail *clearly*.)
+
+If the droplet has already diverged, it is carrying a commit of its own. Confirm and
+discard it:
+
+```bash
+git fetch origin
+git log --oneline origin/main..HEAD   # what this box has that origin doesn't
+git status --short                    # any modified tracked files?
+git reset --hard origin/main          # discards the above
+```
+
+`--hard` is safe here **only because everything that matters on this box is
+gitignored** and therefore untouched: `server/evennia.db3`, `server/conf/
+secret_settings.py`, and `server/logs/`. Check `git status --short` first anyway —
+if it lists a modified tracked file, that change is real and reset will destroy it.
 
 ### 3. Install the contribs, in dependency order
 
