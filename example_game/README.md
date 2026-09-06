@@ -482,27 +482,63 @@ evennia seed_sandbox   # rerunnable; idempotent
 
 ### 6. Snapshot the golden DB
 
+**The golden snapshot is generated locally, not on the droplet, and the droplet
+never pushes.** It is committed as `server/evennia_default.db3`; the droplet only
+ever pulls it. Re-snapshot after every `evennia migrate` and commit the result.
+
+From a local clone, with the contribs installed and no server running:
+
 ```bash
-evennia stop
+cd example_game
+rm -f server/evennia.db3 server/evennia.db3-wal server/evennia.db3-shm
+evennia migrate
+EVENNIA_SUPERUSER_USERNAME=admin EVENNIA_SUPERUSER_EMAIL= EVENNIA_SUPERUSER_PASSWORD='<28+ random chars>' evennia start
+evennia seed_sandbox
+evennia stop            # wait for server/*.pid to clear before copying
 cp server/evennia.db3 server/evennia_default.db3
 git add server/evennia_default.db3 && git commit -m "chore: snapshot golden sandbox DB"
-evennia start
 ```
 
-Re-snapshot after every `evennia migrate` — including the regions/maps
-migrations, which are the most recent.
+Evennia reads those three env vars in `create_superuser()`, so first boot needs no
+interactive prompt. Email is optional and **must be left empty.**
 
-> **The golden snapshot is not currently in the tree.** `server/evennia_default.db3`
-> is whitelisted in `example_game/.gitignore` (the one deliberate exception to
-> `*.db3`) but has never been committed, so `scripts/reset_to_golden.sh` has
-> nothing to restore from. It is deliberately not regenerated here: a golden DB
-> is only meaningful when snapshotted from the deployed sandbox after a real
-> boot and seed, which is exactly this step. Take the snapshot on the droplet.
+Why local rather than from the deployed sandbox, which is the more obvious choice:
+a snapshot taken from the droplet carries that server's real `accounts_accountdb`
+rows into a public repo — the superuser's email and password hash. Worse, a golden
+reset *restores* those rows, so the published hash is the live sandbox's admin
+credential after every reset, and an Evennia superuser has `@py`. Generating locally
+with a purpose-made account keeps production credentials out of the repo entirely.
+
+Two rules follow from the file being public:
+
+- **The password must be high-entropy** (28+ random characters) and stored in a
+  password manager, because its hash is published. Changing it means re-snapshotting.
+- **The account must have an empty email.** Nothing here is scanned by the anonymity
+  guards: they are `types: [text]`, so a binary `.db3` passes through untouched, and
+  the CI sweep runs those same hooks. This file is outside that safety net — check it
+  by hand before committing:
+
+```bash
+python - <<'SCAN'
+import re
+d = open('server/evennia_default.db3','rb').read()
+print('emails :', set(re.findall(rb'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}', d)))
+print('hostname:', b'sandbox.' in d)
+SCAN
+sqlite3 server/evennia_default.db3   "SELECT id,username,email,is_superuser FROM accounts_accountdb;"
+```
+
+Expect no emails and exactly one account: `admin`, blank email, superuser, with a
+`pbkdf2_sha256$` hash. An `md5$` hash means the DB was built under `test_settings.py`
+and must be rebuilt — that hasher is for tests only and would be trivially crackable
+once published.
 
 ### 7. systemd (as root / via sudo)
 
-Do steps 4–6 (migrate, first boot + superuser, seed, snapshot) **before** this —
-systemd is last because it can't handle the interactive first boot.
+Do steps 4–5 (migrate, first boot + superuser, seed) on the droplet **before**
+this — systemd is last because it can't handle the interactive first boot.
+Step 6 is not a droplet step at all: the golden snapshot is built and committed
+from a local clone, and the droplet picks it up with `git pull`.
 
 ```ini
 # /etc/systemd/system/evennia-sandbox.service
@@ -807,7 +843,8 @@ Three mechanisms, for three different needs:
    cannot orphan what a playtester built.
 9. **Golden reset works** — make a throwaway change, run
    `scripts/reset_to_golden.sh`, confirm the world is back to default.
-   (Requires the snapshot from step 6 above; see the note there.)
+   (Requires the committed snapshot from step 6, which the droplet gets by
+   pulling — it is not generated there.)
 10. **The map renders, in a browser** — `/map/` lists four planes:
     `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior` and
     `Sandbox Scratch`. `/map/<pk>/` for the overworld draws eight tiles as an
