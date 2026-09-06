@@ -54,30 +54,40 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.evennia-maps-tile-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+/* A tile with terrain art is an L.imageOverlay, so this class lands on the
+   <img> Leaflet owns. Leaflet sizes and positions that element inline from the
+   cell's map-unit bounds, which is what makes the cell scale with zoom - so
+   width/height must not be set here. */
+.evennia-maps-tile {
   background: #3a3a3a;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 2px;
   box-sizing: border-box;
-}
-
-.evennia-maps-tile-icon img {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
 }
 
-.evennia-maps-tile-icon.evennia-maps-tile-active {
+.evennia-maps-tile.evennia-maps-tile-active {
   border-color: #ffce54;
   box-shadow: 0 0 4px 1px rgba(255, 206, 84, 0.8);
 }
 
+/* A tile with no terrain art is an L.rectangle - an SVG path, whose stroke and
+   fill come from Leaflet's inline attributes (set in tileLayer()) rather than
+   from here. Only the corner rounding is CSS. */
+.evennia-maps-tile-blank {
+  stroke-linejoin: round;
+}
+
+.evennia-maps-portal-cell {
+  stroke-linejoin: round;
+  cursor: pointer;
+}
+
+/* The glyph is a fixed-size pin centred on the portal cell, so it stays
+   legible at every zoom. pointer-events are off so clicks fall through to the
+   cell beneath, which carries the tooltip and the navigation handler. */
 .evennia-maps-portal-marker {
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -34,7 +34,31 @@
 (function () {
   "use strict";
 
+  // One grid cell is TILE_PX *map units* across, matching views.py's TILE_SIZE
+  // so the live map and the static SVG agree on scale.
+  //
+  // Cells are drawn as imageOverlay/rectangle in map units rather than as
+  // fixed-size marker icons. Under L.CRS.Simple one map unit is one pixel at
+  // zoom 0, so a marker placed at a raw grid coordinate sits one pixel from its
+  // neighbour while being drawn TILE_PX pixels wide - every tile on a plane
+  // lands inside a single tile's footprint. Geometry in map units scales with
+  // zoom, which a marker's iconSize (screen pixels) cannot.
   var TILE_PX = 32;
+
+  function cellBounds(tile) {
+    // Leaflet takes [lat, lng]; under CRS.Simple lat is y and increases upward,
+    // which matches the static SVG's (max_y - y) flip. North is up in both.
+    return [
+      [tile.y * TILE_PX, tile.x * TILE_PX],
+      [(tile.y + 1) * TILE_PX, (tile.x + 1) * TILE_PX],
+    ];
+  }
+
+  function cellCenter(tile) {
+    // Pins sit at the middle of the cell, not its corner. They stay fixed-size
+    // on purpose - a pin that scaled with zoom would be unreadable zoomed out.
+    return [(tile.y + 0.5) * TILE_PX, (tile.x + 0.5) * TILE_PX];
+  }
 
   function hangoutLabel(type) {
     if (!type) {
@@ -87,26 +111,53 @@
     return div.innerHTML;
   }
 
-  function tileIcon(tile) {
-    var classes =
-      "evennia-maps-tile-icon" + (tile.has_active_scene ? " evennia-maps-tile-active" : "");
-    // sprite_url comes from MAPS_TERRAIN_TILESET (operator-controlled),
-    // room_name from a builder-settable room key — escape both anyway, so a
-    // room named with markup can't inject into the marker.
-    var inner = tile.sprite_url ? '<img src="' + escapeHtml(tile.sprite_url) + '" alt="" />' : "";
-    return L.divIcon({
-      className: "",
-      html: '<div class="' + classes + '">' + inner + "</div>",
-      iconSize: [TILE_PX, TILE_PX],
+  function tileLayer(tile) {
+    var bounds = cellBounds(tile);
+    if (tile.sprite_url) {
+      // sprite_url comes from MAPS_TERRAIN_TILESET, which is operator-
+      // controlled; Leaflet sets it as the src of an <img> it owns, so there is
+      // no markup interpolation to escape here. The cell's border and its
+      // active-scene highlight are CSS on that <img>.
+      return L.imageOverlay(tile.sprite_url, bounds, {
+        className:
+          "evennia-maps-tile" + (tile.has_active_scene ? " evennia-maps-tile-active" : ""),
+        alt: "",
+        interactive: true,
+      });
+    }
+    // No sprite for this terrain: draw the cell itself. Stroke and fill are
+    // path options rather than CSS because an SVG path takes its colours from
+    // Leaflet's inline attributes.
+    return L.rectangle(bounds, {
+      className: "evennia-maps-tile-blank",
+      color: tile.has_active_scene ? "#ffce54" : "rgba(255, 255, 255, 0.25)",
+      weight: 1,
+      fillColor: "#3a3a3a",
+      fillOpacity: 1,
     });
   }
 
-  function portalIcon() {
-    return L.divIcon({
-      className: "",
-      html: '<div class="evennia-maps-portal-marker">&#8635;</div>',
-      iconSize: [TILE_PX, TILE_PX],
-    });
+  function portalLayers(tile) {
+    // Two layers: the cell, which scales, and the glyph, which does not - the
+    // arrow has to stay legible at every zoom, so it is a pin like the lore and
+    // hangout markers rather than part of the cell.
+    return [
+      L.rectangle(cellBounds(tile), {
+        className: "evennia-maps-portal-cell",
+        color: "#b39ddb",
+        weight: 1,
+        fillColor: "#2b2536",
+        fillOpacity: 1,
+      }),
+      L.marker(cellCenter(tile), {
+        icon: L.divIcon({
+          className: "",
+          html: '<div class="evennia-maps-portal-marker">&#8635;</div>',
+          iconSize: [TILE_PX, TILE_PX],
+        }),
+        interactive: false,
+      }),
+    ];
   }
 
   function linkList(heading, items, urlTemplate) {
@@ -149,7 +200,7 @@
       return null;
     }
     var radius = Math.min(4 + count * 2, 16);
-    return L.circleMarker([tile.y, tile.x], {
+    return L.circleMarker(cellCenter(tile), {
       radius: radius,
       className: "evennia-maps-heatmap-marker",
     }).bindTooltip(count + " recent scene" + (count === 1 ? "" : "s"));
@@ -159,7 +210,7 @@
     if (!tile.has_lore) {
       return null;
     }
-    return L.marker([tile.y, tile.x], {
+    return L.marker(cellCenter(tile), {
       icon: L.divIcon({
         className: "",
         html: '<div class="evennia-maps-lore-marker">&#9733;</div>',
@@ -173,7 +224,7 @@
       return null;
     }
     var label = hangoutLabel(tile.hangout_type);
-    return L.marker([tile.y, tile.x], {
+    return L.marker(cellCenter(tile), {
       icon: L.divIcon({
         className: "",
         html:
@@ -202,20 +253,21 @@
 
     tiles.forEach(function (tile) {
       var isPortal = tile.portal_plane_id !== null && tile.portal_plane_id !== undefined;
-      var marker = L.marker([tile.y, tile.x], {
-        icon: isPortal ? portalIcon() : tileIcon(tile),
-      });
 
       if (isPortal) {
+        var portal = portalLayers(tile);
+        var cell = portal[0];
         // bindTooltip renders its content as HTML, so escape the room key.
-        marker.bindTooltip(escapeHtml(tile.room_name) + " (portal)");
-        marker.on("click", function () {
+        cell.bindTooltip(escapeHtml(tile.room_name) + " (portal)");
+        cell.on("click", function () {
           window.location.href = urlFor(liveMapUrlTemplate, tile.portal_plane_id);
         });
+        portal.forEach(function (layer) {
+          groups.tiles.addLayer(layer);
+        });
       } else {
-        marker.bindPopup(popupContent(tile, urls));
+        groups.tiles.addLayer(tileLayer(tile).bindPopup(popupContent(tile, urls)));
       }
-      groups.tiles.addLayer(marker);
 
       var heatmap = heatmapMarker(tile);
       if (heatmap) {
@@ -244,9 +296,11 @@
     var ys = tiles.map(function (t) {
       return t.y;
     });
+    // Cells occupy [n, n+1), so the far edge is max + 1 - a box drawn to max
+    // alone would clip the last row and column out of the fitted view.
     return L.latLngBounds(
-      [Math.min.apply(null, ys), Math.min.apply(null, xs)],
-      [Math.max.apply(null, ys), Math.max.apply(null, xs)]
+      [Math.min.apply(null, ys) * TILE_PX, Math.min.apply(null, xs) * TILE_PX],
+      [(Math.max.apply(null, ys) + 1) * TILE_PX, (Math.max.apply(null, xs) + 1) * TILE_PX]
     );
   }
 

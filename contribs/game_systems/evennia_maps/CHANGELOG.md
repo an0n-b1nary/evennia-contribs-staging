@@ -7,6 +7,45 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.1] — 2026-09-06 — live map: tiles were all drawn on top of each other
+
+- **Fixed:** the Leaflet map placed every tile at its raw grid coordinate while
+  drawing it `TILE_PX` (32) pixels wide. Under `L.CRS.Simple` one map unit is one
+  pixel at zoom 0, so neighbouring tiles sat *one pixel* apart inside 32-pixel
+  icons and a whole plane collapsed into a single tile's footprint. `fitBounds`
+  capped zoom at 2, so no amount of zooming pulled them apart. A nine-tile plane
+  spanning a 3×4 grid rendered into 12×16 px.
+
+  The static SVG was never affected because `views.build_svg_context` multiplies
+  by `TILE_SIZE`; only the Leaflet path skipped the conversion.
+
+- **Changed:** tiles are now geometry in map units rather than fixed-size marker
+  icons — `L.imageOverlay` over the cell's bounds where the terrain has a sprite,
+  `L.rectangle` where it does not. A marker's `iconSize` is in *screen* pixels and
+  cannot scale with zoom, so multiplying the coordinates alone would have fixed
+  zoom 0 and broken every other zoom level. Cells now scale correctly throughout.
+
+  Cell geometry is one shared definition (`cellBounds`): a tile at `(x, y)` owns
+  the square from `(x·32, y·32)` to `((x+1)·32, (y+1)·32)`. `boundsFor` was
+  extended to the far edge of the last row and column, which the old corner-to-
+  corner box clipped out of the fitted view.
+
+- **Changed:** overlay pins (heatmap, lore, hangouts) and the portal glyph now sit
+  at the *centre* of their cell rather than its corner, and stay fixed-size on
+  purpose — a pin that scaled with zoom would be unreadable zoomed out. A portal
+  is now a cell plus a non-interactive glyph on top, so clicks and the tooltip
+  belong to the cell.
+
+- **Changed:** `.evennia-maps-tile-icon` is gone, replaced by `.evennia-maps-tile`
+  (on the `<img>` of an image overlay) and `.evennia-maps-tile-blank` /
+  `.evennia-maps-portal-cell` (SVG paths, whose stroke and fill come from path
+  options). A game that restyled the old class needs to move those rules.
+
+  Note the tile geometry is client-side only, so no Python test covers it; this
+  needs the browser pass tracked in issue #7.
+
+---
+
 ## [0.3.0] — 2026-08-23 — off-map room types
 
 - **Added:** `MAPS_UNMAPPABLE_ROOM_TYPES`, a tuple of `room_type` values the
