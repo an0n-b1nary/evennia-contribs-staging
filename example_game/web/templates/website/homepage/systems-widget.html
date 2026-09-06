@@ -1,0 +1,50 @@
+{% comment %}
+What this sandbox is actually a demo of. Context from
+web/website/views/index.py::_systems, which builds the linkable half from
+nav.NAV_GROUPS so the inventory cannot drift from the menu.
+
+The in-game-only rows matter as much as the linked ones: five of the fourteen
+contribs installed here put nothing on the web at all, and a developer sizing up
+the repo should be able to see that rather than infer it from an absence.
+{% endcomment %}
+<div class="card">
+  <h2 class="card-header h5 text-center mb-0">Systems on this sandbox</h2>
+
+  <div class="card-body">
+    <p class="text-muted">
+      <small>
+        Every contrib installed here. Linked entries have a web surface; the rest
+        are reachable in-game only &mdash; connect through
+        {% if webclient_enabled %}<a href="{% url 'webclient:index' %}">the web client</a>{% else %}the game client{% endif %}.
+      </small>
+    </p>
+
+    <div class="widget-table-scroll" role="region" aria-label="Installed contribs" tabindex="0">
+      <table class="table table-sm mb-0">
+        <caption class="sr-only">Installed contribs and their web surfaces</caption>
+        <thead>
+          <tr>
+            <th scope="col">Contrib</th>
+            <th scope="col">Version</th>
+            <th scope="col">Web surface</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for system in systems %}
+          <tr>
+            <th scope="row"><code>{{ system.name }}</code></th>
+            <td>{{ system.version|default:"—" }}</td>
+            <td>
+              {% if system.url %}
+              <a href="{{ system.url }}">{{ system.label }}</a>
+              {% else %}
+              <span class="text-muted">{{ system.label }} <em>(in-game only)</em></span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

@@ -425,6 +425,23 @@ PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 # routes (objects, accounts, scripts), which this sandbox does not expose.
 
 ######################################################################
+# Website navigation
+######################################################################
+
+# base.html includes _menu.html on every render, including on pages rendered by
+# contrib views this game does not own. A context processor is the only seam
+# that reaches all of them; see web/website/context_processors.py for why this
+# is not a template tag.
+#
+# Appended rather than reassigned: Evennia's settings_default builds the whole
+# TEMPLATES list (including sekizai and Evennia's own general_context), and
+# restating it here would silently freeze this game against upstream changes to
+# that list.
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "web.website.context_processors.site_menu",
+]
+
+######################################################################
 # Settings given in secret_settings.py override those in this file.
 ######################################################################
 try:

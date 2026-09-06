@@ -1,0 +1,27 @@
+{% comment %}
+Quick route to the map. Context from web/website/views/index.py::_map_summary,
+which links the live (Leaflet) map when that route resolves and degrades to the
+static SVG page, then to the plane list, when it does not.
+{% endcomment %}
+<div class="card h-100">
+  <h2 class="card-header h5 text-center mb-0">The Map</h2>
+
+  {% if map_summary %}
+  <div class="card-body text-center">
+    <p class="mb-2">
+      <strong>{{ map_summary.tile_count }}</strong>
+      room{{ map_summary.tile_count|pluralize }} mapped across
+      <strong>{{ map_summary.plane_count }}</strong>
+      plane{{ map_summary.plane_count|pluralize }}.
+    </p>
+    <p class="text-muted mb-0"><small>Tiles show live scenes, lore and upcoming events.</small></p>
+  </div>
+  <div class="card-footer text-center">
+    <a class="btn btn-primary btn-sm" href="{{ map_summary.url }}">Explore {{ map_summary.plane_name }}</a>
+  </div>
+  {% else %}
+  <div class="card-body">
+    <p class="widget-empty mb-0">No map planes exist yet.</p>
+  </div>
+  {% endif %}
+</div>

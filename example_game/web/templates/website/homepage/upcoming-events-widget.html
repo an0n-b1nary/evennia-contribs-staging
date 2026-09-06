@@ -1,0 +1,41 @@
+{% comment %}
+The next few scheduled events. Context from
+web/website/views/index.py::_upcoming_events, which mirrors CalendarListView.
+
+Times render in UTC here rather than through the calendar pages' local-time JS:
+that script announces the conversion to an aria-live region on the pages that
+own it, and duplicating half of it on a summary card would convert the times
+without the announcement.
+{% endcomment %}
+<div class="card h-100">
+  <h2 class="card-header h5 text-center mb-0">Upcoming Events</h2>
+
+  {% if upcoming_events %}
+  <ul class="list-group list-group-flush widget-list">
+    {% for event in upcoming_events %}
+    <li class="list-group-item">
+      {% if event.url %}
+      <a href="{{ event.url }}">{{ event.title }}</a>
+      {% else %}
+      <strong>{{ event.title }}</strong>
+      {% endif %}
+      <br />
+      <small class="text-muted">
+        {{ event.scheduled_time|date:"D j M, H:i" }} UTC
+        &mdash; in {{ event.scheduled_time|timeuntil }}
+      </small>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="card-body">
+    <p class="widget-empty mb-0">Nothing on the calendar yet.</p>
+  </div>
+  {% endif %}
+
+  {% if calendar_url %}
+  <div class="card-footer text-center">
+    <a href="{{ calendar_url }}">See the full calendar</a>
+  </div>
+  {% endif %}
+</div>

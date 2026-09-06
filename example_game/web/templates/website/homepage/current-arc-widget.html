@@ -1,0 +1,22 @@
+{% comment %}
+The staff-designated current story arc. Context from
+web/website/views/index.py::_current_arc, which passes only the arc's own public
+fields - plot-arc-list is staff-only, so this card never links into the arc
+pages. The whole card is omitted when no arc is current.
+{% endcomment %}
+{% if current_arc %}
+<div class="card mb-3">
+  <h2 class="card-header h5 text-center mb-0">Current Arc</h2>
+  <div class="card-body">
+    <p class="mb-1"><strong>{{ current_arc.name }}</strong></p>
+    {% if current_arc.description %}
+    <p class="text-muted mb-0"><small>{{ current_arc.description }}</small></p>
+    {% endif %}
+  </div>
+  {% if plot_list_url %}
+  <div class="card-footer text-center">
+    <a href="{{ plot_list_url }}">Browse plot threads</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}

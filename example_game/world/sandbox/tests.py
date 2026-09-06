@@ -987,3 +987,311 @@ class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
             with self.subTest(route=name):
                 response = self.client.get(reverse(name))
                 self.assertIn(response.status_code, (200, 302))
+
+
+class TestNavCoversEveryWebSurface(EvenniaTest):
+    """The navbar reaches every surface this game mounts, and cannot 500 the site.
+
+    TestEveryWebSurfaceIsMounted proves the nine contrib routes are wired. That
+    is necessary and not sufficient: for most of this game's life all nine were
+    mounted and none appeared in the menu, so a playtester had to type URLs. This
+    class is the other half - what is mounted is reachable by clicking.
+
+    The coverage test reads LANDING_ROUTES off that class rather than restating
+    the list, so mounting a tenth contrib without adding it to the menu fails
+    here instead of shipping an invisible page.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _request(self, path="/", user=None):
+        request = self.factory.get(path)
+        request.user = user if user is not None else AnonymousUser()
+        return request
+
+    def test_every_landing_route_is_reachable_from_the_nav(self):
+        from web.website.nav import ACCOUNT_LINKS, NAV_GROUPS
+
+        in_menu = {name for _label, table in NAV_GROUPS for _lbl, name, _gate in table}
+        in_menu |= {name for _label, name, _gate in ACCOUNT_LINKS}
+
+        for name, _prefix in TestEveryWebSurfaceIsMounted.LANDING_ROUTES:
+            with self.subTest(route=name):
+                self.assertIn(name, in_menu)
+
+    def test_nav_drops_unresolvable_routes(self):
+        """A route that does not reverse costs one entry, not the whole site.
+
+        This is the contract the menu exists for: it is included from base.html,
+        so a NoReverseMatch here would be a 500 on every page. Same behaviour as
+        evennia_maps.overlays.overlay_url_templates().
+        """
+        from web.website import nav
+
+        broken = (("Setting", (("Nowhere", "no-such-route-name", nav.PUBLIC),)),)
+        with mock.patch.object(nav, "NAV_GROUPS", broken):
+            menu = nav.build_menu(self._request())
+
+        self.assertEqual(menu["groups"], [])
+
+    def test_nav_hides_gated_entries_from_anonymous(self):
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request())
+        labels = [item["label"] for group in menu["groups"] for item in group["items"]]
+
+        self.assertIn("Map", labels)
+        self.assertIn("Lore", labels)
+        self.assertEqual(menu["account"]["personal"], [])
+        self.assertEqual(menu["account"]["staff"], [])
+
+    def test_nav_shows_personal_but_not_staff_entries_to_a_player(self):
+        from web.website.nav import build_menu
+
+        self.account.is_staff = False
+        menu = build_menu(self._request(user=self.account))
+
+        self.assertEqual(
+            [item["label"] for item in menu["account"]["personal"]],
+            ["My XP", "My Tickets", "My Lore"],
+        )
+        self.assertEqual(menu["account"]["staff"], [])
+
+    def test_nav_shows_staff_entries_to_staff(self):
+        from web.website.nav import build_menu
+
+        self.account.is_staff = True
+        menu = build_menu(self._request(user=self.account))
+
+        self.assertEqual(
+            [item["label"] for item in menu["account"]["staff"]],
+            ["Lore Queue", "All Jobs", "Plot Arcs"],
+        )
+
+    def test_nav_marks_the_active_group(self):
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request(path="/scenes/"))
+        active = [group["label"] for group in menu["groups"] if group["active"]]
+
+        self.assertEqual(active, ["Events"])
+
+    def test_a_detail_page_activates_its_section(self):
+        """Prefix matching, so /scenes/12/ lights up Scenes and not just /scenes/."""
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request(path="/scenes/12/"))
+        active = [
+            item["label"] for group in menu["groups"] for item in group["items"] if item["active"]
+        ]
+
+        self.assertEqual(active, ["Scenes"])
+
+    def test_longest_prefix_wins_across_menus(self):
+        """/lore/mine/ activates "My Lore" only - not "Lore" as well.
+
+        Both /lore/ and /lore/mine/ prefix-match the path, which is why the
+        active entry is chosen across the whole menu at once rather than
+        per-list.
+        """
+        from web.website.nav import build_menu
+
+        self.account.is_staff = False
+        menu = build_menu(self._request(path="/lore/mine/", user=self.account))
+
+        active = [
+            item["label"] for group in menu["groups"] for item in group["items"] if item["active"]
+        ]
+        active += [item["label"] for item in menu["account"]["personal"] if item["active"]]
+
+        self.assertEqual(active, ["My Lore"])
+
+
+class TestBaseTemplateOverride(SeededSandboxMixin, EvenniaTest):
+    """The two assets this game's base.html override brings back to life.
+
+    Both were shipped-but-inert before it existed, and neither is visible to any
+    contrib's own suite: a contrib renders against a test URLconf with stock
+    base.html, where its breadcrumb block simply has nowhere to go.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_breadcrumbs_render_on_a_contrib_page(self):
+        """46 contrib templates define {% block breadcrumbs %}; stock base.html has none."""
+        from django.urls import reverse
+
+        response = self.client.get(reverse("evennia_scenes:scene-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('aria-label="Breadcrumb"', response.content.decode())
+
+    def test_accessibility_stylesheet_is_linked(self):
+        """evennia_accessibility ships this CSS; nothing referenced it before."""
+        from django.urls import reverse
+
+        response = self.client.get(reverse("evennia_scenes:scene-list"))
+
+        self.assertIn("evennia_accessibility/css/accessibility.css", response.content.decode())
+
+    def test_the_grouped_menu_renders(self):
+        from django.urls import reverse
+
+        html = self.client.get(reverse("evennia_scenes:scene-list")).content.decode()
+
+        for label in ("Setting", "Events", "Community"):
+            with self.subTest(group=label):
+                self.assertIn(f">{label}</a>", html)
+
+
+class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
+    """The home page: it renders, it stays correct when empty, and it does not leak.
+
+    Anonymous throughout, because that is who arrives from a link - and because
+    the leak cases only mean anything for a viewer with no permissions at all.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def _index(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def test_index_renders_every_widget(self):
+        html = self._index()
+
+        for heading in (
+            "Happening Now",
+            "Upcoming Events",
+            "The Map",
+            "Recent Activity",
+            "Systems on this sandbox",
+        ):
+            with self.subTest(widget=heading):
+                self.assertIn(heading, html)
+
+    def test_index_does_not_leak_a_view_private_scene(self):
+        """The fail-closed case. VIEW_PRIVATE is outside WEB_READABLE_PRIVACY.
+
+        Both a running scene (Happening Now) and a closed one (Recent Activity)
+        are seeded, because the two widgets reach the model by different paths
+        and only one of them copies SceneListView.
+        """
+        from django.utils import timezone
+        from evennia_scenes.models import Scene
+
+        Scene.objects.create(
+            title="Secret Conclave",
+            status=Scene.Status.ACTIVE,
+            privacy=Scene.Privacy.VIEW_PRIVATE,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+        )
+        Scene.objects.create(
+            title="Secret Aftermath",
+            status=Scene.Status.CLOSED,
+            privacy=Scene.Privacy.VIEW_PRIVATE,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+            ended_at=timezone.now(),
+        )
+
+        html = self._index()
+
+        self.assertNotIn("Secret Conclave", html)
+        self.assertNotIn("Secret Aftermath", html)
+
+    def test_index_shows_a_public_scene(self):
+        """The other half of the previous test: the filter is not simply hiding everything."""
+        from django.utils import timezone
+        from evennia_scenes.models import Scene
+
+        Scene.objects.create(
+            title="Open Market Day",
+            status=Scene.Status.ACTIVE,
+            privacy=Scene.Privacy.PUBLIC,
+            room=self.room1,
+            room_name=self.room1.key,
+            started_at=timezone.now(),
+        )
+
+        self.assertIn("Open Market Day", self._index())
+
+    def test_index_hides_unpublished_lore(self):
+        """Mirrors LoreListView: only PUBLISHED, non-archived entries are public."""
+        from django.db.models import Max
+        from evennia_lore.models import LoreEntry
+
+        # entry_number is a required unique column with no default; the contrib
+        # assigns it on the authoring path, which this test bypasses.
+        next_number = (
+            LoreEntry.objects.aggregate(Max("entry_number"))["entry_number__max"] or 0
+        ) + 1
+        LoreEntry.objects.create(
+            entry_number=next_number,
+            title="Draft Secret",
+            body="...",
+            status=LoreEntry.Status.DRAFT,
+        )
+
+        self.assertNotIn("Draft Secret", self._index())
+
+    def test_index_hides_a_cancelled_event(self):
+        """Mirrors CalendarListView's is_cancelled=False."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from evennia_calendar.models import CalendarEvent
+
+        CalendarEvent.objects.create(
+            title="Called Off",
+            scheduled_time=timezone.now() + timedelta(days=1),
+            is_cancelled=True,
+        )
+
+        self.assertNotIn("Called Off", self._index())
+
+    def test_index_lists_the_in_game_only_contribs(self):
+        """The systems widget is honest about the contribs with no web surface."""
+        html = self._index()
+
+        for app_label in ("evennia_rptracker", "evennia_posing", "evennia_social"):
+            with self.subTest(contrib=app_label):
+                self.assertIn(app_label, html)
+        self.assertIn("in-game only", html)
+
+    def test_index_survives_an_empty_database(self):
+        """No widget raises, and each renders its own empty state.
+
+        A freshly migrated game with nothing in it is the first thing an adopter
+        sees, so it has to be a correct page rather than a stack trace.
+        """
+        from evennia_boards.models import Board
+        from evennia_calendar.models import CalendarEvent
+        from evennia_lore.models import LoreEntry
+        from evennia_plots.models import PlotThread
+        from evennia_scenes.models import Scene
+
+        from evennia_maps.models import MapPlane
+
+        for model in (Scene, LoreEntry, CalendarEvent, Board, PlotThread, MapPlane):
+            model.objects.all().delete()
+
+        html = self._index()
+
+        self.assertIn("No scenes are running right now.", html)
+        self.assertIn("Nothing on the calendar yet.", html)
+        self.assertIn("No map planes exist yet.", html)
+        self.assertIn("Nothing has happened here in the last month.", html)
