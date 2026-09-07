@@ -103,3 +103,6 @@ PLAN.md
 
 # Throwaway game dir created when replicating CI locally (see ci.yml).
 ci_game/
+
+# UI/UX screenshot captures (scripts/ui_shots.py) — local review artifacts.
+.screenshots/
