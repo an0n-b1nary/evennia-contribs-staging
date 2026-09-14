@@ -1,0 +1,24 @@
+{% extends "rest_framework/base.html" %}
+{% load static %}
+
+{% block title %}{{ game_name }} API{% endblock %}
+
+{% block style %}
+  {{ block.super }}
+  <link rel="icon" type="image/x-icon" href="{% static 'website/images/evennia_logo.png' %}" />
+  <link rel="stylesheet" type="text/css" href="{% static 'rest_framework/css/api.css' %}">
+{% endblock %}
+
+{% block branding %}
+<h3>{{ game_name }} API</h3>
+{% endblock %}
+
+{% block userlinks %}
+  {{ block.super }}
+  {% url 'api:openapi' as openapi_url %}
+  {% url 'api:redoc' as redoc_url %}
+  {% url 'index' as home_url %}
+  {% if openapi_url %}<li><a href="{{ openapi_url }}">Schema</a></li>{% endif %}
+  {% if redoc_url %}<li><a href="{{ redoc_url }}">Documentation</a></li>{% endif %}
+  {% if home_url %}<li><a href="{{ home_url }}">Home</a></li>{% endif %}
+{% endblock %}

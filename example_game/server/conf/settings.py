@@ -420,13 +420,19 @@ PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 # "rest_framework" and "django_filters" in INSTALLED_APPS and a REST_FRAMEWORK
 # block, and the contrib viewsets declare their own authentication,
 # permission, pagination and filter classes rather than relying on the
-# project-wide defaults — so mounting their routers (web/urls.py) is the only
-# step. REST_API_ENABLED stays False: that flag gates *Evennia's own* /api/
+# project-wide defaults. The contrib routers are mounted in web/urls.py;
+# REST_API_ENABLED stays False: that flag gates *Evennia's own* /api/
 # routes (objects, accounts, scripts), which this sandbox does not expose.
+# The contrib routers below are separate; website/templates/rest_framework/api.html
+# guards optional schema/documentation links on their browsable root.
 
 ######################################################################
 # Website navigation
 ######################################################################
+
+# Shared by native-page categories, the staff menu, and staff-only page links.
+# Keep this aligned with the Builder toggle and contrib *_STAFF_LOCK settings.
+EVENNIA_WEB_STAFF_LOCK = "cmd:perm(Builder)"
 
 # base.html includes _menu.html on every render, including on pages rendered by
 # contrib views this game does not own. A context processor is the only seam

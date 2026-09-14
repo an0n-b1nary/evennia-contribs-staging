@@ -1,0 +1,32 @@
+{% extends "webclient/base.html" %}
+
+{% block connecting %}
+  {% url 'index' as home_url %}
+  {% if home_url %}
+  <nav id="client-site-nav" aria-label="Web client navigation">
+    <a href="{{ home_url }}">&larr; Back to site</a>
+  </nav>
+  {% endif %}
+{% endblock %}
+
+{% block client %}
+<div id="toolbar"></div>
+
+<div id="main" class="split split-vertical" data-role-default>
+  <div id="main-sub" class="split-sub">
+    <div id="messagewindow"></div>
+  </div>
+</div>
+
+<div id="input" class="split split-vertical" data-role-input data-update-append>
+  <div id="inputform" class="wrapper">
+    <div id="prompt" class="prompt"></div>
+    <div id="inputcontrol" class="input-group">
+      <textarea id="inputfield" type="text" class="form-control"></textarea>
+      <span class="input-group-btn">
+        <button class="btn btn-large btn-outline-primary" id="inputsend" type="button" value="">&gt;</button>
+      </span>
+    </div>
+  </div>
+</div>
+{% endblock %}

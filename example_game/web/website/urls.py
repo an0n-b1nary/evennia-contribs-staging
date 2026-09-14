@@ -42,6 +42,13 @@ from django.urls import include, path
 from evennia.web.website.urls import urlpatterns as evennia_website_urlpatterns
 
 from web.website.views.index import SandboxIndexView
+from web.website.views.native import (
+    SandboxChannelListView,
+    SandboxCharacterListView,
+    SandboxCharacterManageView,
+    SandboxHelpDetailView,
+    SandboxHelpListView,
+)
 
 # add patterns here
 urlpatterns = [
@@ -50,6 +57,20 @@ urlpatterns = [
     # Same route name, so every {% url 'index' %} in Evennia's templates follows
     # it without change.
     path("", SandboxIndexView.as_view(), name="index"),
+    # Local native-page overrides precede Evennia's appended patterns below.
+    path("help/", SandboxHelpListView.as_view(), name="help"),
+    path(
+        "help/<str:category>/<str:topic>/",
+        SandboxHelpDetailView.as_view(),
+        name="help-entry-detail",
+    ),
+    path("channels/", SandboxChannelListView.as_view(), name="channels"),
+    path("characters/", SandboxCharacterListView.as_view(), name="characters"),
+    path(
+        "characters/manage/",
+        SandboxCharacterManageView.as_view(),
+        name="character-manage",
+    ),
     path("map/", include("evennia_maps.urls")),
     path("regions/", include("evennia_regions.urls")),
     path("calendar/", include("evennia_calendar.urls")),

@@ -85,17 +85,16 @@ adds two sections from nav.py: the viewer's own pages, and staff pages.
           {% endfor %}
           {% if nav_account.personal %}<div class="dropdown-divider" role="separator"></div>{% endif %}
 
-          {% comment %}
-          Admin hangs off user.is_staff alone, not off nav_account.staff: the
-          three contrib staff routes can all fail to resolve (contribs unmounted)
-          and a staff user must still reach the admin.
-          {% endcomment %}
-          {% if nav_account.staff or user.is_staff %}
+          {% if nav_account.staff or is_web_staff or user.is_staff %}
           <h6 class="dropdown-header">Staff</h6>
           {% for item in nav_account.staff %}
           <a class="dropdown-item{% if item.active %} active{% endif %}" href="{{ item.url }}"
              {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
           {% endfor %}
+          {% comment %}
+          Django Admin is controlled by Django's own flag; it is intentionally
+          not granted by the in-game Builder lock used for contrib staff pages.
+          {% endcomment %}
           {% if user.is_staff %}
           <a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a>
           {% if rest_api_enabled %}<a class="dropdown-item" href="/api">API</a>{% endif %}

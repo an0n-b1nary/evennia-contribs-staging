@@ -1,0 +1,61 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Help{% endblock %}
+
+{% block content %}
+<section aria-labelledby="help-heading">
+  <div class="d-flex justify-content-between align-items-start flex-wrap">
+    <div>
+      <h1 id="help-heading">Help</h1>
+      <p class="text-muted">Browse commands and guides for {{ game_name }}.</p>
+    </div>
+  </div>
+
+  <form method="get" action="{% url 'help' %}" class="form-inline mb-4" role="search">
+    <label class="sr-only" for="help-search">Search help topics</label>
+    <input id="help-search" class="form-control mr-sm-2 mb-2 mb-sm-0" type="search"
+           name="q" value="{{ q }}" placeholder="Search topics, categories, and text">
+    <button class="btn btn-primary" type="submit">Search</button>
+    {% if q %}<a class="btn btn-link" href="{% url 'help' %}">Clear</a>{% endif %}
+  </form>
+
+  {% regroup object_list by sandbox_help_category as help_categories %}
+  {% if help_categories %}
+  <div class="row">
+    <div class="col-lg-9">
+      {% for category in help_categories %}
+      <section class="mb-4" aria-labelledby="help-category-{{ category.list.0.sandbox_help_anchor }}">
+        <h2 class="h4" id="help-category-{{ category.list.0.sandbox_help_anchor }}">
+          {{ category.grouper }}
+        </h2>
+        <ul class="list-unstyled">
+          {% for object in category.list %}
+          <li class="mb-1">
+            <a href="{{ object.web_get_detail_url }}">{{ object.sandbox_help_key }}</a>
+            {% if object.web_get_admin_url and user.is_staff %}
+            <a class="small text-muted" href="{{ object.web_get_admin_url }}">Edit</a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endfor %}
+    </div>
+    <aside class="col-lg-3" aria-label="Help categories">
+      <h2 class="h5">Categories</h2>
+      <ul class="list-unstyled">
+        {% for category in help_categories %}
+        <li><a href="#help-category-{{ category.list.0.sandbox_help_anchor }}">{{ category.grouper }}</a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+  </div>
+  {% elif q %}
+  <p class="text-muted" role="status">No help topics match “{{ q }}”.</p>
+  {% else %}
+  <p class="text-muted" role="status">No help topics are available yet.</p>
+  {% endif %}
+
+  {% include "website/_pagination.html" %}
+</section>
+{% endblock %}

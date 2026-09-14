@@ -1,0 +1,32 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Manage Characters{% endblock %}
+
+{% block content %}
+<section aria-labelledby="manage-characters-heading">
+  <h1 id="manage-characters-heading">Manage Characters</h1>
+  <p class="text-muted">Create, update, or remove characters on your account.</p>
+
+  {% if object_list %}
+  <div class="list-group">
+    {% for object in object_list %}
+    <article class="list-group-item">
+      <div class="d-flex justify-content-between flex-wrap">
+        <h2 class="h5 mb-2"><a href="{{ object.web_get_detail_url }}">{{ object }}</a></h2>
+        <div class="mb-2">
+          <a href="{{ object.web_get_update_url }}">Edit</a>
+          <span aria-hidden="true"> · </span>
+          <a href="{{ object.web_get_delete_url }}">Delete</a>
+        </div>
+      </div>
+      {% if object.db.desc %}<p class="mb-0">{{ object.db.desc }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted" role="status">You have not created any characters yet.</p>
+  {% endif %}
+
+  {% include "website/_pagination.html" %}
+</section>
+{% endblock %}

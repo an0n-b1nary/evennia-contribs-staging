@@ -16,6 +16,7 @@ Registered in ``server/conf/settings.py``.
 """
 
 from web.website.nav import build_menu
+from web.website.permissions import is_staff_user
 
 
 def site_menu(request):
@@ -26,4 +27,8 @@ def site_menu(request):
     than pattern matching.
     """
     menu = build_menu(request)
-    return {"nav_groups": menu["groups"], "nav_account": menu["account"]}
+    return {
+        "nav_groups": menu["groups"],
+        "nav_account": menu["account"],
+        "is_web_staff": is_staff_user(request),
+    }

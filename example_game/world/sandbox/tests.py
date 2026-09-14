@@ -22,10 +22,13 @@ from unittest import mock
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
+
+urlpatterns = [path("", include("web.urls"))]
 
 
 class TestPoseRecordedGlue(EvenniaTest):
@@ -1053,7 +1056,10 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
     def test_nav_shows_personal_but_not_staff_entries_to_a_player(self):
         from web.website.nav import build_menu
 
-        self.account.is_staff = False
+        for permission in self.account.permissions.all():
+            self.account.permissions.remove(permission)
+        # Django admin status is not the Evennia Builder permission.
+        self.account.is_staff = True
         menu = build_menu(self._request(user=self.account))
 
         self.assertEqual(
@@ -1065,7 +1071,8 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
     def test_nav_shows_staff_entries_to_staff(self):
         from web.website.nav import build_menu
 
-        self.account.is_staff = True
+        self.account.permissions.add("Builder")
+        self.account.is_staff = False
         menu = build_menu(self._request(user=self.account))
 
         self.assertEqual(
@@ -1101,7 +1108,9 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
         """
         from web.website.nav import build_menu
 
-        self.account.is_staff = False
+        for permission in self.account.permissions.all():
+            self.account.permissions.remove(permission)
+        self.account.is_staff = True
         menu = build_menu(self._request(path="/lore/mine/", user=self.account))
 
         active = [
@@ -1295,3 +1304,249 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
         self.assertIn("Nothing on the calendar yet.", html)
         self.assertIn("No map planes exist yet.", html)
         self.assertIn("Nothing has happened here in the last month.", html)
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestPhaseOneWebUi(SeededSandboxMixin, EvenniaTest):
+    """Native page overrides, rendered templates, and their visibility seams."""
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    class HelpTopic:
+        def __init__(self, key, category, body=""):
+            self.key = key
+            self.help_category = category
+            self.entrytext = body
+
+        def web_get_detail_url(self):
+            return f"/help/{self.help_category.lower()}/{self.key.lower()}/"
+
+        def web_get_admin_url(self):
+            return "/admin/help/topic/"
+
+    def _request(self, path_, user=None):
+        from django.urls import resolve
+
+        request = self.factory.get(path_, HTTP_ACCEPT="text/html")
+        request.user = AnonymousUser() if user is None else user
+        request.resolver_match = resolve(path_.split("?", 1)[0])
+        # Evennia's general_context reads request.session for authenticated users.
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        return request
+
+    def _render(self, view, path_, user=None, **kwargs):
+        response = view.as_view()(self._request(path_, user=user), **kwargs)
+        response.render()
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def _remove_permissions(self):
+        for permission in self.account.permissions.all():
+            self.account.permissions.remove(permission)
+
+    def test_open_canvas_home_orders_live_widgets_before_the_welcome(self):
+        from django.urls import reverse
+        from web.website.views.index import SandboxIndexView
+
+        html = self._render(SandboxIndexView, reverse("index"))
+
+        self.assertEqual(html.count("<h1"), 1)
+        self.assertLess(html.index("Happening Now"), html.index("Welcome to Evennia!"))
+        self.assertLess(html.index("Recent Activity"), html.index("Welcome to Evennia!"))
+        self.assertIn('id="main-content"', html)
+        self.assertIn('href="#main-content"', html)
+
+    def test_native_pages_render_and_have_explicit_empty_states(self):
+        from django.urls import reverse
+        from web.website.views.native import (
+            SandboxChannelListView,
+            SandboxCharacterListView,
+            SandboxCharacterManageView,
+            SandboxHelpListView,
+        )
+
+        rendered = (
+            ("channels", SandboxChannelListView, "No public channels are available yet."),
+            ("characters", SandboxCharacterListView, "No characters are available yet."),
+            (
+                "character-manage",
+                SandboxCharacterManageView,
+                "You have not created any characters yet.",
+            ),
+            ("help", SandboxHelpListView, "No help topics are available yet."),
+        )
+        for route_name, view_class, empty_message in rendered:
+            with self.subTest(route=route_name):
+                with mock.patch.object(view_class, "get_queryset", return_value=[]):
+                    html = self._render(view_class, reverse(route_name), user=self.account)
+                self.assertIn(empty_message, html)
+
+    def test_native_pages_render_their_real_lists(self):
+        from django.urls import reverse
+        from web.website.views.native import (
+            SandboxChannelListView,
+            SandboxCharacterListView,
+            SandboxCharacterManageView,
+            SandboxHelpListView,
+        )
+
+        views = (
+            ("help", SandboxHelpListView, "Help"),
+            ("channels", SandboxChannelListView, "Channels"),
+            ("characters", SandboxCharacterListView, "Characters"),
+            ("character-manage", SandboxCharacterManageView, "Manage Characters"),
+        )
+        for route_name, view_class, expected_text in views:
+            with self.subTest(route=route_name):
+                html = self._render(view_class, reverse(route_name), user=self.account)
+                self.assertIn(expected_text, html)
+
+    def test_help_search_aliases_comms_and_hides_restricted_categories(self):
+        from django.http import Http404
+        from django.urls import reverse
+        from web.website.views.native import SandboxHelpDetailView, SandboxHelpListView
+
+        comms = self.HelpTopic("@dig", "Comms", "A unique queryable help phrase.")
+        building = self.HelpTopic("build-rule", "Building", "A private builder phrase.")
+        topics = ({"@dig": comms, "build-rule": building}, {}, {})
+        help_url = reverse("help")
+
+        with mock.patch(
+            "evennia.web.website.views.help.collect_topics",
+            return_value=topics,
+        ):
+            html = self._render(SandboxHelpListView, f"{help_url}?q=unique+queryable")
+            self.assertIn("Communication", html)
+            self.assertIn("@dig", html)
+            self.assertEqual(html.count('id="help-category-communication"'), 1)
+            self.assertNotIn("Building", html)
+            self.assertNotIn("private builder phrase", html)
+
+            key_search = self._render(SandboxHelpListView, f"{help_url}?q=%40dig")
+            self.assertIn("@dig", key_search)
+
+            with self.assertRaises(Http404):
+                SandboxHelpDetailView.as_view()(
+                    self._request("/help/building/build-rule/"),
+                    category="building",
+                    topic="build-rule",
+                )
+
+    def test_help_detail_preserves_command_spelling_and_separates_admin_access(self):
+        from django.urls import reverse
+        from web.website.views.native import SandboxHelpDetailView
+
+        topic = self.HelpTopic("@dig", "Comms", "A literal command topic.")
+        topics = ({"@dig": topic}, {}, {})
+        detail_url = reverse(
+            "help-entry-detail",
+            kwargs={"category": "comms", "topic": "dig"},
+        )
+
+        self._remove_permissions()
+        self.account.is_staff = False
+        with mock.patch(
+            "evennia.web.website.views.help.collect_topics",
+            return_value=topics,
+        ):
+            html = self._render(
+                SandboxHelpDetailView,
+                detail_url,
+                user=self.account,
+                category="comms",
+                topic="dig",
+            )
+        self.assertIn('<h1 id="help-topic-heading">@dig</h1>', html)
+        self.assertNotIn("@Dig", html)
+        self.assertNotIn("/admin/help/topic/", html)
+
+        self.account.is_staff = True
+        with mock.patch(
+            "evennia.web.website.views.help.collect_topics",
+            return_value=topics,
+        ):
+            html = self._render(
+                SandboxHelpDetailView,
+                detail_url,
+                user=self.account,
+                category="comms",
+                topic="dig",
+            )
+        self.assertIn("/admin/help/topic/", html)
+
+    def test_django_staff_flag_does_not_replace_builder_lock(self):
+        from django.urls import reverse
+        from web.website.nav import build_menu
+        from web.website.views.index import SandboxIndexView
+
+        self._remove_permissions()
+        self.account.is_staff = True
+        request = self._request("/", user=self.account)
+        self.assertEqual(build_menu(request)["account"]["staff"], [])
+
+        self.account.permissions.add("Builder")
+        self.account.is_staff = False
+        request.user = self.account
+        staff_links = build_menu(request)["account"]["staff"]
+        self.assertEqual(
+            [link["label"] for link in staff_links], ["Lore Queue", "All Jobs", "Plot Arcs"]
+        )
+
+        html = self._render(SandboxIndexView, reverse("index"), user=self.account)
+        self.assertIn("Lore Queue", html)
+        self.assertNotIn('href="/admin/"', html)
+
+    def test_web_staff_lock_keeps_evennias_superuser_bypass(self):
+        from web.website.nav import build_menu
+
+        self._remove_permissions()
+        self.account.is_staff = False
+        self.account.is_superuser = True
+        self.account.locks.cache_lock_bypass(self.account)
+
+        staff_links = build_menu(self._request("/", user=self.account))["account"]["staff"]
+        self.assertEqual(
+            [link["label"] for link in staff_links], ["Lore Queue", "All Jobs", "Plot Arcs"]
+        )
+
+    def test_channel_list_filters_mudinfo_even_when_its_case_differs(self):
+        from django.urls import reverse
+        from evennia.comms.models import ChannelDB
+        from web.website.views.native import SandboxChannelListView
+
+        mudinfo = ChannelDB.objects.create_channel(key="mUdInFo")
+        public = ChannelDB.objects.create_channel(key="Public Phase One")
+        self.addCleanup(mudinfo.delete)
+        self.addCleanup(public.delete)
+
+        with override_settings(CHANNEL_MUDINFO={"key": "MudInfo"}):
+            html = self._render(SandboxChannelListView, reverse("channels"))
+        self.assertNotIn("mUdInFo", html)
+        self.assertIn("Public Phase One", html)
+
+    def test_api_root_and_webclient_shell_render_game_overrides(self):
+        from django.contrib.staticfiles import finders
+        from django.urls import resolve, reverse
+
+        api_response = resolve("/api/v1/").func(self._request("/api/v1/", user=self.account))
+        api_response.render()
+        self.assertEqual(api_response.status_code, 200)
+        self.assertIn("Contrib Sandbox API", api_response.content.decode())
+
+        client_path = reverse("webclient:index")
+        client_response = resolve(client_path).func(self._request(client_path, user=self.account))
+        self.assertEqual(client_response.status_code, 200)
+        client_html = client_response.content.decode()
+        self.assertIn("Back to site", client_html)
+        self.assertIn("webclient/css/custom.css", client_html)
+        self.assertIn("webclient/js/plugins/goldenlayout_default_config.js", client_html)
+
+        custom_css = finders.find("webclient/css/custom.css")
+        layout_config = finders.find("webclient/js/plugins/goldenlayout_default_config.js")
+        self.assertIn("example_game", str(custom_css))
+        self.assertIn("example_game", str(layout_config))

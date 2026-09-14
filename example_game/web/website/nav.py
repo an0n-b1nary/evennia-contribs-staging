@@ -32,6 +32,8 @@ import logging
 
 from django.urls import NoReverseMatch, reverse
 
+from web.website.permissions import is_staff_user
+
 logger = logging.getLogger("evennia")
 
 # Visibility gates. An entry whose gate the request fails is omitted rather than
@@ -94,7 +96,7 @@ def _passes_gate(request, gate):
     if user is None or not user.is_authenticated:
         return False
     if gate == STAFF:
-        return bool(user.is_staff)
+        return is_staff_user(request)
     return True
 
 

@@ -1,0 +1,31 @@
+{% if page_obj and page_obj.has_other_pages %}
+<nav aria-label="Pagination" class="mt-3">
+  <ul class="pagination justify-content-center mb-0">
+    <li class="page-item{% if not page_obj.has_previous %} disabled{% endif %}">
+      {% if page_obj.has_previous %}
+      <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" aria-label="Previous">Previous</a>
+      {% else %}
+      <span class="page-link">Previous</span>
+      {% endif %}
+    </li>
+    {% for page_number in page_obj.paginator.page_range %}
+    {% if page_number >= page_obj.number|add:"-2" and page_number <= page_obj.number|add:"2" %}
+    <li class="page-item{% if page_number == page_obj.number %} active{% endif %}">
+      {% if page_number == page_obj.number %}
+      <span class="page-link" aria-current="page">{{ page_number }}</span>
+      {% else %}
+      <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}page={{ page_number }}">{{ page_number }}</a>
+      {% endif %}
+    </li>
+    {% endif %}
+    {% endfor %}
+    <li class="page-item{% if not page_obj.has_next %} disabled{% endif %}">
+      {% if page_obj.has_next %}
+      <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}page={{ page_obj.next_page_number }}" aria-label="Next">Next</a>
+      {% else %}
+      <span class="page-link">Next</span>
+      {% endif %}
+    </li>
+  </ul>
+</nav>
+{% endif %}

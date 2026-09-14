@@ -1,0 +1,38 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Channels{% endblock %}
+
+{% block content %}
+<section aria-labelledby="channels-heading">
+  <h1 id="channels-heading">Channels</h1>
+  <p class="text-muted">Public channels available in {{ game_name }}.</p>
+
+  {% if object_list %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <caption class="sr-only">Available public channels</caption>
+      <thead>
+        <tr>
+          <th scope="col">Channel</th>
+          <th scope="col">Description</th>
+          <th scope="col">Listeners</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for object in object_list %}
+        <tr>
+          <th scope="row"><a href="{{ object.web_get_detail_url }}">{{ object.name }}</a></th>
+          <td>{{ object.db.desc|default:"—" }}</td>
+          <td>{{ object.subscriptions.all|length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted" role="status">No public channels are available yet.</p>
+  {% endif %}
+
+  {% include "website/_pagination.html" %}
+</section>
+{% endblock %}

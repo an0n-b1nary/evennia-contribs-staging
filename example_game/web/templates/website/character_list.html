@@ -1,0 +1,24 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Characters{% endblock %}
+
+{% block content %}
+<section aria-labelledby="character-list-heading">
+  <h1 id="character-list-heading">Characters</h1>
+  <p class="text-muted">Characters visible in {{ game_name }}.</p>
+
+  {% if object_list %}
+  <ul class="list-group">
+    {% for object in object_list %}
+    <li class="list-group-item">
+      <a href="{{ object.web_get_detail_url }}">{{ object }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-muted" role="status">No characters are available yet.</p>
+  {% endif %}
+
+  {% include "website/_pagination.html" %}
+</section>
+{% endblock %}

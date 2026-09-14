@@ -102,6 +102,28 @@ partner and its layer is simply absent. `world/sandbox/tests.py`
 (`TestMapOverlaySeam`) is the end-to-end proof, and it can only live here: no
 contrib's own suite installs the other three.
 
+### Native website pages and client shell
+
+`web/website/urls.py` shadows Evennia's native Help index and detail, Channels,
+Characters, and Manage Characters routes while leaving their URL shapes and
+the remaining edit and account flows intact. They use the same wide
+`website/base.html` frame, and any list that paginates includes its own pager
+so pages without a list stay uncluttered. Help keeps Evennia's original detail
+URLs, merges the displayed `Comms` label into `Communication`, preserves
+command spelling on both index and detail pages, and searches topic, category,
+and body text. The `Building`, `Staff`, `Admin`, and `System` categories are
+hidden from non-Builders, including direct detail requests.
+
+`EVENNIA_WEB_STAFF_LOCK` is the game-level, fail-closed lock used for those
+categories and the staff menu. It defaults to `cmd:perm(Builder)` and is
+deliberately independent of Django's `is_staff` flag; Django Admin remains
+gated by that separate Django flag. The `/api/v1/` browsable root also has a
+local template whose optional schema links fail quietly when those routes are
+not installed. The webclient keeps Evennia's normal client
+scripts and layout, with a reserved link back to the site, an 80-character
+reading measure, and a smaller default input pane. Existing browser-local
+layout preferences are not rewritten.
+
 ### The seeded world: an OOC wing and an IC grid
 
 The world is in two halves, and the split is the tutorial.
@@ -925,3 +947,10 @@ Three mechanisms, for three different needs:
     events overlay simply absent. This is the whole point of the signal gating
     and no unit test covers it, because a test process cannot uninstall an
     app. Reinstall afterwards.
+15. **The web UI stays navigable** — render `/`, `/help/`, `/channels/`, and
+    the account's `/characters/` and `/characters/manage/` pages. Confirm
+    Help search keeps literal command names, non-Builders cannot see restricted
+    categories, MudInfo is absent from Channels, and pagination appears only
+    when a list has another page. Open `/api/v1/` and `/webclient/`; verify the
+    API root renders, the client has a route back to the site, and its reading
+    pane is narrower than the viewport.

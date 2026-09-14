@@ -1,4 +1,6 @@
 Replace Evennia's webclient django template with your own here.
 
-You can find the original files in `evennia/web/templates/webclient/`. Just copy
-the original here and modify - after a reload the new template will be used.
+The game overrides `webclient/webclient.html` to add a route back to the site
+while extending Evennia's stock base shell. The original files are in
+`evennia/web/templates/webclient/`; a local template with the same relative
+name takes precedence after reload.

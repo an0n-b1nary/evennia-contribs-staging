@@ -1,0 +1,35 @@
+/* A reserved top strip keeps the route back to the website outside the client. */
+#connecting {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  height: 2.5rem;
+  padding: 0.35rem 0.75rem;
+  background: #141414;
+}
+
+#client-site-nav {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+#client-site-nav a {
+  color: #d8d8d8;
+  text-decoration: underline;
+}
+
+#clientwrapper {
+  height: calc(100% - 2.5rem);
+  margin-top: 2.5rem;
+}
+
+#messagewindow .out,
+#messagewindow .inp,
+#messagewindow .sys,
+#messagewindow .err {
+  display: block;
+  width: min(100%, 80ch);
+  margin-right: auto;
+  margin-left: auto;
+}

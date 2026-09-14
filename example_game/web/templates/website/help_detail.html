@@ -1,0 +1,49 @@
+{% extends "website/base.html" %}
+
+{% block titleblock %}Help — {{ object.sandbox_help_key }}{% endblock %}
+
+{% block content %}
+<article aria-labelledby="help-topic-heading">
+  <nav aria-label="Breadcrumb">
+    <ol class="breadcrumb px-0 bg-transparent">
+      <li class="breadcrumb-item"><a href="{% url 'help' %}">Help</a></li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'help' %}#help-category-{{ object.sandbox_help_anchor }}">
+          {{ object.sandbox_help_category }}
+        </a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ object.sandbox_help_key }}</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-start flex-wrap">
+    <h1 id="help-topic-heading">{{ object.sandbox_help_key }}</h1>
+    {% if object.web_get_admin_url and user.is_staff %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ object.web_get_admin_url }}">Edit</a>
+    {% endif %}
+  </div>
+
+  <pre class="mt-3 text-wrap">{{ entry_text }}</pre>
+
+  {% if topic_previous or topic_next %}
+  <nav aria-label="Topic navigation" class="mt-4">
+    <ul class="pagination justify-content-between">
+      <li class="page-item{% if not topic_previous %} invisible{% endif %}">
+        {% if topic_previous %}
+        <a class="page-link" href="{{ topic_previous.web_get_detail_url }}">
+          Previous: {{ topic_previous.sandbox_help_key }}
+        </a>
+        {% endif %}
+      </li>
+      <li class="page-item{% if not topic_next %} invisible{% endif %}">
+        {% if topic_next %}
+        <a class="page-link" href="{{ topic_next.web_get_detail_url }}">
+          Next: {{ topic_next.sandbox_help_key }}
+        </a>
+        {% endif %}
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</article>
+{% endblock %}

@@ -50,9 +50,10 @@
     such block, so every one of them renders nowhere. Declaring it here is the
     whole fix -- no contrib changes.
     {% endcomment %}
+    <main id="main-content">
     {% block breadcrumbs %}{% endblock %}
 
-    <div class="container main-content mt-4" id="main-copy">
+    <div class="container-fluid main-content mt-4 px-3 px-lg-5" id="main-copy">
       <div class="row">
         {% if sidebar %}
         <div class="col-4">
@@ -66,10 +67,10 @@
           {% block content %}
           {% endblock %}
 
-          {% include 'website/pagination.html' %}
         </div>
       </div>
     </div>
+    </main>
 
     <footer class="footer">
     {% block footer %}
