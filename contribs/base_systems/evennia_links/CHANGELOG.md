@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Validate complete web staff lock strings before evaluation, and deny access
+  when staff policy settings cannot be read. Malformed multi-lock strings must
+  not grant staff access through Evennia's partial lock parsing.
 - Add the shared ``is_staff_user(request)`` web predicate with an optional
   ``EVENNIA_WEB_STAFF_PREDICATE`` hook and fail-closed
   ``EVENNIA_WEB_STAFF_LOCK`` fallback. This replaces nine drifting HTTP

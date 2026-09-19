@@ -18,15 +18,6 @@ _log = logging.getLogger("evennia")
 _DEFAULT_WEB_STAFF_LOCK = "cmd:perm(Builder)"
 
 
-def _setting(name, default=None):
-    """Read a setting while failing closed if Django settings are unavailable."""
-    try:
-        return getattr(settings, name, default)
-    except Exception:
-        _log.exception("evennia_links: could not read setting %s", name)
-        return default
-
-
 def is_staff_user(request) -> bool:
     """Return whether *request* passes the game's web staff policy.
 
@@ -41,7 +32,11 @@ def is_staff_user(request) -> bool:
     if user is None or not getattr(user, "is_authenticated", False):
         return False
 
-    predicate_path = _setting("EVENNIA_WEB_STAFF_PREDICATE", None)
+    try:
+        predicate_path = getattr(settings, "EVENNIA_WEB_STAFF_PREDICATE", None)
+    except Exception:
+        _log.exception("evennia_links: could not read web staff predicate setting")
+        return False
     if predicate_path:
         try:
             predicate = resolve_dotted(predicate_path)
@@ -72,12 +67,28 @@ def is_staff_user(request) -> bool:
             )
             return False
 
-    lockstring = _setting("EVENNIA_WEB_STAFF_LOCK", _DEFAULT_WEB_STAFF_LOCK)
+    try:
+        lockstring = getattr(settings, "EVENNIA_WEB_STAFF_LOCK", _DEFAULT_WEB_STAFF_LOCK)
+    except Exception:
+        _log.exception("evennia_links: could not read web staff lock setting")
+        return False
     if not isinstance(lockstring, str) or not lockstring.strip():
         _log.error("evennia_links: EVENNIA_WEB_STAFF_LOCK is blank or invalid")
         return False
     try:
-        return bool(user.locks.check_lockstring(user, lockstring.strip()))
+        from evennia.locks.lockhandler import validate_lockstring
+
+        lockstring = lockstring.strip()
+        if ":" not in lockstring:
+            lockstring = f"cmd:{lockstring}"
+        # check_lockstring can silently return a partial parse for malformed
+        # multi-lock strings, including an empty set that passes all(). Check
+        # the complete syntax first, without storing locks on the account.
+        valid, error = validate_lockstring(lockstring)
+        if not valid:
+            _log.error("evennia_links: invalid web staff lock: %s", error)
+            return False
+        return bool(user.locks.check_lockstring(user, lockstring))
     except Exception:
         _log.exception("evennia_links: web staff lock evaluation failed")
         return False

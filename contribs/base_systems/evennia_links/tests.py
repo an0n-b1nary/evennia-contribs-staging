@@ -80,6 +80,30 @@ class TestIsStaffUser(EvenniaTest):
         self.account.is_superuser = True
         self.assertTrue(is_staff_user(self._request(self.account)))
 
+    def test_malformed_lock_cannot_grant_staff_access(self):
+        self.account2.permissions.clear()
+        self.assertFalse(is_staff_user(self._request(self.account2)))
+        for lock in ("broken;cmd:all()", "cmd:all();broken;other:none()"):
+            with self.subTest(lock=lock), self.settings(EVENNIA_WEB_STAFF_LOCK=lock):
+                self.assertFalse(is_staff_user(self._request(self.account2)))
+
+    def test_staff_lock_accepts_bare_and_prefixed_expressions(self):
+        self.account2.permissions.add("Builder")
+        for lock in ("perm(Builder)", "cmd:perm(Builder)"):
+            with self.subTest(lock=lock), self.settings(EVENNIA_WEB_STAFF_LOCK=lock):
+                self.assertTrue(is_staff_user(self._request(self.account2)))
+
+    def test_settings_failure_does_not_fall_back_to_default_policy(self):
+        from unittest.mock import PropertyMock, patch
+
+        self.account.permissions.add("Builder")
+        with patch("evennia_links.permissions.settings") as configured:
+            configured.EVENNIA_WEB_STAFF_LOCK = "cmd:perm(Builder)"
+            type(configured).EVENNIA_WEB_STAFF_PREDICATE = PropertyMock(
+                side_effect=RuntimeError("unavailable settings")
+            )
+            self.assertFalse(is_staff_user(self._request(self.account)))
+
     def test_predicate_override_is_authoritative(self):
         from unittest.mock import patch
 
