@@ -3,8 +3,9 @@
 """
 Permission helpers for evennia_jobs web views and API.
 
-Uses Evennia's lock system rather than Django's is_staff flag, which is
-unrelated to in-game permission levels.
+HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy rather
+than Django's ``is_staff`` flag. The jobs command lock remains the policy for
+in-game and authoring actions.
 
 Usage::
 
@@ -18,31 +19,9 @@ Usage::
     character_id = require_character(request)   # raises PermissionDenied if no puppet
 """
 
-from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
-
-def _staff_lock_expr():
-    """Return the bare lock expression (without ``cmd:`` prefix) for staff checks."""
-    lock = getattr(settings, "JOBS_STAFF_LOCK", "cmd:perm(Builder)")
-    return lock[4:] if lock.startswith("cmd:") else lock
-
-
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has staff Evennia permissions.
-
-    Uses Evennia's lock system (configured via JOBS_STAFF_LOCK, default
-    ``perm(Builder)``) rather than Django's ``is_staff`` flag. Falls back to
-    ``is_superuser`` if the lock check raises (e.g. in tests where the
-    account has no locks attribute).
-    """
-    if not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
+from evennia_links import is_staff_user as is_staff_user
 
 
 def get_character_id(user) -> int | None:

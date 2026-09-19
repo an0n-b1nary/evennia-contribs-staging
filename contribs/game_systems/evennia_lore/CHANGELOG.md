@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Changed:** privacy and status metadata are staff-only in the web templates;
+  HTTP staff checks use the shared ``evennia_links`` predicate.
+
 ## [0.2.0] — 2026-08-15 — map tile overlay
 
 - **Added:** `integrations/maps.py` — the `has_lore` map tile overlay. With

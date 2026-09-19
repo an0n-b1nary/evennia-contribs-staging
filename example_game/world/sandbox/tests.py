@@ -760,24 +760,22 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
         from world.sandbox import content
 
         hall = self.tile_by_name["Consulate Hall"].room_id
+        market = self.tile_by_name["Market Row"].room_id
         events = self._overlays()["upcoming_events"]
-        self.assertEqual(set(events), {hall})
+        self.assertEqual(set(events), {hall, market})
         self.assertEqual(
             events[hall][0]["title"], content.CALENDAR_EVENTS_BY_SLUG["kickoff"]["title"]
         )
 
-    def test_a_staff_only_event_is_withheld_from_players(self):
-        # is_staff_event exists to stop staff-run events being
-        # visible-but-unjoinable, and a map pin advertising one would undo
-        # that. This is the pair a playtester watches change when they run
-        # +sandbox/builder on.
+    def test_a_staff_event_is_public_lottery_mode_for_players_and_staff(self):
+        # is_staff_event selects lottery RSVP mode, not map visibility.
         from world.sandbox import content
 
         market = self.tile_by_name["Market Row"].room_id
         briefing = content.CALENDAR_EVENTS_BY_SLUG["briefing"]["title"]
 
         as_player = self._overlays(staff=False)["upcoming_events"]
-        self.assertNotIn(market, as_player)
+        self.assertEqual([e["title"] for e in as_player[market]], [briefing])
 
         as_staff = self._overlays(staff=True)["upcoming_events"]
         self.assertEqual([e["title"] for e in as_staff[market]], [briefing])

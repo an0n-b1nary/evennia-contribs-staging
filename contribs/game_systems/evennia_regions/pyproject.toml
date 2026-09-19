@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-regions"
-version = "0.2.1"
+version = "0.2.2"
 description = "Geographic grouping of rooms into named regions, with soft-archive and web views, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,7 +22,7 @@ classifiers = [
 # Core: models + commands. No web/API deps.
 # evennia-links is HARD because shipped models inherit AbstractArchived /
 # AbstractAuthoredLink, and commands use EditingMixin.
-dependencies = ["evennia>=6.0", "evennia-links>=0.4"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.5"]
 
 [project.optional-dependencies]
 # [web] enables website views and the DRF API.

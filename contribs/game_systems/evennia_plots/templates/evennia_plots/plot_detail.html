@@ -24,10 +24,12 @@
 </div>
 
 <dl class="row">
+  {% if is_staff %}
   <dt class="col-sm-2">Status</dt>
   <dd class="col-sm-10">{{ thread.get_status_display }}</dd>
   <dt class="col-sm-2">Privacy</dt>
   <dd class="col-sm-10">{{ thread.get_privacy_display }}</dd>
+  {% endif %}
   <dt class="col-sm-2">Creator</dt>
   <dd class="col-sm-10">{{ thread.creator_name }}</dd>
   {% if thread.arc %}

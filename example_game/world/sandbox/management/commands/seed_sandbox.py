@@ -500,13 +500,12 @@ class Command(BaseCommand):
         return len(by_slug)
 
     def _create_calendar_events(self):
-        """One open event and one staff-only one, both in the future.
+        """One open event and one public lottery event, both in the future.
 
         Both must be in the future or the map never shows them at all: the
         upcoming_events overlay filters on scheduled_time >= now. The
-        staff-only one carries is_staff_event, which the same overlay withholds
-        from non-staff - so the pair is what makes the visibility rule visible,
-        one event before +sandbox/builder on and two after.
+        second event carries is_staff_event, which selects lottery RSVP mode.
+        Both events remain visible in the map overlay for every viewer.
 
         Returned as {slug: event} rather than counted, because _link_overlays()
         attaches each to a scene: that link is the only path an event has to a
@@ -526,7 +525,7 @@ class Command(BaseCommand):
                 scheduled_time=datetime.now(UTC) + timedelta(days=7 + offset),
                 description=spec["description"],
                 emphasis=CalendarEvent.Emphasis.FREEFORM,
-                is_staff_event=spec["staff_only"],
+                is_staff_event=spec["is_staff_event"],
             )
         return events
 

@@ -69,7 +69,7 @@ class CharacterCmdSet(CmdSet):
 
 | Setting | Default | Description |
 |---|---|---|
-| `REGIONS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for create/edit/add-room/remove-room/here-add/primary; also used by web views and API |
+| `REGIONS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for create/edit/add-room/remove-room/here-add/primary; HTTP checks use the shared web policy |
 | `REGIONS_ROOM_VISIBILITY` | `None` | Dotted path to a `callable(room) -> bool` (**True means visible**) replacing the default room-visibility rule used by the member-room list and the API's staff-only member count |
 
 ---

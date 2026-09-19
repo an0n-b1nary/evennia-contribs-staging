@@ -70,10 +70,11 @@ class CharacterCmdSet(CmdSet):
 
 | Setting | Default | Description |
 |---|---|---|
-| `JOBS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock string for `+discuss` and `+jobs`; also used by web views and API for staff checks |
+| `JOBS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock string for `+discuss` and `+jobs`; HTTP staff checks use the shared web policy |
 
 The staff check is consistent across commands, website views, and the API — all read
-from `JOBS_STAFF_LOCK`.
+from `JOBS_STAFF_LOCK` for in-game commands. HTTP views use `EVENNIA_WEB_STAFF_LOCK`
+through `evennia_links.is_staff_user`.
 
 ---
 

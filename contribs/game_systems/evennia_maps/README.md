@@ -223,6 +223,11 @@ Each installed partner answers for the rooms it has data about, under its own pr
 rule, and the answers are merged. There is nothing to configure: install a partner and
 its overlay appears, uninstall it and the overlay is simply absent.
 
+The calendar's ``is_staff_event`` flag is a public lottery RSVP mode, not a
+privacy tier. Calendar overlays therefore return those events to both player
+and staff renders; providers continue to own their domain-specific privacy
+rules.
+
 | Overlay key | Provided by | Rendered as |
 |---|---|---|
 | `primary_region` | `evennia-regions` | Tile label and link to the region page |

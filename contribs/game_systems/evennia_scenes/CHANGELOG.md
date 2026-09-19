@@ -1,5 +1,9 @@
 # Changelog — evennia-scenes
 
+## [Unreleased]
+
+- **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate.
+
 ## [0.3.0] — 2026-08-15 — map tile overlays
 
 ### Added

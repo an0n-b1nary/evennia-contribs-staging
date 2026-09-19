@@ -72,7 +72,7 @@ class CharacterCmdSet(CmdSet):
 
 | Setting | Default | Description |
 |---|---|---|
-| `LORE_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for approve/reject/unflag/share operations; also used by web views and API |
+| `LORE_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for approve/reject/unflag/share operations; HTTP checks use the shared web policy |
 | `LORE_REQUIRE_APPROVAL` | `False` | When True, submissions start as SUBMITTED (awaiting staff review) instead of PUBLISHED |
 | `LORE_PASSIVE_WEEKLY_CEILING` | `5` | Max passive acquisitions per character per week |
 | `LORE_PASSIVE_LEAN_MULTIPLIER` | `Decimal("2.0")` | Weight multiplier for lean-matching entries |

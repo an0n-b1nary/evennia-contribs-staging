@@ -35,10 +35,12 @@
 <p class="text-muted small mb-3">
   By {{ entry.author_name|default:"Unknown" }} ·
   {{ entry.created_at|date:"Y-m-d" }} ·
+  {% if is_staff %}
   <span class="badge {% if entry.privacy == 'public' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
     {{ entry.get_privacy_display }}
   </span>
   <span class="badge bg-info text-dark">{{ entry.get_status_display }}</span>
+  {% endif %}
   {% if entry.tags.exists %}
   —
   {% for tag in entry.tags.all %}

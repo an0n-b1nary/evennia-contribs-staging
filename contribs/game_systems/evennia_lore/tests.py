@@ -765,6 +765,16 @@ class TestLoreDetailRenders(LoreWebRenderTestCase):
         self.assertIn("The Sunken Road", html)
         self.assertIn("It runs beneath the harbour.", html)
 
+    def test_player_detail_hides_staff_metadata(self):
+        html = self._render(LoreDetailView, pk=self.entry.pk)
+        self.assertNotIn("Published", html)
+        self.assertNotIn("Privacy", html)
+
+    def test_staff_detail_shows_status_and_privacy_metadata(self):
+        html = self._render(LoreDetailView, user=self.account, puppet=self.char1, pk=self.entry.pk)
+        self.assertIn("Published", html)
+        self.assertIn("Public", html)
+
     def test_restricted_entry_renders_a_stub_instead_of_the_body(self):
         restricted = _make_entry(
             title="The Ninth Seal",

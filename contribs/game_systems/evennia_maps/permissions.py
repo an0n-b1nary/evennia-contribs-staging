@@ -3,6 +3,9 @@
 """
 Permission helpers for evennia_maps commands, web views, and API.
 
+HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
+``MAPS_STAFF_LOCK`` remains the lock for map commands and authoring policy.
+
 Settings:
     MAPS_STAFF_LOCK — lock string for place/move/unplace/pin/reflow/check
         operations (default "cmd:perm(Builder)").
@@ -29,6 +32,7 @@ import logging
 
 from django.conf import settings
 
+from evennia_links import is_staff_user as is_staff_user
 from evennia_links import resolve_dotted
 
 _log = logging.getLogger("evennia")
@@ -45,17 +49,6 @@ def is_staff(character) -> bool:
         return bool(character.locks.check_lockstring(character, _staff_lock_expr()))
     except Exception:
         return False
-
-
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has maps staff permission."""
-    if request is None or not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
 
 
 def room_attr_values(room, name):

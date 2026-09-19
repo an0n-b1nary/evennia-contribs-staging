@@ -19,8 +19,10 @@ EvenniaTest provides self.char1 / self.char2 (ObjectDB instances) and
 self.room1, used here as generic linkable/versionable objects.
 """
 
+from django.contrib.auth.models import AnonymousUser
 from django.db import connection, models
 from django.db.models.signals import post_migrate
+from django.test import RequestFactory
 from evennia.utils.test_resources import EvenniaTest
 
 from evennia_links import (
@@ -30,8 +32,87 @@ from evennia_links import (
     AbstractVersion,
     collect_dicts,
     connect_on_ready,
+    is_staff_user,
     resolve_dotted,
 )
+
+
+class TestIsStaffUser(EvenniaTest):
+    """The shared request-level staff policy fails closed and stays global."""
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+
+    def _request(self, user):
+        request = self.factory.get("/")
+        request.user = user
+        return request
+
+    def test_missing_and_anonymous_requests_are_not_staff(self):
+        self.assertFalse(is_staff_user(None))
+        self.assertFalse(is_staff_user(self._request(AnonymousUser())))
+
+    def test_django_staff_flag_does_not_grant_access(self):
+        from types import SimpleNamespace
+
+        user = SimpleNamespace(
+            is_authenticated=True,
+            is_staff=True,
+            locks=SimpleNamespace(check_lockstring=lambda *_: False),
+        )
+        self.assertFalse(is_staff_user(self._request(user)))
+
+    def test_lock_exception_fails_closed_even_for_superuser(self):
+        from types import SimpleNamespace
+
+        def explode(*_args):
+            raise RuntimeError("broken lock handler")
+
+        user = SimpleNamespace(
+            is_authenticated=True,
+            is_superuser=True,
+            locks=SimpleNamespace(check_lockstring=explode),
+        )
+        self.assertFalse(is_staff_user(self._request(user)))
+
+    def test_evennia_superuser_bypass_is_preserved(self):
+        self.account.is_superuser = True
+        self.assertTrue(is_staff_user(self._request(self.account)))
+
+    def test_predicate_override_is_authoritative(self):
+        from unittest.mock import patch
+
+        with (
+            self.settings(EVENNIA_WEB_STAFF_PREDICATE="tests.predicate"),
+            patch(
+                "evennia_links.permissions.resolve_dotted",
+                return_value=lambda request: request.user is self.account,
+            ),
+        ):
+            self.assertTrue(is_staff_user(self._request(self.account)))
+
+    def test_broken_and_recursive_predicates_fail_closed(self):
+        from unittest.mock import patch
+
+        request = self._request(self.account)
+        with (
+            self.settings(EVENNIA_WEB_STAFF_PREDICATE="tests.broken"),
+            patch(
+                "evennia_links.permissions.resolve_dotted",
+                side_effect=ImportError("missing"),
+            ),
+        ):
+            self.assertFalse(is_staff_user(request))
+        with (
+            self.settings(EVENNIA_WEB_STAFF_PREDICATE="evennia_links.is_staff_user"),
+            patch(
+                "evennia_links.permissions.resolve_dotted",
+                return_value=is_staff_user,
+            ),
+        ):
+            self.assertFalse(is_staff_user(request))
+
 
 # ---------------------------------------------------------------------------
 # Throwaway concrete subclasses (test-only)
@@ -204,7 +285,7 @@ class TestAbstractAuthoredLinkCreateLink(ProbeTablesTest):
         self.assertEqual(link.created_by_name, self.char1.key)
 
     def test_no_creator_is_blank(self):
-        link, created = AuthoredLinkProbe.create_link(self.char1, self.char2)
+        link, _created = AuthoredLinkProbe.create_link(self.char1, self.char2)
         self.assertIsNone(link.created_by)
         self.assertEqual(link.created_by_name, "")
 

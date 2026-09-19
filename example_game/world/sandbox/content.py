@@ -650,16 +650,15 @@ PLOT_THREAD = {
     "description": "[Placeholder] One line: a thread inside the arc, open for hooks.",
 }
 
-# Two events, and the second one is the visibility demo: is_staff_event exists
-# to stop staff-run events being visible-but-unjoinable to everyone, so the
-# calendar overlay withholds it from non-staff. A playtester sees one event on
-# the map; the same playtester after +sandbox/builder on sees two.
+# Two events, and the second one demonstrates public lottery mode:
+# is_staff_event controls RSVP selection, not visibility. Both events appear
+# on the map for players and staff; only the RSVP behavior differs.
 CALENDAR_EVENTS = (
     {
         "slug": "kickoff",
         "title": "Sandbox Kickoff",
         "description": "[Placeholder] One line describing a seeded open event to RSVP to.",
-        "staff_only": False,
+        "is_staff_event": False,
         # The scene the event reaches the map through. There is no
         # CalendarEvent -> Room field anywhere in the calendar; a
         # SceneCalendarLink to a scene rooted in a room is the only path.
@@ -668,8 +667,8 @@ CALENDAR_EVENTS = (
     {
         "slug": "briefing",
         "title": "Staff Briefing",
-        "description": "[Placeholder] One line describing a staff-run event players cannot join.",
-        "staff_only": True,
+        "description": "[Placeholder] One line describing a staff-run event with lottery RSVP.",
+        "is_staff_event": True,
         "scene_slug": "market-day",
     },
 )

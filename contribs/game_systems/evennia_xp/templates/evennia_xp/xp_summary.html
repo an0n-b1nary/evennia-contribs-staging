@@ -13,6 +13,7 @@
 {% block content %}
 <h1 class="mb-3">My XP{% if character_name %} — {{ character_name }}{% endif %}</h1>
 
+{% if has_character %}
 {% if downtime_active %}
 <div class="alert alert-warning" role="alert" aria-live="polite">
   <strong>Modified XP Rates</strong> — XP rates are currently reduced
@@ -118,5 +119,9 @@
 
 {% else %}
 {% include "evennia_xp/_empty_state.html" with message="No XP has been awarded yet. RP activity earns XP each Monday." %}
+{% endif %}
+{% else %}
+{% url 'character-manage' as manage_characters_url %}
+{% include "evennia_xp/_empty_state.html" with message="No playable character is linked to this account yet. Link a character to view its XP balance and award history." action_url=manage_characters_url action_label="Manage Characters" %}
 {% endif %}
 {% endblock %}

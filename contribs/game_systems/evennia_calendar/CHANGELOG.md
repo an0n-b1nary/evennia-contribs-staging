@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Changed:** map overlays show public lottery events to both player and staff
+  viewers; ``is_staff_event`` is not a visibility flag. HTTP staff checks use
+  the shared ``evennia_links`` predicate.
+
 ## [0.2.0] — 2026-08-15 — map tile overlay
 
 ### Added
@@ -20,9 +26,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   An event has no room of its own — it reaches the map only through a linked
   `Scene`, so the provider resolves the scenes app through the existing
   `CALENDAR_SCENES_APP_LABEL` gate and the overlay is empty without it.
-  Staff-only events are withheld from non-staff, the rule the calendar's own web
-  views already apply: `is_staff_event` exists to stop staff-run events being
-  visible-but-unjoinable, and a map pin advertising one would undo that.
+  The map overlay returns the same events to player and staff renders;
+  `is_staff_event` selects public lottery RSVP mode rather than visibility.
 - `TestWebPagesRender` — all twelve pages (month grid, list, event detail,
   cluster detail with its ranked-choice form, event create/edit/cancel/invite,
   tag management and creation, cluster create/edit/membership, exclusions) are

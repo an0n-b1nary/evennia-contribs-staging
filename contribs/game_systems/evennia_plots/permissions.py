@@ -25,6 +25,8 @@ Web view usage::
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
+from evennia_links import is_staff_user as is_staff_user
+
 # ---------------------------------------------------------------------------
 # In-game (character-level) helpers — used by models and commands
 # ---------------------------------------------------------------------------
@@ -68,28 +70,6 @@ def can_manage_arc(character, arc=None) -> bool:
 # ---------------------------------------------------------------------------
 # Web (request-level) helpers — used by views and API
 # ---------------------------------------------------------------------------
-
-
-def _staff_lock_expr() -> str:
-    """Return the bare lock expression (without ``cmd:`` prefix) for staff checks."""
-    lock = getattr(settings, "PLOTS_STAFF_LOCK", "cmd:perm(Builder)")
-    return lock[4:] if lock.startswith("cmd:") else lock
-
-
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has plot staff permissions.
-
-    Uses Evennia's lock system (configured via ``PLOTS_STAFF_LOCK``, default
-    ``perm(Builder)``) rather than Django's ``is_staff`` flag. Falls back to
-    ``is_superuser`` if the lock check raises (e.g. in tests).
-    """
-    if not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
 
 
 def get_character_id(user) -> int | None:

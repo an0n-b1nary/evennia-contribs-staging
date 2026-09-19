@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate;
+  player plot details no longer expose the privacy field.
 - **Fixed:** every shipped template included its partials from
   `website/partials/…` — `_form_errors.html`, `_form_field.html`,
   `_form_actions.html`, `_empty_state.html` and `_pagination.html`. None of

@@ -119,7 +119,7 @@ rows via `record_xp()`.
 | `XP_ANTIGAMING_SWEEPS` | `[]` | List of dotted paths. Each: `sweep(window_end)`. Called before collectors. |
 | `XP_POST_BATCH_HOOKS` | `[]` | List of dotted paths. Each: `hook(window_end, awards, week_label)`. Called after writes. |
 | `XP_MULTIPLIER_RESOLVER` | `None` | Dotted path to `fn(source, *, thread, room, character) → Decimal`. Returns 1.0 when unset. |
-| `XP_STAFF_LOCK` | `"cmd:perm(Builder)"` | Evennia lock expression for `+xp/grant` and web staff checks. |
+| `XP_STAFF_LOCK` | `"cmd:perm(Builder)"` | Evennia lock expression for `+xp/grant`; HTTP staff checks use `EVENNIA_WEB_STAFF_LOCK`. |
 
 ---
 
@@ -190,7 +190,7 @@ urlpatterns += [
 ]
 ```
 
-- `GET /xp/` — `XPSummaryView` — balance card + by-source breakdown + paginated log. Requires login + active puppet.
+- `GET /xp/` — `XPSummaryView` — balance card + by-source breakdown + paginated log. Requires login; the account's playable roster supplies the read-only character identity, with an explanatory empty state when none is linked.
 - `GET /api/v1/xp-log/` — `XPLogViewSet` — returns only the requesting character's rows.
 
 ---

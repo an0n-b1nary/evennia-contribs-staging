@@ -27,7 +27,7 @@ boards. IC boards integrate with [evennia-xp](../evennia_xp/) for cutscene XP aw
 
 ## Dependencies
 
-**Hard:** `evennia>=6.0`, `evennia-links>=0.2` (provides `AbstractArchived`, `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`)
+**Hard:** `evennia>=6.0`, `evennia-links>=0.5` (provides `AbstractArchived`, `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, and the shared web staff predicate)
 
 **Optional `[web]`:** `evennia-accessibility>=0.1`, `djangorestframework>=3.14`, `django-filter>=23`
 
@@ -122,7 +122,7 @@ urlpatterns = [
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `BOARDS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock expression for staff-only board actions |
+| `BOARDS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock expression for in-game staff-only board actions |
 | `BOARDS_CALENDAR_APP_LABEL` | `None` | App label to enable `PostCalendarLink` soft-ref cascade cleanup |
 | `BOARDS_ANTIGAMING_REPORTER` | `None` | Dotted path to `callable(title, description)` for staff ticket creation on XP flag |
 

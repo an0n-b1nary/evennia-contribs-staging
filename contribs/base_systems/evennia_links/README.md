@@ -300,6 +300,17 @@ Callers that treat the hook as *optional* should wrap the call and log-and-skip
 on failure, so a game's misconfigured setting degrades that one feature instead
 of crashing the command reading it.
 
+### Web staff predicate
+
+``is_staff_user(request)`` is the shared request-level staff decision for
+contrib web views and APIs. It first checks the optional
+``EVENNIA_WEB_STAFF_PREDICATE`` dotted callable; when unset it evaluates
+``EVENNIA_WEB_STAFF_LOCK`` (default ``"cmd:perm(Builder)"``) through Evennia's
+lock handler. A broken predicate or lock fails closed, and Django's
+``user.is_staff`` flag is intentionally ignored. Existing per-contrib
+``*_STAFF_LOCK`` settings continue to govern in-game commands and authoring;
+games migrating HTTP staff checks should set the one web-wide setting instead.
+
 ---
 
 ## Bridge-ownership convention

@@ -138,7 +138,7 @@ class TestPlotsInit(unittest.TestCase):
     def test_version(self):
         import evennia_plots
 
-        self.assertEqual(evennia_plots.__version__, "0.1.0")
+        self.assertEqual(evennia_plots.__version__, "0.2.1")
 
     def test_signals_eagerly_exported(self):
         from django.dispatch import Signal
@@ -1234,6 +1234,22 @@ class TestWebPagesRender(EvenniaTest):
         html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)
         self.assertIn("The Salt Road", html)
         self.assertIn("The caravan set out.", html)
+
+    def test_player_thread_detail_hides_status_and_privacy(self):
+        html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)
+        self.assertNotIn("Status", html)
+        self.assertNotIn("Privacy", html)
+
+    def test_staff_thread_detail_shows_status_and_privacy(self):
+        html = self._render(
+            PlotDetailView,
+            path_=f"/plots/{self.thread.pk}/",
+            user=self.account,
+            puppet=self.char1,
+            pk=self.thread.pk,
+        )
+        self.assertIn("Status", html)
+        self.assertIn("Privacy", html)
 
     def test_thread_detail_renders_without_updates(self):
         bare = _make_thread("Quiet Thread", creator=self.char1, status="active")

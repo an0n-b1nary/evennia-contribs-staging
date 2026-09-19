@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-plots"
-version = "0.2.0"
+version = "0.2.1"
 description = "Narrative plot management (+plot/+arc/+hook) with thread bonuses, arc XP multipliers, and a full web + REST surface for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -23,7 +23,7 @@ classifiers = [
 # gating. evennia-links is HARD because shipped models inherit AbstractVersion
 # and AbstractAuthoredLink, and apps.py uses connect_soft_ref_cleanup +
 # connect_on_ready.
-dependencies = ["evennia>=6.0", "evennia-links>=0.2"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.5"]
 
 [project.optional-dependencies]
 # [web] enables website views, DRF API, accessible forms, and all 14 templates.

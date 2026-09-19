@@ -513,21 +513,42 @@ class TestXPSummaryViewAuth(EvenniaTest):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/accounts/login/", response["Location"])
 
-    def test_no_puppet_raises_permission_denied(self):
-        from django.core.exceptions import PermissionDenied
-
+    def test_no_character_returns_empty_queryset(self):
         from evennia_xp.views import XPSummaryView
 
         request = self.factory.get("/xp/")
         request.user = self.account2
-        # Ensure no puppets
+        # Ensure no playable characters.
         self.account2.db._playable_characters = []
         view = XPSummaryView()
         view.request = request
         view.kwargs = {}
         view.args = ()
-        with self.assertRaises(PermissionDenied):
-            view.get_queryset()
+        self.assertFalse(view.get_queryset().exists())
+
+    def test_roster_character_works_without_live_puppet(self):
+        from evennia_xp.views import XPSummaryView
+
+        self.account2.characters.add(self.char2)
+        request = self.factory.get("/xp/")
+        request.user = self.account2
+        view = XPSummaryView()
+        view.request = request
+        view.kwargs = {}
+        view.args = ()
+        self.assertEqual(view._character_id(), self.char2.pk)
+
+    def test_multiple_roster_prefers_a_live_roster_character_only(self):
+        from evennia_xp.permissions import get_character_id
+
+        self.account.db._playable_characters = [self.char2, self.char1]
+        with patch.object(self.account, "get_all_puppets", return_value=[self.char1]):
+            self.assertEqual(get_character_id(self.account), self.char1.pk)
+        # A live puppet outside the account roster must not become the XP
+        # identity; roster order remains the deterministic fallback.
+        outsider = MagicMock(pk=999999)
+        with patch.object(self.account, "get_all_puppets", return_value=[outsider]):
+            self.assertEqual(get_character_id(self.account), self.char2.pk)
 
 
 class TestXPSummaryViewContext(EvenniaTest):
@@ -864,6 +885,18 @@ class TestXPSummaryRenders(EvenniaTest):
         html = self._render()
         self.assertIn("No XP has been awarded yet.", html)
         self.assertNotIn("Lifetime Breakdown by Source", html)
+
+    def test_summary_renders_no_character_state(self):
+        request = self.factory.get("/xp/")
+        request.user = self.account2
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        self.account2.db._playable_characters = []
+        with patch("evennia_xp.views.get_character_id", return_value=None):
+            response = XPSummaryView.as_view()(request)
+        response.render()
+        html = response.content.decode()
+        self.assertIn("No playable character is linked", html)
+        self.assertNotIn("Current Balance", html)
 
     def test_summary_renders_the_screenreader_layout(self):
         record_xp(

@@ -275,7 +275,7 @@ class TestCharacterMsgHeaderAndHighlight(PosingTestCase):
         finally:
             DefaultCharacter.msg = orig
 
-        msg_text, msg_opts = captured["text"]
+        msg_text, _msg_opts = captured["text"]
         self.assertIn("--- Char2 ---", msg_text)
         self.assertIn("nods.", msg_text)
 

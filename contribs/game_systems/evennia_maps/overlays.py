@@ -18,7 +18,7 @@ Five of the six overlays carry a privacy rule *only the owning domain
 knows*. ``evennia_scenes`` exposes ``room.active_scene_id`` as a bare pk
 with no privacy dimension — light a pin from it and a view-private scene
 announces itself to every anonymous visitor. Same for the heatmap (window
-+ visibility tiers) and the calendar (staff-only events). A standalone
+visibility tiers) and the calendar (public lottery events). A standalone
 evennia_maps must not re-encode any of those rules, so it asks instead.
 
 Overlay keys evennia_maps reads
@@ -27,6 +27,10 @@ Each value is a ``{room_id: value}`` dict; missing rooms simply have no
 overlay. Providers must write **disjoint** top-level keys — receiver order
 is not guaranteed, so two providers claiming one key is a bug in the
 providers.
+
+Calendar's ``is_staff_event`` flag is a public lottery RSVP mode, not a
+visibility tier; the calendar provider returns those events to both player and
+staff map renders. Privacy filtering remains owned by each provider's domain.
 
 ===================  ============  ===============================================
 Key                  Owner         Value

@@ -929,11 +929,12 @@ Three mechanisms, for three different needs:
     than all the same. Click through a tile popup to the region, the scene log
     and the event page. Then click the **portal marker** on Consulate Hall and
     confirm it navigates to the `Consulate Interior` plane.
-12. **The staff room and the staff event appear only for staff** — as the
-    fresh account from step 4, confirm the Warren is absent from the map, from
-    `/regions/` and from `+where`, and that Market Row shows no upcoming event.
-    Run `+sandbox/builder on` and confirm all four appear. This is the
-    fail-closed visibility rule and the `is_staff_event` rule, both end to end.
+12. **Staff-room privacy and public lottery mode** — as the fresh account
+    from step 4, confirm the Warren is absent from the map, from `/regions/`
+    and from `+where`. Market Row still shows the Staff Briefing event for
+    players and staff: `is_staff_event` selects lottery RSVP mode rather than
+    hiding the event. Run `+sandbox/builder on` and confirm only the Warren
+    changes with the staff toggle.
 13. **`+map/check` and `+map/reflow` have something to report** — as staff, run
     `+map/check`: it should name the Study as an unmapped neighbour of the
     Lobby, the Warren as a blank-terrain tile, and the Drafting Room as a tile

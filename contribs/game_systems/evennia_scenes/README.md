@@ -10,7 +10,7 @@ a Bootstrap-compatible web log browser, and a DRF REST API.
 ## Requirements
 
 - `evennia>=6.0`
-- `evennia-links>=0.3` (provides `AbstractArchived`, `AbstractVersion`,
+- `evennia-links>=0.5` (provides `AbstractArchived`, `AbstractVersion`,
   `EditingMixin`)
 
 Optional:

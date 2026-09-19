@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** the optional web extra now depends on ``evennia-links>=0.5``;
+  HTTP staff checks use its shared predicate.
 - **Fixed:** the documentation comments at the top of `_empty_state.html` and
   `_pagination.html` spanned multiple lines. Django's template tag regex is not
   `DOTALL`, so a multi-line `{# ... #}` is not a comment — its text renders into the

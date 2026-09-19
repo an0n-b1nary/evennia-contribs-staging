@@ -431,7 +431,11 @@ PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 ######################################################################
 
 # Shared by native-page categories, the staff menu, and staff-only page links.
-# Keep this aligned with the Builder toggle and contrib *_STAFF_LOCK settings.
+# Keep this as the single HTTP staff policy. Set EVENNIA_WEB_STAFF_PREDICATE to
+# a dotted callable(request) when the game needs a custom rule; it is
+# authoritative and fails closed if it cannot be loaded or raises. The
+# contrib *_STAFF_LOCK settings below remain for in-game commands and
+# authoring, not for HTTP staff chrome.
 EVENNIA_WEB_STAFF_LOCK = "cmd:perm(Builder)"
 
 # base.html includes _menu.html on every render, including on pages rendered by

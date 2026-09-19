@@ -1,25 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Permission helpers for evennia_lore web views and API (LORE_STAFF_LOCK)."""
+"""Permission helpers for evennia_lore web views and API.
 
-from django.conf import settings
+HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
+``LORE_STAFF_LOCK`` remains the in-game and authoring lock.
+"""
+
 from django.core.exceptions import PermissionDenied
 
-
-def _staff_lock_expr():
-    lock = getattr(settings, "LORE_STAFF_LOCK", "cmd:perm(Builder)")
-    return lock[4:] if lock.startswith("cmd:") else lock
-
-
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has lore staff permission."""
-    if not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
+from evennia_links import is_staff_user as is_staff_user
 
 
 def get_character_id(user) -> int | None:

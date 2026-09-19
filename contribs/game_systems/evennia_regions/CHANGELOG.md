@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Changed:** HTTP staff checks are shared with the other web surfaces and the
+  room attribute helper is now public as ``room_attr_values``.
+
 ## [0.2.1] — 2026-08-15 — docs
 
 Documentation only; no code, schema or behaviour change.

@@ -16,6 +16,7 @@ Public API:
     connect_soft_ref_cleanup    — cascade compensation for integer soft-reference fields
     collect_dicts            — send_robust() a collector signal and merge dict responses
     resolve_dotted            — import an object from a "pkg.mod.attr" path
+    is_staff_user             — shared request-level web staff policy
 
 See each module's docstring for usage examples.
 
@@ -31,9 +32,10 @@ by which point the registry is ready.
 
 from .collect import collect_dicts, resolve_dotted
 from .listeners import connect_on_ready
+from .permissions import is_staff_user
 from .softref import connect_soft_ref_cleanup
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 # name -> submodule that defines it. Imported on first access via __getattr__.
 _LAZY = {
@@ -57,6 +59,7 @@ __all__ = [
     "collect_dicts",
     "connect_on_ready",
     "connect_soft_ref_cleanup",
+    "is_staff_user",
     "resolve_dotted",
 ]
 

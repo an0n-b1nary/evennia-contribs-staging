@@ -5,14 +5,14 @@ Web view for the XP summary page.
 
 XPSummaryView — self-only balance, by-source breakdown, and paginated log.
 
-Permission: login required + active puppet (require_character). Staff view
-other characters' XP through Django admin.
+Permission: login required. The account's playable-character roster selects
+the identity; accounts without a playable character receive an empty state.
+Staff view other characters' XP through Django admin.
 """
 
 from decimal import Decimal
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
 from django.views.generic import ListView
 
 from evennia_xp.models import CharacterXP, XPLog
@@ -28,8 +28,9 @@ class XPSummaryView(LoginRequiredMixin, ListView):
     """XP balance, lifetime by-source breakdown, and paginated log for the
     requesting character.
 
-    Requires an active puppet (character_id). Anonymous and logged-in users
-    without a puppet receive 403.
+    Uses the account's persistent playable-character roster. Anonymous users
+    are redirected by LoginRequiredMixin; authenticated accounts without a
+    playable character receive an explanatory empty state.
     """
 
     template_name = "evennia_xp/xp_summary.html"
@@ -37,15 +38,39 @@ class XPSummaryView(LoginRequiredMixin, ListView):
     paginate_by = 50
     login_url = "/accounts/login/"
 
+    def _character_id(self):
+        if not hasattr(self, "_resolved_character_id"):
+            self._resolved_character_id = get_character_id(self.request.user)
+        return self._resolved_character_id
+
     def get_queryset(self):
-        character_id = get_character_id(self.request.user)
+        character_id = self._character_id()
         if not character_id:
-            raise PermissionDenied("An active character is required to view XP.")
+            return XPLog.objects.none()
         return XPLog.objects.filter(character_id=character_id).order_by("-awarded_at")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        character_id = get_character_id(self.request.user)
+        character_id = self._character_id()
+        context["character_id"] = character_id
+        context["has_character"] = bool(character_id)
+
+        if not character_id:
+            context.update(
+                {
+                    "page_title": "My XP",
+                    "character_name": "",
+                    "balance": Decimal("0.00"),
+                    "total_earned": Decimal("0.00"),
+                    "total_spent": Decimal("0.00"),
+                    "last_payout_week": "",
+                    "by_source": [],
+                    "screenreader_mode": False,
+                    "downtime_active": False,
+                    "xp_mult": Decimal("1.0"),
+                }
+            )
+            return context
 
         try:
             xp_row = CharacterXP.objects.get(character_id=character_id)

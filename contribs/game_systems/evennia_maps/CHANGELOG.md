@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate;
+  calendar lottery events are not treated as private map data.
+
 ## [0.3.1] — 2026-09-06 — live map: tiles were all drawn on top of each other
 
 - **Fixed:** the Leaflet map placed every tile at its raw grid coordinate while

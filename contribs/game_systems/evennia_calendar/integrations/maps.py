@@ -16,10 +16,10 @@ soonest first, for non-cancelled events still in the future.
 
 Visibility
 ----------
-Staff-only events are withheld from non-staff, the same rule the calendar's
-own web views apply. ``is_staff_event`` exists to stop staff-run events
-being visible-but-unjoinable to everyone; a map pin advertising one would
-undo that, and evennia_maps has no way to know the flag exists.
+``is_staff_event`` selects the public lottery RSVP mode; it is not a visibility
+tier. The overlay therefore returns the same upcoming events for player and
+staff renders. Pre-invite restrictions remain enforced by the calendar's
+authoring flows.
 
 How an event reaches a room
 ---------------------------
@@ -51,7 +51,7 @@ def _scene_model():
         return None
 
 
-def _upcoming_events_by_room(room_ids, *, staff):
+def _upcoming_events_by_room(room_ids):
     """
     ``{room_id: [{"id", "title"}, ...]}`` for upcoming, non-cancelled events,
     reached through the scenes rooted in those rooms.
@@ -69,8 +69,6 @@ def _upcoming_events_by_room(room_ids, *, staff):
         event__is_cancelled=False,
         event__scheduled_time__gte=timezone.now(),
     )
-    if not staff:
-        links = links.filter(event__is_staff_event=False)
     # The title rides along on the join already being made — no extra query.
     rows = list(
         links.order_by("event__scheduled_time", "event_id").values_list(
@@ -102,4 +100,4 @@ def provide(sender, room_ids, staff, **kwargs):
     """
     if not room_ids:
         return {}
-    return {"upcoming_events": _upcoming_events_by_room(room_ids, staff=staff)}
+    return {"upcoming_events": _upcoming_events_by_room(room_ids)}

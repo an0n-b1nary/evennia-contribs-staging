@@ -13,7 +13,7 @@ Event calendar system for Evennia games. Provides in-game commands (`+calendar`,
 - **Web UI:** month grid, list view (with filters), detail, cluster, and all authoring views
 - **REST API:** `CalendarEventViewSet` with date/emphasis/staff-event filters
 - **Accessibility-aware commands:** optional `evennia-accessibility` integration for screenreader mode
-- **No `evennia-links` dependency:** first `game_systems` contrib with only `evennia>=6.0` as core dependency
+- **Shared web staff policy:** HTTP staff checks use `evennia-links>=0.5`; `CALENDAR_STAFF_LOCK` remains for in-game authoring.
 
 ## Requirements
 
@@ -21,6 +21,7 @@ Event calendar system for Evennia games. Provides in-game commands (`+calendar`,
 
 ```
 evennia>=6.0
+evennia-links>=0.5
 ```
 
 ### Web + API (`[web]` extra)
@@ -109,7 +110,7 @@ urlpatterns = [
 
 | Setting | Default | Description |
 |---|---|---|
-| `CALENDAR_STAFF_LOCK` | `"cmd:perm(Builder)"` | Evennia lock expression for staff-level calendar access (event toggle, cluster lock, tag creation). Use `cmd:perm(Builder)` or a custom lock expression. |
+| `CALENDAR_STAFF_LOCK` | `"cmd:perm(Builder)"` | Evennia lock expression for in-game/calendar authoring (event toggle, cluster lock, tag creation). HTTP staff checks use `EVENNIA_WEB_STAFF_LOCK`. |
 | `SITE_URL` | `""` | Base URL for absolute web links in in-game `\|lu...\|le` MXP links (e.g. `"https://mygame.example.com"`). Empty string produces relative paths (webclient-only). |
 
 ## Soft-reference contract
@@ -177,9 +178,9 @@ once a `Scene` is linked to it via `SceneCalendarLink`, so the scenes app is res
 through `CALENDAR_SCENES_APP_LABEL` exactly as the soft-ref cleanup hook already resolves
 it. With `evennia-scenes` absent the overlay is empty.
 
-Staff-only events are withheld from non-staff, the same rule the calendar's own web views
-apply — `is_staff_event` exists to stop staff-run events being visible-but-unjoinable to
-everyone, and a map pin advertising one would undo that.
+The map overlay is public: player and staff renders receive the same upcoming events.
+``is_staff_event`` selects lottery RSVP mode rather than visibility. The
+calendar's authoring flows still enforce the anti-favoritism pre-invite rule.
 
 
 ## Programmatic API

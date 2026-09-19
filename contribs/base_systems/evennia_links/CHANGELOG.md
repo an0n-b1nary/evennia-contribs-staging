@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add the shared ``is_staff_user(request)`` web predicate with an optional
+  ``EVENNIA_WEB_STAFF_PREDICATE`` hook and fail-closed
+  ``EVENNIA_WEB_STAFF_LOCK`` fallback. This replaces nine drifting HTTP
+  permission mirrors while leaving per-contrib command locks unchanged.
 - Test-only fix: the probe tables are now created by a `post_migrate` receiver during
   test-database setup instead of by the first `ProbeTablesTest` to run. Importing this
   contrib's test module registers probe models holding CASCADE FKs to `ObjectDB`, so every

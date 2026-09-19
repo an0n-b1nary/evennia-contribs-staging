@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** the read-only XP page resolves a persistent account roster,
+  keeps its resolver request-scoped, and renders an explanatory no-character
+  state; web staff checks use ``evennia_links``.
 - **Fixed:** the documentation comments at the top of `_empty_state.html` and
   `_pagination.html` spanned multiple lines. Django's template tag regex is not
   `DOTALL`, so a multi-line `{# ... #}` is not a comment — its text renders into the

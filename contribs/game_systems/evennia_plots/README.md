@@ -36,7 +36,7 @@ XP rates across the game.
 | Dep | Kind | Reason |
 |---|---|---|
 | `evennia>=6.0` | required | framework |
-| `evennia-links>=0.2` | required | `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, `connect_on_ready` |
+| `evennia-links>=0.5` | required | `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, `connect_on_ready`, shared web staff policy |
 | `evennia-accessibility>=0.1` | `[web]` | accessible forms/templates |
 | `djangorestframework>=3.14` | `[web]` | REST API |
 | `django-filter>=23` | `[web]` | `PlotThreadFilter` |

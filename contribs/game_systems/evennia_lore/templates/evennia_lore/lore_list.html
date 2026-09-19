@@ -59,7 +59,7 @@
       <th scope="col">Title</th>
       <th scope="col">Tags</th>
       <th scope="col">Author</th>
-      <th scope="col">Privacy</th>
+      {% if is_staff %}<th scope="col">Privacy</th>{% endif %}
     </tr>
   </thead>
   <tbody>
@@ -87,7 +87,7 @@
         {% endfor %}
       </td>
       <td>{{ entry.author_name }}</td>
-      <td>{{ entry.get_privacy_display }}</td>
+      {% if is_staff %}<td>{{ entry.get_privacy_display }}</td>{% endif %}
     </tr>
     {% endfor %}
   </tbody>

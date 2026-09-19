@@ -3,6 +3,10 @@
 """
 Permission helpers for evennia_regions commands, web views, and API.
 
+HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
+``REGIONS_STAFF_LOCK`` remains the lock for region commands and authoring
+policy.
+
 Settings:
     REGIONS_STAFF_LOCK — lock string for create/edit/membership operations
         (default "cmd:perm(Builder)").
@@ -19,6 +23,7 @@ import logging
 
 from django.conf import settings
 
+from evennia_links import is_staff_user as is_staff_user
 from evennia_links import resolve_dotted
 
 _log = logging.getLogger("evennia")
@@ -37,18 +42,7 @@ def is_staff(character) -> bool:
         return False
 
 
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has regions staff permission."""
-    if not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
-
-
-def _room_flag_values(room, name):
+def room_attr_values(room, name):
     """Return every value the game might have stored for a room flag.
 
     Games store room flags two ways: as a typeclass attribute (an
@@ -78,8 +72,8 @@ def _room_flag_values(room, name):
 
 def _default_room_visible(room) -> bool:
     try:
-        room_types = _room_flag_values(room, "room_type")
-        teleport_settings = _room_flag_values(room, "allow_teleport")
+        room_types = room_attr_values(room, "room_type")
+        teleport_settings = room_attr_values(room, "allow_teleport")
     except Exception:
         _log.exception(
             "evennia_regions: could not read visibility flags for room %r; treating as hidden",

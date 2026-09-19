@@ -143,7 +143,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.1.0")
+        self.assertEqual(evennia_calendar.__version__, "0.2.1")
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""
@@ -1477,15 +1477,15 @@ class TestMapsOverlayProvider(EvenniaTest):
         event.save()
         self.assertEqual(self._provide()["upcoming_events"], {})
 
-    def test_staff_event_is_withheld_from_visitors(self):
-        # is_staff_event exists to stop staff-run events being
-        # visible-but-unjoinable to everyone; a map pin would undo that.
+    def test_staff_event_is_public_lottery_mode_on_the_map(self):
+        # is_staff_event selects lottery RSVP mode, not map visibility.
         event = _make_staff_event(self.char1)
         SceneCalendarLink.objects.create(event=event, scene_id=self._scene_in(self.room1).pk)
-        self.assertEqual(self._provide()["upcoming_events"], {})
+        expected = [{"id": event.pk, "title": "Staff Event"}]
+        self.assertEqual(self._provide()["upcoming_events"][self.room1.id], expected)
         self.assertEqual(
             self._provide(staff=True)["upcoming_events"][self.room1.id],
-            [{"id": event.pk, "title": "Staff Event"}],
+            expected,
         )
 
     def test_events_are_listed_soonest_first(self):

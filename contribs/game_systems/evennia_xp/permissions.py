@@ -1,42 +1,48 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Permission helpers for evennia_xp web views and API (XP_STAFF_LOCK)."""
+"""Permission helpers for evennia_xp web views and API.
 
-from django.conf import settings
+HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
+``XP_STAFF_LOCK`` remains the in-game and authoring lock where configured.
+"""
+
 from django.core.exceptions import PermissionDenied
 
-
-def _staff_lock_expr():
-    lock = getattr(settings, "XP_STAFF_LOCK", "cmd:perm(Builder)")
-    return lock[4:] if lock.startswith("cmd:") else lock
-
-
-def is_staff_user(request) -> bool:
-    """Return True if the request's account has XP staff permission.
-
-    Uses Evennia's lock system (XP_STAFF_LOCK, default ``perm(Builder)``) rather
-    than Django's ``is_staff`` flag. Falls back to ``is_superuser`` if the lock
-    check raises (e.g. in tests without locks infrastructure).
-    """
-    if not request.user.is_authenticated:
-        return False
-    account = request.user
-    try:
-        return bool(account.locks.check_lockstring(account, _staff_lock_expr()))
-    except Exception:
-        return bool(getattr(account, "is_superuser", False))
+from evennia_links import is_staff_user as is_staff_user
 
 
 def get_character_id(user) -> int | None:
-    """Return the ObjectDB pk for the first puppeted character of *user*.
+    """Return the read-only XP identity from the account's playable roster.
 
-    Returns ``None`` if the user is unauthenticated or has no puppets.
+    A live puppet is a preference only when several roster characters exist;
+    roster order is the deterministic fallback. Live puppets not present in
+    the roster are ignored.
     """
-    if not user.is_authenticated:
+    if user is None or not getattr(user, "is_authenticated", False):
         return None
     account = getattr(user, "account", None) or user
-    puppets = account.get_all_puppets() if hasattr(account, "get_all_puppets") else []
-    return puppets[0].pk if puppets else None
+    try:
+        roster = list(account.characters.all())
+    except Exception:
+        return None
+    roster = [character for character in roster if character and getattr(character, "pk", None)]
+    if not roster:
+        return None
+    if len(roster) == 1:
+        return roster[0].pk
+    try:
+        live = account.get_all_puppets()
+    except Exception:
+        live = []
+    live_ids = {
+        getattr(character, "pk", None)
+        for character in live or []
+        if character and getattr(character, "pk", None)
+    }
+    for character in roster:
+        if character.pk in live_ids:
+            return character.pk
+    return roster[0].pk
 
 
 def require_character(request) -> int:

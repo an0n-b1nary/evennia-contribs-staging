@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** HTTP staff checks now use ``evennia_links.is_staff_user`` and
+  the web-wide ``EVENNIA_WEB_STAFF_LOCK`` policy.
 - **Fixed:** the board list page raised `TemplateSyntaxError` on every request.
   `BoardListView` attached the per-board post count as `board._post_count`, and
   Django's template engine refuses to resolve any variable whose name begins with
