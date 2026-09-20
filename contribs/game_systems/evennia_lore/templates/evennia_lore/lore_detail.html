@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_lore/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ entry.title }} — Lore{% endblock %}
 
 {% block breadcrumbs %}
@@ -14,47 +19,58 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">{{ entry.title }}
-    <small class="text-muted fs-6">#{{ entry.entry_number }}</small>
+    <small class="text-muted">#{{ entry.entry_number }}</small>
   </h1>
-  <div class="d-flex gap-2">
+  <div class="evennia-lore-actions" role="group" aria-label="Entry actions">
     {% if character_id == entry.author_id or is_staff %}
     <a href="{% url 'lore-edit' entry.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
     <a href="{% url 'lore-history' entry.pk %}" class="btn btn-sm btn-outline-secondary">History</a>
     {% endif %}
-    {% if is_staff and entry.status == 'submitted' %}
+  </div>
+</div>
+{% if is_staff and entry.status == 'submitted' %}
+<div class="evennia-lore-actions" role="group" aria-label="Staff actions">
+    <span class="text-muted small">Staff:</span>
     <form method="post" action="{% url 'lore-approve' entry.pk %}" class="d-inline">
       {% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button>
     </form>
     <form method="post" action="{% url 'lore-reject' entry.pk %}" class="d-inline">
       {% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Reject</button>
     </form>
-    {% endif %}
-  </div>
 </div>
+{% endif %}
 
-<p class="text-muted small mb-3">
-  By {{ entry.author_name|default:"Unknown" }} ·
-  {{ entry.created_at|date:"Y-m-d" }} ·
+<dl class="row text-muted small mb-3">
+  <dt class="col-sm-2">Author</dt>
+  <dd class="col-sm-10">{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</dd>
+  <dt class="col-sm-2">Created</dt>
+  <dd class="col-sm-10">{{ entry.created_at|date:"Y-m-d" }}</dd>
   {% if is_staff %}
-  <span class="badge {% if entry.privacy == 'public' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
-    {{ entry.get_privacy_display }}
-  </span>
-  <span class="badge bg-info text-dark">{{ entry.get_status_display }}</span>
+  <dt class="col-sm-2">Privacy</dt>
+  <dd class="col-sm-10">
+    <span class="badge {% if entry.privacy == 'public' %}badge-secondary{% else %}badge-warning text-dark{% endif %}">
+      {{ entry.get_privacy_display }}
+    </span>
+  </dd>
+  <dt class="col-sm-2">Status</dt>
+  <dd class="col-sm-10"><span class="badge badge-info text-dark">{{ entry.get_status_display }}</span></dd>
   {% endif %}
-  {% if entry.tags.exists %}
-  —
+</dl>
+
+<div class="mb-3" aria-label="Tags">
+  <span class="text-muted">Tags:</span>
   {% for tag in entry.tags.all %}
   <a href="{% url 'lore-list' %}?tag={{ tag.name|urlencode }}"
-     class="badge {% if tag.is_major %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+     class="badge {% if tag.is_major %}badge-primary{% else %}badge-secondary{% endif %} text-decoration-none mr-1">
     {{ tag.name }}
   </a>
+  {% empty %}<span class="text-muted">Not recorded</span>
   {% endfor %}
-  {% endif %}
-</p>
+</div>
 
 {% if is_accessible %}
   {% if entry.body %}
-  <div class="lore-body mb-4">
+  <div class="evennia-lore-body mb-4">
     {{ entry.body|linebreaks }}
   </div>
   {% else %}
@@ -85,6 +101,7 @@
       {% for region in region_list %}
       {% url 'region-detail' region.pk as region_url %}
       <li>{% if region_url %}<a href="{{ region_url }}">{{ region.name }}</a>{% else %}{{ region.name }}{% endif %}</li>
+      {% empty %}<li class="text-muted">Not recorded</li>
       {% endfor %}
     </ul>
   </div>
@@ -97,6 +114,7 @@
       {% for scene in linked_scenes %}
       {% url 'scene-detail' scene.pk as scene_url %}
       <li>{% if scene_url %}<a href="{{ scene_url }}">{{ scene.title|default:"Untitled Scene" }}</a>{% else %}{{ scene.title|default:"Untitled Scene" }}{% endif %}</li>
+      {% empty %}<li class="text-muted">Not recorded</li>
       {% endfor %}
     </ul>
   </div>
@@ -109,6 +127,7 @@
       {% for thread in linked_plots %}
       {% url 'plot-detail' thread.pk as thread_url %}
       <li>{% if thread_url %}<a href="{{ thread_url }}">{{ thread.name }}</a>{% else %}{{ thread.name }}{% endif %}</li>
+      {% empty %}<li class="text-muted">Not recorded</li>
       {% endfor %}
     </ul>
   </div>

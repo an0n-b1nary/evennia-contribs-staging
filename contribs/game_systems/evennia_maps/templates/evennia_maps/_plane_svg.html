@@ -50,13 +50,13 @@
     <strong>{{ tile.room_name }}</strong>
     {% if tile.region %}
       {% if tile.region_url %}
-      <a href="{{ tile.region_url }}" class="ms-1">{{ tile.region.name }}</a>
+      <a href="{{ tile.region_url }}" class="ml-1">{{ tile.region.name }}</a>
       {% else %}
-      <span class="text-muted ms-1">{{ tile.region.name }}</span>
+      <span class="text-muted ml-1">{{ tile.region.name }}</span>
       {% endif %}
     {% endif %}
     {% if tile.latest_scene_url %}
-    <a href="{{ tile.latest_scene_url }}" class="ms-1">Recent log</a>
+    <a href="{{ tile.latest_scene_url }}" class="ml-1">Recent log</a>
     {% endif %}
   </li>
   {% endfor %}

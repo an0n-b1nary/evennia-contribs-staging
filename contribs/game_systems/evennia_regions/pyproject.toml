@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-regions"
-version = "0.2.2"
+version = "0.2.3"
 description = "Geographic grouping of rooms into named regions, with soft-archive and web views, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -52,4 +52,7 @@ packages = [
 "evennia_regions.api" = "api"
 
 [tool.setuptools.package-data]
-evennia_regions = ["templates/evennia_regions/*.html"]
+evennia_regions = [
+    "templates/evennia_regions/*.html",
+    "static/evennia_regions/css/*.css",
+]

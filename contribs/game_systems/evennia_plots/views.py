@@ -638,15 +638,15 @@ class PlotUpdateDiffView(TemplateView):
         diff_lines = []
         for line in raw_diff:
             if line.startswith("+++") or line.startswith("---"):
-                css = "diff-meta"
+                css = "evennia-plots-diff-meta"
             elif line.startswith("@@"):
-                css = "diff-hunk"
+                css = "evennia-plots-diff-hunk"
             elif line.startswith("+"):
-                css = "diff-add"
+                css = "evennia-plots-diff-add"
             elif line.startswith("-"):
-                css = "diff-remove"
+                css = "evennia-plots-diff-remove"
             else:
-                css = "diff-context"
+                css = "evennia-plots-diff-context"
             diff_lines.append((css, line))
 
         context["page_title"] = f"Diff v{version.version_number} — {thread.name}"

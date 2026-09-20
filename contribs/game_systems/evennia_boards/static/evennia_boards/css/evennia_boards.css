@@ -1,0 +1,7 @@
+/* Self-contained styles for evennia_boards. */
+.evennia-boards-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-boards-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-boards-actions { display: flex; flex-wrap: wrap; }
+.evennia-boards-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-boards-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-boards-empty { color: #6c757d; font-style: italic; }

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-plots"
-version = "0.2.1"
+version = "0.2.2"
 description = "Narrative plot management (+plot/+arc/+hook) with thread bonuses, arc XP multipliers, and a full web + REST surface for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -53,4 +53,7 @@ packages = ["evennia_plots", "evennia_plots.migrations", "evennia_plots.api", "e
 "evennia_plots.integrations" = "integrations"
 
 [tool.setuptools.package-data]
-evennia_plots = ["templates/evennia_plots/*.html"]
+evennia_plots = [
+    "templates/evennia_plots/*.html",
+    "static/evennia_plots/css/*.css",
+]

@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_xp/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}My XP{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="breadcrumb-nav container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-xp-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item active" aria-current="page">My XP</li>
   </ol>
@@ -46,10 +51,12 @@
 <ul aria-label="XP breakdown by source">
   {% for label, total in by_source %}
   <li>{{ label }}: {{ total }} XP</li>
+  {% empty %}
+  <li class="text-muted">No source totals recorded yet.</li>
   {% endfor %}
 </ul>
 {% else %}
-<div class="table-responsive" role="region" aria-label="XP breakdown by source" tabindex="0">
+<div class="evennia-xp-table-scroll" role="region" aria-label="XP breakdown by source" tabindex="0">
 <table class="table table-sm table-striped">
   <thead>
     <tr>
@@ -63,6 +70,8 @@
       <td>{{ label }}</td>
       <td class="text-right">{{ total }}</td>
     </tr>
+    {% empty %}
+    <tr><td colspan="2" class="text-muted">No source totals recorded yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -86,7 +95,7 @@
   {% endfor %}
 </ul>
 {% else %}
-<div class="table-responsive" role="region" aria-label="XP award log" tabindex="0">
+<div class="evennia-xp-table-scroll" role="region" aria-label="XP award log" tabindex="0">
 <table class="table table-sm table-striped">
   <thead>
     <tr>

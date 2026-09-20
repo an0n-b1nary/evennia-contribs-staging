@@ -381,15 +381,15 @@ class LoreVersionDiffView(TemplateView):
         diff_lines = []
         for line in raw_diff:
             if line.startswith("+++") or line.startswith("---"):
-                diff_lines.append(("header", line))
+                diff_lines.append(("evennia-lore-diff-header", line))
             elif line.startswith("@@"):
-                diff_lines.append(("hunk", line))
+                diff_lines.append(("evennia-lore-diff-hunk", line))
             elif line.startswith("+"):
-                diff_lines.append(("add", line))
+                diff_lines.append(("evennia-lore-diff-add", line))
             elif line.startswith("-"):
-                diff_lines.append(("remove", line))
+                diff_lines.append(("evennia-lore-diff-remove", line))
             else:
-                diff_lines.append(("context", line))
+                diff_lines.append(("evennia-lore-diff-context", line))
 
         context["page_title"] = f"Diff v{version.version_number} — {entry.title}"
         context["entry"] = entry

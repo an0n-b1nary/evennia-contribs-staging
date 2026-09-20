@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-jobs"
-version = "0.1.1"
+version = "0.1.2"
 description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -46,4 +46,7 @@ packages = ["evennia_jobs", "evennia_jobs.migrations", "evennia_jobs.api"]
 "evennia_jobs.api" = "api"
 
 [tool.setuptools.package-data]
-evennia_jobs = ["templates/evennia_jobs/*.html"]
+evennia_jobs = [
+    "templates/evennia_jobs/*.html",
+    "static/evennia_jobs/css/*.css",
+]

@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** HTTP staff checks now use ``evennia_links.is_staff_user`` and
   the web-wide ``EVENNIA_WEB_STAFF_LOCK`` policy.
 - **Fixed:** the board list page raised `TemplateSyntaxError` on every request.

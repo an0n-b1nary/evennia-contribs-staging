@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_lore/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -16,7 +21,7 @@
 <h1>{{ page_title }}</h1>
 
 {% if versions %}
-<div class="table-responsive" role="region" aria-label="Version history" tabindex="0">
+<div class="evennia-lore-table-scroll" role="region" aria-label="Version history" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -30,10 +35,10 @@
     {% for v in versions %}
     <tr>
       <td>v{{ v.version_number }}</td>
-      <td>{{ v.editor_name|default:"Unknown" }}</td>
+      <td>{{ v.editor_name|default:"Unattributed" }}</td>
       <td>{{ v.edited_at|date:"Y-m-d H:i" }}</td>
       <td>
-        <a href="{% url 'lore-diff' entry.pk v.version_number %}" class="btn btn-xs btn-outline-secondary">Diff</a>
+        <a href="{% url 'lore-diff' entry.pk v.version_number %}" class="btn btn-sm btn-outline-secondary">Diff</a>
       </td>
     </tr>
     {% endfor %}

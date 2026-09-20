@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_scenes/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Scene Archive{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-scenes-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item active" aria-current="page">Scene Archive</li>
   </ol>
@@ -14,11 +19,10 @@
 <h1>Scene Archive</h1>
 
 {% if scenes %}
-<div class="scenes-table-scroll" role="region" aria-label="Scene archive" tabindex="0">
+<div class="evennia-scenes-table-scroll" role="region" aria-label="Scene archive" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
-      <th scope="col">#</th>
       <th scope="col">Title</th>
       <th scope="col">Room</th>
       <th scope="col">Participants</th>
@@ -29,9 +33,8 @@
   <tbody>
     {% for scene in scenes %}
     <tr>
-      <td>{{ scene.pk }}</td>
       <td><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">{{ scene.title|default:"Untitled" }}</a></td>
-      <td>{{ scene.room_name }}</td>
+      <td>{{ scene.room_name|default:"Not recorded" }}</td>
       <td>{{ scene.participants.count }}</td>
       <td>{{ scene.log_entries.count }}</td>
       <td>{{ scene.ended_at|date:"Y-m-d"|default:scene.created_at|date:"Y-m-d" }}</td>
@@ -62,6 +65,7 @@
 {% endif %}
 
 {% else %}
-<p class="text-muted">No scenes have been archived yet.</p>
+<p class="text-muted">No scenes have been archived yet. Use <code>+scene/open</code>
+  in-game to start one and <code>+scene/close</code> to add it to the archive.</p>
 {% endif %}
 {% endblock %}

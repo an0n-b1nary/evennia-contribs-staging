@@ -721,7 +721,9 @@ class TestWebPagesRender(EvenniaTest):
         request.session = import_module(settings.SESSION_ENGINE).SessionStore()
         response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_regions/css/evennia_regions.css", html)
+        return html
 
     # -- region list --------------------------------------------------------
 
@@ -767,7 +769,7 @@ class TestWebPagesRender(EvenniaTest):
     def test_region_detail_renders_without_a_description(self):
         bare = _make_region("Nameless Waste", description="")
         html = self._render(RegionDetailView, path_=f"/regions/{bare.pk}/", pk=bare.pk)
-        self.assertIn("(No description.)", html)
+        self.assertIn("Not recorded", html)
 
 
 # ---------------------------------------------------------------------------

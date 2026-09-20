@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_regions/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ region.name }} — Region{% endblock %}
 
 {% block breadcrumbs %}
@@ -13,15 +18,17 @@
 
 {% block content %}
 <h1 class="mb-1">{{ region.name }}</h1>
-<p class="text-muted small mb-3">
-  Created by {{ region.created_by_name|default:"Unknown" }}
-  on {{ region.created_at|date:"Y-m-d" }}
-</p>
+<dl class="row text-muted small mb-3">
+  <dt class="col-sm-2">Created by</dt>
+  <dd class="col-sm-10">{{ region.created_by_name|default:"Unattributed" }}</dd>
+  <dt class="col-sm-2">Created</dt>
+  <dd class="col-sm-10">{{ region.created_at|date:"Y-m-d" }}</dd>
+</dl>
 
 {% if region.description %}
 <p class="mb-4">{{ region.description }}</p>
 {% else %}
-<p class="text-muted mb-4"><em>(No description.)</em></p>
+<p class="text-muted mb-4"><em>Not recorded.</em></p>
 {% endif %}
 
 <h2 class="h5 mb-2">Member Rooms ({{ memberships|length }})</h2>
@@ -29,8 +36,8 @@
 <ul class="list-group mb-4">
   {% for m in memberships %}
   <li class="list-group-item">
-    <span class="text-muted small">#{{ m.room_id }}</span> {{ m.room_name }}
-    {% if m.is_primary %}<span class="badge bg-primary ms-1">Primary</span>{% endif %}
+    {{ m.room_name }}
+    {% if m.is_primary %}<span class="badge badge-primary ml-1">Primary</span>{% endif %}
   </li>
   {% endfor %}
 </ul>

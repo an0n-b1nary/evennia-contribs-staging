@@ -54,6 +54,8 @@ jobs:
       # skips there. Run it here, where Django exists, and require it.
       - name: Django template sweep
         run: python scripts/check_templates.py --require-django
+      - name: Template convention tests
+        run: python scripts/test_check_templates.py
 
       - name: Initialize throwaway game directory
         run: evennia --init ci_game

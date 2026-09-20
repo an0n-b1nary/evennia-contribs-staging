@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-boards"
-version = "0.1.2"
+version = "0.1.3"
 description = "Bulletin board system (+bb/+board) with web UI, REST API, and XP integration for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -58,4 +58,7 @@ packages = [
 "evennia_boards.integrations" = "integrations"
 
 [tool.setuptools.package-data]
-evennia_boards = ["templates/evennia_boards/*.html"]
+evennia_boards = [
+    "templates/evennia_boards/*.html",
+    "static/evennia_boards/css/*.css",
+]

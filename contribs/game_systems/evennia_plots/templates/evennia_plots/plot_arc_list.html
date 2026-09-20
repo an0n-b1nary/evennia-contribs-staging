@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Plot Arcs{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item active" aria-current="page">Plot Arcs</li>
   </ol>
@@ -20,10 +25,10 @@
 
 <!-- Filter bar -->
 <div class="mb-3">
-  <form method="get" class="d-inline-flex flex-wrap gap-2" role="search" aria-label="Filter plot arcs">
+  <form method="get" class="d-inline-flex flex-wrap evennia-plots-gap" role="search" aria-label="Filter plot arcs">
     <div>
       <label for="id_status_filter" class="sr-only">Filter by status</label>
-      <select id="id_status_filter" name="status" class="form-select form-select-sm" style="max-width: 160px;">
+      <select id="id_status_filter" name="status" class="form-control form-control-sm evennia-plots-filter-control">
         <option value="">All statuses</option>
         {% for value, label in status_choices %}
         <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
@@ -32,7 +37,7 @@
     </div>
     <div>
       <label for="id_arc_type_filter" class="sr-only">Filter by type</label>
-      <select id="id_arc_type_filter" name="arc_type" class="form-select form-select-sm" style="max-width: 160px;">
+      <select id="id_arc_type_filter" name="arc_type" class="form-control form-control-sm evennia-plots-filter-control">
         <option value="">All types</option>
         {% for value, label in arc_type_choices %}
         <option value="{{ value }}" {% if arc_type_filter == value %}selected{% endif %}>{{ label }}</option>
@@ -47,7 +52,7 @@
 </div>
 
 {% if arcs %}
-<div class="cov-table-scroll" role="region" aria-label="Plot arcs" tabindex="0">
+<div class="evennia-plots-table-scroll" role="region" aria-label="Plot arcs" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -71,17 +76,17 @@
         {% endif %}
       </td>
       <td>
-        <span class="badge {% if arc.arc_type == 'downtime' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+        <span class="badge {% if arc.arc_type == 'downtime' %}badge-warning text-dark{% else %}badge-secondary{% endif %}">
           {{ arc.get_arc_type_display }}
         </span>
         {% if arc.pauses_xp %}
-        <span class="badge bg-danger ms-1" title="XP gain paused">XP Paused</span>
+        <span class="badge badge-danger ml-1" title="XP gain paused">XP Paused</span>
         {% endif %}
       </td>
-      <td>{{ arc.get_status_display }}</td>
-      <td>{{ arc.creator_name }}</td>
+      <td><span class="badge badge-secondary">{{ arc.get_status_display }}</span></td>
+      <td>{% if not arc.creator_id and arc.creator_name == "Unknown" %}Unattributed{% else %}{{ arc.creator_name|default:"Unattributed" }}{% endif %}</td>
       <td>{{ arc.threads.count }}</td>
-      <td>{% if arc.is_current %}<span class="badge bg-success">Current</span>{% endif %}</td>
+      <td>{% if arc.is_current %}<span class="badge badge-success">Current</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

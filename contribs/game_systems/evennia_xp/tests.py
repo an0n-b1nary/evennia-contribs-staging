@@ -854,7 +854,9 @@ class TestXPSummaryRenders(EvenniaTest):
         with patch("evennia_xp.views.get_character_id", return_value=self.char1.pk):
             response = XPSummaryView.as_view()(request)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_xp/css/evennia_xp.css", html)
+        return html
 
     def test_summary_renders_the_balance_and_award_log(self):
         xp_row = CharacterXP.objects.create(

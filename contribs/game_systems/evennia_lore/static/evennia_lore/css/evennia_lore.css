@@ -1,0 +1,15 @@
+/* Self-contained styles for evennia_lore. */
+.evennia-lore-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-lore-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-lore-actions { display: flex; flex-wrap: wrap; }
+.evennia-lore-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-lore-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-lore-filter-control { max-width: 200px; }
+.evennia-lore-narrow { max-width: 140px; }
+.evennia-lore-empty { color: #6c757d; font-style: italic; }
+.evennia-lore-body { margin-bottom: 1.5rem; }
+.evennia-lore-diff { font-family: monospace; font-size: .85rem; line-height: 1.4; }
+.evennia-lore-diff-add { background-color: #d4edda; color: #155724; }
+.evennia-lore-diff-remove { background-color: #f8d7da; color: #721c24; }
+.evennia-lore-diff-hunk { background-color: #e2e3e5; color: #383d41; }
+.evennia-lore-diff-header, .evennia-lore-diff-context { color: #6c757d; }

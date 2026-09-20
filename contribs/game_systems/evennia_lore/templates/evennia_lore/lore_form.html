@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_lore/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}

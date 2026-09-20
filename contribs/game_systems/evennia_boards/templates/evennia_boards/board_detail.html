@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_boards/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Board: {{ board.name }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="boards-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-boards-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_boards:board-list' %}">Bulletin Boards</a></li>
     <li class="breadcrumb-item active" aria-current="page">{{ board.name }}</li>
@@ -46,13 +51,13 @@
       {% endif %}
       {{ post.title }}
     </span>
-    <span class="d-flex align-items-center gap-2">
-      <span class="text-muted small">{{ post.author_name }} &mdash; {{ post.created_at|date:"Y-m-d" }}</span>
+    <span class="d-flex align-items-center evennia-boards-gap">
+      <span class="text-muted small">{{ post.author_name|default:"Unattributed" }} &mdash; {{ post.created_at|date:"Y-m-d" }}</span>
       {% if character_id and not board.is_read_only or is_staff and not board.is_read_only %}
-      <a href="{% url 'evennia_boards:post-reply' board.pk post.pk %}" class="btn btn-xs btn-outline-secondary">Reply</a>
+      <a href="{% url 'evennia_boards:post-reply' board.pk post.pk %}" class="btn btn-sm btn-outline-secondary">Reply</a>
       {% endif %}
       {% if character_id == post.author_id or is_staff %}
-      <a href="{% url 'evennia_boards:post-edit' board.pk post.pk %}" class="btn btn-xs btn-outline-secondary">Edit</a>
+      <a href="{% url 'evennia_boards:post-edit' board.pk post.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
       {% endif %}
     </span>
   </div>

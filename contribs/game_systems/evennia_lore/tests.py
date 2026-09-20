@@ -700,7 +700,9 @@ class LoreWebRenderTestCase(EvenniaTest):
             with patch.object(user, "get_all_puppets", return_value=[puppet]):
                 response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_lore/css/evennia_lore.css", html)
+        return html
 
 
 class TestLoreListRenders(LoreWebRenderTestCase):
@@ -764,11 +766,20 @@ class TestLoreDetailRenders(LoreWebRenderTestCase):
         html = self._render(LoreDetailView, pk=self.entry.pk)
         self.assertIn("The Sunken Road", html)
         self.assertIn("It runs beneath the harbour.", html)
+        self.assertIn("Not recorded", html)
 
     def test_player_detail_hides_staff_metadata(self):
         html = self._render(LoreDetailView, pk=self.entry.pk)
         self.assertNotIn("Published", html)
         self.assertNotIn("Privacy", html)
+
+    def test_missing_author_uses_the_web_attribution_placeholder(self):
+        self.entry.author = None
+        self.entry.author_name = "Unknown"
+        self.entry.save(update_fields=["author", "author_name"])
+        html = self._render(LoreDetailView, pk=self.entry.pk)
+        self.assertIn("Unattributed", html)
+        self.assertNotIn(">Unknown<", html)
 
     def test_staff_detail_shows_status_and_privacy_metadata(self):
         html = self._render(LoreDetailView, user=self.account, puppet=self.char1, pk=self.entry.pk)
@@ -800,6 +811,7 @@ class TestLoreDetailRenders(LoreWebRenderTestCase):
         html = self._render(LoreDetailView, user=self.account, puppet=self.char1, pk=submitted.pk)
         self.assertIn(f'action="/lore/{submitted.pk}/approve/"', html)
         self.assertIn(f'action="/lore/{submitted.pk}/reject/"', html)
+        self.assertIn('aria-label="Staff actions"', html)
 
     # -- partner links ------------------------------------------------------
     #

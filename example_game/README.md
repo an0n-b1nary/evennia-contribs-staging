@@ -955,3 +955,9 @@ Three mechanisms, for three different needs:
     when a list has another page. Open `/api/v1/` and `/webclient/`; verify the
     API root renders, the client has a route back to the site, and its reading
     pane is narrower than the viewport.
+16. **The contrib shell stays self-contained** — open a list and detail page
+    for each mounted web contrib and inspect the rendered source: its page
+    links the contrib stylesheet, tables sit in a focusable scroll region, and
+    empty collections explain what belongs there. Resize the browser to a
+    narrow viewport and confirm the page remains usable without horizontal
+    overflow outside those table regions.

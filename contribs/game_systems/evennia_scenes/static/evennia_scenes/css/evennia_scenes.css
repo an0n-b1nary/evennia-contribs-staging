@@ -1,0 +1,11 @@
+/* Self-contained styles for evennia_scenes. */
+.evennia-scenes-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-scenes-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-scenes-actions { display: flex; flex-wrap: wrap; }
+.evennia-scenes-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-scenes-empty { color: #6c757d; font-style: italic; }
+.evennia-scenes-diff { font-family: monospace; font-size: .85rem; line-height: 1.4; }
+.evennia-scenes-diff .evennia-scenes-diff-add { background-color: #d4edda; color: #155724; }
+.evennia-scenes-diff .evennia-scenes-diff-remove { background-color: #f8d7da; color: #721c24; }
+.evennia-scenes-diff .evennia-scenes-diff-hunk { background-color: #e2e3e5; color: #383d41; }
+.evennia-scenes-diff .evennia-scenes-diff-meta { color: #6c757d; }

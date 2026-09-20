@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use namespaced classes, packaged CSS, and the
+  shared metadata, table, and empty-state conventions.
+
 - **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate;
   player plot details no longer expose the privacy field.
 - **Fixed:** every shipped template included its partials from

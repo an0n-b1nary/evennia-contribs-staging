@@ -1,11 +1,10 @@
 {% extends "website/base.html" %}
-{% load static %}
-
-{% block titleblock %}{{ plane.name }} &mdash; Map{% endblock %}
 
 {% block header_ext %}
-<link rel="stylesheet" type="text/css" href="{% static 'evennia_maps/css/evennia_maps.css' %}">
+  {{ block.super }}
+  {% include "evennia_maps/_styles.html" %}
 {% endblock %}
+{% block titleblock %}{{ plane.name }} &mdash; Map{% endblock %}
 
 {% block content %}
 <nav aria-label="Breadcrumb">
@@ -16,10 +15,16 @@
 </nav>
 
 <h1 class="mb-1">{{ plane.name }}</h1>
-<p class="text-muted small mb-3">
-  {% if plane.zstack %}{{ plane.zstack }} stack, elevation {{ plane.elevation }} &mdash;{% endif %}
-  {{ tile_count }} room{{ tile_count|pluralize }} shown
-</p>
+<dl class="row text-muted small mb-3">
+  {% if plane.zstack %}
+  <dt class="col-sm-2">Stack</dt>
+  <dd class="col-sm-10">{{ plane.zstack }}</dd>
+  <dt class="col-sm-2">Elevation</dt>
+  <dd class="col-sm-10">{{ plane.elevation }}</dd>
+  {% endif %}
+  <dt class="col-sm-2">Rooms shown</dt>
+  <dd class="col-sm-10">{{ tile_count }} room{{ tile_count|pluralize }}</dd>
+</dl>
 
 {% if plane.description %}
 <p class="mb-4">{{ plane.description }}</p>

@@ -2087,7 +2087,9 @@ class TestWebPagesRender(MapsWebTestCase):
         request = _attach(self.factory.get("/map/"), AnonymousUser())
         response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_maps/css/evennia_maps.css", html)
+        return html
 
     def test_plane_list_renders(self):
         self.assertIn("Rendered", self._render(PlaneListView))
@@ -2107,6 +2109,7 @@ class TestWebPagesRender(MapsWebTestCase):
         self.assertIn('id="evennia-maps-live"', html)
         self.assertIn("/api/v1/planes/0/tiles/", html)
         self.assertIn("evennia_maps/js/evennia_maps.js", html)
+        self.assertLess(html.index("leaflet.css"), html.index("evennia_maps/css/evennia_maps.css"))
 
     @override_settings(MAPS_TILES_URL_NAME="")
     def test_live_map_explains_itself_when_the_api_is_off(self):

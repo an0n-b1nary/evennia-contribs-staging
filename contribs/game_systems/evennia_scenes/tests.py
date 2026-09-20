@@ -789,7 +789,9 @@ class TestWebPagesRender(EvenniaTest):
             with patch.object(user, "get_all_puppets", return_value=[puppet]):
                 response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_scenes/css/evennia_scenes.css", html)
+        return html
 
     def _version(self, content="An older pose."):
         return LogEntryVersion.create_version(parent=self.entry, content=content, editor=self.char1)
@@ -813,6 +815,13 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("Tavern Fight", html)
         self.assertIn("An IC pose here.", html)
         self.assertIn(self.char1.key, html)
+
+    def test_untitled_scene_does_not_expose_its_database_id(self):
+        self.scene.title = ""
+        self.scene.save(update_fields=["title"])
+        html = self._render(SceneDetailView, pk=self.scene.pk)
+        self.assertIn("Untitled Scene", html)
+        self.assertNotIn(f"Scene #{self.scene.pk}", html)
 
     def test_scene_detail_hides_ooc_from_the_rendered_log_by_default(self):
         LogEntry.create_entry(
@@ -854,7 +863,8 @@ class TestWebPagesRender(EvenniaTest):
             pk=self.scene.pk,
             entry_id=self.entry.pk,
         )
-        self.assertIn(f"Edit Log Entry #{self.entry.pk}", html)
+        self.assertIn("Edit Log Entry", html)
+        self.assertNotIn(f"Edit Log Entry #{self.entry.pk}", html)
         self.assertIn("An IC pose here.", html)
         self.assertIn('name="csrfmiddlewaretoken"', html)
 
@@ -921,6 +931,19 @@ class TestWebPagesRender(EvenniaTest):
             version_number=version.version_number,
         )
         self.assertIn("identical to the current content", html)
+
+    def test_log_diff_context_lines_are_namespaced(self):
+        self.entry.content = "Shared line.\nNew line."
+        self.entry.save(update_fields=["content"])
+        version = self._version(content="Shared line.\nOld line.")
+        html = self._render(
+            LogEntryDiffView,
+            pk=self.scene.pk,
+            entry_id=self.entry.pk,
+            version_number=version.version_number,
+        )
+        self.assertIn('evennia-scenes-diff-context"> Shared line.', html)
+        self.assertNotIn(f"Log Entry #{self.entry.pk}", html)
 
 
 class TestSceneDetailViewVisibility(EvenniaTest):
@@ -1111,11 +1134,11 @@ class TestLogEntryDiffViewColorblindSafe(EvenniaTest):
         )
         diff_lines = resp.context_data["diff_lines"]
         classes = {css for css, _line in diff_lines}
-        self.assertIn("diff-add", classes)
-        self.assertIn("diff-remove", classes)
+        self.assertIn("evennia-scenes-diff-add", classes)
+        self.assertIn("evennia-scenes-diff-remove", classes)
         # Each add/remove line also carries a literal +/- text prefix.
-        adds = [line for css, line in diff_lines if css == "diff-add"]
-        removes = [line for css, line in diff_lines if css == "diff-remove"]
+        adds = [line for css, line in diff_lines if css == "evennia-scenes-diff-add"]
+        removes = [line for css, line in diff_lines if css == "evennia-scenes-diff-remove"]
         self.assertTrue(all(line.startswith("+") for line in adds))
         self.assertTrue(all(line.startswith("-") for line in removes))
 

@@ -52,6 +52,11 @@ Type hints in signatures are **encouraged but not required** for public function
 - **Mocks:** use `unittest.mock`; prefer narrow patches over wholesale fakes.
 - Tests must pass under `EvenniaTest` with no source-project-local fixtures (per Evennia's standard contrib requirements).
 
+## Web UI
+
+Contribs that ship templates follow the shared [UI conventions](UI_CONVENTIONS.md)
+for metadata, empty states, accessibility, CSS ownership, and rendered-page tests.
+
 ## Per-contrib packaging
 
 Every contrib directory needs a minimal `pyproject.toml` so `pip install -e "git+...#subdirectory=..."` works. Template:

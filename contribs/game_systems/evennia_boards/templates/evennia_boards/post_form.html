@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_boards/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="boards-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-boards-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_boards:board-list' %}">Bulletin Boards</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></li>
@@ -21,7 +26,7 @@
 <div class="card mb-3 border-secondary">
   <div class="card-header text-muted small">
     Replying to #{{ parent_post.post_number }}: {{ parent_post.title }}
-    &mdash; {{ parent_post.author_name }}
+&mdash; {{ parent_post.author_name|default:"Unattributed" }}
   </div>
   <div class="card-body py-2">
     <p class="mb-0 small">{{ parent_post.content|truncatewords:40 }}</p>
@@ -51,7 +56,7 @@
     {% endif %}
   </div>
   {% endfor %}
-  <div class="d-flex gap-2">
+  <div class="d-flex evennia-boards-gap">
     <button type="submit" class="btn btn-primary">Post</button>
     {% if cancel_url %}
     <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Cancel</a>

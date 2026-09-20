@@ -416,7 +416,9 @@ class TestWebPagesRender(EvenniaTest):
             with patch.object(user, "get_all_puppets", return_value=[puppet]):
                 response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_jobs/css/evennia_jobs.css", html)
+        return html
 
     # -- ticket lists -------------------------------------------------------
 
@@ -428,10 +430,12 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("[anonymous]", html)
         # Non-staff get no route into the full queue.
         self.assertNotIn("All Open Tickets", html)
+        self.assertNotIn('aria-label="Staff actions"', html)
 
     def test_queue_renders_for_staff_with_the_assignee_column(self):
         html = self._render(JobAllView, user=self.account, puppet=self.char1)
         self.assertIn("Ticket Queue", html)
+        self.assertIn('aria-label="Staff actions"', html)
         self.assertIn("Assignee", html)
         # Staff see the real reporter on an ISSUE.
         self.assertIn(self.char2.key, html)
@@ -462,6 +466,14 @@ class TestWebPagesRender(EvenniaTest):
     def test_ticket_detail_renders_without_comments(self):
         html = self._render(JobDetailView, user=self.account, puppet=self.char1, pk=self.job.pk)
         self.assertIn("No comments yet.", html)
+
+    def test_missing_reporter_uses_the_web_attribution_placeholder(self):
+        self.job.author = None
+        self.job.author_name = "Unknown"
+        self.job.save(update_fields=["author", "author_name"])
+        html = self._render(JobDetailView, user=self.account, puppet=self.char1, pk=self.job.pk)
+        self.assertIn("Unattributed", html)
+        self.assertNotIn("Unknown", html)
 
     # -- authoring forms ----------------------------------------------------
 

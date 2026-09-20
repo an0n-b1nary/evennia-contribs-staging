@@ -28,7 +28,8 @@ repos:
         name: django template sweep (compile every template)
         entry: python scripts/check_templates.py
         language: system
-        types: [html]
+        pass_filenames: false
+        always_run: true
 
       - id: anonymity-push-guard
         name: anonymity guard (push remote <-> identity)

@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates now load the namespaced stylesheet through a shared
+  page-local include; scroll and accessibility rules remain self-contained.
+
 - **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate;
   calendar lottery events are not treated as private map data.
 

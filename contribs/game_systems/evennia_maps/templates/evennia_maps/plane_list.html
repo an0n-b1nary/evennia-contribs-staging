@@ -1,12 +1,17 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_maps/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Map{% endblock %}
 
 {% block content %}
 <h1 class="mb-3">Map</h1>
 
 {% if planes %}
-<div class="table-responsive" role="region" aria-label="Planes" tabindex="0">
+<div class="evennia-maps-table-scroll" role="region" aria-label="Planes" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -21,10 +26,10 @@
     <tr>
       <td><a href="{% url 'evennia_maps:plane-detail' plane.pk %}">{{ plane.name }}</a></td>
       <td class="text-muted">
-        {% if plane.zstack %}{{ plane.zstack }} ({{ plane.elevation }}){% else %}&mdash;{% endif %}
+        {% if plane.zstack %}{{ plane.zstack }} ({{ plane.elevation }}){% else %}Not recorded{% endif %}
       </td>
       {% if show_tile_counts %}<td>{{ plane.tile_count }}</td>{% endif %}
-      <td class="text-muted">{{ plane.description|truncatechars:80 }}</td>
+      <td class="text-muted">{{ plane.description|default:"Not recorded"|truncatechars:80 }}</td>
     </tr>
     {% endfor %}
   </tbody>

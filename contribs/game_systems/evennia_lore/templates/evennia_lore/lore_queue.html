@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_lore/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Lore Approval Queue{% endblock %}
 
 {% block breadcrumbs %}
@@ -19,7 +24,7 @@
 </p>
 
 {% if entries %}
-<div class="table-responsive" role="region" aria-label="Submitted lore entries" tabindex="0">
+<div class="evennia-lore-table-scroll" role="region" aria-label="Submitted lore entries" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -35,14 +40,14 @@
     <tr>
       <td>{{ entry.entry_number }}</td>
       <td><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></td>
-      <td>{{ entry.author_name }}</td>
+      <td>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
       <td>{{ entry.created_at|date:"Y-m-d" }}</td>
       <td>
         <form method="post" action="{% url 'lore-approve' entry.pk %}" class="d-inline">
-          {% csrf_token %}<button type="submit" class="btn btn-xs btn-success">Approve</button>
+          {% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button>
         </form>
-        <form method="post" action="{% url 'lore-reject' entry.pk %}" class="d-inline ms-1">
-          {% csrf_token %}<button type="submit" class="btn btn-xs btn-danger">Reject</button>
+        <form method="post" action="{% url 'lore-reject' entry.pk %}" class="d-inline ml-1">
+          {% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Reject</button>
         </form>
       </td>
     </tr>

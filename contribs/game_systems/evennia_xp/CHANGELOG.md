@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** the read-only XP page resolves a persistent account roster,
   keeps its resolver request-scoped, and renders an explanatory no-character
   state; web staff checks use ``evennia_links``.

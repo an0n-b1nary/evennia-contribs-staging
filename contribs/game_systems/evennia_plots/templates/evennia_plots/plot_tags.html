@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Plot Tags{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
     <li class="breadcrumb-item active" aria-current="page">Tags</li>
@@ -20,8 +25,8 @@
 </div>
 
 {% if major_tags %}
-<h2>Major Tags <small class="text-muted fs-6">(staff-defined)</small></h2>
-<div class="cov-table-scroll" role="region" aria-label="Major tags" tabindex="0">
+<h2>Major Tags <small class="text-muted">(staff-defined)</small></h2>
+<div class="evennia-plots-table-scroll" role="region" aria-label="Major tags" tabindex="0">
 <table class="table table-sm">
   <thead>
     <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
@@ -31,11 +36,12 @@
     <tr>
       <td>
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
-           class="badge bg-primary text-decoration-none fs-6">{{ entry.tag.name }}</a>
+           class="badge badge-primary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
       <td>{{ entry.thread_count }}</td>
       <td>{{ entry.arc_count }}</td>
     </tr>
+    {% empty %}<tr><td colspan="3" class="text-muted">No major tags yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -43,8 +49,8 @@
 {% endif %}
 
 {% if minor_tags %}
-<h2>Minor Tags <small class="text-muted fs-6">(player-created)</small></h2>
-<div class="cov-table-scroll" role="region" aria-label="Minor tags" tabindex="0">
+<h2>Minor Tags <small class="text-muted">(player-created)</small></h2>
+<div class="evennia-plots-table-scroll" role="region" aria-label="Minor tags" tabindex="0">
 <table class="table table-sm">
   <thead>
     <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
@@ -54,11 +60,12 @@
     <tr>
       <td>
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
-           class="badge bg-secondary text-decoration-none">{{ entry.tag.name }}</a>
+           class="badge badge-secondary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
       <td>{{ entry.thread_count }}</td>
       <td>{{ entry.arc_count }}</td>
     </tr>
+    {% empty %}<tr><td colspan="3" class="text-muted">No minor tags yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>

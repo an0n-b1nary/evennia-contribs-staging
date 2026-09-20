@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-arc-list' %}">Plot Arcs</a></li>
     {% if arc %}
@@ -23,15 +28,15 @@
 
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
-  <fieldset class="cov-fieldset">
-    <legend class="cov-legend">Arc details</legend>
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">Arc details</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.name %}
     {% include "evennia_accessibility/_form_field.html" with field=form.description %}
     {% include "evennia_accessibility/_form_field.html" with field=form.arc_type %}
   </fieldset>
   {% if arc %}
-  <details class="cov-fieldset mt-3">
-    <summary class="cov-legend" style="cursor:pointer;">Advanced: XP multipliers</summary>
+  <details class="evennia-plots-fieldset mt-3">
+    <summary class="evennia-plots-legend">Advanced: XP multipliers</summary>
     <p class="text-muted small mt-2 mb-3">
       Override the default XP multiplier for each source on this arc.
       Type defaults: Story&nbsp;=&nbsp;1.0&times;, Downtime&nbsp;=&nbsp;0.0&times;.

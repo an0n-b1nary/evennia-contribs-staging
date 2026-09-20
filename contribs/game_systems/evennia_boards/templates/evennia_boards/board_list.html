@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_boards/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Bulletin Boards{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="boards-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-boards-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item active" aria-current="page">Bulletin Boards</li>
   </ol>
@@ -14,11 +19,10 @@
 <h1>Bulletin Boards</h1>
 
 {% if boards %}
-<div class="boards-table-scroll" role="region" aria-label="Bulletin boards" tabindex="0">
+<div class="evennia-boards-table-scroll" role="region" aria-label="Bulletin boards" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
-      <th scope="col">#</th>
       <th scope="col">Board</th>
       <th scope="col">Description</th>
       <th scope="col">Posts</th>
@@ -28,9 +32,8 @@
   <tbody>
     {% for board in boards %}
     <tr>
-      <td>{{ forloop.counter }}</td>
       <td><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
-      <td>{{ board.description }}</td>
+      <td>{{ board.description|default:"Not recorded" }}</td>
       <td>{{ board.post_count }}</td>
       <td>{{ board.get_board_type_display }}</td>
     </tr>

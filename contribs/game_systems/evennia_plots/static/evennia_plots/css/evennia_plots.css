@@ -1,0 +1,16 @@
+/* Self-contained styles for evennia_plots. */
+.evennia-plots-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-plots-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-plots-actions { display: flex; flex-wrap: wrap; }
+.evennia-plots-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-plots-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-plots-filter-control { max-width: 160px; }
+.evennia-plots-fieldset { margin-bottom: 1rem; }
+.evennia-plots-legend { cursor: pointer; }
+.evennia-plots-diff { font-family: monospace; font-size: .85rem; line-height: 1.4; }
+.evennia-plots-diff .evennia-plots-diff-add { background-color: #d4edda; color: #155724; }
+.evennia-plots-diff .evennia-plots-diff-remove { background-color: #f8d7da; color: #721c24; }
+.evennia-plots-diff .evennia-plots-diff-hunk { background-color: #e2e3e5; color: #383d41; }
+.evennia-plots-diff .evennia-plots-diff-meta { color: #6c757d; }
+.evennia-plots-pre-wrap { white-space: pre-wrap; }
+.evennia-plots-empty { color: #6c757d; font-style: italic; }

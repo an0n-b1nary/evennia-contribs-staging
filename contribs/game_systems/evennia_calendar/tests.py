@@ -143,7 +143,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.2.1")
+        self.assertEqual(evennia_calendar.__version__, "0.2.2")
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""
@@ -1161,7 +1161,9 @@ class TestWebPagesRender(EvenniaTest):
             with patch.object(user, "get_all_puppets", return_value=[puppet]):
                 response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_calendar/css/evennia_calendar.css", html)
+        return html
 
     def _as_owner(self, view, **kwargs):
         """Render an authoring page as account/char1, who created the fixtures."""

@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_regions/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}Regions{% endblock %}
 
 {% block breadcrumbs %}
@@ -14,7 +19,7 @@
 <h1 class="mb-3">Regions</h1>
 
 {% if regions %}
-<div class="table-responsive" role="region" aria-label="Regions" tabindex="0">
+<div class="evennia-regions-table-scroll" role="region" aria-label="Regions" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -28,7 +33,7 @@
     <tr>
       <td><a href="{% url 'evennia_regions:region-detail' region.pk %}">{{ region.name }}</a></td>
       {% if show_member_counts %}<td>{{ region.member_count }}</td>{% endif %}
-      <td class="text-muted">{{ region.description|truncatechars:80 }}</td>
+      <td class="text-muted">{{ region.description|default:"Not recorded"|truncatechars:80 }}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -38,6 +43,6 @@
 {% include "evennia_regions/_pagination.html" %}
 
 {% else %}
-{% include "evennia_regions/_empty_state.html" with message="No regions have been defined yet." %}
+{% include "evennia_regions/_empty_state.html" with message="No regions have been defined yet. Staff can create one in-game." action="+region/create <name>=<description>" %}
 {% endif %}
 {% endblock %}

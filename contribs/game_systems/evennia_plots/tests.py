@@ -138,7 +138,7 @@ class TestPlotsInit(unittest.TestCase):
     def test_version(self):
         import evennia_plots
 
-        self.assertEqual(evennia_plots.__version__, "0.2.1")
+        self.assertEqual(evennia_plots.__version__, "0.2.2")
 
     def test_signals_eagerly_exported(self):
         from django.dispatch import Signal
@@ -1206,7 +1206,9 @@ class TestWebPagesRender(EvenniaTest):
             with patch.object(user, "get_all_puppets", return_value=[puppet]):
                 response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_plots/css/evennia_plots.css", html)
+        return html
 
     def _as_owner(self, view, **kwargs):
         """Render an authoring page as account/char1, who created the fixtures."""
@@ -1219,6 +1221,11 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("Plot Threads", html)
         self.assertIn("The Salt Road", html)
         self.assertIn(f'href="/plots/{self.thread.pk}/"', html)
+        self.assertRegex(
+            html,
+            r'<input[^>]*id="id_tag_filter"[^>]*class="form-control form-control-sm evennia-plots-filter-control"',
+        )
+        self.assertNotRegex(html, r'<input[^>]*class="[^"]*"[^>]*class=')
 
     def test_thread_list_renders_its_empty_state(self):
         PlotThread.objects.all().delete()
@@ -1234,6 +1241,20 @@ class TestWebPagesRender(EvenniaTest):
         html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)
         self.assertIn("The Salt Road", html)
         self.assertIn("The caravan set out.", html)
+
+    def test_missing_creator_uses_the_web_attribution_placeholder(self):
+        self.thread.creator = None
+        self.thread.creator_name = "Unknown"
+        self.thread.save(update_fields=["creator", "creator_name"])
+        html = self._render(PlotDetailView, pk=self.thread.pk)
+        self.assertIn("Unattributed", html)
+        self.assertNotIn(">Unknown<", html)
+
+    def test_a_character_named_unknown_keeps_their_attribution(self):
+        self.thread.creator_name = "Unknown"
+        self.thread.save(update_fields=["creator_name"])
+        html = self._render(PlotDetailView, pk=self.thread.pk)
+        self.assertIn(">Unknown<", html)
 
     def test_player_thread_detail_hides_status_and_privacy(self):
         html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)

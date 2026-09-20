@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-tags' %}">Tags</a></li>
@@ -26,7 +31,8 @@
 <h2 class="h5 mt-4">Existing major tags</h2>
 <ul class="list-inline">
   {% for tag in major_tags %}
-  <li class="list-inline-item"><span class="badge bg-primary">{{ tag.name }}</span></li>
+  <li class="list-inline-item"><span class="badge badge-primary">{{ tag.name }}</span></li>
+  {% empty %}<li class="list-inline-item text-muted">No major tags yet.</li>
   {% endfor %}
 </ul>
 {% endif %}
@@ -35,8 +41,8 @@
 
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
-  <fieldset class="cov-fieldset">
-    <legend class="cov-legend">New major tag</legend>
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">New major tag</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.name %}
   </fieldset>
   {% url 'evennia_plots:plot-tags' as cancel_url %}

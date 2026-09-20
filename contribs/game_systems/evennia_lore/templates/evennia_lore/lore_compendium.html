@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_lore/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}My Lore Compendium{% endblock %}
 
 {% block breadcrumbs %}
@@ -15,7 +20,7 @@
 <h1 class="mb-3">My Lore Compendium</h1>
 
 {% if acquisitions %}
-<div class="table-responsive" role="region" aria-label="Acquired lore" tabindex="0">
+<div class="evennia-lore-table-scroll" role="region" aria-label="Acquired lore" tabindex="0">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -32,7 +37,7 @@
       <td>
         <a href="{% url 'lore-detail' acq.entry.pk %}">{{ acq.entry.title }}</a>
         {% if acq.entry.privacy == 'restricted' %}
-        <span class="badge bg-warning text-dark ms-1">Restricted</span>
+        <span class="badge badge-warning text-dark ml-1">Restricted</span>
         {% endif %}
       </td>
       <td>{{ acq.acquired_at|date:"Y-m-d" }}</td>

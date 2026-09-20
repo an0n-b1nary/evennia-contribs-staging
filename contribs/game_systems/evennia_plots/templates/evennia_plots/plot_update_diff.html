@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
@@ -16,10 +21,10 @@
 {% block content %}
 <h1>{{ page_title }}</h1>
 <p class="text-muted small">
-  Snapshot saved by {{ version.editor_name }}
+Snapshot saved by {{ version.editor_name|default:"Unattributed" }}
   on {{ version.created_at|date:"Y-m-d H:i" }} UTC.
   {% if version.is_rollback %}
-    <span class="badge bg-secondary">Rollback from v{{ version.rolled_back_from }}</span>
+    <span class="badge badge-secondary">Rollback from v{{ version.rolled_back_from }}</span>
   {% endif %}
 </p>
 
@@ -28,14 +33,14 @@
   v{{ version.version_number }} is identical to the current content — no differences.
 </div>
 {% else %}
-<pre class="cov-diff"
+<pre class="evennia-plots-diff"
      aria-label="Diff between version {{ version.version_number }} and current content"
-     tabindex="0">{% for css, line in diff_lines %}<span class="{{ css }}">{{ line|escape }}</span>
+     tabindex="0">{% for css, line in diff_lines %}<span class="evennia-plots-diff-line {{ css }}">{{ line|escape }}</span>
 {% endfor %}</pre>
 
 <p class="text-muted small mt-2">
-  <span class="diff-add">+ added lines</span> &nbsp;
-  <span class="diff-remove">- removed lines</span> &nbsp;
+  <span class="evennia-plots-diff-add">+ added lines</span> &nbsp;
+  <span class="evennia-plots-diff-remove">- removed lines</span> &nbsp;
   Colour and prefix are both used so the diff is readable without colour.
 </p>
 {% endif %}

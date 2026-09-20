@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
@@ -19,8 +24,8 @@
 
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
-  <fieldset class="cov-fieldset">
-    <legend class="cov-legend">Thread details</legend>
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">Thread details</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.name %}
     {% include "evennia_accessibility/_form_field.html" with field=form.description %}
     {% include "evennia_accessibility/_form_field.html" with field=form.privacy %}

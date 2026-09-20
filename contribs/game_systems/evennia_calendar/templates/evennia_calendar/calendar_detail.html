@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_calendar/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -22,60 +27,43 @@
 </div>
 {% endif %}
 
-<div role="region" aria-label="Event details" tabindex="0">
-<table class="table table-sm" style="max-width:600px;">
-  <tr>
-    <th scope="row">Date (UTC)</th>
-    <td>{{ event.scheduled_time|date:"Y-m-d H:i" }} UTC</td>
-  </tr>
-  <tr>
-    <th scope="row">Local time</th>
-    <td><span id="local-time">—</span></td>
-  </tr>
-  <tr>
-    <th scope="row">Emphasis</th>
-    <td>{{ event.get_emphasis_display }}</td>
-  </tr>
-  <tr>
-    <th scope="row">Tags</th>
-    <td>
-      {% for tag in event.tags.all %}
-      <a href="{% url 'evennia_calendar:calendar-list' %}?tag={{ tag.name|urlencode }}"
-         class="badge bg-info text-dark text-decoration-none me-1">{{ tag.name }}</a>
-      {% empty %}(none){% endfor %}
-    </td>
-  </tr>
-  <tr>
-    <th scope="row">Capacity</th>
-    <td>
-      {% if event.participant_cap %}
-        {{ event.participant_cap }} max
-        ({{ event.seats_remaining }} remaining)
-      {% else %}
-        Open
-      {% endif %}
-    </td>
-  </tr>
-  <tr>
-    <th scope="row">Type</th>
-    <td>
-      {% if event.is_staff_event %}
-      <span aria-hidden="true" style="color:gold;">&#9733;</span>
-      Staff lottery event
-      {% else %}
-      Player Event
-      {% endif %}
-    </td>
-  </tr>
-  <tr>
-    <th scope="row">Created by</th>
-    <td>{{ event.creator_name|default:"Unknown" }}</td>
-  </tr>
-</table>
-</div>
+<dl class="row mb-4">
+  <dt class="col-sm-3">Date (UTC)</dt>
+  <dd class="col-sm-9">{{ event.scheduled_time|date:"Y-m-d H:i" }} UTC</dd>
+  <dt class="col-sm-3">Local time</dt>
+  <dd class="col-sm-9"><span id="local-time">—</span></dd>
+  <dt class="col-sm-3">Emphasis</dt>
+  <dd class="col-sm-9">{{ event.get_emphasis_display }}</dd>
+  <dt class="col-sm-3">Tags</dt>
+  <dd class="col-sm-9">
+    {% for tag in event.tags.all %}
+    <a href="{% url 'evennia_calendar:calendar-list' %}?tag={{ tag.name|urlencode }}"
+       class="badge badge-info text-dark text-decoration-none mr-1">{{ tag.name }}</a>
+    {% empty %}<span class="text-muted">Not recorded</span>{% endfor %}
+  </dd>
+  <dt class="col-sm-3">Capacity</dt>
+  <dd class="col-sm-9">
+    {% if event.participant_cap %}
+      {{ event.participant_cap }} max ({{ event.seats_remaining }} remaining)
+    {% else %}
+      Open
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">Type</dt>
+  <dd class="col-sm-9">
+    {% if event.is_staff_event %}
+    <span class="text-warning" aria-hidden="true">&#9733;</span>
+    Staff lottery event
+    {% else %}
+    Player Event
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">Created by</dt>
+  <dd class="col-sm-9">{{ event.creator_name|default:"Unattributed" }}</dd>
+</dl>
 
 {% if character_id == event.creator_id or is_staff %}
-<div class="d-flex gap-2 mb-3 flex-wrap">
+<div class="evennia-calendar-actions mb-3">
   <a href="{% url 'evennia_calendar:calendar-event-edit' event.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
   {% if not event.is_staff_event %}
   <a href="{% url 'evennia_calendar:calendar-event-invite' event.pk %}" class="btn btn-sm btn-outline-secondary">Invite</a>
@@ -84,7 +72,7 @@
   <a href="{% url 'evennia_calendar:calendar-event-cancel' event.pk %}" class="btn btn-sm btn-outline-danger">Cancel Event</a>
 </div>
 <details class="mb-3">
-  <summary class="text-muted small" style="cursor:pointer;">Advanced: mutual exclusions</summary>
+  <summary class="text-muted small">Advanced: mutual exclusions</summary>
   <div class="mt-2">
     <p class="text-muted small mb-2">
       Mutual exclusions block a character from RSVPing to two events at once.
@@ -107,6 +95,8 @@
     <a href="{% url 'evennia_calendar:calendar-event-detail' sibling.pk %}">{{ sibling.title }}</a>
     — {{ sibling.scheduled_time|date:"Y-m-d H:i" }} UTC
   </li>
+  {% empty %}
+  <li class="text-muted">No other events are in this cluster.</li>
   {% endfor %}
 </ul>
 <p><a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">View cluster and RSVP &rarr;</a></p>
@@ -114,8 +104,8 @@
 
 <h2>RSVPs</h2>
 {% if rsvps %}
-<div role="region" aria-label="RSVP list" tabindex="0">
-<table class="table table-sm table-striped" style="max-width:500px;">
+<div class="evennia-calendar-table-scroll" role="region" aria-label="RSVP list" tabindex="0">
+<table class="table table-sm table-striped">
   <thead>
     <tr><th scope="col">Character</th><th scope="col">Status</th></tr>
   </thead>
@@ -123,7 +113,7 @@
     {% for rsvp in rsvps %}
     <tr>
       <td>{{ rsvp.character_name }}</td>
-      <td>{{ rsvp.get_status_display }}</td>
+      <td><span class="badge badge-secondary">{{ rsvp.get_status_display }}</span></td>
     </tr>
     {% endfor %}
   </tbody>
@@ -133,7 +123,7 @@
 <p class="text-muted">No RSVPs yet.</p>
 {% endif %}
 
-<p style="margin-top:1rem;">
+<p class="evennia-calendar-note">
   <a href="{% url 'evennia_calendar:calendar-list' %}">&larr; Back to calendar</a>
 </p>
 

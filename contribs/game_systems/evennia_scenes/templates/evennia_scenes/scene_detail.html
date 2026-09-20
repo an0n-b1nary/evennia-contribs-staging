@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_scenes/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-scenes-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-list' %}">Scene Archive</a></li>
     <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
@@ -14,13 +19,20 @@
 {% block content %}
 <h1>{{ scene.title|default:"Untitled Scene" }}</h1>
 
-<div class="mb-3 text-muted small">
-  Room: <strong>{{ scene.room_name }}</strong> &mdash;
-  Creator: <strong>{{ scene.creator_name }}</strong> &mdash;
-  Status: {{ scene.get_status_display }} &mdash;
-  {{ scene.created_at|date:"Y-m-d" }}
-  {% if scene.ended_at %}&mdash; Closed {{ scene.ended_at|date:"Y-m-d" }}{% endif %}
-</div>
+<dl class="row text-muted small mb-3">
+  <dt class="col-sm-2">Room</dt>
+  <dd class="col-sm-10"><strong>{{ scene.room_name|default:"Not recorded" }}</strong></dd>
+  <dt class="col-sm-2">Creator</dt>
+  <dd class="col-sm-10"><strong>{{ scene.creator_name|default:"Unattributed" }}</strong></dd>
+  <dt class="col-sm-2">Status</dt>
+  <dd class="col-sm-10"><span class="badge badge-secondary">{{ scene.get_status_display }}</span></dd>
+  <dt class="col-sm-2">Created</dt>
+  <dd class="col-sm-10">{{ scene.created_at|date:"Y-m-d" }}</dd>
+  {% if scene.ended_at %}
+  <dt class="col-sm-2">Closed</dt>
+  <dd class="col-sm-10">{{ scene.ended_at|date:"Y-m-d" }}</dd>
+  {% endif %}
+</dl>
 
 {% if scene.description %}
 <blockquote class="blockquote mb-4">
@@ -45,26 +57,27 @@
       {{ p.character_name }}
       <span class="text-muted small">({{ p.pose_count }} poses{% if not p.is_active %}, left{% endif %})</span>
     </li>
+    {% empty %}<li class="list-inline-item text-muted">No participants recorded.</li>
     {% endfor %}
   </ul>
 </details>
 {% endif %}
 
 {% if log_entries %}
-<div role="region" aria-label="Scene log" tabindex="0">
+<div class="evennia-scenes-table-scroll" role="region" aria-label="Scene log" tabindex="0">
 {% for entry in log_entries %}
-<div class="card mb-2 log-entry log-type-{{ entry.log_type }}">
+<div class="card mb-2 evennia-scenes-log-entry evennia-scenes-log-type-{{ entry.log_type }}">
   <div class="card-header d-flex justify-content-between align-items-center py-1">
     <span class="small">
-      <span class="badge bg-secondary">{{ entry.get_log_type_display }}</span>
-      <strong>{{ entry.author_name }}</strong>
-      <span class="text-muted ms-1">{{ entry.created_at|date:"H:i" }}</span>
+      <span class="badge badge-secondary">{{ entry.get_log_type_display }}</span>
+      <strong>{{ entry.author_name|default:"Unattributed" }}</strong>
+      <span class="text-muted ml-1">{{ entry.created_at|date:"H:i" }}</span>
     </span>
     <span>
       {% if character_id == entry.author_id or is_staff %}
-      <a href="{% url 'evennia_scenes:log-edit' scene.pk entry.pk %}" class="btn btn-xs btn-outline-secondary">Edit</a>
+      <a href="{% url 'evennia_scenes:log-edit' scene.pk entry.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
       {% endif %}
-      <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}" class="btn btn-xs btn-outline-secondary">History</a>
+      <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}" class="btn btn-sm btn-outline-secondary">History</a>
     </span>
   </div>
   <div class="card-body py-2">

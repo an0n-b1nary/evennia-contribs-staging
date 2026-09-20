@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-lore"
-version = "0.2.1"
+version = "0.2.2"
 description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -48,4 +48,7 @@ packages = ["evennia_lore", "evennia_lore.migrations", "evennia_lore.integration
 "evennia_lore.api" = "api"
 
 [tool.setuptools.package-data]
-evennia_lore = ["templates/evennia_lore/*.html"]
+evennia_lore = [
+    "templates/evennia_lore/*.html",
+    "static/evennia_lore/css/*.css",
+]

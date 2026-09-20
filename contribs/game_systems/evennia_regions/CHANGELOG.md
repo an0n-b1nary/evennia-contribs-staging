@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** HTTP staff checks are shared with the other web surfaces and the
   room attribute helper is now public as ``room_attr_values``.
 

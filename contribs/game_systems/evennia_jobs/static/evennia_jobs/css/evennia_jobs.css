@@ -1,0 +1,7 @@
+/* Self-contained styles for evennia_jobs. */
+.evennia-jobs-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-jobs-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-jobs-actions { display: flex; flex-wrap: wrap; }
+.evennia-jobs-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-jobs-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-jobs-empty { color: #6c757d; font-style: italic; }

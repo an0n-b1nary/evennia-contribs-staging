@@ -881,7 +881,9 @@ class TestWebPagesRender(EvenniaTest):
         request.session = import_module(settings.SESSION_ENGINE).SessionStore()
         response = view.as_view()(request, **kwargs)
         response.render()
-        return response.content.decode()
+        html = response.content.decode()
+        self.assertIn("evennia_boards/css/evennia_boards.css", html)
+        return html
 
     def _render_as_char1(self, view, **kwargs):
         """Render an authoring page as account/char1 (staff, puppeted)."""

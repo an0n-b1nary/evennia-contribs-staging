@@ -1,0 +1,23 @@
+/* Self-contained styles for evennia_calendar. */
+.evennia-calendar-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-calendar-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-calendar-actions { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+.evennia-calendar-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-calendar-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-calendar-spacer { margin-left: auto; }
+.evennia-calendar-filter { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; }
+.evennia-calendar-filter > * { margin-right: .5rem; margin-bottom: .5rem; }
+.evennia-calendar-check { display: flex; align-items: center; margin-right: .5rem; margin-bottom: .5rem; font-size: .9rem; }
+.evennia-calendar-check input { margin-right: .25rem; }
+.evennia-calendar-local-time { font-size: .85rem; color: #6c757d; }
+.evennia-calendar-cluster-link { font-size: .8rem; }
+.evennia-calendar-note { margin-top: 1rem; font-size: .85rem; color: #6c757d; }
+.evennia-calendar-table-fixed { table-layout: fixed; }
+.evennia-calendar-day-heading { width: 14.28%; }
+.evennia-calendar-day-cell { height: 6rem; vertical-align: top; }
+.evennia-calendar-today { background-color: #d4edda; color: #155724; }
+.evennia-calendar-day { height: 6rem; vertical-align: top; }
+.evennia-calendar-event { font-size: .75rem; margin-top: 2px; }
+.evennia-calendar-muted { color: #6c757d; font-size: .85rem; }
+.evennia-calendar-inline { display: inline; }
+.evennia-calendar-empty { color: #6c757d; font-style: italic; }

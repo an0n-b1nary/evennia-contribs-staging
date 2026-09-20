@@ -1,5 +1,10 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_calendar/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -41,11 +46,10 @@
 {% endif %}
 
 <h2>Member Events</h2>
-<div role="region" aria-label="Member events" tabindex="0">
+<div class="evennia-calendar-table-scroll" role="region" aria-label="Member events" tabindex="0">
 <table class="table table-sm table-striped">
   <thead>
     <tr>
-      <th scope="col">#</th>
       <th scope="col">Event</th>
       <th scope="col">Date (UTC)</th>
       <th scope="col">Local Time</th>
@@ -57,20 +61,21 @@
   <tbody>
     {% for event in member_events %}
     <tr>
-      <td>{{ event.pk }}</td>
       <td>
         <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a>
         {% if event.is_staff_event %}
-        <span aria-hidden="true" style="color:gold;">&#9733;</span>
+        <span class="text-warning" aria-hidden="true">&#9733;</span>
         <span class="sr-only">Staff lottery event</span>
         {% endif %}
       </td>
       <td>{{ event.scheduled_time|date:"Y-m-d H:i" }}</td>
-      <td><span class="local-time" data-utc="{{ event.scheduled_time|date:'c' }}">—</span></td>
+      <td><span class="evennia-calendar-local-time" data-utc="{{ event.scheduled_time|date:'c' }}">—</span></td>
       <td>{{ event.get_emphasis_display }}</td>
       <td>{{ event.participant_cap|default:"Open" }}</td>
       <td>{{ event.rsvp_count|default:"0" }}</td>
     </tr>
+    {% empty %}
+    <tr><td colspan="6" class="text-muted">No events are in this cluster yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -78,7 +83,7 @@
 
 {% if existing_crsvp %}
   <h2>Your RSVP Status</h2>
-  <p>Status: <strong>{{ existing_crsvp.get_status_display }}</strong></p>
+  <p>Status: <span class="badge badge-secondary">{{ existing_crsvp.get_status_display }}</span></p>
 
   {% if existing_crsvp.status == "seated" and seated_event %}
   <p>You have been assigned to: <strong><a href="{% url 'evennia_calendar:calendar-event-detail' seated_event.pk %}">{{ seated_event.title }}</a></strong></p>
@@ -88,7 +93,9 @@
   <h3>Your current preferences (in order):</h3>
   <ol>
     {% for pref in existing_prefs %}
-    <li>{{ pref.event.title }} (#{{ pref.event.pk }})</li>
+    <li>{{ pref.event.title }}</li>
+    {% empty %}
+    <li class="text-muted">No preferences recorded.</li>
     {% endfor %}
   </ol>
   {% endif %}
@@ -101,10 +108,10 @@
   {% csrf_token %}
   <fieldset>
     <legend>Event preferences</legend>
-    <p class="form-text text-muted" style="font-size:0.9rem;">
+    <p class="form-text text-muted small">
       Check the events you want to attend. The order you submit them is treated
       as rank 1, 2, 3, … For fine-grained ordering use the in-game command:
-      <code>+rsvp/cluster {{ cluster.pk }}=&lt;event_id1&gt;,&lt;event_id2&gt;,...</code>
+      <code>+rsvp/cluster &lt;cluster&gt;=&lt;event_id1&gt;,&lt;event_id2&gt;,...</code>
     </p>
 
     {% if form.preferences.errors %}
@@ -126,10 +133,12 @@
         (cap: {{ event.participant_cap|default:"open" }})
       </label>
     </div>
+    {% empty %}
+    <p class="text-muted">No events are available for ranking.</p>
     {% endfor %}
   </fieldset>
 
-  <div class="d-flex gap-2 mt-3">
+  <div class="evennia-calendar-actions mt-3">
     <button type="submit" class="btn btn-primary">Submit preferences</button>
   </div>
 </form>
@@ -144,14 +153,14 @@
 <p>This cluster has not been locked yet. RSVPs will open once staff lock it.</p>
 {% endif %}
 
-<p style="margin-top:1rem;"><a href="{% url 'evennia_calendar:calendar-list' %}">&larr; Back to calendar</a></p>
+<p class="evennia-calendar-note"><a href="{% url 'evennia_calendar:calendar-list' %}">&larr; Back to calendar</a></p>
 
 <div aria-live="polite" aria-atomic="true" class="sr-only" id="tz-announce"></div>
 
 <script>
 (function () {
   var updated = false;
-  document.querySelectorAll('.local-time').forEach(function (el) {
+  document.querySelectorAll('.evennia-calendar-local-time').forEach(function (el) {
     var utc = el.getAttribute('data-utc');
     if (utc) {
       el.textContent = new Date(utc).toLocaleString();

@@ -104,7 +104,7 @@ class SceneDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         scene = self.object
-        context["page_title"] = scene.title or f"Scene #{scene.pk}"
+        context["page_title"] = scene.title or "Untitled Scene"
 
         # Both in-room OOC and web-viewer OOC are excluded by default so the
         # public log reads as IC; ?include_ooc=1 surfaces them.
@@ -161,7 +161,7 @@ class LogEntryEditView(ScenesAuthoringMixin, FormView):
         entry = self._get_entry()
         context["entry"] = entry
         context["scene"] = entry.scene
-        context["page_title"] = f"Edit Log Entry #{entry.pk}"
+        context["page_title"] = "Edit Log Entry"
         context["cancel_url"] = reverse(
             "evennia_scenes:scene-detail", kwargs={"pk": entry.scene_id}
         )
@@ -204,7 +204,7 @@ class LogEntryHistoryView(TemplateView):
         context["scene"] = entry.scene
         context["page_obj"] = page_obj
         context["versions"] = page_obj.object_list
-        context["page_title"] = f"Edit History — Log Entry #{entry.pk}"
+        context["page_title"] = "Edit History — Log Entry"
         context["is_staff"] = is_staff_user(self.request)
         return context
 
@@ -250,15 +250,15 @@ class LogEntryDiffView(TemplateView):
         diff_lines = []
         for line in raw_diff:
             if line.startswith(("+++", "---")):
-                css = "diff-meta"
+                css = "evennia-scenes-diff-meta"
             elif line.startswith("@@"):
-                css = "diff-hunk"
+                css = "evennia-scenes-diff-hunk"
             elif line.startswith("+"):
-                css = "diff-add"
+                css = "evennia-scenes-diff-add"
             elif line.startswith("-"):
-                css = "diff-remove"
+                css = "evennia-scenes-diff-remove"
             else:
-                css = "diff-context"
+                css = "evennia-scenes-diff-context"
             diff_lines.append((css, line))
 
         context["entry"] = entry
@@ -266,5 +266,5 @@ class LogEntryDiffView(TemplateView):
         context["version"] = version
         context["diff_lines"] = diff_lines
         context["no_diff"] = not raw_diff
-        context["page_title"] = f"Diff — Log Entry #{entry.pk} vs v{version.version_number}"
+        context["page_title"] = f"Diff — Log Entry vs v{version.version_number}"
         return context

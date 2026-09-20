@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** map overlays show public lottery events to both player and staff
   viewers; ``is_staff_event`` is not a visibility flag. HTTP staff checks use
   the shared ``evennia_links`` predicate.

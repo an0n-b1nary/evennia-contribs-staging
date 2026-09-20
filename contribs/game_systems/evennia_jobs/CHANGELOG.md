@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** the optional web extra now depends on ``evennia-links>=0.5``;
   HTTP staff checks use its shared predicate.
 - **Fixed:** the documentation comments at the top of `_empty_state.html` and

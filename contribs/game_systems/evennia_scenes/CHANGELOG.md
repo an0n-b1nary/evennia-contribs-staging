@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- **Changed:** web templates use the self-contained namespaced stylesheet and
+  table, metadata, and empty-state conventions.
+
 - **Changed:** HTTP staff checks use the shared ``evennia_links`` predicate.
 
 ## [0.3.0] — 2026-08-15 — map tile overlays

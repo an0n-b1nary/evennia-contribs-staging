@@ -113,7 +113,7 @@ counts only.
 
 This repo follows the [Evennia upstream code style](https://github.com/evennia/evennia/blob/main/CODING_STYLE.md) with one tooling difference: we use [Ruff](https://docs.astral.sh/ruff/) for both formatting and linting instead of Black + isort + Flake8. The rules are equivalent (100-char lines, Google-style docstrings, Evennia-conventional import order).
 
-See [CODING_STYLE.md](CODING_STYLE.md) for the full conventions and the per-contrib `pyproject.toml` template.
+See [CODING_STYLE.md](CODING_STYLE.md) for the full conventions and the per-contrib `pyproject.toml` template. Web-surface contribs also follow [UI_CONVENTIONS.md](UI_CONVENTIONS.md).
 
 Local setup (once per clone):
 
@@ -126,9 +126,11 @@ Then `git commit` will run the anonymity guards, the template sweep, Ruff format
 
 ## Template sweep
 
-`scripts/check_templates.py` compiles every Django template in the repo and fails on
-three things: a template that does not compile, a multi-line `{# ... #}` comment, and a
-template that includes or extends itself.
+`scripts/check_templates.py` compiles every Django template in the repo and checks
+markup conventions for web-surface contribs as well: no inline styles, namespaced
+custom classes, scroll wrappers around tables, and empty branches for content loops.
+It also fails on multi-line `{# ... #}` comments and templates that include or extend
+themselves.
 
 It exists because a broken template is invisible to a normal view test. Asserting on a
 view's context compiles no template at all, so a page can be a guaranteed 500 while its

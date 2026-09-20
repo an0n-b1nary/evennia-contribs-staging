@@ -1,44 +1,41 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_scenes/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="scenes-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-scenes-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-list' %}">Scene Archive</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">{{ scene.title|default:"Untitled Scene" }}</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">History #{{ entry.pk }}</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">History</a></li>
     <li class="breadcrumb-item active" aria-current="page">Diff vs v{{ version.version_number }}</li>
   </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<h1>Diff — Log Entry #{{ entry.pk }} vs v{{ version.version_number }}</h1>
+<h1>Diff — Log Entry vs v{{ version.version_number }}</h1>
 
 <div class="mb-2 text-muted small">
   Comparing saved version <strong>v{{ version.version_number }}</strong>
-  ({{ version.created_at|date:"Y-m-d H:i" }}, by {{ version.editor_name }})
+({{ version.created_at|date:"Y-m-d H:i" }}, by {{ version.editor_name|default:"Unattributed" }})
   against the <strong>current</strong> version.
 </div>
 
 {% if no_diff %}
 <p class="text-muted">This version is identical to the current content.</p>
 {% else %}
-{# Colorblind-safe: every line carries a +/- (or space) text prefix as well as a #}
-{# color class, so additions/removals are distinguishable without relying on color. #}
-<style>
-  pre.scene-diff { font-family: monospace; font-size: 0.85rem; line-height: 1.4; }
-  pre.scene-diff .diff-add { background-color: #d4edda; color: #155724; }
-  pre.scene-diff .diff-remove { background-color: #f8d7da; color: #721c24; }
-  pre.scene-diff .diff-hunk { background-color: #e2e3e5; color: #383d41; }
-  pre.scene-diff .diff-meta { color: #6c757d; }
-</style>
-<pre class="scene-diff" role="region" aria-label="Unified diff" tabindex="0">{% for css, line in diff_lines %}<span class="{{ css }}">{{ line }}</span>
+{% comment %}Colorblind-safe: each diff line carries a text prefix as well as a class.{% endcomment %}
+<pre class="evennia-scenes-diff" role="region" aria-label="Unified diff" tabindex="0">{% for css, line in diff_lines %}<span class="evennia-scenes-diff-line {{ css }}">{{ line }}</span>
 {% endfor %}</pre>
 {% endif %}
 
-<div class="mt-4 d-flex gap-2">
+<div class="mt-4 d-flex evennia-scenes-actions">
   <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}">&larr; Back to History</a>
   <a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">&larr; Back to Scene</a>
 </div>

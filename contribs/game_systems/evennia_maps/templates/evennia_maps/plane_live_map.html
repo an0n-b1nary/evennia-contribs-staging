@@ -1,13 +1,14 @@
 {% extends "website/base.html" %}
-{% load static %}
 
 {% block titleblock %}{{ plane.name }} &mdash; Live Map{% endblock %}
 
 {% block header_ext %}
+{% load static %}
+{{ block.super }}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin="anonymous">
-<link rel="stylesheet" type="text/css" href="{% static 'evennia_maps/css/evennia_maps.css' %}">
+{% include "evennia_maps/_styles.html" %}
 {% endblock %}
 
 {% block content %}

@@ -1,0 +1,4 @@
+/* Self-contained styles for evennia_regions. */
+.evennia-regions-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-regions-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-regions-empty { color: #6c757d; font-style: italic; }

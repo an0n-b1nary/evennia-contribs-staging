@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-calendar"
-version = "0.2.1"
+version = "0.2.2"
 description = "Event calendar system (+calendar/+rsvp) with cluster lottery, priority tokens, web UI, and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -54,4 +54,7 @@ packages = [
 "evennia_calendar.api" = "api"
 
 [tool.setuptools.package-data]
-evennia_calendar = ["templates/evennia_calendar/*.html"]
+evennia_calendar = [
+    "templates/evennia_calendar/*.html",
+    "static/evennia_calendar/css/*.css",
+]

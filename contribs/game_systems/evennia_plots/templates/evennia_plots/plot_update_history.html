@@ -1,9 +1,14 @@
 {% extends "website/base.html" %}
 
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
 {% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
-<nav aria-label="Breadcrumb" class="cov-breadcrumb container mt-2">
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
     <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
@@ -15,12 +20,12 @@
 {% block content %}
 <h1>{{ page_title }}</h1>
 <p class="text-muted small">
-  Block {{ update.block_number }} — {{ update.get_update_type_display }} — by {{ update.author_name }}
+Block {{ update.block_number }} — {{ update.get_update_type_display }} — by {% if not update.author_id and update.author_name == "Unknown" %}Unattributed{% else %}{{ update.author_name|default:"Unattributed" }}{% endif %}
   &mdash; {{ update.created_at|date:"Y-m-d H:i" }}
 </p>
 
 {% if versions %}
-<div class="cov-table-scroll" role="region" aria-label="Version history" tabindex="0">
+<div class="evennia-plots-table-scroll" role="region" aria-label="Version history" tabindex="0">
 <table class="table table-sm table-striped">
   <thead>
     <tr>
@@ -35,7 +40,7 @@
     {% for version in versions %}
     <tr>
       <td>v{{ version.version_number }}</td>
-      <td>{{ version.editor_name }}</td>
+      <td>{{ version.editor_name|default:"Unattributed" }}</td>
       <td>{{ version.created_at|date:"Y-m-d H:i" }}</td>
       <td>{% if version.is_rollback %}Rollback from v{{ version.rolled_back_from }}{% endif %}</td>
       <td>
