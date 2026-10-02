@@ -416,15 +416,17 @@ PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 # REST API
 ######################################################################
 
-# Nothing to configure here. Evennia's settings_default already ships both
+# Evennia's settings_default already ships both
 # "rest_framework" and "django_filters" in INSTALLED_APPS and a REST_FRAMEWORK
 # block, and the contrib viewsets declare their own authentication,
 # permission, pagination and filter classes rather than relying on the
 # project-wide defaults. The contrib routers are mounted in web/urls.py;
 # REST_API_ENABLED stays False: that flag gates *Evennia's own* /api/
 # routes (objects, accounts, scripts), which this sandbox does not expose.
-# The contrib routers below are separate; website/templates/rest_framework/api.html
-# guards optional schema/documentation links on their browsable root.
+# The contrib routers are separate; web/templates/rest_framework/api.html
+# guards optional schema/documentation links on their browsable pages. Games
+# mounting these routers need both the URL includes and this template override
+# when Evennia's own API is disabled; see the maps and regions install guides.
 
 ######################################################################
 # Website navigation

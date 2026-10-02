@@ -41,8 +41,10 @@ jobs:
         run: python scripts/test_anonymity_push_guard.py
       - name: Issue publication guard tests
         run: python scripts/test_file_issue.py
-      - name: Contrib install-order tests
-        run: python scripts/test_ci_install_contribs.py
+      - name: Contrib installer and partner runner tests
+        run: |
+          python scripts/test_ci_install_contribs.py
+          python scripts/test_ci_run_partner_tests.py
 
   test:
     runs-on: ubuntu-latest
@@ -79,3 +81,32 @@ jobs:
       - name: Run tests
         working-directory: ci_game
         run: python ../scripts/ci_run_tests.py
+
+
+  partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        calendar: [present, absent]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize throwaway game directory
+        run: evennia --init ci_game < /dev/null
+      - name: Install all partners
+        if: matrix.calendar == 'present'
+        run: python scripts/ci_install_contribs.py ci_game
+      - name: Install without the optional calendar partner
+        if: matrix.calendar == 'absent'
+        run: python scripts/ci_install_contribs.py ci_game --exclude evennia-calendar
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: Fresh-process partner seams and host-configured maps suite
+        run: python scripts/ci_run_partner_tests.py ci_game --calendar ${{ matrix.calendar }}

@@ -215,12 +215,34 @@ The established pattern:
 
 ## CI
 
-Every push and PR runs two jobs:
+Every push and PR runs lint, the full contrib test matrix, and partner integration jobs:
 
 - **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check.
 - **test** (~5–8 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test`.
 
-A PR can't merge until both jobs pass.
+- **partners**: two fresh Python 3.12 environments, one with every contrib
+  and one with calendar omitted from installation and app registration. Each
+  runs the maps suite with host settings plus real overlay, URL, command-import,
+  rendered static/live map, tile feed, and browsable API checks.
+
+A PR can't merge until the required checks pass.
+
+To reproduce the absent-calendar cell, use a **fresh** Python 3.12 venv with
+`evennia==6.0.0` installed and its executables on PATH, from the repo root:
+
+```bash
+evennia --init ci_game < /dev/null
+python scripts/ci_install_contribs.py ci_game --exclude evennia-calendar
+(cd ci_game && evennia migrate --noinput < /dev/null)
+python scripts/ci_run_partner_tests.py ci_game --calendar absent
+```
+
+In another fresh environment, omit `--exclude` and pass `--calendar present`.
+The runner checks that an absent partner has no importable package or installed
+distribution, and rejects launcher exits that ran zero tests. Exclusions also
+fail before pip runs if a retained contrib has a hard dependency on the omitted
+package. These games use test-only MD5 hashing and a small fixture rather than
+the full sandbox seeder, which deliberately requires every demo contrib.
 
 ## Contrib release versions
 

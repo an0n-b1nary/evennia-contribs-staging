@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Docs:** explain the game-level browsable API override required when
+  Evennia's own API is disabled.
+
 ## [0.3.1] - 2026-10-02
 
 - Stack labelled table rows below 640px while retaining table semantics and desktop columns.

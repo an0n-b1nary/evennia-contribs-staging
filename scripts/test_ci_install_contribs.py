@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Install-order regressions for the CI contrib installer."""
 
 from __future__ import annotations
@@ -145,14 +147,14 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         self.settings.parent.mkdir(parents=True)
         self.settings.write_text("INSTALLED_APPS = []\n", encoding="utf-8")
 
-    def run_main(self):
+    def run_main(self, exclude=()):
         with (
             patch.object(installer, "CONTRIBS_ROOT", self.root),
             patch.object(installer.subprocess, "run") as pip,
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
-            code = installer.main(self.game)
+            code = installer.main(self.game, exclude)
         return code, pip, stderr.getvalue()
 
     def test_installs_and_registers_in_dependency_order(self):
@@ -167,6 +169,40 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
             settings.index('"evennia_rp_rules"'), settings.index('"evennia_rp_contest"')
         )
         self.assertIn("MD5PasswordHasher", settings)
+
+    def test_optional_partner_is_not_installed_or_registered(self):
+        self.add("game_systems", "evennia_calendar")
+        self.add("game_systems", "evennia_maps", extras={"calendar": ["evennia-calendar"]})
+        code, pip, _ = self.run_main(("evennia-calendar",))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(pip.call_args_list), 1)
+        self.assertEqual(pathlib.Path(pip.call_args.args[0][-1]).name, "evennia_maps")
+        self.assertNotIn("evennia_calendar", self.settings.read_text(encoding="utf-8"))
+        self.assertIn("evennia_maps", self.settings.read_text(encoding="utf-8"))
+
+    def test_exclusion_accepts_an_app_label(self):
+        self.add("game_systems", "evennia_calendar")
+        self.add("game_systems", "evennia_maps")
+        code, pip, _ = self.run_main(("evennia_calendar",))
+        self.assertEqual(code, 0)
+        self.assertEqual(len(pip.call_args_list), 1)
+
+    def test_unknown_exclusion_fails_before_pip_or_settings_edits(self):
+        self.add("game_systems", "evennia_maps")
+        code, pip, stderr = self.run_main(("evennia_missing",))
+        self.assertEqual(code, 1)
+        pip.assert_not_called()
+        self.assertIn("unknown excluded", stderr)
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), "INSTALLED_APPS = []\n")
+
+    def test_excluded_hard_dependency_fails_before_pip_can_reinstall_it(self):
+        self.add("base_systems", "evennia_links")
+        self.add("game_systems", "evennia_maps", ["evennia-links>=0.5"])
+        code, pip, stderr = self.run_main(("evennia_links",))
+        self.assertEqual(code, 1)
+        pip.assert_not_called()
+        self.assertIn("requires excluded", stderr)
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), "INSTALLED_APPS = []\n")
 
     def test_cycle_fails_before_installing_anything(self):
         self.add("rpg", "evennia_rp_a", ["evennia-rp-b"])

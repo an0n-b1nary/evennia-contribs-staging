@@ -110,9 +110,12 @@ so the feature is visible rather than an empty page; a seam test in
 re-snapshotted after `evennia migrate`.
 
 Easy to forget and worth doing every time: **uninstall an optional partner,
-restart, and confirm the feature degrades instead of breaking.** Gated
-`ready()` blocks and settings seams exist for exactly the absent-partner case,
-and no suite here runs it.
+restart, and confirm the feature degrades instead of breaking.** The CI `partners`
+job now starts fresh environments with calendar present and actually absent,
+then runs real map overlay, route, command-import, rendered-page and API seams
+plus the maps suite under host settings. This covers the calendar edge; repeat
+this check for other optional partners that a change touches. See
+`scripts/ci_run_partner_tests.py` and CONTRIBUTING.md for the local recipe.
 
 ## Conventions
 

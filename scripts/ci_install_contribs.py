@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Iterate contribs, pip-install each, append app labels to INSTALLED_APPS.
 
 Contribs are installed in dependency order: each package's hard
@@ -17,10 +19,13 @@ run isn't dominated by PBKDF2 hashing of the accounts EvenniaTest creates.
 
 Invoked by `.github/workflows/ci.yml` from the repo root with one argument:
 the path to the throwaway Evennia game directory created by `evennia --init`.
+Optional --exclude arguments prepare a fresh environment without selected partners;
+run this in a clean venv so previously installed packages cannot mask missing partners.
 """
 
 from __future__ import annotations
 
+import argparse
 import heapq
 import pathlib
 import re
@@ -140,11 +145,33 @@ def install_order(contribs: list[Contrib]) -> list[Contrib]:
     return ordered
 
 
-def main(game_dir: pathlib.Path) -> int:
+def select_contribs(contribs: list[Contrib], exclude: tuple[str, ...] = ()) -> list[Contrib]:
+    """Select a subset without allowing pip to reinstall an excluded hard dependency.
+
+    Exclusions accept distribution names or app labels. Unknown names and retained
+    packages requiring an excluded sibling fail before installation or settings edits.
+    """
+    excluded = {normalize_name(name) for name in exclude}
+    known = {contrib.name for contrib in contribs}
+    unknown = excluded - known
+    if unknown:
+        raise ContribGraphError(f"unknown excluded contribs: {', '.join(sorted(unknown))}")
+    selected = [contrib for contrib in contribs if contrib.name not in excluded]
+    for contrib in selected:
+        missing = contrib.requires & excluded
+        if missing:
+            raise ContribGraphError(
+                f"{contrib.name} requires excluded contribs: {', '.join(sorted(missing))}"
+            )
+    return install_order(selected)
+
+
+def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
     """Install each contrib and append its app label to the game's settings.
 
     Args:
         game_dir: Path to the Evennia game directory created by `evennia --init`.
+        exclude: Distribution names or app labels to omit from installation.
 
     Returns:
         int: Process exit code (0 on success).
@@ -155,7 +182,7 @@ def main(game_dir: pathlib.Path) -> int:
         return 1
 
     try:
-        contribs = install_order(discover_contribs(CONTRIBS_ROOT))
+        contribs = select_contribs(discover_contribs(CONTRIBS_ROOT), exclude)
     except ContribGraphError as exc:
         print(f"Can't order contribs: {exc}", file=sys.stderr)
         return 1
@@ -163,7 +190,11 @@ def main(game_dir: pathlib.Path) -> int:
     labels: list[str] = []
     for contrib in contribs:
         print(f"Installing {contrib.path}")
-        subprocess.run(["pip", "install", "-e", str(contrib.path)], check=True)
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-e", str(contrib.path)],
+            check=True,
+            stdin=subprocess.DEVNULL,
+        )
         labels.append(contrib.label)
 
     if not labels:
@@ -189,7 +220,8 @@ def main(game_dir: pathlib.Path) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: ci_install_contribs.py <game-dir>", file=sys.stderr)
-        sys.exit(2)
-    sys.exit(main(pathlib.Path(sys.argv[1])))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("game_dir", type=pathlib.Path)
+    parser.add_argument("--exclude", action="append", default=[], metavar="CONTRIB")
+    args = parser.parse_args()
+    sys.exit(main(args.game_dir, tuple(args.exclude)))
