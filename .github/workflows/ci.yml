@@ -35,6 +35,8 @@ jobs:
           fi
       - name: Issue publication guard tests
         run: python scripts/test_file_issue.py
+      - name: Contrib install-order tests
+        run: python scripts/test_ci_install_contribs.py
 
   test:
     runs-on: ubuntu-latest
