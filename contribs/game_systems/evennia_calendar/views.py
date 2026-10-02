@@ -69,11 +69,12 @@ class CalendarMonthView(TemplateView):
         context = super().get_context_data(**kwargs)
 
         now = timezone.now()
+        now_utc = now.astimezone(datetime.UTC)
         try:
-            year = int(self.request.GET.get("year", now.year))
-            month = int(self.request.GET.get("month", now.month))
+            year = int(self.request.GET.get("year", now_utc.year))
+            month = int(self.request.GET.get("month", now_utc.month))
         except ValueError:
-            year, month = now.year, now.month
+            year, month = now_utc.year, now_utc.month
         year = max(2020, min(year, 2040))
         month = max(1, min(month, 12))
 
@@ -96,10 +97,27 @@ class CalendarMonthView(TemplateView):
 
         day_events = {}
         for ev in events:
-            day = ev.scheduled_time.day
+            scheduled_utc = ev.scheduled_time.astimezone(datetime.UTC)
+            ev.grid_time = scheduled_utc.strftime("%H:%M")
+            ev.grid_datetime = scheduled_utc.isoformat()
+            day = scheduled_utc.day
             day_events.setdefault(day, []).append(ev)
 
-        cal_weeks_with_events = [[(day, day_events.get(day, [])) for day in week] for week in cal]
+        cal_weeks_with_events = []
+        for week in cal:
+            cells = []
+            for day in week:
+                day_date = datetime.date(year, month, day) if day else None
+                if day_date is None:
+                    state = "outside"
+                elif day_date < now_utc.date():
+                    state = "past"
+                elif day_date == now_utc.date():
+                    state = "today"
+                else:
+                    state = "future"
+                cells.append((day, day_events.get(day, []), state))
+            cal_weeks_with_events.append(cells)
 
         if month == 1:
             prev_year, prev_month = year - 1, 12
@@ -121,7 +139,7 @@ class CalendarMonthView(TemplateView):
                 "prev_month": prev_month,
                 "next_year": next_year,
                 "next_month": next_month,
-                "today": now.day if (now.year == year and now.month == month) else None,
+                "today": now_utc.day if (now_utc.year == year and now_utc.month == month) else None,
             }
         )
         return context
@@ -827,8 +845,7 @@ class ClusterMembershipView(CalendarAuthoringMixin, FormView):
             if existing_times and event.scheduled_time not in existing_times:
                 form.add_error(
                     None,
-                    "All events in a cluster must share the same "
-                    "scheduled_time (parallel events).",
+                    "All events in a cluster must share the same scheduled_time (parallel events).",
                 )
                 return self.form_invalid(form)
             event.cluster = cluster

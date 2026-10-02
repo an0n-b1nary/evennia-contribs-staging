@@ -7,7 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-10-02
+
+- **Changed:** month cells label past, today, and future days, show event start
+  times, and preserve full event titles for assistive and hover users.
+- **Changed:** standalone event pages explain the in-game RSVP path while
+  clustered events retain their ranked web RSVP route.
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.

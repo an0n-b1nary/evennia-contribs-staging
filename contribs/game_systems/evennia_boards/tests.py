@@ -912,6 +912,13 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("Reply text.", html)
         self.assertIn(f"Re: #{self.post.post_number}", html)
 
+    def test_board_detail_keeps_long_title_and_byline_separate(self):
+        self.post.title = "A very long post title that should truncate before the controls"
+        self.post.save(update_fields=["title"])
+        html = self._render(BoardDetailView, pk=self.board.pk)
+        self.assertIn("evennia-boards-post-title", html)
+        self.assertIn("evennia-boards-post-byline", html)
+
     def test_board_detail_offers_no_authoring_links_to_anonymous(self):
         html = self._render(BoardDetailView, pk=self.board.pk)
         self.assertNotIn(f"/boards/{self.board.pk}/new/", html)

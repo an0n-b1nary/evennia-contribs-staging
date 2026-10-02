@@ -30,7 +30,7 @@ pip install evennia-scenes[web]
 
 ```python
 INSTALLED_APPS += [
-    "evennia_links",   # must precede evennia_scenes
+    "evennia_links",  # must precede evennia_scenes
     "evennia_scenes",
 ]
 ```
@@ -46,6 +46,7 @@ evennia migrate
 ```python
 from evennia_scenes.commands import CmdScene, CmdLog
 
+
 class CharacterCmdSet(CmdSet):
     def at_cmdset_creation(self):
         ...
@@ -59,13 +60,16 @@ class CharacterCmdSet(CmdSet):
 # In your Character typeclass (e.g. typeclasses/characters.py):
 from evennia_scenes.capture import capture_to_scene
 
+
 class Character(DefaultCharacter):
     def at_say(self, speech, msg_self=None, msg_location=None, **kwargs):
         super().at_say(speech, msg_self=msg_self, msg_location=msg_location, **kwargs)
         capture_to_scene(self, speech, log_type="say")
 
+
 # In your Room typeclass:
 from evennia_scenes.capture import register_room_entry
+
 
 class Room(DefaultRoom):
     def at_object_receive(self, moved_obj, source_location, **kwargs):
@@ -95,6 +99,8 @@ urlpatterns += [
 `evennia_scenes` stores the active scene's integer pk in
 `room.active_scene_id` — an Evennia Attribute on the room object, accessed
 via `room.active_scene_id`. It is set to `None` when no scene is active.
+This integration value is deliberately the database PK, because bridge models
+and room hooks use it only as an internal reference.
 
 Cross-domain consumers (e.g., an RP-tracker contrib that links sessions to
 scenes) should read this attribute and store it as an integer soft-reference
@@ -145,6 +151,10 @@ dependency is added.
 | Setting | Default | Description |
 |---|---|---|
 | `SCENES_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock expression for staff operations in `+scene` and `+log`. |
+| `SCENES_REGIONS_APP_LABEL` | `"evennia_regions"` | Optional regions app providing room visibility and detail pages. |
+| `SCENES_LORE_APP_LABEL` | `"evennia_lore"` | Optional lore app used for published scene-linked entries. |
+| `SCENES_PLOTS_APP_LABEL` | `"evennia_plots"` | Optional plots app used for public and invite-only scene-linked threads. |
+| `SCENES_CALENDAR_APP_LABEL` | `"evennia_calendar"` | Optional calendar app used for non-cancelled scene-linked events. |
 | `SITE_URL` | `""` | Optional absolute base URL for web links in MXP telnet clients (e.g. `"https://mygame.com"`). |
 
 ---
@@ -165,8 +175,8 @@ email), decide visibility with the model's own rule rather than rewriting the
 tier list:
 
 ```python
-Scene.objects.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)   # querysets
-Scene.is_web_readable(scene.privacy)                            # single scene
+Scene.objects.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)  # querysets
+Scene.is_web_readable(scene.privacy)  # single scene
 ```
 
 Stated as membership rather than "not view-private" on purpose: if you
@@ -178,6 +188,15 @@ default.
 
 ## Commands
 
+### Public scene numbers
+
+Every scene receives an immutable public `scene_number`. Player-facing
+commands use that number; URLs and cross-contrib integer soft references keep
+using the database PK internally. Existing rows are numbered in PK order when
+the migration runs, and later scenes continue the sequence. This is a
+pre-upstream API change: do not treat a previously remembered command number
+as a database PK.
+
 ### `+scene`
 
 | Switch | Description |
@@ -185,28 +204,28 @@ default.
 | (none) | Show current room's active scene, or list recent scenes |
 | `/open [<title>]` | Open a new scene in this room |
 | `/close` | Pause the active scene |
-| `/resume [<id>]` | Resume a closed scene |
+| `/resume [<scene_number>]` | Resume a closed scene |
 | `/title <text>` | Set or change the scene title |
 | `/desc` | Edit the scene description (EvEditor) |
 | `/privacy <public\|pose-private\|view-private>` | Set scene privacy tier |
 | `/invite <character>` | Invite a character to pose |
 | `/join` | Join the active scene |
 | `/leave` | Leave the active scene |
-| `/info [<id>]` | View detailed scene info |
+| `/info [<scene_number>]` | View detailed scene info |
 
 ### `+log`
 
 | Invocation | Description |
 |---|---|
 | `+log` | List your recent scenes |
-| `+log <scene_id>` | View a scene's log entries |
-| `+log <scene_id>=<page>` | View a specific page |
+| `+log <scene_number>` | View a scene's log entries |
+| `+log <scene_number>=<page>` | View a specific page |
 | `+log/edit <entry_id>` | Edit a log entry (your own, or staff) |
 | `+log/history <entry_id>` | View edit history |
 | `+log/rollback <entry_id>=<ver>` | Rollback to a version (staff only) |
 | `+log/diff <entry_id>=<ver>` | View diff against a version |
-| `+log/ic <scene_id>` | Show only IC entries (pose/emit/say) |
-| `+log/ooc <scene_id>` | Show only OOC entries |
+| `+log/ic <scene_number>` | Show only IC entries (pose/emit/say) |
+| `+log/ooc <scene_number>` | Show only OOC entries |
 
 ---
 

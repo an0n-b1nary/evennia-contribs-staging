@@ -58,6 +58,7 @@ evennia migrate evennia_regions
 ```python
 from evennia_regions.commands import CmdRegion
 
+
 class CharacterCmdSet(CmdSet):
     def at_cmdset_creation(self):
         self.add(CmdRegion)
@@ -71,6 +72,8 @@ class CharacterCmdSet(CmdSet):
 |---|---|---|
 | `REGIONS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for create/edit/add-room/remove-room/here-add/primary; HTTP checks use the shared web policy |
 | `REGIONS_ROOM_VISIBILITY` | `None` | Dotted path to a `callable(room) -> bool` (**True means visible**) replacing the default room-visibility rule used by the member-room list and the API's staff-only member count |
+| `REGIONS_LORE_APP_LABEL` | `"evennia_lore"` | Optional lore app used to resolve published entries attached to a region. |
+| `REGIONS_MAPS_APP_LABEL` | `"evennia_maps"` | Optional maps app used to resolve a room's map placements. |
 
 ---
 
@@ -91,6 +94,7 @@ Games with a different hiding convention can replace the rule entirely. The call
 # my_game/room_visibility.py
 def is_room_web_visible(room):
     return not room.tags.has("secret", category="zone")
+
 
 # settings.py
 REGIONS_ROOM_VISIBILITY = "my_game.room_visibility.is_room_web_visible"
@@ -115,10 +119,14 @@ publishing a raw count tells a visitor how many rooms they are not being shown.
 
 ```python
 from django.urls import include, path
+
 urlpatterns += [path("regions/", include("evennia_regions.urls"))]
 ```
 
-URL names (prefix with `evennia_regions:` when reversing): `region-list`, `region-detail`.
+URL names (prefix with `evennia_regions:` when reversing): `region-list`,
+`region-detail`, and `room-detail`. The room page is `/regions/rooms/<pk>/`
+when mounted at `/regions/`; it applies the same room-visibility predicate as
+the region member list and links to optional map placements.
 
 ---
 
@@ -126,6 +134,7 @@ URL names (prefix with `evennia_regions:` when reversing): `region-list`, `regio
 
 ```python
 from django.urls import include, path
+
 urlpatterns += [path("api/v1/", include("evennia_regions.api.urls"))]
 ```
 
@@ -147,7 +156,10 @@ region = Region.create_region(name="The Ashfields", creator=character, descripti
 # raises IntegrityError — use create_link(), which get_or_creates and fills
 # in created_by/created_by_name from linked_by:
 membership, created = RegionMembership.create_link(
-    region, room, linked_by=character, room_name=room.key,
+    region,
+    room,
+    linked_by=character,
+    room_name=room.key,
     is_primary=not RegionMembership.objects.filter(room=room).exists(),
 )
 

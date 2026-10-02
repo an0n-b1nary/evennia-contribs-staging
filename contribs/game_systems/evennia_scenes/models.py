@@ -11,7 +11,8 @@ Models:
     LogEntryVersion  — append-only edit-history table for LogEntry
 """
 
-from django.db import models
+from django.db import IntegrityError, models, transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from evennia_links import AbstractArchived, AbstractVersion
@@ -63,6 +64,11 @@ class Scene(AbstractArchived):
         max_length=200,
         blank=True,
         help_text="Optional scene title.",
+    )
+    scene_number = models.PositiveIntegerField(
+        unique=True,
+        editable=False,
+        help_text="Stable public number used in player-facing scene commands.",
     )
     description = models.TextField(
         blank=True,
@@ -128,7 +134,39 @@ class Scene(AbstractArchived):
 
     def __str__(self):
         title = self.title or "Untitled"
-        return f"Scene #{self.pk}: {title} ({self.get_status_display()})"
+        return f"Scene #{self.scene_number}: {title} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        """Allocate an immutable public number when a scene is first saved."""
+        if self.pk:
+            previous = (
+                type(self)
+                .all_objects.filter(pk=self.pk)
+                .values_list("scene_number", flat=True)
+                .first()
+            )
+            if previous is not None and self.scene_number != previous:
+                raise ValueError("scene_number is immutable")
+
+        if self.scene_number is not None:
+            return super().save(*args, **kwargs)
+
+        # The retry is intentionally bounded: max()+1 is portable across the
+        # databases Evennia supports, while the unique constraint closes the
+        # race between concurrent scene creation requests.
+        for _attempt in range(5):
+            try:
+                with transaction.atomic():
+                    self.scene_number = (
+                        type(self).all_objects.aggregate(max_number=Max("scene_number"))[
+                            "max_number"
+                        ]
+                        or 0
+                    ) + 1
+                    return super().save(*args, **kwargs)
+            except IntegrityError:
+                self.scene_number = None
+        raise IntegrityError("Could not allocate a unique scene number after 5 attempts.")
 
     def start(self):
         """Transition from OPEN to ACTIVE on first pose."""

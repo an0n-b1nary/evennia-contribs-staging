@@ -248,14 +248,15 @@ class Command(BaseCommand):
 
     def _rebuild(self):
         counts = {}
+        authors = self._seed_characters()
         rooms = self._create_rooms()
         counts["rooms"] = len(rooms)
         counts["exits"] = self._create_exits(rooms)
         counts["objects"] = self._create_plaques(rooms)
-        counts["boards"] = self._create_boards()
+        counts["boards"] = self._create_boards(authors)
         events = self._create_calendar_events()
         counts["calendar_events"] = len(events)
-        entries = self._create_lore()
+        entries = self._create_lore(authors)
         counts["lore_entries"] = len(entries)
         counts["plot_arcs"], counts["plot_threads"] = self._create_plot()
 
@@ -266,7 +267,7 @@ class Command(BaseCommand):
         counts["region_memberships"] = sum(r.memberships.count() for r in regions.values())
         counts["map_tiles"] = self._create_map(rooms)
         counts["scratch_tiles"] = self._create_scratch_plane(rooms)
-        scenes = self._create_scenes(rooms)
+        scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
         return counts
@@ -474,7 +475,21 @@ class Command(BaseCommand):
     # Django-row content
     # ------------------------------------------------------------------
 
-    def _create_boards(self):
+    def _seed_characters(self):
+        """Create owned demo speakers without attributing fixtures to player characters."""
+        from evennia.utils.create import create_object
+
+        return [
+            create_object(
+                "typeclasses.characters.Character",
+                key=name,
+                tags=[(SANDBOX_TAG, SANDBOX_TAG_CATEGORY)],
+                attributes=[("desc", "[Placeholder] A demonstration scene participant.")],
+            )
+            for name in content.SCENE_SPEAKERS
+        ]
+
+    def _create_boards(self, authors):
         # Django-model content (boards/posts and the calendar/lore/plot rows
         # below) has no Evennia tag handler, so it's purged by name/title in
         # _purge() rather than by the sandbox_default tag.
@@ -490,13 +505,14 @@ class Command(BaseCommand):
                 order=order,
             )
 
-        post = content.BOARD_FIRST_POST
-        Post.create_post(
-            board=by_slug[post["board_slug"]],
-            author=None,
-            title=post["title"],
-            content=post["body"],
-        )
+        for index, post in enumerate(content.BOARD_POSTS):
+            author = authors[index % len(authors)] if authors else None
+            Post.create_post(
+                board=by_slug[post["board_slug"]],
+                author=author,
+                title=post["title"],
+                content=post["body"],
+            )
         return len(by_slug)
 
     def _create_calendar_events(self):
@@ -529,21 +545,30 @@ class Command(BaseCommand):
             )
         return events
 
-    def _create_lore(self):
-        from evennia_lore.models import LoreEntry
+    def _create_lore(self, authors):
+        from evennia_lore.models import LoreEntry, LoreTag
 
         # Returned so _link_overlays() can attach these to the region — lore
         # hangs off regions, never off rooms, which is why the has_lore overlay
         # resolves each room's primary region before it can answer.
-        return [
-            LoreEntry.create_entry(
+        tags = {
+            spec["name"]: LoreTag.objects.get_or_create(
+                name=spec["name"], defaults={"is_major": spec["is_major"]}
+            )[0]
+            for spec in content.LORE_TAGS
+        }
+        entries = {}
+        for index, spec in enumerate(content.LORE_ENTRIES):
+            author = authors[index % len(authors)] if authors else None
+            entry = LoreEntry.create_entry(
                 title=spec["title"],
-                author=None,
+                author=author,
                 body=spec["body"],
                 privacy=LoreEntry.Privacy.PUBLIC,
             )
-            for spec in content.LORE_ENTRIES
-        ]
+            entry.tags.set([tags[name] for name in spec.get("tags", ())])
+            entries[spec["slug"]] = entry
+        return entries
 
     def _create_plot(self):
         from django.db.models import Max
@@ -750,7 +775,7 @@ class Command(BaseCommand):
     # Scenes and the overlay links
     # ------------------------------------------------------------------
 
-    def _create_scenes(self, rooms):
+    def _create_scenes(self, rooms, authors):
         """Scenes placed to light three different overlays on three different tiles.
 
         One is left open, in Consulate Hall: that is has_active_scene, and -
@@ -766,7 +791,7 @@ class Command(BaseCommand):
         All PUBLIC, so they show for anonymous web visitors rather than for
         staff only. Returns {slug: Scene}.
         """
-        from evennia_scenes.models import Scene
+        from evennia_scenes.models import LogEntry, Scene
 
         made = {}
         for spec in content.SCENES:
@@ -779,12 +804,24 @@ class Command(BaseCommand):
                 privacy=Scene.Privacy.PUBLIC,
                 status=Scene.Status.OPEN,
             )
+            for log in spec.get("logs", ()):
+                author_index = log.get("author_index", 0)
+                author = authors[author_index] if author_index < len(authors) else None
+                LogEntry.create_entry(
+                    scene=scene,
+                    author=author,
+                    content=log["content"],
+                    log_type=log.get("log_type", LogEntry.LogType.POSE),
+                )
             if spec["closed"]:
                 # close() rather than status=CLOSED at creation: close() is
                 # what stamps ended_at, and the heatmap window filters on
                 # ended_at - a hand-set status would produce a closed scene the
                 # map never counts.
                 scene.close()
+                participants = list(scene.participants.filter(is_active=True))
+                if participants:
+                    participants[-1].leave()
             else:
                 # The room-side half of evennia_scenes' integration contract
                 # (see typeclasses/rooms.py): consumers read the pk off the
@@ -801,14 +838,25 @@ class Command(BaseCommand):
         everywhere is indistinguishable from one that is broken.
         """
         from evennia_calendar.models import SceneCalendarLink
-        from evennia_lore.models import LoreRegionLink
+        from evennia_lore.models import LoreRegionLink, LoreSceneLink
+        from evennia_plots.models import PlotThread, ScenePlotLink
 
         count = 0
         # Lore attaches to a region, not to a room: has_lore lights every room
         # whose primary region has at least one published public entry.
         lore_region = regions[content.LORE_REGION_SLUG]
-        for entry in entries:
+        for entry in entries.values():
             LoreRegionLink.objects.create(entry=entry, region_id=lore_region.pk)
+            count += 1
+
+        for entry_slug, scene_slug in content.LORE_SCENE_LINKS:
+            LoreSceneLink.objects.create(entry=entries[entry_slug], scene_id=scenes[scene_slug].pk)
+            count += 1
+
+        thread = PlotThread.objects.get(name=content.PLOT_THREAD["name"])
+        thread.activate()
+        for scene_slug in content.PLOT_SCENE_SLUGS:
+            ScenePlotLink.create_link(scene=scenes[scene_slug], thread=thread)
             count += 1
         # An event reaches the map only through a scene - there is no
         # CalendarEvent -> Room field anywhere in the calendar.

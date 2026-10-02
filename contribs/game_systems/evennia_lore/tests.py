@@ -520,6 +520,29 @@ class TestCmdLoreBrowse(EvenniaCommandTest):
 
 
 class TestCmdLoreSubmitAndRead(EvenniaCommandTest):
+    def test_scene_link_resolves_public_number_but_stores_primary_key(self):
+        entry = _make_entry("Linked", author=self.char1)
+        scene_model = MagicMock()
+        scene_model.objects.get.return_value = SimpleNamespace(pk=55, scene_number=9001)
+        command = CmdLore()
+        command.caller = self.char1
+        with patch("evennia_lore.commands._get_model", return_value=scene_model):
+            command._do_link_scene(f"#{entry.entry_number}", "9001")
+        scene_model.objects.get.assert_called_once_with(scene_number=9001)
+        self.assertEqual(LoreSceneLink.objects.get(entry=entry).scene_id, 55)
+
+    def test_submission_resolves_public_scene_number(self):
+        from evennia_lore.commands import _lore_submit_save
+
+        scene_model = MagicMock()
+        scene_model.objects.get.return_value = SimpleNamespace(pk=55, scene_number=9001)
+        self.char1.ndb._lore_submit_ctx = {"title": "Linked Submission", "scene_arg": "9001"}
+        with patch("evennia_lore.commands._get_model", return_value=scene_model):
+            _lore_submit_save(self.char1, "Full body content.")
+        scene_model.objects.get.assert_called_once_with(scene_number=9001)
+        entry = LoreEntry.objects.get(title="Linked Submission")
+        self.assertEqual(LoreSceneLink.objects.get(entry=entry).scene_id, 55)
+
     def test_submit_inline_via_editor_save(self):
         """Simulate what start_new_edit callback does on save."""
         from evennia_lore.commands import _lore_submit_save

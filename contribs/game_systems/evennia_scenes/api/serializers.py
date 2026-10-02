@@ -17,6 +17,7 @@ class SceneSerializer(serializers.ModelSerializer):
         model = Scene
         fields = [  # noqa: RUF012
             "id",
+            "scene_number",
             "title",
             "description",
             "status",

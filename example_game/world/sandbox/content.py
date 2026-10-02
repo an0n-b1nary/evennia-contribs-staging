@@ -625,18 +625,38 @@ BOARD_FIRST_POST = {
     "body": "[Placeholder] A short first post: what the sandbox is, and that it resets.",
 }
 
+BOARD_SECOND_POST = {
+    "board_slug": "cutscenes",
+    "title": "[Placeholder] Title of the seeded cutscene post.",
+    "body": "[Placeholder] A short in-character bulletin showing the second board is active.",
+}
+
+SCENE_SPEAKERS = ("Sandbox Storyteller", "Sandbox Visitor")
+
+BOARD_POSTS = (BOARD_FIRST_POST, BOARD_SECOND_POST)
+
+LORE_TAGS = (
+    {"name": "History", "is_major": True},
+    {"name": "Rumor", "is_major": False},
+)
+
 LORE_ENTRIES = (
     {
         "slug": "founding",
         "title": "The Founding of the Sandbox",
         "body": "[Placeholder] A short in-world origin story for this place.",
+        "tags": ("History",),
     },
     {
         "slug": "rumors",
         "title": "Rumors from the Archive",
         "body": "[Placeholder] A short rumor entry, the kind +investigate would turn up.",
+        "tags": ("Rumor",),
     },
 )
+
+LORE_SCENE_LINKS = (("founding", "rehearsal"), ("rumors", "market-day"))
+PLOT_SCENE_SLUGS = ("rehearsal", "market-day")
 
 PLOT_ARC = {
     "slug": "genesis",
@@ -692,6 +712,10 @@ SCENES = (
         # different tile for the overlays to be distinguishable at a glance.
         "room_slug": "consulate",
         "closed": False,
+        "logs": (
+            {"author_index": 0, "content": "[Placeholder] The rehearsal begins in the hall."},
+            {"author_index": 1, "content": "[Placeholder] A second participant takes a turn."},
+        ),
     },
     {
         "slug": "quiet-hour",
@@ -699,6 +723,7 @@ SCENES = (
         "description": "[Placeholder] One line: a scene that has already ended.",
         "room_slug": "archive",
         "closed": True,
+        "logs": ({"author_index": 0, "content": "[Placeholder] The archive doors close."},),
     },
     {
         "slug": "late-shelving",
@@ -706,6 +731,7 @@ SCENES = (
         "description": "[Placeholder] One line: another ended scene in the same room.",
         "room_slug": "archive",
         "closed": True,
+        "logs": ({"author_index": 1, "content": "[Placeholder] A late shelf is catalogued."},),
     },
     {
         "slug": "closing-time",
@@ -713,6 +739,7 @@ SCENES = (
         "description": "[Placeholder] One line: a third ended scene in the same room.",
         "room_slug": "archive",
         "closed": True,
+        "logs": (),
     },
     {
         "slug": "market-day",
@@ -720,6 +747,11 @@ SCENES = (
         "description": "[Placeholder] One line: a single ended scene somewhere busier.",
         "room_slug": "market",
         "closed": True,
+        "logs": (
+            {"author_index": 0, "content": "[Placeholder] Market day winds down."},
+            {"author_index": 1, "content": "[Placeholder] A visitor pauses at the last stall."},
+            {"author_index": 0, "content": "[Placeholder] The final stall closes."},
+        ),
     },
 )
 

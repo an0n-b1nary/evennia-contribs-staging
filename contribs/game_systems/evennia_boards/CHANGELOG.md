@@ -7,7 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-10-02
+
+- **Fixed:** long post titles truncate in the flexible title area while the
+  author/date byline and Reply/Edit controls remain readable and non-shrinking.
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.

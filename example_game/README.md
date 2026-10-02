@@ -961,3 +961,13 @@ Three mechanisms, for three different needs:
     empty collections explain what belongs there. Resize the browser to a
     narrow viewport and confirm the page remains usable without horizontal
     overflow outside those table regions.
+17. **Phase 4 relationships and identifiers** - open a region and follow a
+    member room, then follow its map placement; open a scene and verify its
+    public number, room, participants, and related lore/plot/event links. Use
+    `+scene/info <scene_number>` and `+log <scene_number>` in-game, confirming
+    the displayed public number is the argument accepted by both commands.
+    Confirm a standalone event explains `+rsvp` and a clustered event links to
+    the ranked RSVP page. Check that only secondary region memberships carry
+    a badge and that long board titles leave the byline and actions readable.
+    In the webclient, confirm room headings show names without dbrefs,
+    including when logged in as a builder.

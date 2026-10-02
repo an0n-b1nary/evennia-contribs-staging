@@ -12,6 +12,14 @@ the old app.
 
 ---
 
+## Public scene numbers (added in v0.4.0)
+
+`Scene.scene_number` is the immutable, player-facing identifier used by
+`+scene` and `+log`. Migration `0002_scene_scene_number` numbers existing rows
+in primary-key order; later scenes continue at the next available number.
+Database primary keys remain the internal identifiers for URLs, room
+`active_scene_id` attributes, and cross-contrib soft-reference fields.
+
 ## Map tile overlays (added in v0.3.0)
 
 `integrations/maps.py` is the source game's `world/scenes/maps_integration.py`, carried

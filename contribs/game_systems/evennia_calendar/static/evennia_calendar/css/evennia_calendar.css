@@ -16,6 +16,13 @@
 .evennia-calendar-day-heading { width: 14.28%; }
 .evennia-calendar-day-cell { height: 6rem; vertical-align: top; }
 .evennia-calendar-today { background-color: #d4edda; color: #155724; }
+.evennia-calendar-day-past { background-color: #f1f3f5; color: #495057; }
+.evennia-calendar-day-future { background-color: #ffffff; color: #212529; }
+.evennia-calendar-day-outside { background-color: #e9ecef; color: #6c757d; }
+.evennia-calendar-day-cell a { color: inherit; text-decoration: underline; }
+.evennia-calendar-event { overflow: hidden; }
+.evennia-calendar-event a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evennia-calendar-event time { font-size: .7rem; white-space: nowrap; }
 .evennia-calendar-day { height: 6rem; vertical-align: top; }
 .evennia-calendar-event { font-size: .75rem; margin-top: 2px; }
 .evennia-calendar-muted { color: #6c757d; font-size: .85rem; }

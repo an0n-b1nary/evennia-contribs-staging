@@ -109,7 +109,7 @@ class CmdScene(MuxCommand):
         +scene                              - View current scene or list recent
         +scene/open [<title>]               - Open a new scene in this room
         +scene/close                        - Close (pause) the active scene
-        +scene/resume [<id>]                - Resume a closed scene
+        +scene/resume [<scene_number>]      - Resume a closed scene
         +scene/title <text>                 - Set or change the scene title
         +scene/desc                         - Edit scene description (EvEditor)
         +scene/privacy <public|pose-private|view-private>
@@ -117,7 +117,7 @@ class CmdScene(MuxCommand):
         +scene/invite <character>           - Invite a character to pose
         +scene/join                         - Join the active scene
         +scene/leave                        - Leave the active scene
-        +scene/info [<id>]                  - View scene details
+        +scene/info [<scene_number>]        - View scene details
 
     Privacy tiers:
         public       - Anyone can view on the web; anyone in the room can pose.
@@ -184,7 +184,7 @@ class CmdScene(MuxCommand):
                 for s in recent:
                     title = s.title or "Untitled"
                     lines.append(
-                        f"  |lc+scene/info {s.pk}|lt#{s.pk}|le "
+                        f"  |lc+scene/info {s.scene_number}|lt#{s.scene_number}|le "
                         f"|lu{_scene_web_path(s.pk)}|lt[↗]|le "
                         f"{title} ({s.get_status_display()}) — "
                         f"{s.created_at.strftime('%Y-%m-%d')}"
@@ -209,7 +209,7 @@ class CmdScene(MuxCommand):
             title = existing.title or "Untitled"
             caller.msg(
                 f"This room already has an active scene: "
-                f"|w{title}|n (#{existing.pk}). "
+                f"|w{title}|n (#{existing.scene_number}). "
                 f"Close it first with |w+scene/close|n."
             )
             return
@@ -281,16 +281,16 @@ class CmdScene(MuxCommand):
         existing = self._get_active_scene()
         if existing:
             caller.msg(
-                f"This room already has an active scene (#{existing.pk}). " f"Close it first."
+                f"This room already has an active scene (#{existing.scene_number}). Close it first."
             )
             return
 
         if self.args and self.args.strip().isdigit():
-            scene_id = int(self.args.strip())
+            scene_number = int(self.args.strip())
             try:
-                scene = Scene.objects.get(pk=scene_id, status=Scene.Status.CLOSED)
+                scene = Scene.objects.get(scene_number=scene_number, status=Scene.Status.CLOSED)
             except Scene.DoesNotExist:
-                caller.msg(f"No closed scene found with ID #{scene_id}.")
+                caller.msg(f"No closed scene found with number #{scene_number}.")
                 return
         else:
             scene = (
@@ -329,7 +329,7 @@ class CmdScene(MuxCommand):
         )
 
         title = scene.title or "Untitled"
-        room.msg_contents(f'|y{caller.key} has resumed scene "{title}" (#{scene.pk}).|n')
+        room.msg_contents(f'|y{caller.key} has resumed scene "{title}" (#{scene.scene_number}).|n')
 
     def _title(self):
         """Set or change the scene title."""
@@ -360,11 +360,11 @@ class CmdScene(MuxCommand):
         scene = self._get_active_scene()
 
         if not scene and self.args and self.args.strip().isdigit():
-            scene_id = int(self.args.strip())
+            scene_number = int(self.args.strip())
             try:
-                scene = Scene.all_objects.get(pk=scene_id)
+                scene = Scene.all_objects.get(scene_number=scene_number)
             except Scene.DoesNotExist:
-                caller.msg(f"No scene found with ID #{scene_id}.")
+                caller.msg(f"No scene found with number #{scene_number}.")
                 return
 
         if not scene:
@@ -470,7 +470,8 @@ class CmdScene(MuxCommand):
         caller.msg(f'|g{target.key} is now invited to pose in "{title}".|n')
         if target.has_account:
             target.msg(
-                f"|g{caller.key} has invited you to pose in scene " f'"{title}" (#{scene.pk}).|n'
+                f"|g{caller.key} has invited you to pose in scene "
+                f'"{title}" (#{scene.scene_number}).|n'
             )
 
     def _join(self):
@@ -534,16 +535,18 @@ class CmdScene(MuxCommand):
         caller = self.caller
 
         if self.args and self.args.strip().isdigit():
-            scene_id = int(self.args.strip())
+            scene_number = int(self.args.strip())
             try:
-                scene = Scene.all_objects.get(pk=scene_id)
+                scene = Scene.all_objects.get(scene_number=scene_number)
             except Scene.DoesNotExist:
-                caller.msg(f"No scene found with ID #{scene_id}.")
+                caller.msg(f"No scene found with number #{scene_number}.")
                 return
         else:
             scene = self._get_active_scene()
             if not scene:
-                caller.msg("No active scene. Use |w+scene/info <id>|n to view a specific scene.")
+                caller.msg(
+                    "No active scene. Use |w+scene/info <scene_number>|n to view a specific scene."
+                )
                 return
 
         if scene.privacy == Scene.Privacy.VIEW_PRIVATE and not _is_staff(caller):
@@ -594,7 +597,7 @@ class CmdScene(MuxCommand):
         participant_count = scene.participants.filter(is_active=True).count()
         entry_count = scene.log_entries.filter(is_deleted=False).count()
         return (
-            f"|wActive Scene:|n {title} (#{scene.pk})\n"
+            f"|wActive Scene:|n {title} (#{scene.scene_number})\n"
             f"  Status: {scene.get_status_display()} | "
             f"Privacy: {scene.get_privacy_display()}\n"
             f"  Participants: {participant_count} | "
@@ -608,8 +611,8 @@ class CmdScene(MuxCommand):
         """Format a detailed scene info display."""
         title = scene.title or "Untitled"
         lines = [
-            f"|wScene #{scene.pk}: {title}|n",
-            f"  Status: {scene.get_status_display()} | " f"Privacy: {scene.get_privacy_display()}",
+            f"|wScene #{scene.scene_number}: {title}|n",
+            f"  Status: {scene.get_status_display()} | Privacy: {scene.get_privacy_display()}",
             f"  Room: {scene.room_name}",
             f"  Creator: {scene.creator_name}",
             f"  Created: {scene.created_at.strftime('%Y-%m-%d %H:%M')}",
@@ -628,7 +631,7 @@ class CmdScene(MuxCommand):
                 status = "active" if p.is_active else "left"
                 invited_tag = " |g[invited]|n" if p.is_invited else ""
                 lines.append(
-                    f"    {p.character_name}{invited_tag} — " f"{p.pose_count} poses ({status})"
+                    f"    {p.character_name}{invited_tag} — {p.pose_count} poses ({status})"
                 )
 
         if scene.privacy != Scene.Privacy.PUBLIC:
@@ -644,7 +647,7 @@ class CmdScene(MuxCommand):
 
         if scene.status == Scene.Status.CLOSED:
             lines.append(
-                f"  |lc+log {scene.pk}|lt[View Log]|le"
+                f"  |lc+log {scene.scene_number}|lt[View Log]|le"
                 f"  |lu{_scene_web_path(scene.pk)}|lt[↗ web]|le"
             )
 
@@ -657,14 +660,14 @@ class CmdLog(EditingMixin, MuxCommand):
 
     Usage:
         +log                          - List your recent scenes
-        +log <scene_id>               - View a scene's log
-        +log <scene_id>=<page>        - View a specific page
+        +log <scene_number>           - View a scene's log
+        +log <scene_number>=<page>    - View a specific page
         +log/edit <entry_id>          - Edit a log entry (your own)
         +log/history <entry_id>       - View edit history
         +log/rollback <entry_id>=<ver> - Rollback to version (staff)
         +log/diff <entry_id>=<ver>    - View diff against version
-        +log/ic <scene_id>            - Show only IC entries
-        +log/ooc <scene_id>           - Show only OOC entries
+        +log/ic <scene_number>        - Show only IC entries
+        +log/ooc <scene_number>       - Show only OOC entries
     """
 
     key = "+log"
@@ -720,7 +723,7 @@ class CmdLog(EditingMixin, MuxCommand):
             title = s.title or "Untitled"
             entry_count = s.log_entries.filter(is_deleted=False).count()
             lines.append(
-                f"  |lc+log {s.pk}|lt#{s.pk}|le "
+                f"  |lc+log {s.scene_number}|lt#{s.scene_number}|le "
                 f"|lu{_scene_web_path(s.pk)}|lt[↗]|le "
                 f"{title} ({s.get_status_display()}) — "
                 f"{s.created_at.strftime('%Y-%m-%d')} — "
@@ -740,22 +743,23 @@ class CmdLog(EditingMixin, MuxCommand):
         if not args:
             scene_id = getattr(caller.location, "active_scene_id", None)
             if not scene_id:
-                caller.msg("Usage: |w+log <scene_id>|n")
+                caller.msg("Usage: |w+log <scene_number>|n")
                 return
+            scene_lookup = {"pk": scene_id}
         else:
             if not args.isdigit():
-                caller.msg("Usage: |w+log <scene_id>[=<page>]|n")
+                caller.msg("Usage: |w+log <scene_number>[=<page>]|n")
                 return
-            scene_id = int(args)
+            scene_lookup = {"scene_number": int(args)}
 
         page = 1
         if self.rhs and self.rhs.strip().isdigit():
             page = int(self.rhs.strip())
 
         try:
-            scene = Scene.all_objects.get(pk=scene_id)
+            scene = Scene.all_objects.get(**scene_lookup)
         except Scene.DoesNotExist:
-            caller.msg(f"No scene found with ID #{scene_id}.")
+            caller.msg("No scene found with that number.")
             return
 
         if scene.privacy == Scene.Privacy.VIEW_PRIVATE and not _is_staff(caller):
@@ -790,18 +794,18 @@ class CmdLog(EditingMixin, MuxCommand):
         entries = qs.order_by("order", "created_at")[start : start + LOG_ENTRIES_PER_PAGE]
 
         title = scene.title or "Untitled"
-        lines = [f"|wScene #{scene.pk}: {title}|n " f"(page {page}/{total_pages})"]
+        lines = [f"|wScene #{scene.scene_number}: {title}|n (page {page}/{total_pages})"]
         lines.append("-" * 68)
 
         for entry in entries:
             timestamp = entry.created_at.strftime("%H:%M")
             type_tag = self._format_type_tag(entry.log_type)
-            lines.append(f"  {type_tag} [{timestamp}] " f"|w{entry.author_name}|n: {entry.content}")
+            lines.append(f"  {type_tag} [{timestamp}] |w{entry.author_name}|n: {entry.content}")
 
         lines.append("-" * 68)
         if total_pages > 1:
             lines.append(
-                f"Page {page}/{total_pages}. " f"Use |w+log {scene.pk}=<page>|n to navigate."
+                f"Page {page}/{total_pages}. Use |w+log {scene.scene_number}=<page>|n to navigate."
             )
 
         caller.msg("\n".join(lines))

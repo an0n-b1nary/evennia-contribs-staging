@@ -179,7 +179,11 @@
   }
 
   function popupContent(tile, urls) {
-    var html = '<div class="evennia-maps-popup"><h3>' + escapeHtml(tile.room_name) + "</h3>";
+    var roomLabel = escapeHtml(tile.room_name);
+    if (urls.room) {
+      roomLabel = '<a href="' + urlFor(urls.room, tile.room_id) + '">' + roomLabel + "</a>";
+    }
+    var html = '<div class="evennia-maps-popup"><h3>' + roomLabel + "</h3>";
     if (tile.has_active_scene) {
       html += "<div>A scene is active here.</div>";
     }
@@ -240,6 +244,7 @@
 
   function populateLayer(groups, tiles, container) {
     var urls = {
+      room: container.dataset.roomUrlTemplate,
       region: container.dataset.regionUrlTemplate,
       scene: container.dataset.sceneUrlTemplate,
       event: container.dataset.eventUrlTemplate,

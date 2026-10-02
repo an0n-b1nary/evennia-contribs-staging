@@ -65,6 +65,10 @@ class Room(MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, Defaul
     # docstring — this is the contrib's documented integration contract.
     active_scene_id = AttributeProperty(default=None, autocreate=False)
 
+    def get_extra_display_name_info(self, looker=None, **kwargs):
+        """Keep room headings free of database identifiers in the client."""
+        return ""
+
     def at_object_receive(self, moved_obj, source_location, move_type="move", **kwargs):
         """Auto-register arriving player characters as scene participants.
 

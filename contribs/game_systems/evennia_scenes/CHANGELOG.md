@@ -1,6 +1,11 @@
 # Changelog — evennia-scenes
 
-## [Unreleased]
+## [0.4.0] — 2026-10-02
+
+- **Added:** immutable public scene numbers, migration backfill, command lookup,
+  API output, and permission-aware links to related rooms, lore, plots, events,
+  and participants.
+- **Fixed:** scene archive dates now fall back to creation dates correctly.
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.

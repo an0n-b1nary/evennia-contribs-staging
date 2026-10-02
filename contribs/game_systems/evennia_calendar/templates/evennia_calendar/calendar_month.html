@@ -53,16 +53,18 @@
   <tbody>
     {% for week in cal_weeks_with_events %}
     <tr>
-      {% for day, events in week %}
-      <td class="evennia-calendar-day-cell{% if day == today %} evennia-calendar-today{% endif %}">
+      {% for day, events, day_state in week %}
+      <td class="evennia-calendar-day-cell evennia-calendar-day-{{ day_state }}{% if day == today %} evennia-calendar-today{% endif %}">
         {% if day %}
-        <small>{{ day }}{% if day == today %}<span class="sr-only"> (today)</span>{% endif %}</small>
+        <small>{{ day }}{% if day_state == "past" %}<span class="sr-only"> (past)</span>{% elif day_state == "today" %}<span class="sr-only"> (today)</span>{% elif day_state == "future" %}<span class="sr-only"> (future)</span>{% endif %}</small>
         {% for event in events %}
         <div class="evennia-calendar-event">
           {% if event.is_clustered %}
           <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">[{{ event.cluster.title|truncatechars:10 }}]</a>
           {% endif %}
-          <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title|truncatechars:20 }}</a>
+          <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}"
+             title="{{ event.title }}">{{ event.title|truncatechars:20 }}</a>
+          <time datetime="{{ event.grid_datetime }}" class="d-block">{{ event.grid_time }} UTC</time>
           {% if event.is_staff_event %}<span aria-hidden="true">&#9733;</span><span class="sr-only">Staff lottery event</span>{% endif %}
         </div>
         {% empty %}<span class="text-muted sr-only">No events</span>
@@ -77,7 +79,7 @@
 </div>
 
 <p class="evennia-calendar-muted">
-  All times are UTC. Your browser will show local time on event detail pages.
+  All times are UTC. Past, today, and future days are labelled by text and colour.
   <span aria-hidden="true">&#9733;</span><span class="sr-only">Star symbol</span> = staff lottery event
   &nbsp;|&nbsp; [Cluster] = part of a grouped event cluster.
 </p>

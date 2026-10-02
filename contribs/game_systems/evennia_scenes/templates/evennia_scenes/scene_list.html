@@ -33,11 +33,11 @@
   <tbody>
     {% for scene in scenes %}
     <tr>
-      <td><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">{{ scene.title|default:"Untitled" }}</a></td>
+      <td><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">#{{ scene.scene_number }} — {{ scene.title|default:"Untitled" }}</a></td>
       <td>{{ scene.room_name|default:"Not recorded" }}</td>
       <td>{{ scene.participants.count }}</td>
       <td>{{ scene.log_entries.count }}</td>
-      <td>{{ scene.ended_at|date:"Y-m-d"|default:scene.created_at|date:"Y-m-d" }}</td>
+      <td>{% if scene.ended_at %}{{ scene.ended_at|date:"Y-m-d" }}{% else %}{{ scene.created_at|date:"Y-m-d" }}{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

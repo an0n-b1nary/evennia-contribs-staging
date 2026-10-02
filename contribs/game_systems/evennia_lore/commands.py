@@ -565,11 +565,11 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("Only the entry author (or staff) can link scenes.")
             return
         if not scene_arg.isdigit():
-            caller.msg("Scene ID must be an integer.")
+            caller.msg("Scene number must be an integer.")
             return
         try:
             Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "evennia_scenes")
-            scene = Scene.objects.get(pk=int(scene_arg))
+            scene = Scene.objects.get(scene_number=int(scene_arg))
         except Exception:
             caller.msg(f"No scene #{scene_arg} found.")
             return
@@ -739,7 +739,7 @@ def _lore_submit_save(caller, content):
     if scene_arg and scene_arg.isdigit():
         try:
             Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "evennia_scenes")
-            scene = Scene.objects.get(pk=int(scene_arg))
+            scene = Scene.objects.get(scene_number=int(scene_arg))
             LoreSceneLink.objects.get_or_create(
                 entry=entry,
                 scene_id=scene.pk,

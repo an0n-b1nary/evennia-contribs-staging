@@ -837,11 +837,11 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
     def test_outbound_link_table_resolves_every_role(self):
         # overlay_url_templates() drops any role whose route is not mounted,
         # so a missing include here shows up as a popup with no link rather
-        # than an error. All three partners' pages are mounted in
+        # than an error. All four outbound destinations are mounted in
         # web/website/urls.py precisely so this is non-empty.
         from evennia_maps.overlays import overlay_url_templates
 
-        self.assertEqual(set(overlay_url_templates()), {"region", "scene", "event"})
+        self.assertEqual(set(overlay_url_templates()), {"room", "region", "scene", "event"})
 
     def test_live_map_finds_the_tile_feed(self):
         # Reverses MAPS_TILES_URL_NAME ("api-plane-tiles"); empty when the
@@ -915,6 +915,7 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
         plane = MapPlane.objects.get(name=PLANE_NAME)
         html = self._render(PlaneLiveMapView.as_view(), f"/map/{plane.pk}/live/", pk=plane.pk)
         self.assertIn("/api/v1/planes/", html)
+        self.assertIn("/regions/rooms/", html)
         self.assertIn("/regions/", html)
         self.assertIn("/scenes/", html)
         self.assertIn("/calendar/", html)
@@ -929,10 +930,67 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
         html = self._render(RegionDetailView.as_view(), f"/regions/{region.pk}/", pk=region.pk)
         self.assertIn(name, html)
         self.assertIn("Sandbox Plaza", html)
+        plaza = _search_room("Sandbox Plaza")
+        self.assertIn(f"/regions/rooms/{plaza.pk}/", html)
+        self.assertIn("Related lore", html)
         # The staff room is a member and is still withheld: the region page
         # applies the same visibility rule the map does, which is the point of
         # having it in one place rather than per-view.
         self.assertNotIn(content.IC_ROOMS_BY_SLUG[content.STAFF_ROOM_SLUG].name, html)
+
+    def test_scene_page_renders_public_number_and_related_content(self):
+        from evennia_scenes.models import Scene
+        from evennia_scenes.views import SceneDetailView
+
+        scene = Scene.objects.get(title="Market Day")
+        html = self._render(SceneDetailView.as_view(), f"/scenes/{scene.pk}/", pk=scene.pk)
+        self.assertIn(f"#{scene.scene_number}", html)
+        self.assertIn("Market day winds down.", html)
+        self.assertIn("Rumors from the Archive", html)
+        self.assertIn("The Founding Storm", html)
+        self.assertIn("Staff Briefing", html)
+
+    def test_room_page_links_back_to_real_regions_and_maps(self):
+        from evennia_regions.views import RoomDetailView
+
+        plaza = _search_room("Sandbox Plaza")
+        html = self._render(RoomDetailView.as_view(), "/regions/rooms/", pk=plaza.pk)
+        self.assertIn("Sandbox Plaza", html)
+        self.assertIn("/map/", html)
+        self.assertIn("/regions/", html)
+        self.assertNotIn(f"#{plaza.pk}", html)
+
+    def test_scene_links_follow_partner_visibility_and_survive_absent_partners(self):
+        from evennia_calendar.models import CalendarEvent
+        from evennia_lore.models import LoreEntry
+        from evennia_plots.models import PlotThread
+        from evennia_scenes.models import Scene
+        from evennia_scenes.views import SceneDetailView
+
+        scene = Scene.objects.get(title="Market Day")
+        LoreEntry.objects.filter(title="Rumors from the Archive").update(
+            status=LoreEntry.Status.SUBMITTED
+        )
+        PlotThread.objects.filter(name="The Founding Storm").update(
+            privacy=PlotThread.Privacy.PRIVATE
+        )
+        CalendarEvent.objects.filter(title="Staff Briefing").update(is_cancelled=True)
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"):
+            html = self._render(SceneDetailView.as_view(), "/scenes/", pk=scene.pk)
+        self.assertNotIn("Rumors from the Archive", html)
+        self.assertNotIn("The Founding Storm", html)
+        self.assertNotIn("Staff Briefing", html)
+        self.assertNotIn("Market Row", html)
+        self.assertIn("Location unavailable", html)
+
+        with override_settings(
+            SCENES_LORE_APP_LABEL="missing_lore",
+            SCENES_PLOTS_APP_LABEL="missing_plots",
+            SCENES_CALENDAR_APP_LABEL="missing_calendar",
+        ):
+            html = self._render(SceneDetailView.as_view(), "/scenes/", pk=scene.pk)
+        self.assertIn("Market day winds down.", html)
+        self.assertNotIn("Related content", html)
 
 
 class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):

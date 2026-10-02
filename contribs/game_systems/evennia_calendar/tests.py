@@ -143,7 +143,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.2.2")
+        self.assertEqual(evennia_calendar.__version__, "0.3.0")
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""
@@ -1180,6 +1180,16 @@ class TestWebPagesRender(EvenniaTest):
             CalendarMonthView, path_=f"/calendar/?year={when.year}&month={when.month}"
         )
         self.assertIn("Harvest Revel", html)
+        self.assertIn(self.event.scheduled_time.strftime("%H:%M"), html)
+        self.assertIn("evennia-calendar-day-", html)
+
+    def test_grid_times_stay_utc_with_a_local_timezone(self):
+        when = self.event.scheduled_time
+        with timezone.override("America/Los_Angeles"):
+            html = self._render(
+                CalendarMonthView, path_=f"/calendar/?year={when.year}&month={when.month}"
+            )
+        self.assertIn(f"{when:%H:%M} UTC", html)
 
     def test_month_view_survives_a_junk_year_and_month(self):
         html = self._render(CalendarMonthView, path_="/calendar/?year=abc&month=zz")
@@ -1215,6 +1225,7 @@ class TestWebPagesRender(EvenniaTest):
             CalendarEventDetailView, path_=f"/calendar/{self.event.pk}/", pk=self.event.pk
         )
         self.assertIn("No RSVPs yet.", html)
+        self.assertIn("help +rsvp", html)
 
     def test_event_detail_offers_authoring_links_to_the_creator(self):
         html = self._render(

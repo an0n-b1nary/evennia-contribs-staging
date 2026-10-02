@@ -105,14 +105,16 @@ def _scene_labels_by_id(scene_ids):
     """
     ``{scene_pk: label}`` for the map popup's log links.
 
-    ``Scene.title`` is optional, so fall back to the ``Scene #<pk>`` form
+    ``Scene.title`` is optional, so fall back to the public ``Scene #<number>`` form
     ``Scene.__str__`` already uses rather than rendering a blank link.
     """
     if not scene_ids:
         return {}
     return {
-        pk: title or f"Scene #{pk}"
-        for pk, title in Scene.objects.filter(id__in=scene_ids).values_list("id", "title")
+        pk: title or f"Scene #{scene_number}"
+        for pk, scene_number, title in Scene.objects.filter(id__in=scene_ids).values_list(
+            "id", "scene_number", "title"
+        )
     }
 
 

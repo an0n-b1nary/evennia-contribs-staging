@@ -7,7 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-10-02
+
+- **Added:** a permission-aware room detail page with optional map and lore
+  destinations; region room links now navigate to it.
+- **Changed:** only non-primary memberships receive a `Secondary` badge.
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.

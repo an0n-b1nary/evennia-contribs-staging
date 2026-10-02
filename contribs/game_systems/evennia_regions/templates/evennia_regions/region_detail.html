@@ -36,12 +36,23 @@
 <ul class="list-group mb-4">
   {% for m in memberships %}
   <li class="list-group-item">
-    {{ m.room_name }}
-    {% if m.is_primary %}<span class="badge badge-primary ml-1">Primary</span>{% endif %}
+    {% if m.room_url %}<a href="{{ m.room_url }}">{{ m.room_name }}</a>{% else %}{{ m.room_name }}{% endif %}
+    {% if not m.is_primary %}<span class="badge badge-secondary ml-1">Secondary</span>{% endif %}
   </li>
   {% endfor %}
 </ul>
 {% else %}
 <p class="text-muted mb-4"><em>No rooms have been assigned to this region yet.</em></p>
+{% endif %}
+
+<p class="text-muted small">Primary is the default region for a room. Secondary marks a room that belongs to this region but is not its primary region.</p>
+
+{% if linked_lore %}
+<h2 class="h5">Related lore</h2>
+<ul class="list-unstyled">
+  {% for entry in linked_lore %}
+  <li>{% if entry.entry_url %}<a href="{{ entry.entry_url }}">{{ entry.title }}</a>{% else %}{{ entry.title }}{% endif %}</li>
+  {% empty %}<li class="text-muted">No related lore has been recorded.</li>{% endfor %}
+</ul>
 {% endif %}
 {% endblock %}

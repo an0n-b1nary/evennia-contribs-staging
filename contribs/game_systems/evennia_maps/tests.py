@@ -76,6 +76,7 @@ def _stub_page(request, pk):
 
 
 _STUB_URL_NAMES = {
+    "room": "stub-room-detail",
     "region": "stub-region-detail",
     "scene": "stub-scene-detail",
     "event": "stub-event-detail",
@@ -90,6 +91,7 @@ _STUB_URL_NAMES = {
 urlpatterns = [
     path("map/", include(("evennia_maps.urls", "evennia_maps"))),
     path("api/v1/", include("evennia_maps.api.urls")),
+    path("rooms/<int:pk>/", _stub_page, name="stub-room-detail"),
     path("regions/<int:pk>/", _stub_page, name="stub-region-detail"),
     path("scenes/<int:pk>/", _stub_page, name="stub-scene-detail"),
     path("events/<int:pk>/", _stub_page, name="stub-event-detail"),
@@ -1718,6 +1720,7 @@ class TestCollectOverlays(MapsTestCase):
             self.assertEqual(collect_overlays([], staff=True), {})
 
 
+@override_settings(ROOT_URLCONF=__name__)
 class TestOverlayUrlTemplates(MapsTestCase):
     """Outbound links resolve only when the owning contrib's routes exist."""
 
@@ -1729,6 +1732,7 @@ class TestOverlayUrlTemplates(MapsTestCase):
     @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
     def test_mounted_partners_resolve_with_a_placeholder_pk(self):
         templates = overlay_url_templates()
+        self.assertEqual(templates["room"], "/rooms/0/")
         self.assertEqual(templates["region"], "/regions/0/")
         self.assertEqual(templates["scene"], "/scenes/0/")
         self.assertEqual(templates["event"], "/events/0/")
@@ -1745,7 +1749,9 @@ class TestOverlayUrlTemplates(MapsTestCase):
         self.assertEqual(names["region"], DEFAULT_OVERLAY_URL_NAMES["region"])
 
 
+@override_settings(ROOT_URLCONF=__name__)
 class TestTilesUrlTemplate(MapsTestCase):
+    @override_settings(ROOT_URLCONF="evennia_maps.urls")
     def test_absent_when_the_api_is_not_mounted(self):
         self.assertEqual(tiles_url_template(), "")
 
@@ -1964,6 +1970,7 @@ class TestPlaneMapView(MapsWebTestCase):
         with _provider(_full_provider):
             tile = self._context(AnonymousUser())["svg"]["tiles"][0]
         self.assertEqual(tile["region"]["name"], "Testlands")
+        self.assertEqual(tile["room_url"], f"/rooms/{self.room1.id}/")
         self.assertEqual(tile["region_url"], "/regions/7/")
         self.assertEqual(tile["latest_scene_url"], "/scenes/11/")
 
@@ -2029,6 +2036,7 @@ class TestSvgContextQueryCost(MapsWebTestCase):
         self.assertEqual(small, self._render())
 
 
+@override_settings(ROOT_URLCONF=__name__)
 class TestPlaneLiveMapView(MapsWebTestCase):
     def _context(self, plane, user=None):
         view = PlaneLiveMapView()
@@ -2056,15 +2064,18 @@ class TestPlaneLiveMapView(MapsWebTestCase):
         under.archive()
         self.assertEqual([layer["id"] for layer in self._context(surface)["layers"]], [surface.pk])
 
+    @override_settings(MAPS_TILES_URL_NAME="")
     def test_link_templates_absent_when_partners_are_unmounted(self):
         context = self._context(_make_plane())
         self.assertEqual(context["tiles_url_template"], "")
+        self.assertEqual(context["room_url_template"], "")
         self.assertEqual(context["region_url_template"], "")
 
     @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
     def test_link_templates_present_when_mounted(self):
         context = self._context(_make_plane())
         self.assertEqual(context["tiles_url_template"], "/api/v1/planes/0/tiles/")
+        self.assertEqual(context["room_url_template"], "/rooms/0/")
         self.assertEqual(context["event_url_template"], "/events/0/")
 
 

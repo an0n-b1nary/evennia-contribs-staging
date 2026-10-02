@@ -25,6 +25,11 @@
   Players must RSVP via <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">the cluster page</a>
   to submit ranked preferences. Direct RSVP is not available.
 </div>
+{% else %}
+<div class="alert alert-info">
+  RSVP for this event in-game with <code>+rsvp</code>. Use <code>+events</code> to find the event
+  and <code>help +rsvp</code> for participation and cancellation instructions.
+</div>
 {% endif %}
 
 <dl class="row mb-4">

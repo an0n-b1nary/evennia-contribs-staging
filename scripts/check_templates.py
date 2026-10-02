@@ -199,6 +199,7 @@ BOOTSTRAP4_EXACT = {
     "text-dark",
     "text-info",
     "text-muted",
+    "text-nowrap",
     "text-right",
     "text-success",
     "text-warning",

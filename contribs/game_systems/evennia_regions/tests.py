@@ -42,7 +42,7 @@ from evennia_regions.commands import CmdRegion
 from evennia_regions.integrations import maps as maps_overlays
 from evennia_regions.models import Region, RegionMembership
 from evennia_regions.permissions import is_room_web_visible
-from evennia_regions.views import RegionDetailView, RegionListView
+from evennia_regions.views import RegionDetailView, RegionListView, RoomDetailView
 
 # ---------------------------------------------------------------------------
 # Test URLconf (see the module docstring)
@@ -754,7 +754,8 @@ class TestWebPagesRender(EvenniaTest):
         )
         self.assertIn("Guarded Vale", html)
         self.assertIn(self.room_name, html)
-        self.assertIn("Primary", html)
+        self.assertNotIn(">Primary</span>", html)
+        self.assertNotIn(f"#{self.room1.pk}", html)
         self.assertIn("Member Rooms (1)", html)
 
     def test_region_detail_omits_hidden_rooms_from_the_rendered_page(self):
@@ -770,6 +771,47 @@ class TestWebPagesRender(EvenniaTest):
         bare = _make_region("Nameless Waste", description="")
         html = self._render(RegionDetailView, path_=f"/regions/{bare.pk}/", pk=bare.pk)
         self.assertIn("Not recorded", html)
+
+    def test_room_detail_renders_regions_and_empty_map_state(self):
+        html = self._render(
+            RoomDetailView, path_=f"/regions/rooms/{self.room1.pk}/", pk=self.room1.pk
+        )
+        self.assertIn(self.room1.key, html)
+        self.assertIn("Guarded Vale", html)
+        self.assertIn("has no map location", html)
+
+    def test_room_detail_renders_without_optional_partners_or_memberships(self):
+        RegionMembership.objects.all().delete()
+        with override_settings(REGIONS_MAPS_APP_LABEL="missing_maps"):
+            html = self._render(RoomDetailView, pk=self.room1.pk)
+        self.assertIn("Not recorded", html)
+        self.assertIn("has no map location", html)
+
+    def test_region_detail_renders_without_optional_lore(self):
+        with override_settings(REGIONS_LORE_APP_LABEL="missing_lore"):
+            html = self._render(RegionDetailView, pk=self.region.pk)
+        self.assertIn(self.room_name, html)
+        self.assertNotIn("Related lore", html)
+
+    def test_room_detail_rejects_a_character(self):
+        request = self.factory.get("/regions/rooms/")
+        request.user = AnonymousUser()
+        with self.assertRaises(Http404):
+            RoomDetailView.as_view()(request, pk=self.char1.pk)
+
+    def test_staff_can_follow_hidden_room_links(self):
+        with override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"):
+            html = self._render(RoomDetailView, user=self.account, pk=self.room1.pk)
+        self.assertIn("Guarded Vale", html)
+
+    def test_room_detail_hides_a_room_with_the_visibility_override(self):
+        with (
+            override_settings(REGIONS_ROOM_VISIBILITY="evennia_regions.tests._always_hidden"),
+            self.assertRaises(Http404),
+        ):
+            RoomDetailView.as_view()(
+                self.factory.get(f"/regions/rooms/{self.room1.pk}/"), pk=self.room1.pk
+            )
 
 
 # ---------------------------------------------------------------------------

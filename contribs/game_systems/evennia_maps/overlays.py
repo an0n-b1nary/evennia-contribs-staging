@@ -87,6 +87,7 @@ from evennia_maps.signals import collect_tile_overlays
 logger = logging.getLogger("evennia")
 
 DEFAULT_OVERLAY_URL_NAMES = {
+    "room": "evennia_regions:room-detail",
     "region": "evennia_regions:region-detail",
     "scene": "evennia_scenes:scene-detail",
     "event": "evennia_calendar:calendar-event-detail",

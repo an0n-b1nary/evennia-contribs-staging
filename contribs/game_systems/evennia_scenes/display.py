@@ -20,13 +20,14 @@ def render_scene_ref(scene_id):
         scene_id (int): The Scene pk stored in a soft-reference field.
 
     Returns:
-        str: "Scene #<pk>: <title>" if the scene exists, else "Scene #<pk>".
+        str: "Scene #<public number>: <title>" if the scene exists, else
+            "Scene unavailable".
     """
     try:
         from evennia_scenes.models import Scene
 
-        scene = Scene.objects.only("pk", "title").get(pk=scene_id)
+        scene = Scene.objects.only("pk", "scene_number", "title").get(pk=scene_id)
         title = scene.title or "Untitled"
-        return f"Scene #{scene.pk}: {title}"
+        return f"Scene #{scene.scene_number}: {title}"
     except Exception:
-        return f"Scene #{scene_id}"
+        return "Scene unavailable"

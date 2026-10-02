@@ -20,8 +20,10 @@
 <h1>{{ scene.title|default:"Untitled Scene" }}</h1>
 
 <dl class="row text-muted small mb-3">
+  <dt class="col-sm-2">Scene number</dt>
+  <dd class="col-sm-10">#{{ scene.scene_number }}</dd>
   <dt class="col-sm-2">Room</dt>
-  <dd class="col-sm-10"><strong>{{ scene.room_name|default:"Not recorded" }}</strong></dd>
+  <dd class="col-sm-10"><strong>{% if room_url %}<a href="{{ room_url }}">{{ room_label }}</a>{% else %}{{ room_label }}{% endif %}</strong></dd>
   <dt class="col-sm-2">Creator</dt>
   <dd class="col-sm-10"><strong>{{ scene.creator_name|default:"Unattributed" }}</strong></dd>
   <dt class="col-sm-2">Status</dt>
@@ -54,13 +56,25 @@
   <ul class="list-inline mt-2">
     {% for p in participants %}
     <li class="list-inline-item">
-      {{ p.character_name }}
+      {% if p.character_url %}<a href="{{ p.character_url }}">{{ p.character_name }}</a>{% else %}{{ p.character_name }}{% endif %}
       <span class="text-muted small">({{ p.pose_count }} poses{% if not p.is_active %}, left{% endif %})</span>
     </li>
-    {% empty %}<li class="list-inline-item text-muted">No participants recorded.</li>
     {% endfor %}
   </ul>
 </details>
+{% else %}
+<p class="text-muted">No participants recorded.</p>
+{% endif %}
+
+{% if linked_lore or linked_plots or linked_events %}
+<section class="mb-4" aria-labelledby="scene-links-heading">
+  <h2 id="scene-links-heading" class="h5">Related content</h2>
+  <div class="row">
+    {% if linked_lore %}<div class="col-md-4"><h3 class="h6">Lore</h3><ul class="list-unstyled">{% for entry in linked_lore %}<li>{% if entry.entry_url %}<a href="{{ entry.entry_url }}">{{ entry.title }}</a>{% else %}{{ entry.title }}{% endif %}</li>{% empty %}<li class="text-muted">No related lore.</li>{% endfor %}</ul></div>{% endif %}
+    {% if linked_plots %}<div class="col-md-4"><h3 class="h6">Plots</h3><ul class="list-unstyled">{% for thread in linked_plots %}<li>{% if thread.thread_url %}<a href="{{ thread.thread_url }}">{{ thread.name }}</a>{% else %}{{ thread.name }}{% endif %}</li>{% empty %}<li class="text-muted">No related plots.</li>{% endfor %}</ul></div>{% endif %}
+    {% if linked_events %}<div class="col-md-4"><h3 class="h6">Events</h3><ul class="list-unstyled">{% for event in linked_events %}<li>{% if event.event_url %}<a href="{{ event.event_url }}">{{ event.title }}</a>{% else %}{{ event.title }}{% endif %}</li>{% empty %}<li class="text-muted">No related events.</li>{% endfor %}</ul></div>{% endif %}
+  </div>
+</section>
 {% endif %}
 
 {% if log_entries %}

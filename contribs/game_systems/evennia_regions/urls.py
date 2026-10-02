@@ -17,15 +17,17 @@ Named routes (prefix with ``evennia_regions:`` when reversing)::
 
     region-list      /regions/
     region-detail    /regions/<pk>/
+    room-detail      /regions/rooms/<pk>/
 """
 
 from django.urls import path
 
-from evennia_regions.views import RegionDetailView, RegionListView
+from evennia_regions.views import RegionDetailView, RegionListView, RoomDetailView
 
 app_name = "evennia_regions"
 
 urlpatterns = [
     path("", RegionListView.as_view(), name="region-list"),
+    path("rooms/<int:pk>/", RoomDetailView.as_view(), name="room-detail"),
     path("<int:pk>/", RegionDetailView.as_view(), name="region-detail"),
 ]

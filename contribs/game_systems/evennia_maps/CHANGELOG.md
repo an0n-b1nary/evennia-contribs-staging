@@ -7,7 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.4.0] — 2026-10-02
+
+- **Changed:** static map room names link to the optional region room detail
+  page when that route is mounted.
+
+- **Changed:** live-map popups use the same optional room-detail link for their
+  room heading.
 
 - **Changed:** web templates now load the namespaced stylesheet through a shared
   page-local include; scroll and accessibility rules remain self-contained.

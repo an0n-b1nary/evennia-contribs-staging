@@ -47,7 +47,7 @@
   {% for tile in svg.tiles %}
   <li class="evennia-maps-legend-item">
     <span class="text-muted">({{ tile.x }}, {{ tile.y }})</span>
-    <strong>{{ tile.room_name }}</strong>
+    {% if tile.room_url %}<a href="{{ tile.room_url }}"><strong>{{ tile.room_name }}</strong></a>{% else %}<strong>{{ tile.room_name }}</strong>{% endif %}
     {% if tile.region %}
       {% if tile.region_url %}
       <a href="{{ tile.region_url }}" class="ml-1">{{ tile.region.name }}</a>

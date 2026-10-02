@@ -39,6 +39,12 @@ class TestTypeclassComposition(EvenniaTest):
         self.assertEqual(self.room1.room_type, "ic")
         self.assertIsNone(self.room1.active_scene_id)
 
+    def test_room_appearance_omits_dbref_for_builders(self):
+        self.char1.permissions.add("Builder")
+        appearance = self.room1.return_appearance(self.char1)
+        self.assertIn(self.room1.key, appearance)
+        self.assertNotIn(f"(#{self.room1.pk})", appearance)
+
     def test_character_posing_state_resolves(self):
         """Mixin-provided pose state resolves on the Character. char2 is
         never puppeted in EvenniaTest setUp, but creating it with a

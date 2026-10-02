@@ -43,16 +43,16 @@
 {% if posts %}
 {% for post in posts %}
 <div class="card mb-3{% if post.parent_post %} ml-4{% endif %}">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span>
+  <div class="card-header d-flex justify-content-between align-items-center evennia-boards-post-header">
+    <span class="evennia-boards-post-heading">
       <strong>#{{ post.post_number }}</strong>
       {% if post.parent_post %}
         <span class="text-muted">Re: #{{ post.parent_post.post_number }}</span>
       {% endif %}
-      {{ post.title }}
+      <span class="evennia-boards-post-title" title="{{ post.title }}">{{ post.title }}</span>
     </span>
-    <span class="d-flex align-items-center evennia-boards-gap">
-      <span class="text-muted small">{{ post.author_name|default:"Unattributed" }} &mdash; {{ post.created_at|date:"Y-m-d" }}</span>
+    <span class="d-flex align-items-center evennia-boards-gap evennia-boards-post-actions flex-shrink-0">
+      <span class="text-muted small evennia-boards-post-byline text-nowrap flex-shrink-0">{{ post.author_name|default:"Unattributed" }} &mdash; {{ post.created_at|date:"Y-m-d" }}</span>
       {% if character_id and not board.is_read_only or is_staff and not board.is_read_only %}
       <a href="{% url 'evennia_boards:post-reply' board.pk post.pk %}" class="btn btn-sm btn-outline-secondary">Reply</a>
       {% endif %}

@@ -23,6 +23,8 @@ from unittest.mock import patch
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.db import connection
+from django.db.migrations.loader import MigrationLoader
 from django.test import RequestFactory, override_settings
 from django.urls import include, path
 from django.utils import timezone
@@ -96,6 +98,38 @@ class TestSceneModel(EvenniaTest):
         self.assertIsNotNone(scene.created_at)
         self.assertIsNone(scene.started_at)
         self.assertIsNone(scene.ended_at)
+        self.assertIsNotNone(scene.scene_number)
+
+    def test_public_numbers_are_unique_and_immutable(self):
+        first = _open_scene(self.room1, self.char1, title="First")
+        second = _open_scene(self.room2, self.char2, title="Second")
+        self.assertGreater(second.scene_number, first.scene_number)
+        second.scene_number = first.scene_number
+        with self.assertRaises(ValueError):
+            second.save(update_fields=["scene_number"])
+
+    def test_archived_scenes_keep_their_public_numbers_reserved(self):
+        first = _open_scene(self.room1, self.char1)
+        first.archive()
+        second = _open_scene(self.room2, self.char2)
+        self.assertGreater(second.scene_number, first.scene_number)
+
+    def test_number_migration_backfills_archived_and_unarchived_scenes(self):
+        first = _open_scene(self.room1, self.char1)
+        second = _open_scene(self.room2, self.char2)
+        second.archive()
+        Scene.all_objects.filter(pk=first.pk).update(scene_number=9001)
+        Scene.all_objects.filter(pk=second.pk).update(scene_number=9002)
+        historical_apps = (
+            MigrationLoader(connection)
+            .project_state([("evennia_scenes", "0002_scene_scene_number")])
+            .apps
+        )
+        migration = import_module("evennia_scenes.migrations.0002_scene_scene_number")
+        migration.assign_scene_numbers(historical_apps, connection.schema_editor())
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual((first.scene_number, second.scene_number), (1, 2))
 
     def test_str(self):
         scene = _open_scene(self.room1, self.char1, title="Rumble")
@@ -439,7 +473,7 @@ class TestRenderSceneRef(EvenniaTest):
     def test_renders_title(self):
         scene = _open_scene(self.room1, self.char1, title="Tavern Fight")
         result = render_scene_ref(scene.pk)
-        self.assertIn(str(scene.pk), result)
+        self.assertIn(str(scene.scene_number), result)
         self.assertIn("Tavern Fight", result)
 
     def test_renders_untitled(self):
@@ -449,7 +483,7 @@ class TestRenderSceneRef(EvenniaTest):
 
     def test_missing_pk_returns_fallback(self):
         result = render_scene_ref(999999)
-        self.assertIn("999999", result)
+        self.assertEqual(result, "Scene unavailable")
 
 
 # ---------------------------------------------------------------------------
@@ -574,6 +608,18 @@ class TestCmdScene(EvenniaTest):
         cmd2.func()
         self.assertTrue(any("Backdrop" in str(m) for m in msgs))
 
+    def test_info_and_resume_resolve_public_numbers(self):
+        scene = _open_scene(self.room1, self.char1, title="Numbered Scene")
+        scene.close()
+        Scene.all_objects.filter(pk=scene.pk).update(scene_number=9001)
+        msgs = []
+        self.char1.msg = lambda m=None, **kw: msgs.append(m or kw.get("text"))
+        self._call("+scene/info 9001").func()
+        self.assertTrue(any("Scene #9001: Numbered Scene" in str(m) for m in msgs))
+        self._call("+scene/resume 9001").func()
+        scene.refresh_from_db()
+        self.assertEqual(scene.status, Scene.Status.ACTIVE)
+
     def test_privacy_update(self):
         cmd = self._call("+scene/open Private Test")
         cmd.func()
@@ -643,7 +689,9 @@ class TestCmdLog(EvenniaTest):
     def test_view_log_shows_entries(self):
         msgs = []
         self.char1.msg = lambda m, **kw: msgs.append(m)
-        cmd = self._make_log_cmd(args=str(self.scene.pk), lhs=str(self.scene.pk))
+        Scene.all_objects.filter(pk=self.scene.pk).update(scene_number=9001)
+        self.scene.refresh_from_db()
+        cmd = self._make_log_cmd(args="9001", lhs="9001")
         cmd.func()
         self.assertTrue(any("Original." in str(m) for m in msgs))
 
@@ -803,6 +851,18 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("Scene Archive", html)
         self.assertIn("Tavern Fight", html)
         self.assertIn(f'href="/scenes/{self.scene.pk}/"', html)
+
+    def test_scene_list_displays_close_date(self):
+        when = timezone.now() - timedelta(days=10)
+        Scene.objects.filter(pk=self.scene.pk).update(ended_at=when)
+        self.assertIn(f"<td>{when:%Y-%m-%d}</td>", self._render(SceneListView))
+
+    def test_room_name_survives_unmounted_regions(self):
+        self.scene.room_name = "The Unmounted Tavern"
+        self.scene.save(update_fields=["room_name"])
+        html = self._render(SceneDetailView, pk=self.scene.pk)
+        self.assertIn("The Unmounted Tavern", html)
+        self.assertNotIn("Location unavailable", html)
 
     def test_scene_list_renders_its_empty_state(self):
         Scene.objects.all().delete()
@@ -1301,7 +1361,7 @@ class TestMapsOverlayProvider(EvenniaTest):
         scene = self._closed_scene(self.room1, title="")
         self.assertEqual(
             self._provide()["recent_scenes"][self.room1.id],
-            [{"id": scene.pk, "title": f"Scene #{scene.pk}"}],
+            [{"id": scene.pk, "title": f"Scene #{scene.scene_number}"}],
         )
 
     def test_recent_scenes_stays_public_tier_even_for_staff(self):

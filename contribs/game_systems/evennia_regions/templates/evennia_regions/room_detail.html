@@ -1,0 +1,45 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_regions/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}{{ room.key }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_regions:region-list' %}">Regions</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ room.key }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ room.key }}</h1>
+
+<dl class="row text-muted small mb-4">
+  <dt class="col-sm-3">Description</dt>
+  <dd class="col-sm-9">{% if description %}{{ description|linebreaksbr }}{% else %}Not recorded{% endif %}</dd>
+  <dt class="col-sm-3">Regions</dt>
+  <dd class="col-sm-9">
+    {% for membership in memberships %}
+    <a href="{% url 'evennia_regions:region-detail' membership.region.pk %}">{{ membership.region.name }}</a>{% if not membership.is_primary %} <span class="badge badge-secondary">Secondary</span>{% endif %}{% if not forloop.last %}, {% endif %}
+    {% empty %}Not recorded{% endfor %}
+  </dd>
+</dl>
+
+{% if tiles %}
+<h2 class="h5">Map locations</h2>
+<ul class="list-unstyled">
+  {% for tile in tiles %}
+  <li>{% if tile.map_url %}<a href="{{ tile.map_url }}">{{ tile.plane.name }}</a>{% else %}{{ tile.plane.name }}{% endif %} ({{ tile.x }}, {{ tile.y }})</li>
+  {% empty %}<li class="text-muted">This room has no map location.</li>{% endfor %}
+</ul>
+{% else %}
+<p class="text-muted">This room has no map location.</p>
+{% endif %}
+
+<p class="mt-4"><a href="{% url 'evennia_regions:region-list' %}">&larr; Back to regions</a></p>
+{% endblock %}

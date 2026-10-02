@@ -276,7 +276,8 @@ never imports it. Three rules for providers:
 
 A provider that raises is logged and skipped — its overlay goes absent and the map
 still renders. Outbound links are reversed from `MAPS_OVERLAY_URL_NAMES` (defaults:
-`evennia_regions:region-detail`, `evennia_scenes:scene-detail`,
+`evennia_regions:room-detail`, `evennia_regions:region-detail`,
+`evennia_scenes:scene-detail`,
 `evennia_calendar:calendar-event-detail`); a name that does not resolve renders as
 plain text instead of a broken link.
 

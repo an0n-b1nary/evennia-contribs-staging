@@ -147,6 +147,7 @@ def _build_tile_context(tile, overlays, urls):
         "y": tile.y,
         "room_id": tile.room_id,
         "room_name": tile.room_name or (room.key if room else f"Room #{tile.room_id}"),
+        "room_url": _url_for(urls.get("room", ""), tile.room_id),
         "terrain": tile.terrain,
         "sprite": tile_sprite(tile.terrain),
         "region": region,
@@ -280,6 +281,7 @@ class PlaneLiveMapView(DetailView):
         # Outbound links for popups. An absent role renders no link at all —
         # the partner contrib that owns that page is not installed.
         urls = overlay_url_templates()
+        context["room_url_template"] = urls.get("room", "")
         context["region_url_template"] = urls.get("region", "")
         context["scene_url_template"] = urls.get("scene", "")
         context["event_url_template"] = urls.get("event", "")

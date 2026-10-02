@@ -92,7 +92,7 @@ def _live_scenes():
     ).order_by("-started_at")[:WIDGET_LIMIT]
     return [
         {
-            "title": scene.title or f"Scene #{scene.pk}",
+            "title": scene.title or f"Scene #{scene.scene_number}",
             "room": scene.room_name,
             "started_at": scene.started_at,
             # Detail pages are CLOSED-only, so a running scene has nothing to
@@ -175,7 +175,7 @@ def _recent_activity():
             rows.append(
                 {
                     "kind": "Scene",
-                    "label": scene.title or f"Scene #{scene.pk}",
+                    "label": scene.title or f"Scene #{scene.scene_number}",
                     "when": scene.ended_at,
                     "url": _url("evennia_scenes:scene-detail", scene.pk),
                 }

@@ -25,11 +25,14 @@ Wire into your game's URLconf::
 
 import difflib
 
+from django.apps import apps
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
+from django.utils.text import slugify
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 from evennia.objects.models import ObjectDB
 
@@ -120,10 +123,119 @@ class SceneDetailView(DetailView):
         context["page_obj"] = page_obj
         context["log_entries"] = page_obj.object_list
         context["include_ooc"] = include_ooc
-        context["participants"] = scene.participants.all()
+        participants = list(scene.participants.select_related("character"))
+        for participant in participants:
+            participant.character_url = ""
+            character = participant.character
+            if character is not None:
+                try:
+                    if character.access(self.request.user, "view"):
+                        participant.character_url = reverse(
+                            "character-detail",
+                            kwargs={"slug": slugify(character.key), "pk": character.pk},
+                        )
+                except (AttributeError, NoReverseMatch):
+                    pass
+        context["participants"] = participants
+        context.update(_related_scene_links(scene))
+        context["room_label"] = scene.room_name or "Not recorded"
+        if _room_is_visible(scene.room, self.request):
+            context["room_url"] = _room_url(scene.room)
+        else:
+            context["room_url"] = ""
+            context["room_label"] = "Location unavailable"
         context["is_staff"] = is_staff_user(self.request)
         context["character_id"] = get_character_id(self.request.user)
         return context
+
+
+def _room_is_visible(room, request):
+    """Use the installed regions policy for both room labels and links."""
+    if room is None or is_staff_user(request):
+        return True
+    if apps.is_installed(getattr(settings, "SCENES_REGIONS_APP_LABEL", "evennia_regions")):
+        try:
+            from evennia_regions.permissions import is_room_web_visible
+
+            return is_room_web_visible(room)
+        except (ImportError, LookupError):
+            return False
+    return True
+
+
+def _room_url(room):
+    """Return the optional destination for a room whose visibility was checked."""
+    if room is None:
+        return ""
+    try:
+        return reverse("evennia_regions:room-detail", kwargs={"pk": room.pk})
+    except NoReverseMatch:
+        return ""
+
+
+def _related_scene_links(scene):
+    """Resolve optional lore, plot, and calendar bridges without hard imports."""
+    context = {"linked_lore": [], "linked_plots": [], "linked_events": []}
+    try:
+        lore_label = getattr(settings, "SCENES_LORE_APP_LABEL", "evennia_lore")
+        lore_link = apps.get_model(lore_label, "LoreSceneLink")
+        lore_entry = apps.get_model(lore_label, "LoreEntry")
+        entry_ids = lore_link.objects.filter(scene_id=scene.pk).values_list("entry_id", flat=True)
+        entries = list(
+            lore_entry.objects.filter(
+                pk__in=entry_ids, status=lore_entry.Status.PUBLISHED, is_archived=False
+            ).order_by("entry_number")
+        )
+        for entry in entries:
+            try:
+                entry.entry_url = reverse("lore-detail", kwargs={"pk": entry.pk})
+            except NoReverseMatch:
+                entry.entry_url = ""
+        context["linked_lore"] = entries
+    except (LookupError, ValueError):
+        pass
+
+    try:
+        plot_label = getattr(settings, "SCENES_PLOTS_APP_LABEL", "evennia_plots")
+        plot_link = apps.get_model(plot_label, "ScenePlotLink")
+        plot_thread = apps.get_model(plot_label, "PlotThread")
+        thread_ids = plot_link.objects.filter(scene_id=scene.pk).values_list("thread_id", flat=True)
+        threads = plot_thread.objects.filter(pk__in=thread_ids).exclude(
+            privacy=plot_thread.Privacy.PRIVATE
+        )
+        threads = list(threads.order_by("name"))
+        for thread in threads:
+            try:
+                thread.thread_url = reverse("evennia_plots:plot-detail", kwargs={"pk": thread.pk})
+            except NoReverseMatch:
+                thread.thread_url = ""
+        context["linked_plots"] = threads
+    except (LookupError, ValueError):
+        pass
+
+    try:
+        calendar_label = getattr(settings, "SCENES_CALENDAR_APP_LABEL", "evennia_calendar")
+        calendar_link = apps.get_model(calendar_label, "SceneCalendarLink")
+        event_model = apps.get_model(calendar_label, "CalendarEvent")
+        event_ids = calendar_link.objects.filter(scene_id=scene.pk).values_list(
+            "event_id", flat=True
+        )
+        events = list(
+            event_model.objects.filter(pk__in=event_ids, is_cancelled=False).order_by(
+                "scheduled_time"
+            )
+        )
+        for event in events:
+            try:
+                event.event_url = reverse(
+                    "evennia_calendar:calendar-event-detail", kwargs={"pk": event.pk}
+                )
+            except NoReverseMatch:
+                event.event_url = ""
+        context["linked_events"] = events
+    except (LookupError, ValueError):
+        pass
+    return context
 
 
 class LogEntryEditView(ScenesAuthoringMixin, FormView):
