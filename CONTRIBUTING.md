@@ -87,6 +87,9 @@ one. File through the wrapper instead of `gh` directly:
 python scripts/file_issue.py create --title "..." --body-file draft.md --label bug
 python scripts/file_issue.py comment 7 --body-file reply.md
 
+# Private targets require an explicit opt-in and verified GitHub visibility:
+python scripts/file_issue.py comment 7 --repo owner/private-game --private --body-file reply.md
+
 # scan without publishing:
 python scripts/file_issue.py create --title "..." --body-file draft.md --dry-run
 ```
@@ -96,6 +99,14 @@ so external clones are not blocked by config they were never given — the wrapp
 **fails closed**. A missing patterns file at commit time means "not the
 maintainer's clone"; at publish time it means "about to publish, with no idea
 what is forbidden".
+
+`--private` requires `--repo owner/name` and verifies that GitHub reports that
+exact repository as private. Failed lookups, public targets, mismatched identities,
+and missing patterns abort. Both fields are still scanned; matching lines are
+printed as warnings for a verified private target. Use this mode only from a
+private terminal. `--dry-run` performs the same visibility check and scan without
+publishing. Without the explicit flag, the normal blocking scan applies to every
+target, including private ones.
 
 `.github/workflows/anonymity-issues.yml` sweeps every issue and comment
 server-side, so the web UI and the API are covered too. Be clear about what that
@@ -114,6 +125,9 @@ counts only.
 This repo follows the [Evennia upstream code style](https://github.com/evennia/evennia/blob/main/CODING_STYLE.md) with one tooling difference: we use [Ruff](https://docs.astral.sh/ruff/) for both formatting and linting instead of Black + isort + Flake8. The rules are equivalent (100-char lines, Google-style docstrings, Evennia-conventional import order).
 
 See [CODING_STYLE.md](CODING_STYLE.md) for the full conventions and the per-contrib `pyproject.toml` template. Web-surface contribs also follow [UI_CONVENTIONS.md](UI_CONVENTIONS.md).
+
+Host games adapting the sandbox shell can follow [WEB_PORTING.md](WEB_PORTING.md)
+for navigation, homepage widgets, viewer policy, template checks, and live scenes.
 
 Local setup (once per clone):
 
