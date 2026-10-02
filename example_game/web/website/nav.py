@@ -61,6 +61,7 @@ NAV_GROUPS = (
         "Events",
         (
             ("Scenes", "evennia_scenes:scene-list", PUBLIC),
+            ("Happening Now", "evennia_scenes:scene-live-list", PUBLIC),
             ("Plots", "evennia_plots:plot-list", PUBLIC),
             ("Calendar", "evennia_calendar:calendar-list", PUBLIC),
         ),

@@ -37,6 +37,7 @@ Key                  Owner         Value
 ===================  ============  ===============================================
 ``primary_region``   regions       ``{"id": int, "name": str}`` — the room's
                                    primary region, for the tile link
+``active_scenes``    scenes        ``[{"id": int, "title": str}, ...]`` for live scenes
 ``has_active_scene`` scenes        ``True`` for a room with a live scene
 ``recent_scene_count`` scenes      ``int`` — heatmap weight
 ``recent_scenes``    scenes        ``[{"id": int, "title": str}, ...]``

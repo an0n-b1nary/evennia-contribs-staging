@@ -241,7 +241,11 @@ class CmdScene(MuxCommand):
         scene_opened.send(sender=Scene, scene=scene, creator=caller)
 
         title_str = f' "{title}"' if title else ""
-        room.msg_contents(f"|y{caller.key} has opened a scene{title_str}.|n")
+        room.msg_contents(
+            f"|y{caller.key} has opened a scene{title_str}.|n "
+            "Privacy: Public. This scene is readable on the web while it runs. "
+            "Use +scene/privacy view-private to restrict viewing."
+        )
 
     def _close(self):
         """Close (pause) the active scene."""
@@ -422,7 +426,14 @@ class CmdScene(MuxCommand):
         scene.privacy = privacy_value
         scene.save(update_fields=["privacy"])
 
-        caller.location.msg_contents(f"|yScene privacy set to:|n {scene.get_privacy_display()}")
+        visibility = (
+            "Readable on the web while it runs."
+            if Scene.is_web_readable(scene.privacy)
+            else "Only invited participants and staff can read the web log."
+        )
+        caller.location.msg_contents(
+            f"|yScene privacy set to:|n {scene.get_privacy_display()}. {visibility}"
+        )
 
     def _invite(self):
         """Invite a character to pose in a non-public scene."""
@@ -563,8 +574,8 @@ class CmdScene(MuxCommand):
         """Redirect to the privacy model (publish step no longer needed)."""
         self.caller.msg(
             "|yScenes no longer require a separate publish step.|n\n"
-            "Closed |wpublic|n and |wpose-private|n scenes appear automatically "
-            "on the web log browser when you close them.\n"
+            "|wpublic|n and |wpose-private|n scenes appear automatically "
+            "on the web log browser while running and after closing.\n"
             "Use |w+scene/privacy|n to control visibility:\n"
             "  |w+scene/privacy public|n       — visible to everyone (default)\n"
             "  |w+scene/privacy pose-private|n — visible to everyone; "
@@ -645,7 +656,7 @@ class CmdScene(MuxCommand):
         entry_count = scene.log_entries.filter(is_deleted=False).count()
         lines.append(f"  Log entries: {entry_count}")
 
-        if scene.status == Scene.Status.CLOSED:
+        if not scene.is_archived:
             lines.append(
                 f"  |lc+log {scene.scene_number}|lt[View Log]|le"
                 f"  |lu{_scene_web_path(scene.pk)}|lt[↗ web]|le"

@@ -1,5 +1,13 @@
 # Changelog — evennia-scenes
 
+## [0.5.0] — 2026-10-02
+
+- **Added:** privacy-checked live scene reading, a separate happening-now list,
+  last-page defaults, and ten-second polling with a manual refresh fallback.
+- **Fixed:** API detail/log routes can read live web-readable scenes while the
+  default list remains the archive; OOC pagination preserves its filter.
+- **Added:** live scene links in map overlays and in-game visibility notices.
+
 ## [0.4.0] — 2026-10-02
 
 - **Added:** immutable public scene numbers, migration backfill, command lookup,

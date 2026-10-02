@@ -154,6 +154,7 @@ class PlaneViewSet(ReadOnlyModelViewSet):
                 "hangout_type": tile_hangout_type(tile.room),
                 "primary_region_id": (primary_region.get(tile.room_id) or {}).get("id"),
                 "has_active_scene": bool(has_active_scene.get(tile.room_id, False)),
+                "active_scenes": overlays.get("active_scenes", {}).get(tile.room_id, []),
                 "recent_scene_count": recent_scene_counts.get(tile.room_id, 0),
                 "has_lore": bool(has_lore.get(tile.room_id, False)),
                 "recent_scenes": recent_scenes_by_room.get(tile.room_id, []),

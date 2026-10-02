@@ -172,6 +172,19 @@ class SandboxCharacterListView(CharacterListView):
 
     template_name = "website/character_list.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for character in context["object_list"]:
+            character.sandbox_online = bool(character.sessions.count())
+            character.sandbox_last_seen = character.attributes.get("sandbox_last_seen")
+            concept = getattr(character, "profile_role", "")
+            character.sandbox_concept = (
+                " ".join(str(concept).split())
+                if concept and concept != "Unspecified"
+                else "Concept not recorded"
+            )
+        return context
+
 
 class SandboxCharacterManageView(CharacterManageView):
     """Native account character-management list with explicit pagination."""

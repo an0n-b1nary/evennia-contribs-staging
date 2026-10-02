@@ -193,9 +193,8 @@ from evennia_boards.signals import post_created, board_unread_notified
 # post_created(sender=Post, post=Post, board=Board)
 post_created.connect(my_handler)
 
-# board_unread_notified — reserved for future notification infrastructure.
-# Declared but not yet fired by the login listener.
-# Planned kwargs: account=AccountDB, board=Board, unread_count=int
+# Login listener: one signal per subscribed board with new posts.
+# sender=Subscription, account=AccountDB, board=Board, unread_count=int
 board_unread_notified.connect(my_handler)
 ```
 
@@ -204,3 +203,13 @@ board_unread_notified.connect(my_handler)
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).
+
+
+### Web read state
+
+The board index shows the latest non-archived post and author. Authenticated
+viewers also see unread counts. Successful full-board renders persist the
+highest displayed post number in the account Attribute `boards_web_read`, keyed
+by board ID. Reading with replies hidden does not mark unseen replies read.
+Anonymous browsing creates no read state. These markers are separate from
+subscription `last_notified_at`, so web reading never consumes login notifications.

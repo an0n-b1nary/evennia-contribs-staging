@@ -73,6 +73,7 @@ class RoomTileSerializer(serializers.Serializer):
     # evennia_maps/overlays.py.
     primary_region_id = serializers.IntegerField(allow_null=True)
     has_active_scene = serializers.BooleanField()
+    active_scenes = MapPopupLinkSerializer(many=True)
     recent_scene_count = serializers.IntegerField()
     has_lore = serializers.BooleanField()
     recent_scenes = MapPopupLinkSerializer(many=True)

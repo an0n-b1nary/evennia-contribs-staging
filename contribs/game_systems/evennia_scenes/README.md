@@ -167,8 +167,20 @@ dependency is added.
 | `pose-private` | Everyone | Only invited characters (`+scene/invite`) |
 | `view-private` | Only invited characters and staff | Only invited characters |
 
-Closed `public` and `pose-private` scenes appear in the web log browser
-automatically — no separate publish step is needed.
+`public` and `pose-private` scenes are readable while running and after closing.
+`/scenes/` stays a finished-scene archive; `/scenes/live/` lists public scenes
+happening now. Live details open at the last log page and poll every ten seconds.
+Explicit numbered pages stay put. `?page=latest` follows the tail; without
+JavaScript, use **Refresh latest entries**. OOC remains hidden unless
+`?include_ooc=1`, including during polling and pagination.
+
+Every poll checks the same scene privacy predicate as the initial request.
+Private scenes stay invited-and-staff only, archived scenes return 404, and
+unknown privacy tiers fail closed. Public scenes can be spectated anonymously;
+posing still requires the existing in-game permissions. No separate publish
+step is needed. The authenticated REST API defaults its list to closed scenes,
+accepts `?status=open` / `?status=active`, and serves live detail/log routes
+without a status parameter. Its existing public-only privacy policy is unchanged.
 
 If you add your own web surface (a map overlay, a search index, a digest
 email), decide visibility with the model's own rule rather than rewriting the
@@ -239,6 +251,7 @@ if your game registers the maps app under a different label.
 | Overlay key | Value | Visibility |
 |---|---|---|
 | `has_active_scene` | `{room_id: True}` for open/active scenes | Web-readable tiers only, unless staff |
+| `active_scenes` | `{room_id: [{"id", "title"}, …]}` for live scene links | Web-readable tiers only, unless staff |
 | `recent_scene_count` | `{room_id: int}`, closed scenes in the last 90 days | Web-readable tiers only, unless staff |
 | `recent_scenes` | `{room_id: [{"id", "title"}, …]}`, 3 newest closed | Web-readable tiers **always**, staff included |
 

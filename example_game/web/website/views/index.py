@@ -95,9 +95,7 @@ def _live_scenes():
             "title": scene.title or f"Scene #{scene.scene_number}",
             "room": scene.room_name,
             "started_at": scene.started_at,
-            # Detail pages are CLOSED-only, so a running scene has nothing to
-            # link to yet. The card links to the archive as a whole instead.
-            "url": None,
+            "url": _url("evennia_scenes:scene-detail", scene.pk),
         }
         for scene in scenes
     ]

@@ -53,6 +53,7 @@ DEFAULT_PAGES: list[tuple[str, str]] = [
     ("plots", "/plots/"),
     ("plot-detail", "/plots/1/"),
     ("scenes", "/scenes/"),
+    ("scenes-live", "/scenes/live/"),
     # Both scene states, because they render differently and the archive only
     # ever shows you the closed one: 1 is the open scene the map's
     # has_active_scene overlay reads, 4 is a closed one with an ended_at.
@@ -60,9 +61,8 @@ DEFAULT_PAGES: list[tuple[str, str]] = [
     ("scene-detail-closed", "/scenes/4/"),
     ("boards", "/boards/"),
     ("board-detail", "/boards/1/"),
-    # Board 2 is seeded with no posts -- kept in the list on purpose, as the
-    # cheapest standing check on how an empty collection presents itself.
-    ("board-detail-empty", "/boards/2/"),
+    # Both seeded boards now contain authored examples.
+    ("board-detail-second", "/boards/2/"),
     ("lore", "/lore/"),
     ("lore-detail", "/lore/1/"),
     ("jobs", "/jobs/"),

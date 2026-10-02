@@ -152,6 +152,10 @@ def _build_tile_context(tile, overlays, urls):
         "sprite": tile_sprite(tile.terrain),
         "region": region,
         "region_url": _url_for(urls.get("region", ""), region["id"]) if region else "",
+        "active_scenes": [
+            {**scene, "url": _url_for(urls.get("scene", ""), scene["id"])}
+            for scene in overlays.get("active_scenes", {}).get(tile.room_id, [])
+        ],
         "latest_scene": latest_scene,
         "latest_scene_url": (
             _url_for(urls.get("scene", ""), latest_scene["id"]) if latest_scene else ""

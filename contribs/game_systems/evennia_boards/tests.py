@@ -892,17 +892,70 @@ class TestWebPagesRender(EvenniaTest):
 
     # -- board list ---------------------------------------------------------
 
-    def test_board_list_renders_names_and_post_counts(self):
+    def test_board_list_renders_latest_post_and_author(self):
         html = self._render(BoardListView)
         self.assertIn("Notices", html)
-        # The count is attached as board.post_count. Django refuses to resolve
-        # any template variable starting with an underscore, so the earlier
-        # board._post_count made this page a guaranteed TemplateSyntaxError.
-        self.assertIn("<td>2</td>", html)
+        self.assertIn("Re: First Post", html)
+        self.assertIn(self.char2.key, html)
+        self.assertNotIn('<th scope="col">Posts</th>', html)
 
     def test_board_list_renders_its_empty_state(self):
         Board.objects.all().delete()
         self.assertIn("No bulletin boards have been configured.", self._render(BoardListView))
+
+    def test_web_unread_is_per_account_and_excludes_archived_posts(self):
+        html = self._render(BoardListView, user=self.account)
+        self.assertIn("2 unread", html)
+        self._render(BoardDetailView, user=self.account, pk=self.board.pk)
+        self.assertNotIn("unread</span>", self._render(BoardListView, user=self.account))
+        self.assertIn("2 unread", self._render(BoardListView, user=self.account2))
+        new = Post.create_post(
+            board=self.board, author=self.char2, title="New", content="A new post"
+        )
+        self.assertIn("1 unread", self._render(BoardListView, user=self.account))
+        new.archive()
+        html = self._render(BoardListView, user=self.account)
+        self.assertNotIn("1 unread", html)
+        self.assertIn("Re: First Post", html)
+
+    def test_unrendered_and_filtered_board_views_do_not_mark_replies_read(self):
+        request = self.factory.get("/boards/")
+        request.user = self.account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        response = BoardDetailView.as_view()(request, pk=self.board.pk)
+        self.assertIsNone(self.account.attributes.get("boards_web_read"))
+        request = self.factory.get("/boards/?show_replies=0")
+        request.user = self.account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        filtered = BoardDetailView.as_view()(request, pk=self.board.pk)
+        filtered.render()
+        self.assertIsNone(self.account.attributes.get("boards_web_read"))
+        response.render()
+        self.assertEqual(self.account.attributes.get("boards_web_read")[str(self.board.pk)], 2)
+
+    def test_login_signal_reports_each_board_count_and_no_empty_notification(self):
+        from evennia_boards.listeners import _notify_board_subscriptions
+        from evennia_boards.signals import board_unread_notified
+
+        Subscription.objects.create(account=self.account, board=self.board)
+        seen = []
+
+        def receiver(sender, **kwargs):
+            seen.append((sender, kwargs["account"], kwargs["board"], kwargs["unread_count"]))
+
+        board_unread_notified.connect(receiver, weak=False)
+        try:
+            with patch.object(self.account, "msg"):
+                _notify_board_subscriptions(self.account)
+                _notify_board_subscriptions(self.account)
+            self.assertEqual(seen, [(Subscription, self.account, self.board, 2)])
+        finally:
+            board_unread_notified.disconnect(receiver)
+
+    def test_empty_board_and_anonymous_unread_render(self):
+        Post.objects.all().delete()
+        self.assertIn("No posts yet.", self._render(BoardListView))
+        self.assertNotIn("Unread</th>", self._render(BoardListView))
 
     # -- board detail -------------------------------------------------------
 

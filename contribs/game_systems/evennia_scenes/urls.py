@@ -26,10 +26,12 @@ from evennia_scenes.views import (
     LogEntryHistoryView,
     SceneDetailView,
     SceneListView,
+    SceneLiveListView,
 )
 
 urlpatterns = [
     path("scenes/", SceneListView.as_view(), name="scene-list"),
+    path("scenes/live/", SceneLiveListView.as_view(), name="scene-live-list"),
     path("scenes/<int:pk>/", SceneDetailView.as_view(), name="scene-detail"),
     path(
         "scenes/<int:pk>/log/<int:entry_id>/edit/",

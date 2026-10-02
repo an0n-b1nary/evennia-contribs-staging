@@ -1007,7 +1007,7 @@ class TestWebPagesRender(EvenniaTest):
 
 
 class TestSceneDetailViewVisibility(EvenniaTest):
-    """SceneDetailView parity: only CLOSED, non-archived scenes are reachable,
+    """SceneDetailView parity: non-archived scenes at every status are reachable,
     OOC is hidden by default, and VIEW_PRIVATE is gated. Assertions read
     response.context_data so they do not depend on the host base template /
     URLconf (no .render()).
@@ -1050,14 +1050,13 @@ class TestSceneDetailViewVisibility(EvenniaTest):
         self.assertIn(self.ooc_entry, entries)
         self.assertTrue(resp.context_data["include_ooc"])
 
-    def test_detail_open_scene_not_reachable(self):
-        from django.http import Http404
-
+    def test_detail_open_scene_is_reachable(self):
         from evennia_scenes.views import SceneDetailView
 
-        open_scene = _open_scene(self.room2, self.char1)  # status OPEN
-        with self.assertRaises(Http404):
-            SceneDetailView.as_view()(self._anon_get(), pk=open_scene.pk)
+        scene = _open_scene(self.room2, self.char1)
+        response = SceneDetailView.as_view()(self._anon_get(), pk=scene.pk)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context_data["is_live"])
 
     def test_detail_archived_scene_not_reachable(self):
         from django.http import Http404
@@ -1412,3 +1411,155 @@ class TestMapsOverlayWiring(EvenniaTest):
         _open_scene(self.room1, self.char1)
         overlays = collect_overlays([self.room1.id], staff=False)
         self.assertTrue(overlays["has_active_scene"][self.room1.id])
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestLiveSceneReading(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.scene = _open_scene(self.room1, self.char1, title="Live rehearsal")
+        self.scene.privacy = Scene.Privacy.POSE_PRIVATE
+        self.scene.save()
+
+    def request(self, query="", user=None):
+        request = self.factory.get("/scenes/live/" + query)
+        request.user = AnonymousUser() if user is None else user
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        return request
+
+    def detail(self, query="", user=None):
+        from evennia_scenes.views import SceneDetailView
+
+        return SceneDetailView.as_view()(self.request(query, user), pk=self.scene.pk)
+
+    def test_live_tail_pagination_and_earlier_pages_preserve_ooc_filter(self):
+        for index in range(27):
+            LogEntry.create_entry(scene=self.scene, author=self.char1, content=f"Pose {index}")
+        LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="Hidden OOC", log_type="ooc"
+        )
+        response = self.detail()
+        response.render()
+        html = response.content.decode()
+        self.assertEqual(response.context_data["page_obj"].number, 2)
+        self.assertIn("Pose 26", html)
+        self.assertNotIn("Hidden OOC", html)
+        self.assertIn("Live</span>", html)
+        self.assertIn(self.char1.key, html)
+        self.assertIn("live_scene.js", html)
+        earlier = self.detail("?page=1&include_ooc=1")
+        earlier.render()
+        self.assertIn("Pose 0", earlier.content.decode())
+        self.assertIn("&amp;include_ooc=1", earlier.content.decode())
+
+    def test_poll_updates_entries_participants_and_stops_when_closed(self):
+        import json
+
+        first = self.detail("?poll=1&page=latest")
+        self.assertIn("No log entries", json.loads(first.content)["html"])
+        entry = LogEntry.create_entry(
+            scene=self.scene, author=self.char2, content="<script>unsafe</script>"
+        )
+        LogEntry.create_entry(
+            scene=self.scene, author=self.char1, content="OOC secret", log_type="web_ooc"
+        )
+        payload = json.loads(self.detail("?poll=1&page=latest").content)
+        self.assertIn("&lt;script&gt;unsafe", payload["html"])
+        self.assertIn(self.char2.key, payload["html"])
+        self.assertNotIn("OOC secret", payload["html"])
+        entry.is_deleted = True
+        entry.save()
+        self.assertNotIn("unsafe", json.loads(self.detail("?poll=1").content)["html"])
+        self.assertIn(
+            "OOC secret", json.loads(self.detail("?poll=1&include_ooc=1").content)["html"]
+        )
+        self.scene.close()
+        final = self.detail("?poll=1&page=latest")
+        self.assertFalse(json.loads(final.content)["live"])
+        self.assertEqual(final["Cache-Control"], "private, no-store")
+
+    def test_poll_rechecks_revoked_private_unknown_and_archived_access(self):
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+
+        for privacy in (Scene.Privacy.VIEW_PRIVATE, "future_private"):
+            self.scene.privacy = privacy
+            self.scene.save()
+            for query in ("", "?poll=1"):
+                with (
+                    self.subTest(privacy=privacy, query=query),
+                    self.assertRaises(PermissionDenied),
+                ):
+                    self.detail(query)
+        self.scene.archive()
+        with self.assertRaises(Http404):
+            self.detail("?poll=1")
+
+    def test_live_private_scene_remains_invited_or_staff_only(self):
+        self.scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        self.scene.save()
+        SceneParticipant.objects.update_or_create(
+            scene=self.scene,
+            character=self.char1,
+            defaults={"is_invited": True, "character_name": self.char1.key},
+        )
+        with (
+            patch("evennia_scenes.views.is_staff_user", return_value=False),
+            patch("evennia_scenes.views.get_character_id", return_value=self.char1.pk),
+        ):
+            response = self.detail(user=self.account)
+            response.render()
+            self.assertIn("Live rehearsal", response.content.decode())
+        with patch("evennia_scenes.views.is_staff_user", return_value=True):
+            response = self.detail(user=self.account)
+            response.render()
+            self.assertIn("Live rehearsal", response.content.decode())
+
+    def test_live_list_is_separate_from_archive_and_has_an_empty_state(self):
+        from evennia_scenes.views import SceneListView, SceneLiveListView
+
+        live = SceneLiveListView.as_view()(self.request())
+        live.render()
+        self.assertIn("Live rehearsal", live.content.decode())
+        archive = SceneListView.as_view()(self.request())
+        archive.render()
+        self.assertNotIn("Live rehearsal", archive.content.decode())
+        self.scene.close()
+        empty = SceneLiveListView.as_view()(self.request())
+        empty.render()
+        self.assertIn("No scenes are running right now", empty.content.decode())
+
+    def test_api_default_archive_and_live_retrieve_log_status_filter(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from evennia_scenes.api.views import SceneViewSet
+
+        LogEntry.create_entry(scene=self.scene, author=self.char1, content="API live pose")
+
+        def call(action, query="", pk=None):
+            request = APIRequestFactory().get("/api/v1/scenes/" + query)
+            force_authenticate(request, user=self.account)
+            kwargs = {"pk": pk} if pk else {}
+            return SceneViewSet.as_view({"get": action})(request, **kwargs)
+
+        self.assertEqual(call("list").data["results"], [])
+        self.assertEqual(call("retrieve", pk=self.scene.pk).status_code, 200)
+        self.assertEqual(len(call("list", "?status=active").data["results"]), 1)
+        self.assertEqual(
+            call("log", pk=self.scene.pk).data["results"][0]["content"], "API live pose"
+        )
+        self.scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        self.scene.save()
+        self.assertEqual(call("retrieve", pk=self.scene.pk).status_code, 404)
+        self.assertEqual(call("log", pk=self.scene.pk).status_code, 404)
+
+    def test_active_map_links_follow_the_same_privacy_policy(self):
+        from evennia_scenes.integrations.maps import provide
+
+        overlays = provide(None, [self.room1.pk], False)
+        self.assertEqual(overlays["active_scenes"][self.room1.pk][0]["id"], self.scene.pk)
+        self.scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        self.scene.save()
+        self.assertEqual(provide(None, [self.room1.pk], False)["active_scenes"], {})
+        self.assertTrue(provide(None, [self.room1.pk], True)["active_scenes"])

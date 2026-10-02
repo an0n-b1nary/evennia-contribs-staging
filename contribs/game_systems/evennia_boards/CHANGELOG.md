@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] — 2026-10-02
+
+- **Fixed:** the login listener emits `board_unread_notified` once per subscribed
+  board with new posts, with account, board and unread count.
+- **Changed:** the board index shows latest post, author and per-account web unread
+  counts. Read markers persist after successful full-board renders, independently
+  of subscription notification timestamps; archived posts are excluded.
+
 ## [0.2.0] — 2026-10-02
 
 - **Fixed:** long post titles truncate in the flexible title area while the

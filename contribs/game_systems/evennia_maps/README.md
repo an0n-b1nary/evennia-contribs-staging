@@ -232,6 +232,7 @@ rules.
 |---|---|---|
 | `primary_region` | `evennia-regions` | Tile label and link to the region page |
 | `has_active_scene` | `evennia-scenes` | Highlighted tile border |
+| `active_scenes` | `evennia-scenes` | Live log links in the popup and static map |
 | `recent_scene_count` | `evennia-scenes` | Activity heatmap layer |
 | `recent_scenes` | `evennia-scenes` | Log links in the tile popup |
 | `has_lore` | `evennia-lore` | Lore pin layer |

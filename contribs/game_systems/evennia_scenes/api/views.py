@@ -23,7 +23,7 @@ from evennia_scenes.models import LogEntry, Scene
 
 
 class SceneViewSet(ReadOnlyModelViewSet):
-    """Closed public scenes.
+    """Public scenes: the default list is the archive; details may be live.
 
     Only web-readable tiers (Scene.WEB_READABLE_PRIVACY — PUBLIC and
     POSE_PRIVATE) are exposed in the API. Every other tier is excluded to
@@ -50,7 +50,10 @@ class SceneViewSet(ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = Scene.objects.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)
         status = self.request.query_params.get("status")
-        qs = qs.filter(status=status) if status else qs.filter(status=Scene.Status.CLOSED)
+        if status:
+            qs = qs.filter(status=status)
+        elif getattr(self, "action", "list") == "list":
+            qs = qs.filter(status=Scene.Status.CLOSED)
         return qs
 
     @action(detail=True, url_path="log", url_name="log")

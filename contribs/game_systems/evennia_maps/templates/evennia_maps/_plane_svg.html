@@ -55,6 +55,9 @@
       <span class="text-muted ml-1">{{ tile.region.name }}</span>
       {% endif %}
     {% endif %}
+    {% for scene in tile.active_scenes %}
+    {% if scene.url %}<a href="{{ scene.url }}" class="ml-1">Live: {{ scene.title }}</a>{% else %}<span class="ml-1">Live: {{ scene.title }}</span>{% endif %}
+    {% empty %}{% endfor %}
     {% if tile.latest_scene_url %}
     <a href="{{ tile.latest_scene_url }}" class="ml-1">Recent log</a>
     {% endif %}

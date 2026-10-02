@@ -39,6 +39,11 @@ def _notify_board_subscriptions(sender, session=None, **kwargs):
         if count:
             plural = "s" if count != 1 else ""
             lines.append(f"  |w{sub.board.name}|n: {count} new post{plural}")
+            from evennia_boards.signals import board_unread_notified
+
+            board_unread_notified.send(
+                sender=Subscription, account=account, board=sub.board, unread_count=count
+            )
         pks.append(sub.pk)
 
     if lines:

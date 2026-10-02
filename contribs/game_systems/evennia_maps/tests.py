@@ -1665,6 +1665,7 @@ def _full_provider(sender, room_ids, staff, **kwargs):
     return {
         "primary_region": {rid: {"id": 7, "name": "Testlands"} for rid in room_ids},
         "has_active_scene": {rid: True for rid in room_ids},
+        "active_scenes": {rid: [{"id": 12, "title": "Live rehearsal"}] for rid in room_ids},
         "recent_scene_count": {rid: 3 for rid in room_ids},
         "recent_scenes": {rid: [{"id": 11, "title": "A log"}] for rid in room_ids},
         "has_lore": {rid: True for rid in room_ids},
@@ -2247,6 +2248,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
             tile = self._tiles(self.client)[0]
         self.assertIsNone(tile["primary_region_id"])
         self.assertFalse(tile["has_active_scene"])
+        self.assertEqual(tile["active_scenes"], [])
         self.assertFalse(tile["has_lore"])
         self.assertEqual(tile["recent_scene_count"], 0)
         self.assertEqual(tile["recent_scenes"], [])
@@ -2257,6 +2259,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
             tile = self._tiles(self.client)[0]
         self.assertEqual(tile["primary_region_id"], 7)
         self.assertTrue(tile["has_active_scene"])
+        self.assertEqual(tile["active_scenes"], [{"id": 12, "title": "Live rehearsal"}])
         self.assertEqual(tile["recent_scene_count"], 3)
         self.assertEqual(tile["recent_scenes"], [{"id": 11, "title": "A log"}])
         self.assertEqual(tile["upcoming_events"], [{"id": 22, "title": "A moot"}])

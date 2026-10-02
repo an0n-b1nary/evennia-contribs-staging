@@ -24,6 +24,7 @@ Wire into your game's URLconf::
 """
 
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count, OuterRef, Subquery
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -37,22 +38,47 @@ from evennia_boards.permissions import get_character_id, is_staff_user
 
 
 class BoardListView(ListView):
-    """Paginated list of all boards with post counts."""
+    """Boards with their latest post and account-specific web unread state."""
 
     model = Board
     template_name = "evennia_boards/board_list.html"
     context_object_name = "boards"
 
     def get_queryset(self):
-        return Board.objects.all()
+        latest = Post.objects.filter(board_id=OuterRef("pk")).order_by("-post_number")
+        return Board.objects.annotate(
+            latest_title=Subquery(latest.values("title")[:1]),
+            latest_author=Subquery(latest.values("author_name")[:1]),
+            latest_number=Subquery(latest.values("post_number")[:1]),
+            latest_time=Subquery(latest.values("created_at")[:1]),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Bulletin Boards"
+        account = self.request.user
+        context["show_unread"] = account.is_authenticated
+        markers = (
+            account.attributes.get("boards_web_read", default={})
+            if account.is_authenticated
+            else {}
+        )
+        counts = {}
+        if account.is_authenticated:
+            # Group by board and read cutoff; query count stays flat in board count.
+            from django.db.models import Q
+
+            unread = Q(pk__in=[])
+            for board in context["boards"]:
+                unread |= Q(board=board, post_number__gt=markers.get(str(board.pk), 0))
+            counts = dict(
+                Post.objects.filter(unread)
+                .values("board_id")
+                .annotate(count=Count("pk"))
+                .values_list("board_id", "count")
+            )
         for board in context["boards"]:
-            # Not `_post_count`: Django's template engine refuses to
-            # resolve any variable whose name starts with an underscore.
-            board.post_count = board.posts.count()
+            board.unread_count = counts.get(board.pk, 0)
         return context
 
 
@@ -63,6 +89,23 @@ class BoardDetailView(DetailView):
     template_name = "evennia_boards/board_detail.html"
     context_object_name = "board"
 
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        account = self.request.user
+        posts = context["posts"]
+        if account.is_authenticated and context["show_replies"] and posts:
+            key = str(self.object.pk)
+            last_number = max(post.post_number for post in posts)
+
+            def mark_read(rendered_response):
+                markers = dict(account.attributes.get("boards_web_read", default={}))
+                markers[key] = max(markers.get(key, 0), last_number)
+                account.attributes.add("boards_web_read", markers)
+
+            response.add_post_render_callback(mark_read)
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         board = self.object
@@ -71,6 +114,7 @@ class BoardDetailView(DetailView):
         show_replies = self.request.GET.get("show_replies", "1")
         if show_replies != "1":
             posts = posts.filter(parent_post__isnull=True)
+        posts = list(posts)
         context["posts"] = posts
         context["show_replies"] = show_replies == "1"
         context["is_staff"] = is_staff_user(self.request)

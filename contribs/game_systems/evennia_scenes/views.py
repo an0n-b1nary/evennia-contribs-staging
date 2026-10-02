@@ -29,8 +29,9 @@ from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils.text import slugify
 from django.views.generic import DetailView, FormView, ListView, TemplateView
@@ -88,6 +89,21 @@ class SceneListView(ListView):
         return context
 
 
+class SceneLiveListView(SceneListView):
+    """Public scenes happening now, separate from the finished archive."""
+
+    def get_queryset(self):
+        return Scene.objects.filter(
+            status__in=(Scene.Status.OPEN, Scene.Status.ACTIVE),
+            privacy__in=Scene.WEB_READABLE_PRIVACY,
+        ).order_by("-started_at", "-pk")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(page_title="Happening Now", live_list=True)
+        return context
+
+
 class SceneDetailView(DetailView):
     """Scene detail showing log entries with pagination."""
 
@@ -96,13 +112,27 @@ class SceneDetailView(DetailView):
     context_object_name = "scene"
 
     def get_object(self, queryset=None):
-        # CLOSED-only + non-archived (Scene.objects excludes archived): an
-        # in-progress or soft-archived scene must not be reachable by URL.
-        # _can_view_scene then applies the privacy tier (VIEW_PRIVATE → invited/staff).
-        scene = get_object_or_404(Scene.objects, pk=self.kwargs["pk"], status=Scene.Status.CLOSED)
+        # The manager excludes archived scenes; privacy applies at every status
+        # and on every poll, using the same fail-closed membership predicate.
+        scene = get_object_or_404(Scene.objects, pk=self.kwargs["pk"])
         if not _can_view_scene(scene, self.request):
             raise PermissionDenied("This scene is private.")
         return scene
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.GET.get("poll") == "1":
+            response = JsonResponse(
+                {
+                    "html": render_to_string(
+                        "evennia_scenes/_scene_reading.html", context, request=self.request
+                    ),
+                    "live": context["is_live"],
+                }
+            )
+        else:
+            response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -112,13 +142,18 @@ class SceneDetailView(DetailView):
         # Both in-room OOC and web-viewer OOC are excluded by default so the
         # public log reads as IC; ?include_ooc=1 surfaces them.
         qs = scene.log_entries.filter(is_deleted=False)
-        include_ooc = bool(self.request.GET.get("include_ooc"))
+        include_ooc = self.request.GET.get("include_ooc") == "1"
         if not include_ooc:
             qs = qs.exclude(log_type__in=[LogEntry.LogType.OOC, LogEntry.LogType.WEB_OOC])
         qs = qs.order_by("order", "created_at")
 
         paginator = Paginator(qs, ENTRIES_PER_PAGE)
-        page_number = self.request.GET.get("page", 1)
+        context["is_live"] = scene.status in (Scene.Status.OPEN, Scene.Status.ACTIVE)
+        page_number = self.request.GET.get("page")
+        if page_number is None or page_number == "latest":
+            page_number = (
+                paginator.num_pages if context["is_live"] or page_number == "latest" else 1
+            )
         page_obj = paginator.get_page(page_number)
         context["page_obj"] = page_obj
         context["log_entries"] = page_obj.object_list

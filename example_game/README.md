@@ -971,3 +971,32 @@ Three mechanisms, for three different needs:
     a badge and that long board titles leave the byline and actions readable.
     In the webclient, confirm room headings show names without dbrefs,
     including when logged in as a builder.
+
+
+### Present activity on the web
+
+The home page and both map views link running scenes to readable logs. The
+**Happening Now** menu opens `/scenes/live/`; `/scenes/` remains the archive.
+Live logs begin on the newest page, show participants, and poll every ten seconds.
+Numbered earlier pages stay put, OOC filtering survives pagination, and manual
+refresh works without JavaScript. The poll uses the same privacy checks as the
+initial page; view-private scenes still require an invitation or staff access.
+
+Boards show the latest post and author plus unread counts for the signed-in
+account. Reading a full board marks the displayed posts read independently of
+subscription login notifications. Characters show online state, last seen, and
+their `+finger/set role` concept. Last seen records character puppet/unpuppet
+activity, so a web login alone does not make a character look active. Existing
+characters show **Not recorded** until they next connect; demo speakers have
+different concepts but are not presented as connected players.
+
+The seed varies scene lengths and speakers, with an intentionally empty archive
+entry, plausible timestamps, authored/tagged lore, and posts on both boards.
+
+Browser check: open a live scene from the home page and map, add a pose in-game,
+and confirm it arrives within ten seconds. Check the latest-page rollover, an
+earlier numbered page, and Show OOC. Close the scene and confirm polling stops.
+Change a scene to view-private while an uninvited reader follows it and confirm
+the reading area clears. Read a board, return to the index, and confirm its
+unread count clears only for that account. Disable JavaScript and verify the
+manual refresh link. Check the character list after connecting/disconnecting.

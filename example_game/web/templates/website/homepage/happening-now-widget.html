@@ -2,8 +2,7 @@
 Scenes running right now. Context from web/website/views/index.py::_live_scenes,
 which applies Scene.WEB_READABLE_PRIVACY - do not add a filter here.
 
-No per-scene link: scene detail pages are CLOSED-only, so a running scene has no
-page yet. The footer links the archive instead.
+Each live scene links to its privacy-checked log.
 {% endcomment %}
 <div class="card h-100">
   <h2 class="card-header h5 text-center mb-0">Happening Now</h2>
@@ -12,7 +11,7 @@ page yet. The footer links the archive instead.
   <ul class="list-group list-group-flush widget-list">
     {% for scene in live_scenes %}
     <li class="list-group-item">
-      <strong>{{ scene.title }}</strong>
+      <strong>{% if scene.url %}<a href="{{ scene.url }}">{{ scene.title }}</a>{% else %}{{ scene.title }}{% endif %}</strong>
       {% if scene.room %}<br /><small class="text-muted">{{ scene.room }}</small>{% endif %}
       {% if scene.started_at %}
       <br /><small class="text-muted">started {{ scene.started_at|timesince }} ago</small>

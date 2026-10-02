@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0] — 2026-10-02
+
+- **Added:** privacy-filtered `active_scenes` overlay records and tile payloads,
+  linking live scenes from both Leaflet popups and the static map room list.
+  Missing scene providers or routes degrade to empty overlays or plain text.
+
 ## [0.4.0] — 2026-10-02
 
 - **Changed:** static map room names link to the optional region room detail

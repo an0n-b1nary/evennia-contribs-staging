@@ -47,6 +47,13 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
 
     """
 
+    def at_post_puppet(self, **kwargs):
+        """Record character activity independently of account web logins."""
+        from django.utils import timezone
+
+        super().at_post_puppet(**kwargs)
+        self.attributes.add("sandbox_last_seen", timezone.now())
+
     def at_post_unpuppet(self, account=None, session=None, **kwargs):
         """Clear the pose timer (PosingCharacterMixin, via super) and end
         any active RPTracker session — documented game glue per
@@ -57,3 +64,7 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
         from evennia_rptracker import end_session
 
         end_session(self.id, manual=False)
+
+        from django.utils import timezone
+
+        self.attributes.add("sandbox_last_seen", timezone.now())

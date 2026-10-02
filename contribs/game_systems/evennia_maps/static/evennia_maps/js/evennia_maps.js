@@ -193,6 +193,7 @@
     if (tile.primary_region_id && urls.region) {
       html += '<a href="' + urlFor(urls.region, tile.primary_region_id) + '">View region</a>';
     }
+    html += linkList("Happening now", tile.active_scenes, urls.scene);
     html += linkList("Recent logs", tile.recent_scenes, urls.scene);
     html += linkList("Upcoming events", tile.upcoming_events, urls.event);
     return html + "</div>";

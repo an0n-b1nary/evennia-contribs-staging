@@ -42,7 +42,7 @@
 
 {% if posts %}
 {% for post in posts %}
-<div class="card mb-3{% if post.parent_post %} ml-4{% endif %}">
+<div id="post-{{ post.post_number }}" class="card mb-3{% if post.parent_post %} ml-4{% endif %}">
   <div class="card-header d-flex justify-content-between align-items-center evennia-boards-post-header">
     <span class="evennia-boards-post-heading">
       <strong>#{{ post.post_number }}</strong>

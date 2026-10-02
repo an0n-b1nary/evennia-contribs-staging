@@ -5,18 +5,19 @@
   {% include "evennia_scenes/_styles.html" %}
 {% endblock %}
 
-{% block titleblock %}Scene Archive{% endblock %}
+{% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-scenes-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item active" aria-current="page">Scene Archive</li>
+    <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
   </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<h1>Scene Archive</h1>
+<h1>{{ page_title }}</h1>
+<p>{% if live_list %}<a href="{% url 'evennia_scenes:scene-list' %}">Browse the scene archive</a>{% else %}<a href="{% url 'evennia_scenes:scene-live-list' %}">See scenes happening now</a>{% endif %}</p>
 
 {% if scenes %}
 <div class="evennia-scenes-table-scroll" role="region" aria-label="Scene archive" tabindex="0">
@@ -65,7 +66,8 @@
 {% endif %}
 
 {% else %}
-<p class="text-muted">No scenes have been archived yet. Use <code>+scene/open</code>
-  in-game to start one and <code>+scene/close</code> to add it to the archive.</p>
+{% if live_list %}<p class="text-muted">No scenes are running right now. Use <code>+scene/open</code> in-game to start one.</p>
+{% else %}<p class="text-muted">No scenes have been archived yet. Use <code>+scene/open</code>
+  in-game to start one and <code>+scene/close</code> to add it to the archive.</p>{% endif %}
 {% endif %}
 {% endblock %}

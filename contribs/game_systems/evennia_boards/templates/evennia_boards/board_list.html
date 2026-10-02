@@ -25,7 +25,9 @@
     <tr>
       <th scope="col">Board</th>
       <th scope="col">Description</th>
-      <th scope="col">Posts</th>
+      <th scope="col">Last post</th>
+      <th scope="col">Last author</th>
+      {% if show_unread %}<th scope="col">Unread</th>{% endif %}
       <th scope="col">Type</th>
     </tr>
   </thead>
@@ -34,7 +36,9 @@
     <tr>
       <td><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
       <td>{{ board.description|default:"Not recorded" }}</td>
-      <td>{{ board.post_count }}</td>
+      <td>{% if board.latest_number %}<a href="{% url 'evennia_boards:board-detail' board.pk %}#post-{{ board.latest_number }}">{{ board.latest_title }}</a><br><small class="text-muted">{{ board.latest_time|date:"Y-m-d H:i" }}</small>{% else %}<span class="text-muted">No posts yet. Use <code>+bb/post</code> in-game to write one.</span>{% endif %}</td>
+      <td>{{ board.latest_author|default:"Unattributed" }}</td>
+      {% if show_unread %}<td>{% if board.unread_count %}<span class="badge badge-primary">{{ board.unread_count }} unread</span>{% else %}<span class="text-muted">Read</span>{% endif %}</td>{% endif %}
       <td>{{ board.get_board_type_display }}</td>
     </tr>
     {% endfor %}

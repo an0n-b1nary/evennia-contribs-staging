@@ -1,8 +1,10 @@
 {% extends "website/base.html" %}
+{% load static %}
 
 {% block header_ext %}
   {{ block.super }}
   {% include "evennia_scenes/_styles.html" %}
+  <script src="{% static 'evennia_scenes/js/live_scene.js' %}" defer></script>
 {% endblock %}
 
 {% block titleblock %}{{ page_title }}{% endblock %}
@@ -19,111 +21,12 @@
 {% block content %}
 <h1>{{ scene.title|default:"Untitled Scene" }}</h1>
 
-<dl class="row text-muted small mb-3">
-  <dt class="col-sm-2">Scene number</dt>
-  <dd class="col-sm-10">#{{ scene.scene_number }}</dd>
-  <dt class="col-sm-2">Room</dt>
-  <dd class="col-sm-10"><strong>{% if room_url %}<a href="{{ room_url }}">{{ room_label }}</a>{% else %}{{ room_label }}{% endif %}</strong></dd>
-  <dt class="col-sm-2">Creator</dt>
-  <dd class="col-sm-10"><strong>{{ scene.creator_name|default:"Unattributed" }}</strong></dd>
-  <dt class="col-sm-2">Status</dt>
-  <dd class="col-sm-10"><span class="badge badge-secondary">{{ scene.get_status_display }}</span></dd>
-  <dt class="col-sm-2">Created</dt>
-  <dd class="col-sm-10">{{ scene.created_at|date:"Y-m-d" }}</dd>
-  {% if scene.ended_at %}
-  <dt class="col-sm-2">Closed</dt>
-  <dd class="col-sm-10">{{ scene.ended_at|date:"Y-m-d" }}</dd>
-  {% endif %}
-</dl>
-
-{% if scene.description %}
-<blockquote class="blockquote mb-4">
-  <p>{{ scene.description|linebreaksbr }}</p>
-</blockquote>
+{% if is_live %}
+<p id="scene-poll-status" role="status">Refresh this page to see new entries.</p>
 {% endif %}
-
-<div class="mb-3">
-  {% if include_ooc %}
-  <a href="?">Hide OOC</a>
-  {% else %}
-  <a href="?include_ooc=1">Show OOC</a>
-  {% endif %}
+<div id="scene-reading" data-live="{{ is_live|yesno:'true,false' }}">
+  {% include "evennia_scenes/_scene_reading.html" %}
 </div>
-
-{% if participants %}
-<details class="mb-3">
-  <summary><strong>Participants ({{ participants|length }})</strong></summary>
-  <ul class="list-inline mt-2">
-    {% for p in participants %}
-    <li class="list-inline-item">
-      {% if p.character_url %}<a href="{{ p.character_url }}">{{ p.character_name }}</a>{% else %}{{ p.character_name }}{% endif %}
-      <span class="text-muted small">({{ p.pose_count }} poses{% if not p.is_active %}, left{% endif %})</span>
-    </li>
-    {% endfor %}
-  </ul>
-</details>
-{% else %}
-<p class="text-muted">No participants recorded.</p>
-{% endif %}
-
-{% if linked_lore or linked_plots or linked_events %}
-<section class="mb-4" aria-labelledby="scene-links-heading">
-  <h2 id="scene-links-heading" class="h5">Related content</h2>
-  <div class="row">
-    {% if linked_lore %}<div class="col-md-4"><h3 class="h6">Lore</h3><ul class="list-unstyled">{% for entry in linked_lore %}<li>{% if entry.entry_url %}<a href="{{ entry.entry_url }}">{{ entry.title }}</a>{% else %}{{ entry.title }}{% endif %}</li>{% empty %}<li class="text-muted">No related lore.</li>{% endfor %}</ul></div>{% endif %}
-    {% if linked_plots %}<div class="col-md-4"><h3 class="h6">Plots</h3><ul class="list-unstyled">{% for thread in linked_plots %}<li>{% if thread.thread_url %}<a href="{{ thread.thread_url }}">{{ thread.name }}</a>{% else %}{{ thread.name }}{% endif %}</li>{% empty %}<li class="text-muted">No related plots.</li>{% endfor %}</ul></div>{% endif %}
-    {% if linked_events %}<div class="col-md-4"><h3 class="h6">Events</h3><ul class="list-unstyled">{% for event in linked_events %}<li>{% if event.event_url %}<a href="{{ event.event_url }}">{{ event.title }}</a>{% else %}{{ event.title }}{% endif %}</li>{% empty %}<li class="text-muted">No related events.</li>{% endfor %}</ul></div>{% endif %}
-  </div>
-</section>
-{% endif %}
-
-{% if log_entries %}
-<div class="evennia-scenes-table-scroll" role="region" aria-label="Scene log" tabindex="0">
-{% for entry in log_entries %}
-<div class="card mb-2 evennia-scenes-log-entry evennia-scenes-log-type-{{ entry.log_type }}">
-  <div class="card-header d-flex justify-content-between align-items-center py-1">
-    <span class="small">
-      <span class="badge badge-secondary">{{ entry.get_log_type_display }}</span>
-      <strong>{{ entry.author_name|default:"Unattributed" }}</strong>
-      <span class="text-muted ml-1">{{ entry.created_at|date:"H:i" }}</span>
-    </span>
-    <span>
-      {% if character_id == entry.author_id or is_staff %}
-      <a href="{% url 'evennia_scenes:log-edit' scene.pk entry.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-      {% endif %}
-      <a href="{% url 'evennia_scenes:log-history' scene.pk entry.pk %}" class="btn btn-sm btn-outline-secondary">History</a>
-    </span>
-  </div>
-  <div class="card-body py-2">
-    {{ entry.content|linebreaksbr }}
-  </div>
-</div>
-{% endfor %}
-</div>
-
-{% if page_obj.has_other_pages %}
-<nav aria-label="Log pagination">
-  <ul class="pagination">
-    {% if page_obj.has_previous %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo; Previous</a>
-    </li>
-    {% endif %}
-    <li class="page-item disabled">
-      <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-    </li>
-    {% if page_obj.has_next %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next &raquo;</a>
-    </li>
-    {% endif %}
-  </ul>
-</nav>
-{% endif %}
-
-{% else %}
-<p class="text-muted">No log entries found for this scene.</p>
-{% endif %}
 
 <div class="mt-4">
   <a href="{% url 'evennia_scenes:scene-list' %}">&larr; Back to Scene Archive</a>

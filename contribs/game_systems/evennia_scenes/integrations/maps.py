@@ -19,6 +19,9 @@ Overlay keys
 ``has_active_scene``
     ``{room_id: True}`` for rooms with a currently open/active scene.
     Privacy-filtered for non-staff.
+``active_scenes``
+    ``{room_id: [{"id", "title"}, ...]}`` for currently open/active scenes.
+    Uses the same staff-aware privacy filter as the active indicator.
 ``recent_scene_count``
     ``{room_id: int}`` — closed scenes in the last 90 days, the heatmap
     weight. Privacy-filtered for non-staff.
@@ -56,6 +59,18 @@ def _active_scene_room_ids(room_ids, *, staff):
     if not staff:
         qs = qs.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)
     return set(qs.values_list("room_id", flat=True))
+
+
+def _active_scenes_by_room(room_ids, *, staff):
+    qs = Scene.objects.filter(room_id__in=room_ids, status__in=_LIVE_SCENE_STATUSES)
+    if not staff:
+        qs = qs.filter(privacy__in=Scene.WEB_READABLE_PRIVACY)
+    result = {}
+    for scene in qs.order_by("-started_at", "-pk"):
+        result.setdefault(scene.room_id, []).append(
+            {"id": scene.pk, "title": scene.title or f"Scene #{scene.scene_number}"}
+        )
+    return result
 
 
 def _recent_scene_counts_by_room(room_ids, *, staff):
@@ -138,8 +153,10 @@ def provide(sender, room_ids, staff, **kwargs):
     """
     if not room_ids:
         return {}
+    active = _active_scenes_by_room(room_ids, staff=staff)
     return {
-        "has_active_scene": {rid: True for rid in _active_scene_room_ids(room_ids, staff=staff)},
+        "has_active_scene": {rid: True for rid in active},
+        "active_scenes": active,
         "recent_scene_count": _recent_scene_counts_by_room(room_ids, staff=staff),
         "recent_scenes": _recent_scenes_by_room(room_ids),
     }

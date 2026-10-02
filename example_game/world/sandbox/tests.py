@@ -648,7 +648,7 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
 
         return collect_overlays(self.room_ids, staff=staff)
 
-    def test_all_six_overlay_keys_are_answered(self):
+    def test_all_seven_overlay_keys_are_answered(self):
         # The keys evennia_maps/overlays.py documents. A provider that failed
         # to connect degrades to an absent key rather than an error, which is
         # exactly why this has to be asserted somewhere.
@@ -657,6 +657,7 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
             {
                 "primary_region",
                 "has_active_scene",
+                "active_scenes",
                 "recent_scene_count",
                 "recent_scenes",
                 "has_lore",
@@ -1606,3 +1607,86 @@ class TestPhaseOneWebUi(SeededSandboxMixin, EvenniaTest):
         layout_config = finders.find("webclient/js/plugins/goldenlayout_default_config.js")
         self.assertIn("example_game", str(custom_css))
         self.assertIn("example_game", str(layout_config))
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestPresentWebSeams(SeededSandboxMixin, EvenniaTest):
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def request(self, path, user=None):
+        request = RequestFactory().get(path)
+        request.user = user if user is not None else AnonymousUser()
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        return request
+
+    def test_home_and_map_link_to_readable_seeded_live_scene(self):
+        from django.urls import reverse
+        from evennia_scenes.models import Scene
+        from web.website.views.index import SandboxIndexView
+
+        from evennia_maps.models import MapPlane
+        from evennia_maps.views import PlaneMapView
+        from world.sandbox import content
+
+        scene = Scene.objects.get(title="Kickoff Rehearsal")
+        destination = reverse("evennia_scenes:scene-detail", args=[scene.pk])
+        home = SandboxIndexView.as_view()(self.request("/"))
+        home.render()
+        self.assertIn(f'href="{destination}"', home.content.decode())
+        plane = MapPlane.objects.get(name=content.PLANE_NAME)
+        response = PlaneMapView.as_view()(self.request("/map/"), pk=plane.pk)
+        response.render()
+        self.assertIn(f'href="{destination}"', response.content.decode())
+        self.assertIn("Live: Kickoff Rehearsal", response.content.decode())
+
+    def test_recent_connections_empty_state_renders(self):
+        from web.website.views.index import SandboxIndexView
+
+        with mock.patch(
+            "evennia.web.website.views.index._gamestats",
+            return_value={"accounts_connected_recent": []},
+        ):
+            response = SandboxIndexView.as_view()(self.request("/"))
+            response.render()
+            self.assertIn("No accounts have connected recently", response.content.decode())
+
+    def test_character_activity_concept_and_hidden_character(self):
+        from django.utils import timezone
+        from web.website.views.native import SandboxCharacterListView
+
+        self.char1.profile_role = "An archivist."
+        self.char1.attributes.add("sandbox_last_seen", timezone.now())
+        self.char2.locks.add("view:false()")
+        with mock.patch.object(self.char1.sessions, "count", return_value=1):
+            response = SandboxCharacterListView.as_view()(
+                self.request("/characters/", self.account)
+            )
+            response.render()
+        html = response.content.decode()
+        self.assertIn("An archivist.", html)
+        self.assertIn("Online</span>", html)
+        self.assertNotIn(self.char2.key + "</a>", html)
+        response = SandboxCharacterListView.as_view()(self.request("/characters/", self.account))
+        response.render()
+        self.assertIn("Offline</span>", response.content.decode())
+        self.assertIn("Last seen:", response.content.decode())
+
+    def test_seeded_content_varies_and_has_real_authors_tags_and_participants(self):
+        from evennia_boards.models import Board, Post
+        from evennia_lore.models import LoreEntry
+        from evennia_scenes.models import Scene
+
+        from world.sandbox import content
+
+        scenes = Scene.objects.filter(title__in=[spec["title"] for spec in content.SCENES])
+        self.assertGreater(len({scene.log_entries.count() for scene in scenes}), 1)
+        self.assertTrue(any(scene.participants.count() >= 2 for scene in scenes))
+        self.assertTrue(any(scene.log_entries.count() == 0 for scene in scenes))
+        for board in Board.objects.filter(name__in=[spec["name"] for spec in content.BOARDS]):
+            self.assertTrue(Post.objects.filter(board=board, author__isnull=False).exists())
+        for entry in LoreEntry.objects.filter(
+            title__in=[spec["title"] for spec in content.LORE_ENTRIES]
+        ):
+            self.assertIsNotNone(entry.author)
+            self.assertTrue(entry.tags.exists())

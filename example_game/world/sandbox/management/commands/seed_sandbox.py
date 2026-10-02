@@ -484,9 +484,17 @@ class Command(BaseCommand):
                 "typeclasses.characters.Character",
                 key=name,
                 tags=[(SANDBOX_TAG, SANDBOX_TAG_CATEGORY)],
-                attributes=[("desc", "[Placeholder] A demonstration scene participant.")],
+                attributes=[
+                    ("desc", "[Placeholder] A demonstration scene participant."),
+                    (
+                        "profile_role",
+                        "[Placeholder] A storyteller."
+                        if index == 0
+                        else "[Placeholder] A visiting archivist.",
+                    ),
+                ],
             )
-            for name in content.SCENE_SPEAKERS
+            for index, name in enumerate(content.SCENE_SPEAKERS)
         ]
 
     def _create_boards(self, authors):
@@ -791,10 +799,14 @@ class Command(BaseCommand):
         All PUBLIC, so they show for anonymous web visitors rather than for
         staff only. Returns {slug: Scene}.
         """
+        from datetime import timedelta
+
+        from django.utils import timezone
         from evennia_scenes.models import LogEntry, Scene
 
         made = {}
-        for spec in content.SCENES:
+        for index, spec in enumerate(content.SCENES):
+            started = timezone.now() - timedelta(days=index, minutes=30)
             room = rooms[spec["room_slug"]]
             scene = Scene.objects.create(
                 title=spec["title"],
@@ -804,14 +816,17 @@ class Command(BaseCommand):
                 privacy=Scene.Privacy.PUBLIC,
                 status=Scene.Status.OPEN,
             )
-            for log in spec.get("logs", ()):
+            for log_index, log in enumerate(spec.get("logs", ())):
                 author_index = log.get("author_index", 0)
                 author = authors[author_index] if author_index < len(authors) else None
-                LogEntry.create_entry(
+                entry = LogEntry.create_entry(
                     scene=scene,
                     author=author,
                     content=log["content"],
                     log_type=log.get("log_type", LogEntry.LogType.POSE),
+                )
+                LogEntry.objects.filter(pk=entry.pk).update(
+                    created_at=started + timedelta(minutes=3 * log_index)
                 )
             if spec["closed"]:
                 # close() rather than status=CLOSED at creation: close() is
@@ -827,6 +842,15 @@ class Command(BaseCommand):
                 # (see typeclasses/rooms.py): consumers read the pk off the
                 # room without importing the contrib.
                 room.active_scene_id = scene.pk
+            Scene.objects.filter(pk=scene.pk).update(
+                created_at=started,
+                started_at=started if spec.get("logs") else None,
+                ended_at=started + timedelta(minutes=15) if spec["closed"] else None,
+            )
+            scene.participants.update(joined_at=started)
+            scene.participants.filter(is_active=False).update(
+                left_at=started + timedelta(minutes=15)
+            )
             made[spec["slug"]] = scene
         return made
 
