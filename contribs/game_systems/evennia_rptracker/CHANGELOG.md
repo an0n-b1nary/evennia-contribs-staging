@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.4] - 2026-10-02
+
+- **Fixed:** exported `__version__` now matches the installed package metadata.
+
 ## [0.1.3] — 2026-08-02 — use the shared resolve_dotted
 
 - `commands.py`'s local `_resolve_dotted` now delegates to

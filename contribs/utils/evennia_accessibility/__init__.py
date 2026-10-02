@@ -22,7 +22,7 @@ from .accessibility import describe_icon, describe_priority, plain_list, uses_sc
 from .forms import AccessibleForm, AccessibleModelForm
 from .mxp import absolute_web_url, mxp_link
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "AccessibleForm",

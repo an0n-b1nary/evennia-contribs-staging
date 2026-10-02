@@ -35,7 +35,7 @@ from .listeners import connect_on_ready
 from .permissions import is_staff_user
 from .softref import connect_soft_ref_cleanup
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 # name -> submodule that defines it. Imported on first access via __getattr__.
 _LAZY = {

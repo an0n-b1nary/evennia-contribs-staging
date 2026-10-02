@@ -218,3 +218,17 @@ ScenePlotLink.create_link(scene=scene_obj, thread=thread, linked_by=character)
 # Look up the arc-adjusted multiplier for any XP source
 mult = resolve_xp_multiplier("rp_session", thread=thread)
 ```
+
+## Upgrading to 0.3.0
+
+The empty top-level `collectors`, `antigaming`, and `gating` modules deprecated
+in 0.2.0 are removed. Update any old dotted settings paths before upgrading:
+
+| Removed path | Supported path |
+|---|---|
+| `evennia_plots.collectors.collect_thread_bonuses` | `evennia_plots.integrations.xp.collect_thread_bonuses` |
+| `evennia_plots.collectors.collect_arc_bonuses` | `evennia_plots.integrations.xp.collect_arc_bonuses` |
+| `evennia_plots.antigaming.sweep` | `evennia_plots.integrations.antigaming.sweep` |
+| `evennia_plots.gating.resolve_xp_multiplier` | `evennia_plots.integrations.gating.resolve_xp_multiplier` |
+
+The installation examples above already use these supported paths.

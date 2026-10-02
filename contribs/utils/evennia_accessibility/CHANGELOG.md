@@ -2,7 +2,7 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
-## Unreleased
+## [0.1.1] - 2026-10-02
 
 - **Fixed:** the documentation comments at the top of `_form_actions.html`,
   `_form_errors.html` and `_form_field.html` spanned multiple lines. Django's template
