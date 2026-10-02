@@ -19,6 +19,7 @@ import datetime
 import random
 import unittest
 from importlib import import_module
+from importlib.metadata import version
 from unittest.mock import patch
 
 from django.apps import apps
@@ -143,7 +144,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.3.2")
+        self.assertEqual(evennia_calendar.__version__, version("evennia-calendar"))
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""

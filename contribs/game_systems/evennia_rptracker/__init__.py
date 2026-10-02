@@ -33,7 +33,7 @@ from evennia_rptracker.tracker import (
     recover_orphaned_sessions,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.4"
 
 _LAZY = {
     "RPSession": "models",

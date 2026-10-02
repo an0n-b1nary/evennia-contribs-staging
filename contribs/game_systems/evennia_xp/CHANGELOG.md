@@ -7,11 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.1.4] - 2026-10-02
-
-- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
-
-## [Unreleased]
+## [0.1.5] - 2026-10-02
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.
@@ -32,7 +28,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   state, and the screen-reader linear-list layout. The suite's existing
   `response.render()` calls are DRF API renders, which compile no HTML template.
 
----
+## [0.1.4] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
 
 ## [0.1.1] — 2026-07-05 — update future-ownership map in MIGRATION_NOTES
 

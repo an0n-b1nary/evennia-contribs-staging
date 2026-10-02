@@ -19,6 +19,8 @@ import unittest
 from datetime import timedelta
 from decimal import Decimal
 from importlib import import_module
+from importlib.metadata import version
+from importlib.util import find_spec
 from unittest.mock import MagicMock, patch
 
 from django.apps import apps
@@ -138,7 +140,16 @@ class TestPlotsInit(unittest.TestCase):
     def test_version(self):
         import evennia_plots
 
-        self.assertEqual(evennia_plots.__version__, "0.2.4")
+        self.assertEqual(evennia_plots.__version__, version("evennia-plots"))
+
+    def test_deprecated_integration_modules_removed(self):
+        """0.3 removes the empty pre-0.2 import paths; documented paths remain."""
+        for name in ("collectors", "antigaming", "gating"):
+            with self.subTest(name=name):
+                self.assertIsNone(find_spec(f"evennia_plots.{name}"))
+        for name in ("xp", "antigaming", "gating"):
+            with self.subTest(name=name):
+                self.assertIsNotNone(find_spec(f"evennia_plots.integrations.{name}"))
 
     def test_signals_eagerly_exported(self):
         from django.dispatch import Signal

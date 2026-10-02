@@ -27,6 +27,10 @@ jobs:
           printf '%s\n' "$ANONYMITY_PATTERNS" > .anonymity-patterns
       - name: Run pre-commit on all files
         run: pre-commit run --all-files
+      - name: Contrib release metadata checks
+        run: |
+          python scripts/check_contrib_versions.py
+          python scripts/test_check_contrib_versions.py
       - name: Python syntax check
         run: |
           files=$(git ls-files '*.py')
@@ -67,6 +71,8 @@ jobs:
         run: evennia --init ci_game
       - name: Install all contribs and register their apps
         run: python scripts/ci_install_contribs.py ci_game
+      - name: Installed contrib version parity
+        run: python scripts/check_contrib_versions.py --installed
       - name: Migrate
         working-directory: ci_game
         run: evennia migrate --noinput

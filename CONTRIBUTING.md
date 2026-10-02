@@ -222,6 +222,20 @@ Every push and PR runs two jobs:
 
 A PR can't merge until both jobs pass.
 
+## Contrib release versions
+
+When cutting a contrib version, update `pyproject.toml` and `__version__` in
+`__init__.py` together, then move shipped notes into a dated changelog section
+for that version. Keep future `## [Unreleased]` notes above released versions.
+A new contrib may keep its initial notes under Unreleased until its first
+release is ready.
+
+Run `python scripts/check_contrib_versions.py` before committing. CI checks
+all contribs without importing their Django apps, then repeats the check with
+`--installed` after editable installation to verify distribution metadata.
+Calendar and plots also compare their exported version to installed metadata
+in their own suites, without hard-coding release numbers.
+
 ## License
 
 By contributing, you agree your contributions are licensed under [BSD 3-Clause](LICENSE), matching Evennia upstream.

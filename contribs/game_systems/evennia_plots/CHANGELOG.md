@@ -7,16 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.2.4] - 2026-10-02
+## [0.3.0] - 2026-10-02
 
-- **Fixed:** command helpers import the public accessibility export so the installed
-  partner's screen-reader preference is honored; the absent-partner fallback remains.
-
-## [0.2.3] - 2026-10-02
-
-- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
-
-## [Unreleased]
+- **Breaking:** remove the deprecated top-level `collectors.py`,
+  `antigaming.py`, and `gating.py` stubs promised in 0.2.0.
+  Update dotted settings paths to `evennia_plots.integrations.xp`,
+  `evennia_plots.integrations.antigaming`, and
+  `evennia_plots.integrations.gating`, respectively.
 
 - **Changed:** web templates use namespaced classes, packaged CSS, and the
   shared metadata, table, and empty-state conventions.
@@ -45,7 +42,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   broken includes shipped, because compiling a template resolves no
   `{% include %}` target. Replaced with real renders.
 
----
+## [0.2.4] - 2026-10-02
+
+- **Fixed:** command helpers import the public accessibility export so the installed
+  partner's screen-reader preference is honored; the absent-partner fallback remains.
+
+## [0.2.3] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
 
 ## [0.2.0] — 2026-07-05 — XP glue moved to integrations/ + app-label fixes
 

@@ -1,6 +1,6 @@
 # Changelog — evennia-links
 
-## Unreleased
+## [0.5.1] - 2026-10-02
 
 - Validate complete web staff lock strings before evaluation, and deny access
   when staff policy settings cannot be read. Malformed multi-lock strings must

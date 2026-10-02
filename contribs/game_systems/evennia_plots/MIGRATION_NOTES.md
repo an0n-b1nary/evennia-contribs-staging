@@ -57,9 +57,9 @@ In the source project the XP machinery is split across three modules outside
 
 | Source location | `evennia-plots` location |
 |---|---|
-| `world/utils/xp_gating.py` | `evennia_plots/gating.py` |
-| `world/xp/collectors.py` (thread/arc slice) | `evennia_plots/collectors.py` |
-| `world/xp/antigaming.py` (thread slice) | `evennia_plots/antigaming.py` |
+| `world/utils/xp_gating.py` | `evennia_plots/integrations/gating.py` |
+| `world/xp/collectors.py` (thread/arc slice) | `evennia_plots/integrations/xp.py` |
+| `world/xp/antigaming.py` (thread slice) | `evennia_plots/integrations/antigaming.py` |
 | `world/links/models.py::PlotBonusCredit` | `evennia_plots/models.py` |
 
 The source keeps these outside `world/plots/` because its domain-island rule

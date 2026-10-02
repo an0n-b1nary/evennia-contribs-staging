@@ -7,11 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.1.3] - 2026-10-02
-
-- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
-
-## [Unreleased]
+## [0.1.4] - 2026-10-02
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
   table, metadata, and empty-state conventions.
@@ -38,7 +34,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `response.render()`, with the test module doubling as a test URLconf. Both fixes above
   were compile-time failures that no context-only view test could see.
 
----
+## [0.1.3] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
 
 ## [0.1.0] — 2026-06-01 — initial extraction
 
