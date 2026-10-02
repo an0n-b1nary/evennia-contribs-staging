@@ -1,31 +1,23 @@
-"""Refuse to push to a protected GitHub remote when identity could leak.
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 
-Run as a pre-push hook (pre-commit framework, stages: [pre-push]).
+"""Refuse protected pushes when commit identity or the active account could leak.
 
-Args: <remote_name> <remote_url>     (forwarded by git/pre-commit)
-Stdin: one line per ref being pushed: <local_ref> <local_sha> <remote_ref> <remote_sha>
+Configure a maintainer clone with ``git config anonymity.expected-gh-account HANDLE``.
+Unconfigured clones and remotes outside that account are unaffected. Protected pushes
+require a readable, nonempty ``.anonymity-patterns`` file and a matching active gh account.
 
-The "protected remote" is determined per-clone by git config:
-  git config anonymity.expected-gh-account <handle>
-
-If that key is unset, the guard is inactive (exits 0). External clones and
-forks therefore get a no-op by default; only clones whose maintainer has
-explicitly configured the expected handle run the checks.
-
-When active and the remote URL matches `github.com[:/]<handle>/`:
-  1. Walks every commit being pushed and rejects if any commit's author or
-     committer name/email matches a forbidden pattern in `.anonymity-patterns`
-     (best-effort: if `.anonymity-patterns` is absent, the commit walk is
-     skipped but the gh-account check still runs).
-  2. Verifies the active `gh` account equals the configured handle. This
-     catches the case where the credential helper would push using the wrong
-     account's token.
-
-For any other remote, exits 0 immediately.
+Native Git hooks provide remote name/URL as arguments and pushed refs on stdin.
+The pre-commit framework instead provides PRE_COMMIT_REMOTE_* environment variables
+and consumes stdin itself. In that mode, check its selected range plus every local
+branch/tag commit absent from the remote-tracking refs. This conservative check also
+covers a multi-ref push, since pre-commit only forwards the first changed ref's range.
+It can reject an unpublished identity on a branch that is not part of this push.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -38,19 +30,25 @@ EXPECTED_ACCOUNT_CONFIG_KEY = "anonymity.expected-gh-account"
 ZERO_SHA = "0" * 40
 
 
-def _git_config(key: str) -> str | None:
+def _git(*args: str) -> str:
+    result = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def expected_account() -> str | None:
     result = subprocess.run(
-        ["git", "config", "--get", key],
+        ["git", "config", "--get", EXPECTED_ACCOUNT_CONFIG_KEY],
         capture_output=True,
         text=True,
         check=False,
     )
-    value = result.stdout.strip()
-    return value or None
-
-
-def expected_account() -> str | None:
-    return _git_config(EXPECTED_ACCOUNT_CONFIG_KEY)
+    if result.returncode == 1:
+        return None  # key is unset
+    if result.returncode != 0:
+        raise RuntimeError(f"could not read guard configuration: {result.stderr.strip()}")
+    return result.stdout.strip() or None
 
 
 def remote_matches_account(url: str, account: str) -> bool:
@@ -59,65 +57,70 @@ def remote_matches_account(url: str, account: str) -> bool:
 
 
 def commits_to_check(local_sha: str, remote_sha: str) -> list[str]:
-    """Return SHAs being newly pushed. Empty list if the ref is being deleted."""
+    """Return newly pushed commits; a ref deletion has no commits to inspect."""
+    for sha in (local_sha, remote_sha):
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", sha):
+            raise RuntimeError("invalid commit SHA in pushed ref")
     if local_sha == ZERO_SHA:
-        return []  # ref deletion
-    rev_range = local_sha if remote_sha == ZERO_SHA else f"{remote_sha}..{local_sha}"
-    result = subprocess.run(
-        ["git", "rev-list", rev_range],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
         return []
-    return [line for line in result.stdout.splitlines() if line]
+    rev_range = local_sha if remote_sha == ZERO_SHA else f"{remote_sha}..{local_sha}"
+    return _git("rev-list", rev_range).splitlines()
 
 
 def commit_identity(sha: str) -> list[tuple[str, str]]:
-    """Return [(label, value), ...] for the commit's author + committer name/email."""
-    fmt = "%an%n%ae%n%cn%n%ce"
-    result = subprocess.run(
-        ["git", "show", "-s", f"--format={fmt}", sha],
-        capture_output=True,
-        text=True,
-        check=False,
+    """Return every author/committer identity field, refusing unreadable commits."""
+    lines = _git("show", "-s", "--format=%an%n%ae%n%cn%n%ce", sha).splitlines()
+    if len(lines) != 4:
+        raise RuntimeError(f"could not read all identity fields for {sha[:7]}")
+    return list(
+        zip(
+            ("author name", "author email", "committer name", "committer email"), lines, strict=True
+        )
     )
-    if result.returncode != 0:
-        return []
-    lines = result.stdout.splitlines()
-    if len(lines) < 4:
-        return []
-    return [
-        ("author name", lines[0]),
-        ("author email", lines[1]),
-        ("committer name", lines[2]),
-        ("committer email", lines[3]),
-    ]
 
 
-def check_commits(patterns: list[re.Pattern[str]]) -> list[str]:
-    """Read refs from stdin; return failure messages (empty if all clean)."""
+def _precommit_commits(remote_name: str) -> set[str]:
+    local_ref = os.environ.get("PRE_COMMIT_TO_REF") or os.environ.get("PRE_COMMIT_LOCAL_BRANCH")
+    if not local_ref or local_ref.startswith("-") or remote_name.startswith("-"):
+        raise RuntimeError("missing or invalid pre-commit push context")
+    commits = set(
+        _git(
+            "rev-list", "--branches", "--tags", local_ref, "--not", f"--remotes={remote_name}"
+        ).splitlines()
+    )
+    from_ref = os.environ.get("PRE_COMMIT_FROM_REF")
+    to_ref = os.environ.get("PRE_COMMIT_TO_REF")
+    if from_ref and to_ref:
+        commits.update(commits_to_check(to_ref, from_ref))
+    return commits
+
+
+def check_commits(patterns: list[re.Pattern[str]], *, remote_name: str | None = None) -> list[str]:
+    """Check native pushed refs or the framework's conservative outgoing commit set."""
+    commits: set[str] = set()
+    if remote_name is not None:
+        commits = _precommit_commits(remote_name)
+    else:
+        for raw in sys.stdin:
+            parts = raw.split()
+            if len(parts) != 4:
+                raise RuntimeError("malformed pushed ref input")
+            _local_ref, local_sha, _remote_ref, remote_sha = parts
+            commits.update(commits_to_check(local_sha, remote_sha))
     failures: list[str] = []
-    for raw in sys.stdin:
-        parts = raw.split()
-        if len(parts) != 4:
-            continue
-        _local_ref, local_sha, _remote_ref, remote_sha = parts
-        for sha in commits_to_check(local_sha, remote_sha):
-            for label, value in commit_identity(sha):
-                for pat in patterns:
-                    if pat.search(value):
-                        failures.append(
-                            f"  {sha[:7]} {label} = {value!r} "
-                            f"matches forbidden pattern /{pat.pattern}/"
-                        )
-                        break
+    for sha in sorted(commits):
+        for label, value in commit_identity(sha):
+            for pat in patterns:
+                if pat.search(value):
+                    failures.append(
+                        f"  {sha[:7]} {label} = {value!r} matches forbidden pattern /{pat.pattern}/"
+                    )
+                    break
     return failures
 
 
 def check_gh_account(expected: str) -> str | None:
-    """Return None if active gh account equals expected, else an error message."""
+    """Return an error unless the active gh account equals the configured handle."""
     result = subprocess.run(
         ["gh", "api", "user", "--jq", ".login"],
         capture_output=True,
@@ -126,8 +129,7 @@ def check_gh_account(expected: str) -> str | None:
     )
     if result.returncode != 0:
         return (
-            "could not determine active gh account "
-            f"(gh api user failed: {result.stderr.strip()})"
+            f"could not determine active gh account (gh api user failed: {result.stderr.strip()})"
         )
     active = result.stdout.strip()
     if active != expected:
@@ -139,39 +141,41 @@ def check_gh_account(expected: str) -> str | None:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        return 0
-    remote_url = argv[1]  # argv[0] = remote name, argv[1] = remote URL
-
-    account = expected_account()
-    if account is None:
-        return 0  # guard not configured on this clone
-    if not remote_matches_account(remote_url, account):
-        return 0  # remote is not the protected one
-
-    patterns = load_patterns() if PATTERNS_FILE.exists() else []
-
-    commit_failures = check_commits(patterns) if patterns else []
-    gh_error = check_gh_account(account)
-
-    if not commit_failures and gh_error is None:
-        print(
-            f"anonymity push guard: identity OK for push to {remote_url}",
-            file=sys.stderr,
-        )
-        return 0
-
-    print(
-        f"anonymity push guard: refusing push to {remote_url}",
-        file=sys.stderr,
-    )
-    if commit_failures:
-        print("forbidden identity in pushed commits:", file=sys.stderr)
-        for line in commit_failures:
-            print(line, file=sys.stderr)
-    if gh_error:
-        print(gh_error, file=sys.stderr)
-    return 1
+    try:
+        account = expected_account()
+        if account is None:
+            return 0
+        native = len(argv) == 2
+        remote_name = argv[0] if native else os.environ.get("PRE_COMMIT_REMOTE_NAME")
+        remote_url = argv[1] if native else os.environ.get("PRE_COMMIT_REMOTE_URL")
+        if not remote_name or not remote_url:
+            raise RuntimeError(
+                "missing remote context; run through Git/pre-commit or pass NAME URL"
+            )
+        if not remote_matches_account(remote_url, account):
+            return 0
+        if not PATTERNS_FILE.exists():
+            raise RuntimeError(".anonymity-patterns not found; refusing protected push unchecked")
+        patterns = load_patterns()
+        if not patterns:
+            raise RuntimeError(
+                ".anonymity-patterns contains no patterns; refusing protected push unchecked"
+            )
+        failures = check_commits(patterns, remote_name=None if native else remote_name)
+        if failures:
+            print(f"anonymity push guard: refusing push to {remote_url}", file=sys.stderr)
+            print("forbidden identity in outgoing commits:", file=sys.stderr)
+            for line in failures:
+                print(line, file=sys.stderr)
+            return 1
+        gh_error = check_gh_account(account)
+        if gh_error:
+            raise RuntimeError(gh_error)
+    except (OSError, RuntimeError, UnicodeError) as exc:
+        print(f"anonymity push guard: refusing push: {exc}", file=sys.stderr)
+        return 1
+    print(f"anonymity push guard: identity OK for push to {remote_url}", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":

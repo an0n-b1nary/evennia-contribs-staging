@@ -88,7 +88,7 @@ try:
                 )
             except Exception:
                 logger.exception(
-                    "XP batch Script: run_weekly_batch raised an exception " "for week=%s",
+                    "XP batch Script: run_weekly_batch raised an exception for week=%s",
                     target_week,
                 )
 

@@ -378,8 +378,7 @@ class CmdRPTrackerStaff(MuxCommand):
 
         lines.append("=" * 60)
         lines.append(
-            "Use |w+rptracker/flag <id>=<reason>|n or "
-            "|w+rptracker/unflag <id>|n to manage flags."
+            "Use |w+rptracker/flag <id>=<reason>|n or |w+rptracker/unflag <id>|n to manage flags."
         )
 
         self.caller.msg("\n".join(lines))

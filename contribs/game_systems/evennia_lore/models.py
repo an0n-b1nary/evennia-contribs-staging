@@ -273,8 +273,7 @@ class LoreEntry(AbstractArchived):
                 return entry
 
         raise IntegrityError(
-            f"Could not allocate a unique entry_number after "
-            f"{_CREATE_ENTRY_MAX_RETRIES} attempts."
+            f"Could not allocate a unique entry_number after {_CREATE_ENTRY_MAX_RETRIES} attempts."
         )
 
     def publish(self, reviewed_by=None):
@@ -571,4 +570,4 @@ class LoreInspirationCredit(models.Model):
         ordering = ["created_at"]  # noqa: RUF012
 
     def __str__(self):
-        return f"LoreInspirationCredit: {self.character_name} " f"← LoreSceneLink #{self.link_id}"
+        return f"LoreInspirationCredit: {self.character_name} ← LoreSceneLink #{self.link_id}"

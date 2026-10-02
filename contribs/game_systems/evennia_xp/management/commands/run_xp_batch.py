@@ -28,7 +28,7 @@ class Command(BaseCommand):
             "--week",
             metavar="YYYY-Www",
             default=None,
-            help=("ISO week to process, e.g. 2026-W18. " "Defaults to the last completed week."),
+            help=("ISO week to process, e.g. 2026-W18. Defaults to the last completed week."),
         )
         parser.add_argument(
             "--dry-run",

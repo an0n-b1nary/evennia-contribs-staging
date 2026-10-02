@@ -210,7 +210,7 @@ class Job(models.Model):
             except IntegrityError:
                 continue
         raise IntegrityError(
-            f"Could not allocate a unique job_number after " f"{_CREATE_JOB_MAX_RETRIES} attempts."
+            f"Could not allocate a unique job_number after {_CREATE_JOB_MAX_RETRIES} attempts."
         )
 
     def mark_in_review(self):

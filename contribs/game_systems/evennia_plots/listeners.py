@@ -43,7 +43,7 @@ def on_scene_linked_to_thread(sender, thread, scene, linked_by, **kwargs):
             )
     except Exception:
         logger.exception(
-            "evennia_plots.listeners: failed to create PlotParticipants " "(thread=%s, scene=%s)",
+            "evennia_plots.listeners: failed to create PlotParticipants (thread=%s, scene=%s)",
             thread.pk,
             scene.pk,
         )

@@ -416,7 +416,7 @@ class CmdLore(EditingMixin, MuxCommand):
             title__iexact=title, status=LoreEntry.Status.PUBLISHED
         ).exists():
             caller.msg(
-                f"|rA PUBLISHED entry titled '{title}' already exists.|n " f"Use a different title."
+                f"|rA PUBLISHED entry titled '{title}' already exists.|n Use a different title."
             )
             return
         caller.ndb._lore_submit_ctx = {"title": title, "scene_arg": scene_arg}

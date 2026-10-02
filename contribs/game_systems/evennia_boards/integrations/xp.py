@@ -69,7 +69,7 @@ def _call_reporter(title, description):
     reporter_path = getattr(settings, "BOARDS_ANTIGAMING_REPORTER", None)
     if not reporter_path:
         logger.warning(
-            "evennia_boards: no BOARDS_ANTIGAMING_REPORTER configured; " "flag logged only: %r",
+            "evennia_boards: no BOARDS_ANTIGAMING_REPORTER configured; flag logged only: %r",
             title,
         )
         return

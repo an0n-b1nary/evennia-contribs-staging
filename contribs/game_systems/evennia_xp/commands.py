@@ -295,9 +295,7 @@ class CmdXp(MuxCommand):
             granted_by=caller,
         )
 
-        caller.msg(
-            f"|wGranted {amount} XP to {target.key}.|n  " f"Reason: {reason}  (XPLog #{log.pk})"
-        )
+        caller.msg(f"|wGranted {amount} XP to {target.key}.|n  Reason: {reason}  (XPLog #{log.pk})")
         # Notify recipient if they're online.
         if target.has_account:
             target.msg(f"|w{caller.key} granted you {amount} XP.|n  Reason: {reason}")

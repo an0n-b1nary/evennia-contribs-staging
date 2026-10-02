@@ -153,9 +153,12 @@ Keep `ready()` minimal: import-only, no heavy work; Django calls it at startup.
 - **Ruff** handles formatting, linting, and import sorting. Config lives at the repo root in `pyproject.toml` under `[tool.ruff]`. Same 100-char limit as Evennia upstream's Black; same rule set as upstream's Flake8 (and a few extras: bugbear, pyupgrade, simplify).
 - **pre-commit** runs the anonymity guard, Ruff format, and Ruff check on every commit. One-time setup per clone:
   ```bash
-  pip install pre-commit ruff
-  pre-commit install
+  pip install pre-commit ruff==0.16.10
+  pre-commit install --hook-type pre-commit --hook-type pre-push
   ```
+- Verify both hooks with `git rev-parse --git-path hooks/pre-commit` and
+  `git rev-parse --git-path hooks/pre-push`; both reported paths must contain
+  pre-commit-generated hook files. This also works in linked worktrees.
 - **Manual format/lint:**
   ```bash
   ruff format .
