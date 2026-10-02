@@ -238,7 +238,7 @@ class CmdPot(MuxCommand):
             return
 
         # Build the table.
-        header = "|w+========================== Pose Order " "===========================+|n"
+        header = "|w+========================== Pose Order ===========================+|n"
         col_header = f" |w{'Name':<30} {'Time':<12} {'Status':<6}|n"
         separator = "|x" + "-" * 57 + "|n"
 
@@ -260,7 +260,7 @@ class CmdPot(MuxCommand):
             rows.append(f" {name:<30} {time_str:<12} {status:<6}")
 
         footer_count = f" {len(characters)} character{'s' if len(characters) != 1 else ''} present"
-        footer_line = "|w+=======================================================" "=+|n"
+        footer_line = "|w+========================================================+|n"
 
         output = "\n".join(
             [header, col_header, separator, *rows, separator, footer_count, footer_line]
@@ -437,7 +437,7 @@ class CmdPoseHeader(MuxCommand):
                 caller.msg("Pose separator cleared.")
 
         else:
-            caller.msg(f"|wUnknown switch:|n /{switch}. " "See |whelp +poseheader|n.")
+            caller.msg(f"|wUnknown switch:|n /{switch}. See |whelp +poseheader|n.")
 
 
 # =====================================================================
@@ -529,4 +529,4 @@ class CmdHighlight(MuxCommand):
             caller.msg(f"{label} highlight color set to: {preview}")
 
         else:
-            caller.msg(f"|wUnknown switch:|n /{switch}. " "See |whelp +highlight|n.")
+            caller.msg(f"|wUnknown switch:|n /{switch}. See |whelp +highlight|n.")

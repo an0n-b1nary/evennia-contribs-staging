@@ -81,8 +81,7 @@ def _is_unmappable(room):
         room_types = room_attr_values(room, "room_type")
     except Exception:
         logger.exception(
-            "evennia_maps.listeners: could not read room_type for room #%s; "
-            "treating as unmappable",
+            "evennia_maps.listeners: could not read room_type for room #%s; treating as unmappable",
             getattr(room, "id", None),
         )
         return True

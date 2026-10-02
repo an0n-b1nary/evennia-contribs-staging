@@ -172,4 +172,4 @@ class CharacterXP(models.Model):
         verbose_name_plural = "Character XP"
 
     def __str__(self):
-        return f"CharacterXP: {self.character_name} " f"({self.current_balance} XP balance)"
+        return f"CharacterXP: {self.character_name} ({self.current_balance} XP balance)"

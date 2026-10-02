@@ -47,7 +47,7 @@ def on_rp_activity_recorded(sender, character, session_id, room, **kwargs):
         )
     except Exception:
         logger.exception(
-            "rptracker: failed to create RPSessionSceneLink " "(session=%s, scene=%s)",
+            "rptracker: failed to create RPSessionSceneLink (session=%s, scene=%s)",
             session_id,
             scene_id,
         )

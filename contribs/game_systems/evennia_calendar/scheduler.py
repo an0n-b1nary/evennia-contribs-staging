@@ -146,7 +146,7 @@ def run_lottery(event, rng=None):
             logger.exception("Calendar: lottery_selected signal failed for rsvp #%s", rsvp.pk)
 
     logger.info(
-        "Calendar: lottery drawn for event #%s '%s'. " "Selected %d, remaining in pool %d.",
+        "Calendar: lottery drawn for event #%s '%s'. Selected %d, remaining in pool %d.",
         event.pk,
         event.title,
         len(selected),
@@ -196,7 +196,7 @@ def run_cluster_lottery(cluster, rng=None):
 
     if not cluster.is_locked:
         logger.warning(
-            "Calendar: run_cluster_lottery called on unlocked cluster #%s. " "Skipping.",
+            "Calendar: run_cluster_lottery called on unlocked cluster #%s. Skipping.",
             cluster.pk,
         )
         return
@@ -383,7 +383,7 @@ def run_cluster_lottery(cluster, rng=None):
         logger.exception("Calendar: cluster_drawn signal failed for cluster #%s", cluster.pk)
 
     logger.info(
-        "Calendar: cluster draw complete for cluster #%s '%s'. " "Seated %d, unseated %d.",
+        "Calendar: cluster draw complete for cluster #%s '%s'. Seated %d, unseated %d.",
         cluster.pk,
         cluster.title,
         len(seated_rsvps),

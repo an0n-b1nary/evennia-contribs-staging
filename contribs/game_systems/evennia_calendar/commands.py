@@ -132,7 +132,7 @@ def _format_event_detail(event, sr_mode=False):
         cap_str = f"{cap} max ({event.seats_remaining} remaining)" if cap else "Unlimited"
         web_url = _event_web_path(event.pk)
         lines = [
-            f"Event #{event.pk}: {event.title}{staff_tag}" f" |lu{web_url}|lt[↗]|le",
+            f"Event #{event.pk}: {event.title}{staff_tag} |lu{web_url}|lt[↗]|le",
             f"  Time: {event.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC",
             f"  Emphasis: {event.get_emphasis_display()}",
             f"  Tags: {tags}",
@@ -156,8 +156,7 @@ def _format_event_detail(event, sr_mode=False):
                 lines.append("  Other events in this cluster:")
                 for s in siblings:
                     lines.append(
-                        f"    #{s.pk} {s.title}"
-                        f" — {s.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC"
+                        f"    #{s.pk} {s.title} — {s.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC"
                     )
         return "\n".join(lines)
 
@@ -769,8 +768,7 @@ class CmdCalendar(MuxCommand):
         event.cluster = cluster
         event.save(update_fields=["cluster", "updated_at"])
         self.caller.msg(
-            f"Event #{event.pk} '{event.title}' added to cluster "
-            f"#{cluster.pk} '{cluster.title}'."
+            f"Event #{event.pk} '{event.title}' added to cluster #{cluster.pk} '{cluster.title}'."
         )
 
     def _cluster_remove(self):
@@ -869,7 +867,7 @@ class CmdCalendar(MuxCommand):
         lines.append(f" Total ranked preferences submitted: {total_pending}")
         if not cluster.is_locked:
             lines.append(
-                " RSVP opens after staff locks with " f"|w+calendar/cluster/lock {cluster.pk}|n"
+                f" RSVP opens after staff locks with |w+calendar/cluster/lock {cluster.pk}|n"
             )
         else:
             lines.append(f" RSVP: |w+rsvp/cluster {cluster.pk}=<event_id1>,<event_id2>,...|n")
@@ -1563,8 +1561,7 @@ class CmdRsvp(MuxCommand):
         concrete = crsvp.concrete_rsvps.first()
         if concrete:
             lines.append(
-                f" Assigned event: |w'{concrete.event.title}'|n "
-                f"[{concrete.get_status_display()}]"
+                f" Assigned event: |w'{concrete.event.title}'|n [{concrete.get_status_display()}]"
             )
         lines.append(sep)
         self.caller.msg("\n".join(lines))
@@ -1584,8 +1581,7 @@ class CmdRsvp(MuxCommand):
             return
         if crsvp.status != ClusterRSVP.Status.PENDING:
             self.caller.msg(
-                f"|rCannot cancel: your cluster RSVP status is "
-                f"'{crsvp.get_status_display()}'.|n"
+                f"|rCannot cancel: your cluster RSVP status is '{crsvp.get_status_display()}'.|n"
             )
             return
         if cluster.has_run:

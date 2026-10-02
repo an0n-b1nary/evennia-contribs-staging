@@ -496,7 +496,7 @@ class ClusterRSVPPreference(models.Model):
         ordering = ["rank"]  # noqa: RUF012
 
     def __str__(self):
-        return f"#{self.rank}: {self.event.title} " f"(for {self.cluster_rsvp.character_name})"
+        return f"#{self.rank}: {self.event.title} (for {self.cluster_rsvp.character_name})"
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +589,7 @@ class RSVP(models.Model):
         ]
 
     def __str__(self):
-        return f"RSVP: {self.character_name} → {self.event.title} " f"[{self.get_status_display()}]"
+        return f"RSVP: {self.character_name} → {self.event.title} [{self.get_status_display()}]"
 
     def confirm(self):
         """Confirm this RSVP (INVITED or LOTTERY_SELECTED → CONFIRMED)."""
@@ -703,9 +703,7 @@ class PriorityToken(models.Model):
 
     def __str__(self):
         status = "redeemed" if self.is_redeemed else "unredeemed"
-        return (
-            f"PriorityToken [{self.get_scope_display()}] for " f"{self.character_name} ({status})"
-        )
+        return f"PriorityToken [{self.get_scope_display()}] for {self.character_name} ({status})"
 
     @property
     def is_redeemed(self):

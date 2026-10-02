@@ -384,7 +384,7 @@ class CmdBoard(MuxCommand):
         ]
         if post.parent_post_id and post.parent_post:
             lines.append(
-                f"  |wReply to:|n #{post.parent_post.post_number}" f" — {post.parent_post.title}"
+                f"  |wReply to:|n #{post.parent_post.post_number} — {post.parent_post.title}"
             )
         lines.append("-" * 60)
         lines.append(post.content)
@@ -534,7 +534,7 @@ class CmdBoard(MuxCommand):
         _, created = Subscription.objects.get_or_create(account=account, board=board)
         if created:
             caller.msg(
-                f"|gSubscribed to {board.name}.|n " f"You will be notified of new posts on login."
+                f"|gSubscribed to {board.name}.|n You will be notified of new posts on login."
             )
         else:
             caller.msg(f"You are already subscribed to {board.name}.")

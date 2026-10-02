@@ -135,7 +135,7 @@ class RPSession(models.Model):
         ]
 
     def __str__(self):
-        return f"RPSession #{self.pk}: {self.character_name} " f"({self.get_status_display()})"
+        return f"RPSession #{self.pk}: {self.character_name} ({self.get_status_display()})"
 
     def duration_seconds(self):
         """Return session duration in seconds.
