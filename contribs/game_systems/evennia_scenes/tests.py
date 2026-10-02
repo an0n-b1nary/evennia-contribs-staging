@@ -855,7 +855,7 @@ class TestWebPagesRender(EvenniaTest):
     def test_scene_list_displays_close_date(self):
         when = timezone.now() - timedelta(days=10)
         Scene.objects.filter(pk=self.scene.pk).update(ended_at=when)
-        self.assertIn(f"<td>{when:%Y-%m-%d}</td>", self._render(SceneListView))
+        self.assertIn(f"</span>{when:%Y-%m-%d}</td>", self._render(SceneListView))
 
     def test_room_name_survives_unmounted_regions(self):
         self.scene.room_name = "The Unmounted Tavern"

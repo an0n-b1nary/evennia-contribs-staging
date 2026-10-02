@@ -12,24 +12,24 @@
 
 {% if planes %}
 <div class="evennia-maps-table-scroll" role="region" aria-label="Planes" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Name</th>
-      <th scope="col">Stack</th>
-      {% if show_tile_counts %}<th scope="col">Rooms</th>{% endif %}
-      <th scope="col">Description</th>
+<table role="table" class="evennia-maps-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Name</th>
+      <th role="columnheader" scope="col">Stack</th>
+      {% if show_tile_counts %}<th role="columnheader" scope="col">Rooms</th>{% endif %}
+      <th role="columnheader" scope="col">Description</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for plane in planes %}
-    <tr>
-      <td><a href="{% url 'evennia_maps:plane-detail' plane.pk %}">{{ plane.name }}</a></td>
-      <td class="text-muted">
+    <tr role="row">
+      <td role="cell"><span class="evennia-maps-cell-label" aria-hidden="true">Name</span><a href="{% url 'evennia_maps:plane-detail' plane.pk %}">{{ plane.name }}</a></td>
+      <td role="cell" class="text-muted"><span class="evennia-maps-cell-label" aria-hidden="true">Stack</span>
         {% if plane.zstack %}{{ plane.zstack }} ({{ plane.elevation }}){% else %}Not recorded{% endif %}
       </td>
-      {% if show_tile_counts %}<td>{{ plane.tile_count }}</td>{% endif %}
-      <td class="text-muted">{{ plane.description|default:"Not recorded"|truncatechars:80 }}</td>
+      {% if show_tile_counts %}<td role="cell"><span class="evennia-maps-cell-label" aria-hidden="true">Rooms</span>{{ plane.tile_count }}</td>{% endif %}
+      <td role="cell" class="text-muted"><span class="evennia-maps-cell-label" aria-hidden="true">Description</span>{{ plane.description|default:"Not recorded"|truncatechars:80 }}</td>
     </tr>
     {% endfor %}
   </tbody>

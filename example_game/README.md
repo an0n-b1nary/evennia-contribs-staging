@@ -959,8 +959,11 @@ Three mechanisms, for three different needs:
     for each mounted web contrib and inspect the rendered source: its page
     links the contrib stylesheet, tables sit in a focusable scroll region, and
     empty collections explain what belongs there. Resize the browser to a
-    narrow viewport and confirm the page remains usable without horizontal
-    overflow outside those table regions.
+    narrow viewport and confirm data tables become labelled stacked rows at
+    640px or below, with readable titles and working links. The calendar opens
+    as a chronological list of the selected month; its explicit Month Grid,
+    List View, and Automatic controls work with JavaScript disabled. An explicit
+    mobile grid scrolls inside its own region.
 17. **Phase 4 relationships and identifiers** - open a region and follow a
     member room, then follow its map placement; open a scene and verify its
     public number, room, participants, and related lore/plot/event links. Use
@@ -1000,3 +1003,11 @@ Change a scene to view-private while an uninvited reader follows it and confirm
 the reading area clears. Read a board, return to the index, and confirm its
 unread count clears only for that account. Disable JavaScript and verify the
 manual refresh link. Check the character list after connecting/disconnecting.
+
+Mobile verification: run `python scripts/ui_shots.py --viewport mobile` from the
+repo root against the running sandbox. The report records page/viewport widths
+and the script fails for horizontal page overflow, non-200 responses, or browser
+warnings/errors. Check both populated and empty tables and the calendar's month
+navigation. Desktop tables keep their columns. After a reseed changes IDs, use
+`--routes-file <file.json>` with an explicit JSON list of `["slug", "/path/"]`
+pairs; this also allows extra routes such as history and staff pages.

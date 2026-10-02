@@ -16,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
 <h1 class="mb-0">Event Calendar</h1>
 {% if request.user.is_authenticated %}
 <div class="evennia-calendar-actions">
@@ -27,17 +27,39 @@
 </div>
 
 <div class="evennia-calendar-actions">
-  <a href="?year={{ prev_year }}&month={{ prev_month }}"
+  <a href="?year={{ prev_year }}&month={{ prev_month }}&view={{ view_mode }}"
      class="btn btn-sm btn-secondary"
      aria-label="Previous month">&larr; Prev</a>
   <strong>{{ month_name }} {{ year }}</strong>
-  <a href="?year={{ next_year }}&month={{ next_month }}"
+  <a href="?year={{ next_year }}&month={{ next_month }}&view={{ view_mode }}"
      class="btn btn-sm btn-secondary"
      aria-label="Next month">Next &rarr;</a>
-  <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-sm btn-outline-secondary evennia-calendar-spacer">List View</a>
+  <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-sm btn-outline-secondary evennia-calendar-spacer">All Upcoming Events</a>
 </div>
 
-<div class="evennia-calendar-table-scroll" role="region" aria-label="Calendar grid for {{ month_name }} {{ year }}" tabindex="0">
+<nav class="evennia-calendar-actions" aria-label="Calendar display">
+  <a href="?year={{ year }}&month={{ month }}&view=auto" class="btn btn-sm btn-outline-secondary"{% if view_mode == "auto" %} aria-current="true"{% endif %}>Automatic</a>
+  <a href="?year={{ year }}&month={{ month }}&view=list" class="btn btn-sm btn-outline-secondary"{% if view_mode == "list" %} aria-current="true"{% endif %}>List View</a>
+  <a href="?year={{ year }}&month={{ month }}&view=grid" class="btn btn-sm btn-outline-secondary"{% if view_mode == "grid" %} aria-current="true"{% endif %}>Month Grid</a>
+</nav>
+<p class="evennia-calendar-muted">Automatic shows a list on small screens and a grid on larger screens.</p>
+
+<div class="evennia-calendar-display-{{ view_mode }}">
+<section class="evennia-calendar-month-list" aria-label="Events in {{ month_name }} {{ year }}">
+  <ul class="list-group mb-3">
+    {% for event in month_events %}
+    <li class="list-group-item">
+      <a href="{% url 'evennia_calendar:calendar-event-detail' event.pk %}">{{ event.title }}</a>
+      <time class="d-block" datetime="{{ event.grid_datetime }}">{{ event.list_date }} at {{ event.grid_time }} UTC</time>
+      {% if event.is_clustered %}<a class="d-block" href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}">Cluster: {{ event.cluster.title }}</a>{% endif %}
+      {% if event.is_staff_event %}<span class="badge badge-secondary">Staff lottery event</span>{% endif %}
+    </li>
+    {% empty %}
+    <li class="list-group-item text-muted">No events are scheduled for {{ month_name }} {{ year }}. Use <code>+calendar/create</code> in-game to schedule one.</li>
+    {% endfor %}
+  </ul>
+</section>
+<div class="evennia-calendar-table-scroll evennia-calendar-month-grid" role="region" aria-label="Calendar grid for {{ month_name }} {{ year }}" tabindex="0">
 <table class="table table-bordered evennia-calendar-table-fixed">
   <thead class="thead-dark">
     <tr>
@@ -76,11 +98,14 @@
     {% endfor %}
   </tbody>
 </table>
+<p class="evennia-calendar-muted">
+  Past, today, and future days are labelled by text and colour.
+  <span aria-hidden="true">&#9733;</span><span class="sr-only">Star symbol</span> = staff lottery event.
+</p>
+</div>
 </div>
 
 <p class="evennia-calendar-muted">
-  All times are UTC. Past, today, and future days are labelled by text and colour.
-  <span aria-hidden="true">&#9733;</span><span class="sr-only">Star symbol</span> = staff lottery event
-  &nbsp;|&nbsp; [Cluster] = part of a grouped event cluster.
+  All times are UTC. Cluster links open grouped events and their ranked RSVP page.
 </p>
 {% endblock %}

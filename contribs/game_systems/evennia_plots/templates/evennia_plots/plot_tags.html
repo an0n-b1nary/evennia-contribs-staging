@@ -27,21 +27,21 @@
 {% if major_tags %}
 <h2>Major Tags <small class="text-muted">(staff-defined)</small></h2>
 <div class="evennia-plots-table-scroll" role="region" aria-label="Major tags" tabindex="0">
-<table class="table table-sm">
-  <thead>
-    <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
+<table role="table" class="evennia-plots-table-stack table table-sm">
+  <thead role="rowgroup">
+    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Threads</th><th role="columnheader" scope="col">Arcs</th></tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for entry in major_tags %}
-    <tr>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Tag</span>
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
            class="badge badge-primary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
-      <td>{{ entry.thread_count }}</td>
-      <td>{{ entry.arc_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Threads</span>{{ entry.thread_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arcs</span>{{ entry.arc_count }}</td>
     </tr>
-    {% empty %}<tr><td colspan="3" class="text-muted">No major tags yet.</td></tr>
+    {% empty %}<tr role="row"><td role="cell" colspan="3" class="text-muted">No major tags yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -51,21 +51,21 @@
 {% if minor_tags %}
 <h2>Minor Tags <small class="text-muted">(player-created)</small></h2>
 <div class="evennia-plots-table-scroll" role="region" aria-label="Minor tags" tabindex="0">
-<table class="table table-sm">
-  <thead>
-    <tr><th scope="col">Tag</th><th scope="col">Threads</th><th scope="col">Arcs</th></tr>
+<table role="table" class="evennia-plots-table-stack table table-sm">
+  <thead role="rowgroup">
+    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Threads</th><th role="columnheader" scope="col">Arcs</th></tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for entry in minor_tags %}
-    <tr>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Tag</span>
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
            class="badge badge-secondary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
-      <td>{{ entry.thread_count }}</td>
-      <td>{{ entry.arc_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Threads</span>{{ entry.thread_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arcs</span>{{ entry.arc_count }}</td>
     </tr>
-    {% empty %}<tr><td colspan="3" class="text-muted">No minor tags yet.</td></tr>
+    {% empty %}<tr role="row"><td role="cell" colspan="3" class="text-muted">No minor tags yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>

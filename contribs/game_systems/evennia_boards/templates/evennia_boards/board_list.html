@@ -20,26 +20,26 @@
 
 {% if boards %}
 <div class="evennia-boards-table-scroll" role="region" aria-label="Bulletin boards" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Board</th>
-      <th scope="col">Description</th>
-      <th scope="col">Last post</th>
-      <th scope="col">Last author</th>
-      {% if show_unread %}<th scope="col">Unread</th>{% endif %}
-      <th scope="col">Type</th>
+<table role="table" class="evennia-boards-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Board</th>
+      <th role="columnheader" scope="col">Description</th>
+      <th role="columnheader" scope="col">Last post</th>
+      <th role="columnheader" scope="col">Last author</th>
+      {% if show_unread %}<th role="columnheader" scope="col">Unread</th>{% endif %}
+      <th role="columnheader" scope="col">Type</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for board in boards %}
-    <tr>
-      <td><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
-      <td>{{ board.description|default:"Not recorded" }}</td>
-      <td>{% if board.latest_number %}<a href="{% url 'evennia_boards:board-detail' board.pk %}#post-{{ board.latest_number }}">{{ board.latest_title }}</a><br><small class="text-muted">{{ board.latest_time|date:"Y-m-d H:i" }}</small>{% else %}<span class="text-muted">No posts yet. Use <code>+bb/post</code> in-game to write one.</span>{% endif %}</td>
-      <td>{{ board.latest_author|default:"Unattributed" }}</td>
-      {% if show_unread %}<td>{% if board.unread_count %}<span class="badge badge-primary">{{ board.unread_count }} unread</span>{% else %}<span class="text-muted">Read</span>{% endif %}</td>{% endif %}
-      <td>{{ board.get_board_type_display }}</td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Board</span><a href="{% url 'evennia_boards:board-detail' board.pk %}">{{ board.name }}</a></td>
+      <td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Description</span>{{ board.description|default:"Not recorded" }}</td>
+      <td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Last post</span>{% if board.latest_number %}<a href="{% url 'evennia_boards:board-detail' board.pk %}#post-{{ board.latest_number }}">{{ board.latest_title }}</a><br><small class="text-muted">{{ board.latest_time|date:"Y-m-d H:i" }}</small>{% else %}<span class="text-muted">No posts yet. Use <code>+bb/post</code> in-game to write one.</span>{% endif %}</td>
+      <td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Last author</span>{{ board.latest_author|default:"Unattributed" }}</td>
+      {% if show_unread %}<td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Unread</span>{% if board.unread_count %}<span class="badge badge-primary">{{ board.unread_count }} unread</span>{% else %}<span class="text-muted">Read</span>{% endif %}</td>{% endif %}
+      <td role="cell"><span class="evennia-boards-cell-label" aria-hidden="true">Type</span>{{ board.get_board_type_display }}</td>
     </tr>
     {% endfor %}
   </tbody>

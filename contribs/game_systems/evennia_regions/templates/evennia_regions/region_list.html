@@ -20,20 +20,20 @@
 
 {% if regions %}
 <div class="evennia-regions-table-scroll" role="region" aria-label="Regions" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Name</th>
-      {% if show_member_counts %}<th scope="col">Rooms</th>{% endif %}
-      <th scope="col">Description</th>
+<table role="table" class="evennia-regions-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Name</th>
+      {% if show_member_counts %}<th role="columnheader" scope="col">Rooms</th>{% endif %}
+      <th role="columnheader" scope="col">Description</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for region in regions %}
-    <tr>
-      <td><a href="{% url 'evennia_regions:region-detail' region.pk %}">{{ region.name }}</a></td>
-      {% if show_member_counts %}<td>{{ region.member_count }}</td>{% endif %}
-      <td class="text-muted">{{ region.description|default:"Not recorded"|truncatechars:80 }}</td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-regions-cell-label" aria-hidden="true">Name</span><a href="{% url 'evennia_regions:region-detail' region.pk %}">{{ region.name }}</a></td>
+      {% if show_member_counts %}<td role="cell"><span class="evennia-regions-cell-label" aria-hidden="true">Rooms</span>{{ region.member_count }}</td>{% endif %}
+      <td role="cell" class="text-muted"><span class="evennia-regions-cell-label" aria-hidden="true">Description</span>{{ region.description|default:"Not recorded"|truncatechars:80 }}</td>
     </tr>
     {% endfor %}
   </tbody>

@@ -15,3 +15,18 @@
   .evennia-boards-post-heading { flex-basis: 100%; }
   .evennia-boards-post-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
 }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-boards-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-boards-table-stack,
+  .evennia-boards-table-stack tbody,
+  .evennia-boards-table-stack tr,
+  .evennia-boards-table-stack td,
+  .evennia-boards-table-stack tbody th { display: block; width: 100%; }
+  .evennia-boards-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-boards-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-boards-table-stack tbody td,
+  .evennia-boards-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-boards-table-stack .evennia-boards-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

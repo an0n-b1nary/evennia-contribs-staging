@@ -1,9 +1,9 @@
 """Screenshot the example_game web surfaces for UI/UX review.
 
 Walks a list of routes against a running Evennia webserver, capturing a
-full-page PNG per route per viewport plus a text report of HTTP status and
-browser console errors. Output goes to a gitignored directory; nothing this
-script produces is meant to be committed.
+full-page PNG per route per viewport plus a text report of HTTP status,
+page width, and browser console errors. Output goes to a gitignored directory;
+nothing this script produces is meant to be committed.
 
 Authentication forges a Django session row for an existing account and hands
 the browser the resulting cookie, so no password ever appears on a command
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
 import os
 import re
 import sys
@@ -38,9 +39,9 @@ GAME_DIR = REPO_ROOT / "example_game"
 # what makes two capture runs comparable side by side.
 #
 # The pks are the ones the sandbox seeder creates (plane 1 = Sandbox Overworld,
-# region 1 = The Commons). If a reseed renumbers them, fix them here rather
-# than teaching the script to guess: a screenshot of the wrong plane is worse
-# than a 404 you can see in the report.
+# region 1 = The Commons). If a reseed renumbers them, supply --routes-file
+# with explicit [slug, path] pairs. The script never guesses which records
+# should stand in for a missing page.
 DEFAULT_PAGES: list[tuple[str, str]] = [
     ("home", "/"),
     ("map-index", "/map/"),
@@ -49,9 +50,12 @@ DEFAULT_PAGES: list[tuple[str, str]] = [
     ("regions-index", "/regions/"),
     ("region-detail", "/regions/1/"),
     ("calendar", "/calendar/"),
+    ("calendar-list", "/calendar/list/"),
     ("calendar-event", "/calendar/1/"),
     ("plots", "/plots/"),
     ("plot-detail", "/plots/1/"),
+    ("plot-arc-detail", "/plots/arc/1/"),
+    ("plot-tags", "/plots/tags/"),
     ("scenes", "/scenes/"),
     ("scenes-live", "/scenes/live/"),
     # Both scene states, because they render differently and the archive only
@@ -65,6 +69,7 @@ DEFAULT_PAGES: list[tuple[str, str]] = [
     ("board-detail-second", "/boards/2/"),
     ("lore", "/lore/"),
     ("lore-detail", "/lore/1/"),
+    ("lore-history", "/lore/1/history/"),
     ("jobs", "/jobs/"),
     ("xp", "/xp/"),
     ("characters", "/characters/"),
@@ -118,9 +123,33 @@ def capture(args: argparse.Namespace) -> int:
     from playwright.sync_api import sync_playwright
 
     pages = DEFAULT_PAGES
+    if args.routes_file:
+        try:
+            pages = json.loads(Path(args.routes_file).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as err:
+            print(f"cannot read routes file: {err}", file=sys.stderr)
+            return 2
+        if (
+            not isinstance(pages, list)
+            or not pages
+            or not all(
+                isinstance(row, list)
+                and len(row) == 2
+                and all(isinstance(value, str) for value in row)
+                and re.fullmatch(r"[a-z0-9-]+", row[0])
+                and row[1].startswith("/")
+                and not row[1].startswith("//")
+                for row in pages
+            )
+        ):
+            print("routes file must contain [slug, /path] pairs", file=sys.stderr)
+            return 2
+        if len({slug for slug, _ in pages}) != len(pages):
+            print("routes file slugs must be unique", file=sys.stderr)
+            return 2
     if args.only:
         wanted = set(args.only)
-        missing = wanted - {slug for slug, _ in DEFAULT_PAGES}
+        missing = wanted - {slug for slug, _ in pages}
         if missing:
             print(f"unknown page slug(s): {', '.join(sorted(missing))}", file=sys.stderr)
             return 2
@@ -182,10 +211,18 @@ def capture(args: argparse.Namespace) -> int:
                     if args.settle:
                         page.wait_for_timeout(args.settle)
                     shot = out_dir / f"{slug}__{vp_name}.png"
+                    dimensions = page.evaluate(
+                        "({viewport: innerWidth, page: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)})"
+                    )
                     page.screenshot(path=str(shot), full_page=True)
-                    if status != 200:
+                    overflow = dimensions["page"] > dimensions["viewport"]
+                    if status != 200 or overflow or console:
                         failures += 1
-                    report.append(f"[{vp_name}] {slug} {path} -> {status}  {shot.name}")
+                    report.append(
+                        f"[{vp_name}] {slug} {path} -> {status}  {shot.name}  "
+                        f"width={dimensions['page']}/{dimensions['viewport']}"
+                        + (" OVERFLOW" if overflow else "")
+                    )
                     report.extend(f"    {entry}" for entry in console)
                 context.close()
         finally:
@@ -215,6 +252,9 @@ def main() -> int:
     parser.add_argument("--anon", action="store_true", help="capture as a logged-out visitor")
     parser.add_argument("--account", type=int, default=1, help="account id to log in as")
     parser.add_argument("--only", nargs="+", metavar="SLUG", help="capture just these pages")
+    parser.add_argument(
+        "--routes-file", help="JSON list of [slug, path] pairs for reseeded or extra routes"
+    )
     parser.add_argument("--viewport", nargs="+", choices=sorted(VIEWPORTS), help="limit viewports")
     parser.add_argument("--scale", type=float, default=1.0, help="device scale factor")
     parser.add_argument("--timeout", type=int, default=20000, help="per-page timeout (ms)")

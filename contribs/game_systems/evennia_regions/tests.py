@@ -740,11 +740,11 @@ class TestWebPagesRender(EvenniaTest):
     def test_member_counts_are_withheld_from_non_staff(self):
         # A raw count includes rooms the detail page hides, so publishing it
         # tells a visitor exactly how many rooms they are not being shown.
-        self.assertNotIn('<th scope="col">Rooms</th>', self._render(RegionListView))
+        self.assertNotIn('scope="col">Rooms</th>', self._render(RegionListView))
 
     def test_member_counts_are_rendered_for_staff(self):
         html = self._render(RegionListView, user=self.account)
-        self.assertIn('<th scope="col">Rooms</th>', html)
+        self.assertIn('scope="col">Rooms</th>', html)
 
     # -- region detail ------------------------------------------------------
 

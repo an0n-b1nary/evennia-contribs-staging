@@ -100,6 +100,7 @@ class CalendarMonthView(TemplateView):
             scheduled_utc = ev.scheduled_time.astimezone(datetime.UTC)
             ev.grid_time = scheduled_utc.strftime("%H:%M")
             ev.grid_datetime = scheduled_utc.isoformat()
+            ev.list_date = scheduled_utc.strftime("%a, %b %d")
             day = scheduled_utc.day
             day_events.setdefault(day, []).append(ev)
 
@@ -135,6 +136,10 @@ class CalendarMonthView(TemplateView):
                 "month": month,
                 "month_name": _cal.month_name[month],
                 "cal_weeks_with_events": cal_weeks_with_events,
+                "month_events": list(events),
+                "view_mode": self.request.GET.get("view")
+                if self.request.GET.get("view") in {"grid", "list"}
+                else "auto",
                 "prev_year": prev_year,
                 "prev_month": prev_month,
                 "next_year": next_year,

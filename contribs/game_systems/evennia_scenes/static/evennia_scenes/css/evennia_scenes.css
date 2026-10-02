@@ -9,3 +9,18 @@
 .evennia-scenes-diff .evennia-scenes-diff-remove { background-color: #f8d7da; color: #721c24; }
 .evennia-scenes-diff .evennia-scenes-diff-hunk { background-color: #e2e3e5; color: #383d41; }
 .evennia-scenes-diff .evennia-scenes-diff-meta { color: #6c757d; }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-scenes-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-scenes-table-stack,
+  .evennia-scenes-table-stack tbody,
+  .evennia-scenes-table-stack tr,
+  .evennia-scenes-table-stack td,
+  .evennia-scenes-table-stack tbody th { display: block; width: 100%; }
+  .evennia-scenes-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-scenes-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-scenes-table-stack tbody td,
+  .evennia-scenes-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-scenes-table-stack .evennia-scenes-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

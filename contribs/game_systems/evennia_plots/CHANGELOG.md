@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.3] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
+
 ## [Unreleased]
 
 - **Changed:** web templates use namespaced classes, packaged CSS, and the

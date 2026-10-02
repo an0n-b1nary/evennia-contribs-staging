@@ -26,24 +26,24 @@ Block {{ update.block_number }} — {{ update.get_update_type_display }} — by 
 
 {% if versions %}
 <div class="evennia-plots-table-scroll" role="region" aria-label="Version history" tabindex="0">
-<table class="table table-sm table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Version</th>
-      <th scope="col">Editor</th>
-      <th scope="col">Saved at (UTC)</th>
-      <th scope="col">Note</th>
-      <th scope="col">Action</th>
+<table role="table" class="evennia-plots-table-stack table table-sm table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Version</th>
+      <th role="columnheader" scope="col">Editor</th>
+      <th role="columnheader" scope="col">Saved at (UTC)</th>
+      <th role="columnheader" scope="col">Note</th>
+      <th role="columnheader" scope="col">Action</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for version in versions %}
-    <tr>
-      <td>v{{ version.version_number }}</td>
-      <td>{{ version.editor_name|default:"Unattributed" }}</td>
-      <td>{{ version.created_at|date:"Y-m-d H:i" }}</td>
-      <td>{% if version.is_rollback %}Rollback from v{{ version.rolled_back_from }}{% endif %}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Version</span>v{{ version.version_number }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Editor</span>{{ version.editor_name|default:"Unattributed" }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Saved at (UTC)</span>{{ version.created_at|date:"Y-m-d H:i" }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Note</span>{% if version.is_rollback %}Rollback from v{{ version.rolled_back_from }}{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Action</span>
         <a href="{% url 'evennia_plots:plot-update-diff' thread.pk update.pk version.version_number %}">
           Diff vs. current
         </a>

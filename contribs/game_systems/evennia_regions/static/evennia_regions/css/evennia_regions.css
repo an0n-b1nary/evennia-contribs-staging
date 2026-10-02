@@ -3,3 +3,18 @@
 .evennia-regions-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
 .evennia-regions-empty { color: #6c757d; font-style: italic; }
 .evennia-regions-room-description { white-space: pre-wrap; }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-regions-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-regions-table-stack,
+  .evennia-regions-table-stack tbody,
+  .evennia-regions-table-stack tr,
+  .evennia-regions-table-stack td,
+  .evennia-regions-table-stack tbody th { display: block; width: 100%; }
+  .evennia-regions-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-regions-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-regions-table-stack tbody td,
+  .evennia-regions-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-regions-table-stack .evennia-regions-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

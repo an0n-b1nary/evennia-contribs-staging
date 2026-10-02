@@ -14,3 +14,18 @@
 .evennia-plots-diff .evennia-plots-diff-meta { color: #6c757d; }
 .evennia-plots-pre-wrap { white-space: pre-wrap; }
 .evennia-plots-empty { color: #6c757d; font-style: italic; }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-plots-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-plots-table-stack,
+  .evennia-plots-table-stack tbody,
+  .evennia-plots-table-stack tr,
+  .evennia-plots-table-stack td,
+  .evennia-plots-table-stack tbody th { display: block; width: 100%; }
+  .evennia-plots-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-plots-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-plots-table-stack tbody td,
+  .evennia-plots-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-plots-table-stack .evennia-plots-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

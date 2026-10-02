@@ -897,7 +897,7 @@ class TestWebPagesRender(EvenniaTest):
         self.assertIn("Notices", html)
         self.assertIn("Re: First Post", html)
         self.assertIn(self.char2.key, html)
-        self.assertNotIn('<th scope="col">Posts</th>', html)
+        self.assertNotIn('scope="col">Posts</th>', html)
 
     def test_board_list_renders_its_empty_state(self):
         Board.objects.all().delete()

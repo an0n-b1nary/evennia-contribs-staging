@@ -2,3 +2,18 @@
 .evennia-xp-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .evennia-xp-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
 .evennia-xp-empty { color: #6c757d; font-style: italic; }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-xp-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-xp-table-stack,
+  .evennia-xp-table-stack tbody,
+  .evennia-xp-table-stack tr,
+  .evennia-xp-table-stack td,
+  .evennia-xp-table-stack tbody th { display: block; width: 100%; }
+  .evennia-xp-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-xp-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-xp-table-stack tbody td,
+  .evennia-xp-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-xp-table-stack .evennia-xp-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

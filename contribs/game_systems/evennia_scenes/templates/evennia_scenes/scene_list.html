@@ -21,24 +21,24 @@
 
 {% if scenes %}
 <div class="evennia-scenes-table-scroll" role="region" aria-label="Scene archive" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Title</th>
-      <th scope="col">Room</th>
-      <th scope="col">Participants</th>
-      <th scope="col">Entries</th>
-      <th scope="col">Date</th>
+<table role="table" class="evennia-scenes-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Room</th>
+      <th role="columnheader" scope="col">Participants</th>
+      <th role="columnheader" scope="col">Entries</th>
+      <th role="columnheader" scope="col">Date</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for scene in scenes %}
-    <tr>
-      <td><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">#{{ scene.scene_number }} — {{ scene.title|default:"Untitled" }}</a></td>
-      <td>{{ scene.room_name|default:"Not recorded" }}</td>
-      <td>{{ scene.participants.count }}</td>
-      <td>{{ scene.log_entries.count }}</td>
-      <td>{% if scene.ended_at %}{{ scene.ended_at|date:"Y-m-d" }}{% else %}{{ scene.created_at|date:"Y-m-d" }}{% endif %}</td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-scenes-cell-label" aria-hidden="true">Title</span><a href="{% url 'evennia_scenes:scene-detail' scene.pk %}">#{{ scene.scene_number }} — {{ scene.title|default:"Untitled" }}</a></td>
+      <td role="cell"><span class="evennia-scenes-cell-label" aria-hidden="true">Room</span>{{ scene.room_name|default:"Not recorded" }}</td>
+      <td role="cell"><span class="evennia-scenes-cell-label" aria-hidden="true">Participants</span>{{ scene.participants.count }}</td>
+      <td role="cell"><span class="evennia-scenes-cell-label" aria-hidden="true">Entries</span>{{ scene.log_entries.count }}</td>
+      <td role="cell"><span class="evennia-scenes-cell-label" aria-hidden="true">Date</span>{% if scene.ended_at %}{{ scene.ended_at|date:"Y-m-d" }}{% else %}{{ scene.created_at|date:"Y-m-d" }}{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

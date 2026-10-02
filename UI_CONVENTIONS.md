@@ -29,6 +29,15 @@ Presentation rules are mirrored in each contrib and checked by
 - Every data table is inside an `evennia-<contrib>-table-scroll` region with a
   useful accessible label and keyboard focus. The region owns horizontal
   overflow so a narrow viewport does not make the page wider.
+- Below 640px, data tables use stacked rows with a visible label in every cell.
+  Mirror the `evennia-<contrib>-table-stack` rules in each contrib's stylesheet.
+  Keep the column headers visually hidden rather than removing them and retain
+  explicit table/rowgroup/row/cell roles when CSS changes their display. Mobile
+  labels carry `aria-hidden="true"` so assistive technology uses the original
+  headers. Full-width empty-state cells do not need a label.
+- The calendar's automatic display uses a chronological list on narrow screens
+  and a month grid on larger screens. Explicit grid/list controls preserve the
+  selected month and work without JavaScript.
 
 ## Templates and tests
 

@@ -81,3 +81,18 @@
 .widget-table-scroll {
   overflow-x: auto;
 }
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.sandbox-cell-label { display: none; }
+@media (max-width: 640px) {
+  .sandbox-table-stack,
+  .sandbox-table-stack tbody,
+  .sandbox-table-stack tr,
+  .sandbox-table-stack td,
+  .sandbox-table-stack tbody th { display: block; width: 100%; }
+  .sandbox-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .sandbox-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .sandbox-table-stack tbody td,
+  .sandbox-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .sandbox-table-stack .sandbox-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

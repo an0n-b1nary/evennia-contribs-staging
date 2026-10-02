@@ -143,7 +143,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.3.0")
+        self.assertEqual(evennia_calendar.__version__, "0.3.1")
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""
@@ -1194,6 +1194,47 @@ class TestWebPagesRender(EvenniaTest):
     def test_month_view_survives_a_junk_year_and_month(self):
         html = self._render(CalendarMonthView, path_="/calendar/?year=abc&month=zz")
         self.assertIn("Event Calendar", html)
+
+    def test_month_list_keeps_full_titles_and_selected_month_events(self):
+        when = datetime.datetime(2026, 10, 2, 0, 30, tzinfo=datetime.UTC)
+        self.event.scheduled_time = when
+        self.event.title = "A long event title that must remain readable on a phone"
+        self.event.save()
+        other = _make_event(self.char1, title="Outside selected month")
+        other.scheduled_time = when.replace(month=11)
+        other.save()
+        cancelled = _make_event(self.char1, title="Cancelled selected month event")
+        cancelled.scheduled_time = when
+        cancelled.is_cancelled = True
+        cancelled.save()
+        with timezone.override("America/Los_Angeles"):
+            html = self._render(CalendarMonthView, path_="/calendar/?year=2026&month=10")
+        self.assertIn("evennia-calendar-display-auto", html)
+        self.assertIn(self.event.title, html)
+        self.assertIn("Fri, Oct 02 at 00:30 UTC", html)
+        self.assertNotIn("Outside selected month", html)
+        self.assertNotIn("Cancelled selected month event", html)
+
+    def test_month_list_renders_its_empty_state(self):
+        CalendarEvent.objects.all().delete()
+        html = self._render(CalendarMonthView, path_="/calendar/?year=2026&month=10")
+        self.assertIn("No events are scheduled for October 2026.", html)
+        self.assertIn("+calendar/create", html)
+
+    def test_month_display_choice_and_navigation_survive_year_boundary(self):
+        for mode in ("grid", "list"):
+            with self.subTest(mode=mode):
+                html = self._render(
+                    CalendarMonthView, path_=f"/calendar/?year=2026&month=12&view={mode}"
+                )
+                self.assertIn(f"evennia-calendar-display-{mode}", html)
+                self.assertIn(f"year=2027&month=1&view={mode}", html)
+                self.assertIn(f"year=2026&month=11&view={mode}", html)
+                self.assertIn("year=2026&month=12&view=auto", html)
+
+    def test_unknown_month_display_uses_automatic(self):
+        html = self._render(CalendarMonthView, path_="/calendar/?view=unknown")
+        self.assertIn("evennia-calendar-display-auto", html)
 
     def test_list_view_renders_upcoming_events(self):
         html = self._render(CalendarListView, path_="/calendar/list/")

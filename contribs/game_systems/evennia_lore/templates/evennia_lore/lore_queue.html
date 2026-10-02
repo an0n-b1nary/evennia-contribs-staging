@@ -25,24 +25,24 @@
 
 {% if entries %}
 <div class="evennia-lore-table-scroll" role="region" aria-label="Submitted lore entries" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Title</th>
-      <th scope="col">Author</th>
-      <th scope="col">Submitted</th>
-      <th scope="col">Actions</th>
+<table role="table" class="evennia-lore-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Author</th>
+      <th role="columnheader" scope="col">Submitted</th>
+      <th role="columnheader" scope="col">Actions</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for entry in entries %}
-    <tr>
-      <td>{{ entry.entry_number }}</td>
-      <td><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></td>
-      <td>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
-      <td>{{ entry.created_at|date:"Y-m-d" }}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Number</span>{{ entry.entry_number }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Title</span><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Author</span>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Submitted</span>{{ entry.created_at|date:"Y-m-d" }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Actions</span>
         <form method="post" action="{% url 'lore-approve' entry.pk %}" class="d-inline">
           {% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button>
         </form>

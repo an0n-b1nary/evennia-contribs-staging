@@ -1,5 +1,9 @@
 # Changelog — evennia-scenes
 
+## [0.5.1] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
+
 ## [0.5.0] — 2026-10-02
 
 - **Added:** privacy-checked live scene reading, a separate happening-now list,

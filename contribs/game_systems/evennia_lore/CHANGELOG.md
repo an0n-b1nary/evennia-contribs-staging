@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.1] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
+
 ## [0.3.0] — 2026-10-02
 
 - **Changed:** scene-link commands accept public scene numbers from evennia-scenes 0.4.0; stored soft references remain database keys.

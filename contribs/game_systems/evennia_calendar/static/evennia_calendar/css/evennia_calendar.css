@@ -1,5 +1,5 @@
 /* Self-contained styles for evennia_calendar. */
-.evennia-calendar-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.evennia-calendar-table-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .evennia-calendar-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
 .evennia-calendar-actions { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
 .evennia-calendar-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
@@ -28,3 +28,27 @@
 .evennia-calendar-muted { color: #6c757d; font-size: .85rem; }
 .evennia-calendar-inline { display: inline; }
 .evennia-calendar-empty { color: #6c757d; font-style: italic; }
+.evennia-calendar-display-auto .evennia-calendar-month-list,
+.evennia-calendar-display-grid .evennia-calendar-month-list,
+.evennia-calendar-display-list .evennia-calendar-month-grid { display: none; }
+.evennia-calendar-month-list { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .evennia-calendar-display-auto .evennia-calendar-month-list { display: block; }
+  .evennia-calendar-display-auto .evennia-calendar-month-grid { display: none; }
+  .evennia-calendar-display-grid .evennia-calendar-table-fixed { min-width: 48rem; }
+}
+
+/* Preserve table headers for assistive technology while stacking labelled rows. */
+.evennia-calendar-cell-label { display: none; }
+@media (max-width: 640px) {
+  .evennia-calendar-table-stack,
+  .evennia-calendar-table-stack tbody,
+  .evennia-calendar-table-stack tr,
+  .evennia-calendar-table-stack td,
+  .evennia-calendar-table-stack tbody th { display: block; width: 100%; }
+  .evennia-calendar-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .evennia-calendar-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-calendar-table-stack tbody td,
+  .evennia-calendar-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
+  .evennia-calendar-table-stack .evennia-calendar-cell-label { display: block; font-size: .8rem; font-weight: 600; }
+}

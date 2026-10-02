@@ -61,21 +61,21 @@
 
 {% if entries %}
 <div class="evennia-lore-table-scroll" role="region" aria-label="Lore entries" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Title</th>
-      <th scope="col">Tags</th>
-      <th scope="col">Author</th>
-      {% if is_staff %}<th scope="col">Privacy</th>{% endif %}
+<table role="table" class="evennia-lore-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Tags</th>
+      <th role="columnheader" scope="col">Author</th>
+      {% if is_staff %}<th role="columnheader" scope="col">Privacy</th>{% endif %}
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for entry in entries %}
-    <tr>
-      <td>{{ entry.entry_number }}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Number</span>{{ entry.entry_number }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Title</span>
         <a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a>
         {% if entry.privacy == 'restricted' %}
         <span class="badge badge-warning text-dark ml-1" title="+share required for full content">🔒 Restricted</span>
@@ -87,7 +87,7 @@
         <br><small class="text-muted">{{ entry.summary|truncatechars:100 }}</small>
         {% endif %}
       </td>
-      <td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Tags</span>
         {% for tag in entry.tags.all %}
         <a href="?tag={{ tag.name|urlencode }}"
            class="badge {% if tag.is_major %}badge-primary{% else %}badge-secondary{% endif %} text-decoration-none">
@@ -96,8 +96,8 @@
         {% empty %}<span class="text-muted">Not recorded</span>
         {% endfor %}
       </td>
-      <td>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
-      {% if is_staff %}<td>{{ entry.get_privacy_display }}</td>{% endif %}
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Author</span>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
+      {% if is_staff %}<td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Privacy</span>{{ entry.get_privacy_display }}</td>{% endif %}
     </tr>
     {% endfor %}
   </tbody>

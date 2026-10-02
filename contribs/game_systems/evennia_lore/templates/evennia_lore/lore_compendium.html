@@ -21,27 +21,27 @@
 
 {% if acquisitions %}
 <div class="evennia-lore-table-scroll" role="region" aria-label="Acquired lore" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Title</th>
-      <th scope="col">Acquired</th>
-      <th scope="col">Source</th>
+<table role="table" class="evennia-lore-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Acquired</th>
+      <th role="columnheader" scope="col">Source</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for acq in acquisitions %}
-    <tr>
-      <td>{{ acq.entry.entry_number }}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Number</span>{{ acq.entry.entry_number }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Title</span>
         <a href="{% url 'lore-detail' acq.entry.pk %}">{{ acq.entry.title }}</a>
         {% if acq.entry.privacy == 'restricted' %}
         <span class="badge badge-warning text-dark ml-1">Restricted</span>
         {% endif %}
       </td>
-      <td>{{ acq.acquired_at|date:"Y-m-d" }}</td>
-      <td>{{ acq.get_source_display }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Acquired</span>{{ acq.acquired_at|date:"Y-m-d" }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Source</span>{{ acq.get_source_display }}</td>
     </tr>
     {% endfor %}
   </tbody>

@@ -57,21 +57,21 @@
 </ul>
 {% else %}
 <div class="evennia-xp-table-scroll" role="region" aria-label="XP breakdown by source" tabindex="0">
-<table class="table table-sm table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Source</th>
-      <th scope="col" class="text-right">Total XP</th>
+<table role="table" class="evennia-xp-table-stack table table-sm table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Source</th>
+      <th role="columnheader" scope="col" class="text-right">Total XP</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for label, total in by_source %}
-    <tr>
-      <td>{{ label }}</td>
-      <td class="text-right">{{ total }}</td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-xp-cell-label" aria-hidden="true">Source</span>{{ label }}</td>
+      <td role="cell" class="text-right"><span class="evennia-xp-cell-label" aria-hidden="true">Total XP</span>{{ total }}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="2" class="text-muted">No source totals recorded yet.</td></tr>
+    <tr role="row"><td role="cell" colspan="2" class="text-muted">No source totals recorded yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -96,24 +96,24 @@
 </ul>
 {% else %}
 <div class="evennia-xp-table-scroll" role="region" aria-label="XP award log" tabindex="0">
-<table class="table table-sm table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Date</th>
-      <th scope="col">Source</th>
-      <th scope="col" class="text-right">Amount</th>
-      <th scope="col">Week</th>
-      <th scope="col">Note</th>
+<table role="table" class="evennia-xp-table-stack table table-sm table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Date</th>
+      <th role="columnheader" scope="col">Source</th>
+      <th role="columnheader" scope="col" class="text-right">Amount</th>
+      <th role="columnheader" scope="col">Week</th>
+      <th role="columnheader" scope="col">Note</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for row in logs %}
-    <tr>
-      <td>{{ row.awarded_at|date:"Y-m-d" }}</td>
-      <td>{{ row.get_source_type_display }}</td>
-      <td class="text-right">+{{ row.amount }}</td>
-      <td>{{ row.week }}</td>
-      <td class="text-muted small">
+    <tr role="row">
+      <td role="cell"><span class="evennia-xp-cell-label" aria-hidden="true">Date</span>{{ row.awarded_at|date:"Y-m-d" }}</td>
+      <td role="cell"><span class="evennia-xp-cell-label" aria-hidden="true">Source</span>{{ row.get_source_type_display }}</td>
+      <td role="cell" class="text-right"><span class="evennia-xp-cell-label" aria-hidden="true">Amount</span>+{{ row.amount }}</td>
+      <td role="cell"><span class="evennia-xp-cell-label" aria-hidden="true">Week</span>{{ row.week }}</td>
+      <td role="cell" class="text-muted small"><span class="evennia-xp-cell-label" aria-hidden="true">Note</span>
         {% if row.reason %}{{ row.reason }}{% endif %}
         {% if row.granted_by_name %}<em>(by {{ row.granted_by_name }})</em>{% endif %}
       </td>

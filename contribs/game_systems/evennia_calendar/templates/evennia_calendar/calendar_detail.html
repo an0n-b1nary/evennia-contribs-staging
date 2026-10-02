@@ -110,15 +110,15 @@
 <h2>RSVPs</h2>
 {% if rsvps %}
 <div class="evennia-calendar-table-scroll" role="region" aria-label="RSVP list" tabindex="0">
-<table class="table table-sm table-striped">
-  <thead>
-    <tr><th scope="col">Character</th><th scope="col">Status</th></tr>
+<table role="table" class="evennia-calendar-table-stack table table-sm table-striped">
+  <thead role="rowgroup">
+    <tr role="row"><th role="columnheader" scope="col">Character</th><th role="columnheader" scope="col">Status</th></tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for rsvp in rsvps %}
-    <tr>
-      <td>{{ rsvp.character_name }}</td>
-      <td><span class="badge badge-secondary">{{ rsvp.get_status_display }}</span></td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Character</span>{{ rsvp.character_name }}</td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Status</span><span class="badge badge-secondary">{{ rsvp.get_status_display }}</span></td>
     </tr>
     {% endfor %}
   </tbody>

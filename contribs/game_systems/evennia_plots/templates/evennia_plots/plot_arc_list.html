@@ -53,29 +53,29 @@
 
 {% if arcs %}
 <div class="evennia-plots-table-scroll" role="region" aria-label="Plot arcs" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Name</th>
-      <th scope="col">Type</th>
-      <th scope="col">Status</th>
-      <th scope="col">Creator</th>
-      <th scope="col">Threads</th>
-      <th scope="col">Current</th>
+<table role="table" class="evennia-plots-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Name</th>
+      <th role="columnheader" scope="col">Type</th>
+      <th role="columnheader" scope="col">Status</th>
+      <th role="columnheader" scope="col">Creator</th>
+      <th role="columnheader" scope="col">Threads</th>
+      <th role="columnheader" scope="col">Current</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for arc in arcs %}
-    <tr>
-      <td>{{ arc.arc_number }}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Number</span>{{ arc.arc_number }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Name</span>
         <a href="{% url 'evennia_plots:plot-arc-detail' arc.pk %}">{{ arc.name }}</a>
         {% if arc.description %}
         <br><small class="text-muted">{{ arc.description }}</small>
         {% endif %}
       </td>
-      <td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Type</span>
         <span class="badge {% if arc.arc_type == 'downtime' %}badge-warning text-dark{% else %}badge-secondary{% endif %}">
           {{ arc.get_arc_type_display }}
         </span>
@@ -83,10 +83,10 @@
         <span class="badge badge-danger ml-1" title="XP gain paused">XP Paused</span>
         {% endif %}
       </td>
-      <td><span class="badge badge-secondary">{{ arc.get_status_display }}</span></td>
-      <td>{% if not arc.creator_id and arc.creator_name == "Unknown" %}Unattributed{% else %}{{ arc.creator_name|default:"Unattributed" }}{% endif %}</td>
-      <td>{{ arc.threads.count }}</td>
-      <td>{% if arc.is_current %}<span class="badge badge-success">Current</span>{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Status</span><span class="badge badge-secondary">{{ arc.get_status_display }}</span></td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Creator</span>{% if not arc.creator_id and arc.creator_name == "Unknown" %}Unattributed{% else %}{{ arc.creator_name|default:"Unattributed" }}{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Threads</span>{{ arc.threads.count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Current</span>{% if arc.is_current %}<span class="badge badge-success">Current</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

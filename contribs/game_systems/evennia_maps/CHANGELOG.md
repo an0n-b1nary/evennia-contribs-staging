@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.1] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
+
 ## [0.5.0] — 2026-10-02
 
 - **Added:** privacy-filtered `active_scenes` overlay records and tile payloads,

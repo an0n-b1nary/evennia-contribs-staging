@@ -22,22 +22,22 @@
 
 {% if versions %}
 <div class="evennia-lore-table-scroll" role="region" aria-label="Version history" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Version</th>
-      <th scope="col">Edited by</th>
-      <th scope="col">Date</th>
-      <th scope="col">Actions</th>
+<table role="table" class="evennia-lore-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Version</th>
+      <th role="columnheader" scope="col">Edited by</th>
+      <th role="columnheader" scope="col">Date</th>
+      <th role="columnheader" scope="col">Actions</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for v in versions %}
-    <tr>
-      <td>v{{ v.version_number }}</td>
-      <td>{{ v.editor_name|default:"Unattributed" }}</td>
-      <td>{{ v.edited_at|date:"Y-m-d H:i" }}</td>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Version</span>v{{ v.version_number }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Edited by</span>{{ v.editor_name|default:"Unattributed" }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Date</span>{{ v.edited_at|date:"Y-m-d H:i" }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Actions</span>
         <a href="{% url 'lore-diff' entry.pk v.version_number %}" class="btn btn-sm btn-outline-secondary">Diff</a>
       </td>
     </tr>

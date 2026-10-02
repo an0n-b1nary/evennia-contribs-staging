@@ -20,21 +20,21 @@ the repo should be able to see that rather than infer it from an absence.
     </p>
 
     <div class="widget-table-scroll" role="region" aria-label="Installed contribs" tabindex="0">
-      <table class="table table-sm mb-0">
+      <table role="table" class="sandbox-table-stack table table-sm mb-0">
         <caption class="sr-only">Installed contribs and their web surfaces</caption>
-        <thead>
-          <tr>
-            <th scope="col">Contrib</th>
-            <th scope="col">Version</th>
-            <th scope="col">Web surface</th>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th role="columnheader" scope="col">Contrib</th>
+            <th role="columnheader" scope="col">Version</th>
+            <th role="columnheader" scope="col">Web surface</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {% for system in systems %}
-          <tr>
-            <th scope="row"><code>{{ system.name }}</code></th>
-            <td>{{ system.version|default:"—" }}</td>
-            <td>
+          <tr role="row">
+            <th role="rowheader" scope="row"><span class="sandbox-cell-label" aria-hidden="true">Contrib</span><code>{{ system.name }}</code></th>
+            <td role="cell"><span class="sandbox-cell-label" aria-hidden="true">Version</span>{{ system.version|default:"—" }}</td>
+            <td role="cell"><span class="sandbox-cell-label" aria-hidden="true">Web surface</span>
               {% if system.url %}
               <a href="{{ system.url }}">{{ system.label }}</a>
               {% else %}

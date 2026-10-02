@@ -46,27 +46,27 @@
 
 {% if threads %}
 <div class="evennia-plots-table-scroll" role="region" aria-label="Plot threads" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Name</th>
-      <th scope="col">Tags</th>
-      <th scope="col">Creator</th>
-      <th scope="col">Scenes</th>
-      <th scope="col">Arc</th>
+<table role="table" class="evennia-plots-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Name</th>
+      <th role="columnheader" scope="col">Tags</th>
+      <th role="columnheader" scope="col">Creator</th>
+      <th role="columnheader" scope="col">Scenes</th>
+      <th role="columnheader" scope="col">Arc</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for thread in threads %}
-    <tr>
-      <td>{{ thread.plot_number }}</td>
-      <td><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a>
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Number</span>{{ thread.plot_number }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Name</span><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a>
         {% if thread.description %}
         <br><small class="text-muted">{{ thread.description }}</small>
         {% endif %}
       </td>
-      <td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Tags</span>
         {% for tag in thread.tags.all %}
         <a href="?tag={{ tag.name|urlencode }}"
            class="badge {% if tag.is_major %}badge-primary{% else %}badge-secondary{% endif %} text-decoration-none">
@@ -75,9 +75,9 @@
         {% empty %}<span class="text-muted">Not recorded</span>
         {% endfor %}
       </td>
-      <td>{% if not thread.creator_id and thread.creator_name == "Unknown" %}Unattributed{% else %}{{ thread.creator_name|default:"Unattributed" }}{% endif %}</td>
-      <td>{{ thread.scene_links.count }}</td>
-      <td>{% if thread.arc %}<a href="{% url 'evennia_plots:plot-arc-detail' thread.arc.pk %}">{{ thread.arc.name }}</a>{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Creator</span>{% if not thread.creator_id and thread.creator_name == "Unknown" %}Unattributed{% else %}{{ thread.creator_name|default:"Unattributed" }}{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Scenes</span>{{ thread.scene_links.count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arc</span>{% if thread.arc %}<a href="{% url 'evennia_plots:plot-arc-detail' thread.arc.pk %}">{{ thread.arc.name }}</a>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>

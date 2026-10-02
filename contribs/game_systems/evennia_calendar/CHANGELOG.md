@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.1] - 2026-10-02
+
+- Stack labelled table rows below 640px while retaining table semantics and desktop columns.
+- Default to a chronological list of the selected month on narrow screens, with explicit grid/list controls that work without JavaScript.
+
 ## [0.3.0] — 2026-10-02
 
 - **Changed:** month cells label past, today, and future days, show event start

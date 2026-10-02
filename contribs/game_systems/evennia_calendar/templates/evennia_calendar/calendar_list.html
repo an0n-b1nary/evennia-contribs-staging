@@ -83,21 +83,21 @@
 
 {% if events %}
 <div class="evennia-calendar-table-scroll" role="region" aria-label="Event list" tabindex="0">
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th scope="col">Event</th>
-      <th scope="col">Date (UTC)</th>
-      <th scope="col">Local Time</th>
-      <th scope="col">Emphasis</th>
-      <th scope="col">Tags</th>
-      <th scope="col">Cap</th>
+<table role="table" class="evennia-calendar-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Event</th>
+      <th role="columnheader" scope="col">Date (UTC)</th>
+      <th role="columnheader" scope="col">Local Time</th>
+      <th role="columnheader" scope="col">Emphasis</th>
+      <th role="columnheader" scope="col">Tags</th>
+      <th role="columnheader" scope="col">Cap</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody role="rowgroup">
     {% for event in events %}
-    <tr>
-      <td>
+    <tr role="row">
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Event</span>
         {% if event.is_clustered %}
         <a href="{% url 'evennia_calendar:calendar-cluster-detail' event.cluster.pk %}" class="evennia-calendar-cluster-link">[{{ event.cluster.title }}]</a><br>
         {% endif %}
@@ -107,18 +107,18 @@
         <span class="sr-only">Staff lottery event</span>
         {% endif %}
       </td>
-      <td>{{ event.scheduled_time|date:"Y-m-d H:i" }}</td>
-      <td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Date (UTC)</span>{{ event.scheduled_time|date:"Y-m-d H:i" }}</td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Local Time</span>
         <span class="evennia-calendar-local-time" data-utc="{{ event.scheduled_time|date:'c' }}">—</span>
       </td>
-      <td>{{ event.get_emphasis_display }}</td>
-      <td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Emphasis</span>{{ event.get_emphasis_display }}</td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Tags</span>
         {% for tag in event.tags.all %}
         <a href="?tag={{ tag.name|urlencode }}"
            class="badge badge-info text-dark text-decoration-none mr-1">{{ tag.name }}</a>
         {% empty %}<span class="text-muted">Not recorded</span>{% endfor %}
       </td>
-      <td>{{ event.participant_cap|default:"Open" }}</td>
+      <td role="cell"><span class="evennia-calendar-cell-label" aria-hidden="true">Cap</span>{{ event.participant_cap|default:"Open" }}</td>
     </tr>
     {% endfor %}
   </tbody>
