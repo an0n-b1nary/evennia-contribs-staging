@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+
 """Refuse protected pushes when commit identity or the active account could leak.
 
 Configure a maintainer clone with ``git config anonymity.expected-gh-account HANDLE``.

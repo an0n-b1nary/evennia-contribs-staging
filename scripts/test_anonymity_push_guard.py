@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+
 """Regression tests for the pre-push publication boundary."""
 
 from __future__ import annotations
