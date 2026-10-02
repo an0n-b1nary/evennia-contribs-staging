@@ -17,7 +17,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
 try:
-    from evennia_accessibility.utils import uses_screenreader
+    from evennia_accessibility import uses_screenreader
 except ImportError:
 
     def uses_screenreader(_):

@@ -138,7 +138,7 @@ class TestPlotsInit(unittest.TestCase):
     def test_version(self):
         import evennia_plots
 
-        self.assertEqual(evennia_plots.__version__, "0.2.3")
+        self.assertEqual(evennia_plots.__version__, "0.2.4")
 
     def test_signals_eagerly_exported(self):
         from django.dispatch import Signal

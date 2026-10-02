@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-plots"
-version = "0.2.3"
+version = "0.2.4"
 description = "Narrative plot management (+plot/+arc/+hook) with thread bonuses, arc XP multipliers, and a full web + REST surface for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

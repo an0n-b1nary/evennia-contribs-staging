@@ -113,6 +113,70 @@ class TestContribSettings(EvenniaTestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestScreenreaderCommandSeam(EvenniaTest):
+    """Optional command consumers honor the installed partner's real option."""
+
+    def test_consumer_helpers_follow_the_account_preference(self):
+        from evennia_accessibility import uses_screenreader
+
+        for enabled in (True, False):
+            self.account.options.set("screenreader_mode", str(enabled))
+            for name in ("boards", "calendar", "plots", "scenes"):
+                with self.subTest(contrib=name, enabled=enabled):
+                    consumer = import_module(f"evennia_{name}.commands")
+                    self.assertIs(consumer.uses_screenreader, uses_screenreader)
+                    self.assertEqual(consumer.uses_screenreader(self.char1), enabled)
+
+    def test_enabled_preference_selects_plain_command_output(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from evennia_boards.commands import CmdBoard
+        from evennia_boards.models import Board
+        from evennia_calendar.commands import CmdCalendar
+        from evennia_calendar.models import CalendarEvent
+        from evennia_plots.commands import CmdPlot
+        from evennia_plots.models import PlotThread
+
+        Board.objects.create(name="Accessible board")
+        CalendarEvent.objects.create(
+            title="Accessible event", scheduled_time=timezone.now() + timedelta(days=1)
+        )
+        PlotThread.create_thread(name="Accessible plot", creator=self.char1)
+        self.account.options.set("screenreader_mode", "True")
+        for command, method, heading in (
+            (CmdBoard(), "_list_boards", "Bulletin Boards: 1 board"),
+            (CmdCalendar(), "_list_upcoming", "Upcoming Events: 1 event"),
+            (CmdPlot(), "_do_list", "Plot Threads: 1 thread"),
+        ):
+            with self.subTest(command=command.key):
+                command.caller = self.char1
+                command.args = ""
+                with mock.patch.object(self.char1, "msg") as message:
+                    getattr(command, method)()
+                self.assertTrue(message.call_args.args[0].startswith(heading))
+
+    def test_commands_import_without_the_optional_accessibility_partner(self):
+        import builtins
+        from runpy import run_path
+
+        real_import = builtins.__import__
+
+        def without_accessibility(name, *args, **kwargs):
+            if name == "evennia_accessibility" or name.startswith("evennia_accessibility."):
+                raise ModuleNotFoundError(name)
+            return real_import(name, *args, **kwargs)
+
+        self.account.options.set("screenreader_mode", "True")
+        for name in ("boards", "calendar", "plots", "scenes"):
+            with self.subTest(contrib=name):
+                consumer = import_module(f"evennia_{name}.commands")
+                # Independent module globals keep the installed consumers intact.
+                with mock.patch("builtins.__import__", side_effect=without_accessibility):
+                    absent = run_path(consumer.__file__)
+                self.assertFalse(absent["uses_screenreader"](self.char1))
+
+
 class SeededSandboxMixin:
     """Run seed_sandbox with START_LOCATION pointed at a room that exists.
 

@@ -24,7 +24,7 @@ from evennia.utils.eveditor import EvEditor
 # Screenreader support — optional; falls back to always-False when
 # evennia-accessibility is not installed.
 try:
-    from evennia_accessibility.utils import uses_screenreader
+    from evennia_accessibility import uses_screenreader
 except ImportError:
 
     def uses_screenreader(_caller):

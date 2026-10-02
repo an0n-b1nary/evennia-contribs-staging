@@ -1,5 +1,10 @@
 # Changelog — evennia-scenes
 
+## [0.5.2] - 2026-10-02
+
+- **Fixed:** command helpers import the public accessibility export so the installed
+  partner's screen-reader preference is honored; the absent-partner fallback remains.
+
 ## [0.5.1] - 2026-10-02
 
 - Stack labelled table rows below 640px while retaining table semantics and desktop columns.

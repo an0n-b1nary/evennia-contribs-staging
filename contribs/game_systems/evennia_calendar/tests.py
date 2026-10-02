@@ -143,7 +143,7 @@ class TestInitExports(EvenniaTest):
     def test_version_exported(self):
         import evennia_calendar
 
-        self.assertEqual(evennia_calendar.__version__, "0.3.1")
+        self.assertEqual(evennia_calendar.__version__, "0.3.2")
 
     def test_signals_eagerly_exported(self):
         """Signals must be plain Signal objects importable without AppRegistryNotReady."""
@@ -1003,13 +1003,12 @@ class TestCmdRsvp(EvenniaTest):
         self.assertEqual(prefs[0].event, ev1)
         self.assertEqual(prefs[1].event, ev2)
 
-    def test_screenreader_fallback_non_empty(self):
-        """The uses_screenreader shim returns False and doesn't crash."""
+    def test_screenreader_is_off_by_default(self):
+        """The optional helper is callable and defaults to standard output."""
         from evennia_calendar import commands as cmd_mod
 
         orig = getattr(cmd_mod, "uses_screenreader", None)
         self.assertIsNotNone(orig)
-        # The fallback always returns False without crashing.
         self.assertFalse(orig(self.char1))
 
 

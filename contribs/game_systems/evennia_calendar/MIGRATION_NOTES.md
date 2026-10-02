@@ -44,7 +44,7 @@ contrib uses a soft import shim:
 
 ```python
 try:
-    from evennia_accessibility.utils import uses_screenreader
+    from evennia_accessibility import uses_screenreader
 except ImportError:
     def uses_screenreader(_): return False
 ```

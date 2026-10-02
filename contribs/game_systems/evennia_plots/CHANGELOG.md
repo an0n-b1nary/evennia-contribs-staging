@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.4] - 2026-10-02
+
+- **Fixed:** command helpers import the public accessibility export so the installed
+  partner's screen-reader preference is honored; the absent-partner fallback remains.
+
 ## [0.2.3] - 2026-10-02
 
 - Stack labelled table rows below 640px while retaining table semantics and desktop columns.

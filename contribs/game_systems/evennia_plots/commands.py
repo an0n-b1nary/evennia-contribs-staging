@@ -41,7 +41,7 @@ from evennia_plots.permissions import can_manage_arc, is_plot_staff
 from evennia_plots.signals import arc_currency_changed, arc_type_changed
 
 try:
-    from evennia_accessibility.utils import uses_screenreader
+    from evennia_accessibility import uses_screenreader
 except ImportError:
 
     def uses_screenreader(caller):

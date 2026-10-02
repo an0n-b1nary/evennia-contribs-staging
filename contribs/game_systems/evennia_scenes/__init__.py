@@ -37,7 +37,7 @@ Web/API surface (requires [web] extra):
     # API: include("evennia_scenes.api.urls") at /api/v1/ or similar
 """
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 from evennia_scenes.signals import (
     log_entry_created,

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-boards"
-version = "0.3.1"
+version = "0.3.2"
 description = "Bulletin board system (+bb/+board) with web UI, REST API, and XP integration for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

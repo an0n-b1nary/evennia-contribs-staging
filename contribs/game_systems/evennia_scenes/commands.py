@@ -28,7 +28,7 @@ from evennia_scenes.signals import scene_closed, scene_opened
 LOG_ENTRIES_PER_PAGE = 20
 
 try:
-    from evennia_accessibility.utils import uses_screenreader
+    from evennia_accessibility import uses_screenreader
 except ImportError:
 
     def uses_screenreader(_):
