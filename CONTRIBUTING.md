@@ -46,7 +46,7 @@ This repo ships five coordinated anonymity guards. All read from the same gitign
 | `anonymity-identity-guard` | pre-commit | Forbidden strings in `git config user.name`/`user.email` or `GIT_{AUTHOR,COMMITTER}_*` env vars. |
 | `file_issue.py` | before `gh` | Forbidden strings in an **issue title or body** you are about to publish. Not a hook — a wrapper you call instead of `gh issue create`. |
 | `anonymity-issues.yml` | GitHub Actions | Forbidden strings in any issue or comment, however it was filed. Redacts, labels `anonymity-hold`, closes and locks; deletes an offending comment. |
-| `anonymity-push-guard` | pre-push | Pushes to `github.com/<handle>/*` (where `<handle>` is `git config anonymity.expected-gh-account`) where any commit's author/committer matches a forbidden pattern, OR where the active `gh` account does not equal that handle. If the config key is unset, the guard is inactive — external clones and forks are unaffected by default. |
+| `anonymity-push-guard` | pre-push | Pushes to `github.com/<handle>/*` (where `<handle>` is `git config anonymity.expected-gh-account`) where any commit's author/committer matches a forbidden pattern, OR where the active `gh` account does not equal that handle. An active guard refuses protected pushes if patterns are missing, empty, unreadable, or invalid, or if Git cannot inspect commits. If the config key is unset, the guard is inactive — external clones and forks are unaffected by default. |
 
 One-time setup per clone:
 
@@ -76,7 +76,25 @@ To run the file-content + identity checks against the entire repo:
 pre-commit run --all-files --hook-stage pre-commit
 ```
 
-If `.anonymity-patterns` is missing, every guard skips with a warning rather than failing — that way external contributors aren't blocked by maintainer-only config.
+Verify the install with `git rev-parse --git-path hooks/pre-commit` and
+`git rev-parse --git-path hooks/pre-push`. Both reported paths must contain
+pre-commit-generated hook files (including the `--hook-type` for that stage).
+Use Git's paths rather than assuming `.git` is a directory: linked worktrees
+share the clone's hooks. The config also sets both default install hook types,
+so a plain `pre-commit install` installs both stages.
+
+The file-content and commit-identity hooks skip with a warning when patterns
+are missing, allowing external contributors to commit without maintainer config.
+The issue wrapper fails closed. The push guard is inactive when the expected
+account is unset; once configured, protected pushes require valid, nonempty
+patterns and a matching active account.
+
+The push guard supports both native Git input and pre-commit's environment
+variables. Pre-commit forwards only one ref's range for a multi-ref push, so
+its guard also checks all local branch/tag commits absent from that remote's
+tracking refs. A forbidden identity on another unpublished branch can therefore
+block a push; correct that identity or remove the obsolete local branch before
+retrying. Git inspection failures block the push instead of skipping commits.
 
 ### Issues are not covered by the pre-commit hooks
 
@@ -129,10 +147,10 @@ See [CODING_STYLE.md](CODING_STYLE.md) for the full conventions and the per-cont
 Host games adapting the sandbox shell can follow [WEB_PORTING.md](WEB_PORTING.md)
 for navigation, homepage widgets, viewer policy, template checks, and live scenes.
 
-Local setup (once per clone):
+Local setup (once per clone; the Ruff version matches the hook pin):
 
 ```bash
-pip install pre-commit ruff
+pip install pre-commit ruff==0.16.10
 pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 

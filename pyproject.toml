@@ -6,6 +6,7 @@
 line-length = 100
 target-version = "py312"
 extend-exclude = [
+    "*.md",  # keep documentation examples outside the Python formatter
     "contribs/*/*/migrations/*",
     ".pre-commit-cache/",
     "scripts/anonymity_guard.py",  # contains regex strings Ruff would flag

@@ -2,10 +2,12 @@
 #
 # Setup (one-time, per clone):
 #   pip install pre-commit
-#   pre-commit install
+#   pre-commit install --hook-type pre-commit --hook-type pre-push
 #
-# Then `git commit` will automatically run these checks against staged files.
+# Then commits run the checks below and pushes run the identity/account guard.
 # Run manually against everything with: pre-commit run --all-files
+
+default_install_hook_types: [pre-commit, pre-push]
 
 repos:
   - repo: local
@@ -40,8 +42,8 @@ repos:
         stages: [pre-push]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.0  # pin to a known-good version; update intentionally
+    rev: v0.16.10  # pin to a known-good version; update intentionally
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
