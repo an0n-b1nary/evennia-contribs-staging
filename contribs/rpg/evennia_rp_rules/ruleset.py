@@ -35,6 +35,8 @@ from importlib import import_module
 from types import ModuleType
 
 from evennia_rp_rules import _spec
+from evennia_rp_rules._config import resolve_dotted as _resolve_dotted
+from evennia_rp_rules._config import setting
 from evennia_rp_rules.issues import WARNING, Issue, RulesetError
 from evennia_rp_rules.outcomes import OutcomeLadder
 from evennia_rp_rules.resolvers import Contest, Resolver, ResolverConfigError
@@ -45,18 +47,6 @@ DEFAULT_RESOLVER = "evennia_rp_rules.resolvers.GradedResolver"
 DEFAULT_TAG_KIND = "domain"
 
 _TOP_LEVEL = {"version", "scales", "default_scale", "stats", "tags", "outcomes", "resolver"}
-
-
-def _resolve_dotted(path: str):
-    """Import and return the object at `path` (`"pkg.module.attr"`).
-
-    Vendored rather than imported from `evennia_links` so this package keeps no
-    dependency beyond Evennia; keep in step with `evennia_links.resolve_dotted`.
-    """
-    module_path, _, attr = path.rpartition(".")
-    if not module_path:
-        raise ImportError(f"{path!r} is not a dotted path")
-    return getattr(import_module(module_path), attr)
 
 
 @dataclass(frozen=True)
@@ -472,9 +462,7 @@ def get_ruleset() -> Ruleset:
     """
     ruleset = _CACHE.get("ruleset")
     if ruleset is None:
-        from django.conf import settings
-
-        ref = getattr(settings, "RP_RULES_RULESET", DEFAULT_RULESET)
+        ref = setting("RP_RULES_RULESET", DEFAULT_RULESET)
         ruleset = Ruleset.from_spec(load_ruleset_spec(ref))
         _CACHE["ruleset"] = ruleset
     return ruleset

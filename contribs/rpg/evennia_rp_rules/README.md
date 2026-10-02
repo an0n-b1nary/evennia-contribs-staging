@@ -148,6 +148,143 @@ rounding.
 | E003 | error | Pips can cross a rung, in either direction |
 | W001 | warning | A pip changes no odds. Whole-number dice only resolve whole points, so a pip worth a fraction of a point after rung factors can do nothing at all |
 
+With the app installed, the same table runs as Django system checks
+(`evennia_rp_rules.E003` and so on) at startup, so a broken ruleset stops the
+server instead of misbehaving in play. One more check covers settings:
+
+| Id | Level | Meaning |
+|---|---|---|
+| W002 | warning | An `RP_RULES_*` dotted path can't be imported, or isn't the right shape |
+
+---
+
+## Checks
+
+A **check** is one stat tested against a stated difficulty or an opponent:
+
+```python
+from evennia_rp_rules import Check, estimate_check, resolve_check
+
+check = Check("test", ana, "charisma", tags={"performance"}, difficulty="A")
+result = resolve_check(check)                  # rolls, fires check_resolved
+result.outcome.label                           # "Narrow Success"
+[e.describe() for e in result.entries_for("actor")]   # ["Expertise: Performance +8"]
+estimate_check(check, viewer="actor").odds.success    # exact, nothing rolled
+```
+
+- `kind` names the system asking (`"test"`; combat will use its own), so
+  modifiers and listeners can tell checks apart without importing each other.
+- The actor and opponent can be anything with stats; see *Subjects* below.
+  An opposed check (`opponent=...`, optionally `opponent_stat=` and
+  `opponent_tags=`) rolls the ruleset's `opposed_noise`.
+- `CheckError` carries a message fit to show the player: an unknown stat, a
+  character without that stat, a difficulty that doesn't parse.
+- `result.as_dict()` is a JSON-safe record of everything, including entries
+  only staff may see. Store it and filter later with `entries_for(viewer)`.
+- `check_resolved` (in `evennia_rp_rules.signals`) fires after every resolved
+  check, with `check` and `result`. It doesn't fire for estimates. A receiver
+  that raises propagates, so a game can wrap the check and its record in one
+  transaction.
+
+### Subjects
+
+The kernel never reads a character's attributes. It asks a **stat source**:
+
+```python
+class StatSource(Protocol):
+    def get_rating(self, stat_key) -> Rating | str | None: ...
+    def get_modifiers(self, check) -> Iterable[Modifier]: ...   # optional
+```
+
+`get_subject(obj)` uses `obj` itself if it has `get_rating`. Otherwise it asks
+`RP_RULES_SUBJECT_ADAPTER(obj)`, and finally wraps a plain dict in a
+`DictStatSource`. Characters need no typeclass changes, and an NPC can be a
+stat block: `DictStatSource({"prowess": "A+"}, modifiers=[...])`.
+
+### Modifiers and the pipeline
+
+A modifier is anything that bends a check, such as an ability bonus, a flaw or
+a storyteller's call. Combat will later add stances and riders. Each one
+declares:
+
+- the **phases** it hooks;
+- whether it **applies** to a given check;
+- its **visibility**;
+- and what it adds, through `ctx.add(score=..., rung=...)`.
+
+```python
+class Inspired(BaseModifier):
+    key, label = "inspired", "Inspired"
+
+    def applies(self, ctx):
+        return ctx.stat.key == "charisma"
+
+    def apply(self, phase, ctx):
+        ctx.add(score=3)
+```
+
+A check runs **BUILD**, then **PRE_RESOLVE** (which sees what BUILD added),
+rolls, then **ON_OUTCOME** (which sees the outcome and may add notes, but
+can't change numbers). `DECLARE`, `OFFER_REACTIONS` and `REACTION_CHOSEN` are
+reserved for combat and never run in a check.
+
+**Order never changes a number.** Within a phase, every modifier sees the
+state as it was when the phase began, and each side's total is a sum. So the
+same modifiers give the same result whichever order the providers return them
+in. Entries that share a `stack` name don't stack: only the strongest counts,
+and the others stay in the ledger marked *not applied*.
+
+Modifiers are collected from the actor's subject, the opponent's subject, every
+callable in `RP_RULES_MODIFIER_PROVIDERS` (`provider(check) -> modifiers`) and
+the check's own `modifiers=`.
+
+**Visibility** decides who sees a modifier, and so whose estimate counts it:
+
+| Visibility | Seen by | Example |
+|---|---|---|
+| `open` | anyone shown the breakdown | Domain Expertise |
+| `hidden` | staff and the side that owns it | an attacker's feint |
+| `secret` | staff only | a storyteller's private thumb on the scale |
+
+`estimate_check(check, viewer=...)` leaves out what the viewer can't see, so
+an estimate is exactly as good as what the viewer knows. Resolution always
+counts everything.
+
+### Effect kinds
+
+Catalog data becomes a modifier through `build_modifier(spec, level=...)`:
+
+```python
+build_modifier({"kind": "tag_bonus", "tags": ["performance"], "score": 8, "per_level": 1},
+               level=3, key="expertise-performance", label="Expertise: Performance")
+# +10 on any check tagged Performance
+```
+
+| Kind | Fields | Effect |
+|---|---|---|
+| `score_bonus` | `score`, `per_level`; filters `stats`, `tags` | Flat score bonus or penalty |
+| `tag_bonus` | `tags` (required), `score`, `per_level`; filter `stats` | Bonus on checks sharing a tag (Domain Expertise) |
+| `rung_shift` | `steps`; filters `stats`, `tags` | Whole rungs up or down, pips kept, clamped |
+
+Every kind also takes `key`, `label`, `visibility`, `priority`, `stack` and
+`check_kinds` (for example `["test"]`). A bonus isn't a pip, so it may carry a
+rating past the next rung.
+
+Add your own kinds with `RP_RULES_EFFECT_KINDS = {"kind": "path.to.Class"}`.
+The class needs a `from_spec(spec, *, level, **meta)` classmethod that raises
+`EffectSpecError` on bad data. `effect_problems(spec, vocabulary=..., ruleset=...)`
+lists every problem with a spec, including unknown tags and stats, for a
+catalog's `clean()`.
+
+### Tag vocabulary
+
+The ruleset's `tags` are a seed. `get_vocabulary()` returns
+`RP_RULES_VOCABULARY()` if that's set; chargen's database vocabulary is one
+example, letting staff add a domain without a deploy. Otherwise it returns
+the ruleset's own tags. Commands resolve player input with
+`get_vocabulary().find(text, kind="domain")`. The pipeline treats tags as
+opaque keys.
+
 ---
 
 ## The odds tool
@@ -180,6 +317,15 @@ python -m evennia_rp_rules.odds --ruleset world.ruleset --matrix success --markd
 | Setting | Default | Purpose |
 |---|---|---|
 | `RP_RULES_RULESET` | `"evennia_rp_rules.example_ruleset"` | A dict, a module (its `RULESET`), a `module.ATTR` path, or a `.py` file |
+| `RP_RULES_SUBJECT_ADAPTER` | unset | Dotted path to `adapter(obj)`, returning a stat source or `None` |
+| `RP_RULES_MODIFIER_PROVIDERS` | `[]` | Dotted paths to `provider(check)`, each returning modifiers |
+| `RP_RULES_EFFECT_KINDS` | `{}` | `{kind: "path.to.Class"}`, added to the built-in kinds |
+| `RP_RULES_VOCABULARY` | unset | Dotted path to a zero-argument factory returning a vocabulary |
+| `RP_RULES_ROLLER` | unset | Dotted path to a zero-argument factory returning a roller (default `RandomRoller()`) |
+
+Every setting is read when it's needed, and the defaults apply when Django
+isn't configured. A script can therefore resolve checks with an explicit
+`ruleset=` and `roller=`.
 
 `get_ruleset()` caches the built ruleset. The cache clears whenever an
 `RP_RULES_*` setting changes, including under `override_settings`.
@@ -202,13 +348,14 @@ class MyTests(RulesetTestMixin, SimpleTestCase):
 
 `TEST_RULESET` is tiny and round-numbered for hand-checkable expectations.
 `ScriptedRoller` refuses totals the dice couldn't produce, so a test can't
-pass on an impossible roll.
+pass on an impossible roll. `ProbeSubject` is a stat block that records every
+check it was asked for modifiers on.
 
 ---
 
 ## Roadmap
 
-The next release adds the check pipeline: stat subjects, a frozen `Check`,
-phase-hooked modifiers (`ScoreBonus`, `TagBonus`, `RungShift`) folded
-commutatively, a `check_resolved` signal, and system checks that surface the
-validation table above at startup.
+`evennia-rp-chargen` (character sheets, abilities, build locks) and
+`evennia-rp-contest` (`+test` challenges) are built on this release. Combat
+will add the reserved phases' behaviour (declarations, reaction offers) and an
+action/reaction layer on top of the same checks, modifiers and outcome ladder.

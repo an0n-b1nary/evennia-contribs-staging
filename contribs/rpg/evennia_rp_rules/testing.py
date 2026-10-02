@@ -16,6 +16,9 @@ so `mid` vs `mid` with a scripted roll of 0 is exactly `good`, and so on.
 `RulesetTestMixin` points `RP_RULES_RULESET` at a spec for the duration of each
 test and exposes the built ruleset as `self.ruleset`; it needs Django
 (`SimpleTestCase` or anything above it).
+
+`ProbeSubject` is a stat block that remembers every check it was asked about,
+for testing that a subject's modifiers reach the pipeline.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from copy import deepcopy
 
 from evennia_rp_rules.dice import ScriptedRoller
 from evennia_rp_rules.ruleset import get_ruleset, reset_ruleset_cache
+from evennia_rp_rules.subjects import DictStatSource
 
 TEST_RULESET = {
     "version": "test",
@@ -98,4 +102,20 @@ class RulesetTestMixin:
         return ScriptedRoller(totals)
 
 
-__all__ = ["TEST_RULESET", "RulesetTestMixin", "fresh_test_ruleset"]
+class ProbeSubject(DictStatSource):
+    """A `DictStatSource` that records the checks it's asked for modifiers on.
+
+    Attributes:
+        seen: Every `Check` passed to `get_modifiers()`, in order.
+    """
+
+    def __init__(self, ratings=None, **kwargs):
+        super().__init__(ratings, **kwargs)
+        self.seen: list = []
+
+    def get_modifiers(self, check) -> list:
+        self.seen.append(check)
+        return super().get_modifiers(check)
+
+
+__all__ = ["TEST_RULESET", "ProbeSubject", "RulesetTestMixin", "fresh_test_ruleset"]
