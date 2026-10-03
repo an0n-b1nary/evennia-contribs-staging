@@ -48,7 +48,7 @@ Decisions log
 - Default difficulty C.
 - XP costs and the starting allowance are placeholders until the ability
   catalog (P3); expect fine-tuning there.
-- Elements: Root, Flame, Water, Storm, Stone. Domains add Acrobatics, Alchemy,
+- Elements set (since replaced; see below). Domains add Acrobatics, Alchemy,
   Insight, Seduction, Thievery; Craft renamed Tinkering.
 - Unchanged from the first proposal, open to revision: grade spacing, Edge
   and Weakness curves, rung factors, Domain Expertise +8 / +1 per level / max 5.
@@ -60,6 +60,13 @@ Decisions log
   width Edge and Expertise move fewer percentage points than they would with
   decisive grades; Edge can't grow (E003 caps it under a grade), so Expertise
   is the lever if specialists need to stand out more.
+
+2026-10-02, elements:
+
+- Elements are now the conventional Fire, Water, Air, Earth, Light and
+  Darkness. The earlier list was specific to one setting, and this sandbox
+  is a generic reference game. A game swaps in its own elements; nothing in
+  the contribs depends on which exist.
 """
 
 RULESET = {
@@ -144,11 +151,12 @@ RULESET = {
         {"key": "survival", "name": "Survival"},
         {"key": "thievery", "name": "Thievery"},
         {"key": "tinkering", "name": "Tinkering"},
-        {"key": "root", "name": "Root", "kind": "element"},
-        {"key": "flame", "name": "Flame", "kind": "element"},
+        {"key": "fire", "name": "Fire", "kind": "element"},
         {"key": "water", "name": "Water", "kind": "element"},
-        {"key": "storm", "name": "Storm", "kind": "element"},
-        {"key": "stone", "name": "Stone", "kind": "element"},
+        {"key": "air", "name": "Air", "kind": "element"},
+        {"key": "earth", "name": "Earth", "kind": "element"},
+        {"key": "light", "name": "Light", "kind": "element"},
+        {"key": "darkness", "name": "Darkness", "kind": "element"},
     ],
     # Degrees mirror around zero: the sign says success or failure, the size
     # says by how much.
