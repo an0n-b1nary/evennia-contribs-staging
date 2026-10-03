@@ -78,6 +78,14 @@ editable (`pip install -e`, in dependency order — see the install loop in
 - `EvenniaTest` creates two accounts per test — use settings with the fast
   MD5 hasher (throwaway games get it from `ci_install_contribs.py`;
   `example_game` has it in `test_settings.py`).
+- **`makemigrations` can write into Evennia itself.** Evennia 6.0.0's own
+  models drift from its shipped migrations, and `makemigrations <app>` also
+  generates migrations for the apps it depends on — so for a contrib with an
+  `ObjectDB` foreign key it writes `objects/0015_…` into `site-packages`, and
+  the contrib's migration then depends on a file no real install has. Run it
+  with `--dry-run --verbosity 3`, save only the contrib's migration from the
+  output, and depend on `("objects", "__first__")` as the existing contribs
+  do. Check with `makemigrations <app> --dry-run` ("No changes detected").
 
 ## Landing a new contrib — wiring `example_game` is part of the job
 
