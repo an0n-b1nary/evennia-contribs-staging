@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-rp-chargen"
+version = "0.1.0"
+description = "Character sheets for Evennia RP games: graded stats, edge and weakness pips, point-buy or array allocation, and scene-aware build locks."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+# evennia-rp-rules is the kernel every rating, check and signal comes from.
+# evennia-links provides resolve_dotted (settings hooks) and, from the ability
+# catalog on, AbstractArchived and soft-reference cleanup.
+dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-links>=0.5"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+# Flat layout: package contents live at the same level as pyproject.toml.
+[tool.setuptools]
+packages = [
+    "evennia_rp_chargen",
+    "evennia_rp_chargen.migrations",
+    "evennia_rp_chargen.integrations",
+]
+
+[tool.setuptools.package-dir]
+"evennia_rp_chargen" = "."
+"evennia_rp_chargen.migrations" = "migrations"
+"evennia_rp_chargen.integrations" = "integrations"
