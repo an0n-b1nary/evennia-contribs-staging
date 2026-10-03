@@ -263,8 +263,13 @@ build_modifier({"kind": "tag_bonus", "tags": ["performance"], "score": 8, "per_l
 | Kind | Fields | Effect |
 |---|---|---|
 | `score_bonus` | `score`, `per_level`; filters `stats`, `tags` | Flat score bonus or penalty |
-| `tag_bonus` | `tags` (required), `score`, `per_level`; filter `stats` | Bonus on checks sharing a tag (Domain Expertise) |
+| `tag_bonus` | `tags` (required), `score`, `per_level`, `match`; filter `stats` | Bonus on checks sharing a tag (Domain Expertise) |
 | `rung_shift` | `steps`; filters `stats`, `tags` | Whole rungs up or down, pips kept, clamped |
+
+`match` decides whose tags count: `"own"`, the default, means the owner's own
+check (Expertise). `"opposing"` means the other side's, which lets an
+opponent resist what's aimed at them (Resistance). It works on every kind
+that filters by tags.
 
 Every kind also takes `key`, `label`, `visibility`, `priority`, `stack` and
 `check_kinds` (for example `["test"]`). A bonus isn't a pip, so it may carry a

@@ -46,8 +46,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Effect kinds.** `score_bonus`, `tag_bonus` and `rung_shift`, built from
   data by `build_modifier()`; games add kinds through `RP_RULES_EFFECT_KINDS`.
   `effect_problems()` validates specs against a vocabulary and ruleset.
+  A tag filter's `match` can be `"opposing"` to resist the other side's
+  tags.
 - **Vocabulary.** `RulesetVocabulary` and `get_vocabulary()` with
-  `RP_RULES_VOCABULARY`.
+  `RP_RULES_VOCABULARY`; `match_spelling()` resolves player input the same
+  way for any vocabulary.
 - **System checks.** Ruleset issues surface at startup as
   `evennia_rp_rules.E001`-`E003` and `W001`; W002 flags unresolvable
   `RP_RULES_*` paths.

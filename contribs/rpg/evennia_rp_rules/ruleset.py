@@ -137,12 +137,12 @@ class Ruleset:
         Raises:
             LookupError: Player-readable "unknown" or "ambiguous" message.
         """
-        return _find(self.stats.values(), text, "stat")
+        return match_spelling(self.stats.values(), text, "stat")
 
     def find_tag(self, text: str, *, kind: str | None = None) -> TagDef:
         """Resolve player input to a tag, optionally only of one `kind`."""
         tags = [t for t in self.tags.values() if kind is None or t.kind == kind]
-        return _find(tags, text, kind or "tag")
+        return match_spelling(tags, text, kind or "tag")
 
     def scale(self, key: str | None = None) -> Scale:
         return self.default_scale if key is None else self.scales[key]
@@ -152,7 +152,14 @@ class Ruleset:
         return self.scale(scale).parse(text)
 
 
-def _find(candidates, text: str, noun: str):
+def match_spelling(candidates, text: str, noun: str):
+    """Resolve player input to one of `candidates` (anything with `spellings()` and `name`).
+
+    An exact key, name or alias wins; otherwise a unique prefix of one.
+
+    Raises:
+        LookupError: Player-readable "unknown" or "ambiguous" message.
+    """
     candidates = list(candidates)
     needle = str(text).strip().casefold()
     if not needle:
@@ -482,6 +489,7 @@ __all__ = [
     "TagDef",
     "get_ruleset",
     "load_ruleset_spec",
+    "match_spelling",
     "reset_ruleset_cache",
     "spec_digest",
 ]

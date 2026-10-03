@@ -143,6 +143,27 @@ class FilterTests(unittest.TestCase):
         self.assertEqual(run(RungShift(5, key="x")).effective["actor"].rung.key, "high")
         self.assertEqual(run(RungShift(-5, key="x")).effective["actor"].rung.key, "low")
 
+    def test_opposing_match_resists_the_other_sides_tags(self):
+        resist = build_modifier(
+            {"kind": "tag_bonus", "tags": ["riddles"], "score": 3, "match": "opposing"},
+            key="resistance",
+        )
+        expert = TagBonus(3, tags={"riddles"}, key="expertise")
+        actor = DictStatSource({"brains": "Mid"}, ruleset=RULES)
+        opponent = DictStatSource({"brains": "Mid"}, modifiers=[resist, expert], ruleset=RULES)
+        check = Check("test", actor, "brains", tags={"riddles"}, opponent=opponent)
+        result = resolve_check(check, roller=ScriptedRoller([0]), ruleset=RULES, send_signal=False)
+        # Resistance sees the actor's Riddles; the opponent's own side carries no tags.
+        self.assertEqual([e.key for e in result.ledger], ["resistance"])
+        self.assertEqual(result.score("target"), 13)
+
+    def test_match_must_be_known(self):
+        with self.assertRaises(EffectSpecError) as caught:
+            build_modifier({"kind": "tag_bonus", "tags": ["x"], "score": 1, "match": "sideways"})
+        self.assertIn("'match' must be one of", str(caught.exception))
+        with self.assertRaises(ValueError):
+            ScoreBonus(1, key="x", match="sideways")
+
     def test_tag_bonus_needs_tags(self):
         with self.assertRaises(ValueError):
             TagBonus(1, tags=(), key="x")

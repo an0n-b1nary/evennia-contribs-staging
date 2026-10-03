@@ -210,6 +210,10 @@ class EffectSpecError(ValueError):
         super().__init__("; ".join(self.messages))
 
 
+OWN = "own"
+OPPOSING = "opposing"
+TAG_MATCHES = (OWN, OPPOSING)
+
 _COMMON_FIELDS = {"kind", "key", "label", "visibility", "priority", "stack", "check_kinds"}
 
 
@@ -246,6 +250,15 @@ class _SpecReader:
         if not isinstance(value, int) or isinstance(value, bool):
             self.problems.append(f"{self.kind}: {name!r} must be a whole number, got {value!r}")
             return None
+        return value
+
+    def choice(self, name: str, choices: tuple[str, ...], default: str) -> str:
+        value = self.spec.get(name, default)
+        if value not in choices:
+            self.problems.append(
+                f"{self.kind}: {name!r} must be one of {list(choices)}, got {value!r}"
+            )
+            return default
         return value
 
     def keys(self, name: str, *, required=False) -> frozenset[str]:
@@ -323,6 +336,7 @@ class _FilteredModifier(BaseModifier):
         check_kinds=(),
         stats=(),
         tags=(),
+        match: str = OWN,
     ):
         self.key = key
         self.label = label or key
@@ -334,13 +348,21 @@ class _FilteredModifier(BaseModifier):
         self.check_kinds = frozenset(check_kinds)
         self.stats = frozenset(stats)
         self.tags = frozenset(tags)
+        if match not in TAG_MATCHES:
+            raise ValueError(f"match must be one of {list(TAG_MATCHES)}, got {match!r}")
+        self.match = match
 
     def applies(self, ctx: ResolutionContext) -> bool:
         if self.check_kinds and ctx.check.kind not in self.check_kinds:
             return False
         if self.stats and ctx.stat.key not in self.stats:
             return False
-        return not self.tags or bool(self.tags & ctx.tags)
+        if not self.tags:
+            return True
+        # OWN: the owner's own check carries the tag (Expertise). OPPOSING: the
+        # other side's does, so the owner is resisting it (Resistance).
+        tags = ctx.tags if self.match == OWN else ctx.check.tags_for(ctx.other_side)
+        return bool(self.tags & tags)
 
 
 class ScoreBonus(_FilteredModifier):
@@ -348,11 +370,13 @@ class ScoreBonus(_FilteredModifier):
 
     Spec: `{"kind": "score_bonus", "score": 2}`, optionally with `per_level`
     (added for each level above the first) and filters `stats`, `tags` and
-    `check_kinds` (all must pass; `tags` passes on any shared tag).
+    `check_kinds` (all must pass; `tags` passes on any shared tag). `match`
+    says whose tags count: `"own"` (the default, the owner's own check) or
+    `"opposing"` (the other side's, for resisting what's aimed at the owner).
     """
 
     kind = "score_bonus"
-    _fields = frozenset({"score", "per_level", "stats", "tags"})
+    _fields = frozenset({"score", "per_level", "stats", "tags", "match"})
 
     def __init__(self, score, *, per_level=0, level: int = 1, **meta):
         super().__init__(**meta)
@@ -369,9 +393,12 @@ class ScoreBonus(_FilteredModifier):
         per_level = reader.number("per_level", 0)
         stats = reader.keys("stats")
         tags = reader.keys("tags", required=cls is TagBonus)
+        match = reader.choice("match", TAG_MATCHES, OWN)
         meta = reader.meta(key=key, label=label, source=source, scope=scope, visibility=visibility)
         reader.finish()
-        return cls(score, per_level=per_level, level=level, stats=stats, tags=tags, **meta)
+        return cls(
+            score, per_level=per_level, level=level, stats=stats, tags=tags, match=match, **meta
+        )
 
     def apply(self, phase: str, ctx: ResolutionContext) -> None:
         ctx.add(score=self.amount, stack=self.stack)
@@ -383,6 +410,8 @@ class TagBonus(ScoreBonus):
     Spec: `{"kind": "tag_bonus", "tags": ["performance"], "score": 8,
     "per_level": 1}`. At level 3 that's +10 on any check tagged Performance.
     It's a bonus, not a pip, so it may carry a rating past the next rung.
+    With `"match": "opposing"` it applies when the *other* side's check
+    carries the tag instead: Domain Resistance.
     """
 
     kind = "tag_bonus"
@@ -401,7 +430,7 @@ class RungShift(_FilteredModifier):
     """
 
     kind = "rung_shift"
-    _fields = frozenset({"steps", "stats", "tags"})
+    _fields = frozenset({"steps", "stats", "tags", "match"})
 
     def __init__(self, steps: int, **meta):
         super().__init__(**meta)
@@ -416,9 +445,10 @@ class RungShift(_FilteredModifier):
         steps = reader.integer("steps", required=True)
         stats = reader.keys("stats")
         tags = reader.keys("tags")
+        match = reader.choice("match", TAG_MATCHES, OWN)
         meta = reader.meta(key=key, label=label, source=source, scope=scope, visibility=visibility)
         reader.finish()
-        return cls(steps, stats=stats, tags=tags, **meta)
+        return cls(steps, stats=stats, tags=tags, match=match, **meta)
 
     def apply(self, phase: str, ctx: ResolutionContext) -> None:
         ctx.add(rung=self.steps, stack=self.stack)
