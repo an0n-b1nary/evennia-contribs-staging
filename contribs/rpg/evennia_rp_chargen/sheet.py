@@ -42,6 +42,43 @@ def stat_lines(character) -> list[str]:
     return lines
 
 
+def ability_lines(character, build=None) -> list[str]:
+    """Abilities, flaws, loadout use and what's left to spend."""
+    from evennia_rp_chargen import abilities
+
+    copies = abilities.owned(character)
+    lines = []
+    equipped = [c for c in copies if c.equipped and not c.ability.is_flaw]
+    spare = [c for c in copies if not c.equipped and not c.ability.is_flaw]
+    flaws = [c for c in copies if c.ability.is_flaw]
+
+    def name(copy):
+        level = f" {copy.level}" if copy.ability.max_level > 1 else ""
+        return f"{copy.display_name}{level}"
+
+    if copies:
+        lines.append("")
+    if equipped:
+        lines.append(" |wEquipped:|n " + ", ".join(name(c) for c in equipped))
+    if spare:
+        lines.append(" |wNot equipped:|n " + ", ".join(name(c) for c in spare))
+    if flaws:
+        lines.append(" |wFlaws:|n " + ", ".join(name(c) for c in flaws))
+    budget = abilities.loadout_budget()
+    unit = conf.get("RP_CHARGEN_LOADOUT_UNIT")
+    noun = conf.get("RP_CHARGEN_LOADOUT_NOUN").capitalize()
+    used = abilities.loadout_used(character)
+    if budget is not None:
+        lines.append(f" {noun}: {used} of {budget} {unit} used.")
+    if build is not None and build.allowance_total:
+        allowance = conf.get("RP_CHARGEN_ALLOWANCE_NOUN").capitalize()
+        lines.append(
+            f" {allowance}: {abilities.format_amount(build.allowance_left)} of "
+            f"{abilities.format_amount(build.allowance_total)} left."
+        )
+    return lines
+
+
 def render_sheet(character, *, staff: bool = False) -> str:
     """The full sheet. `staff` adds the review trail and data problems."""
     ruleset = get_ruleset()
@@ -77,6 +114,8 @@ def render_sheet(character, *, staff: bool = False) -> str:
             lines.append(f" {things.capitalize()}: |ylocked|n ({state.reason or 'locked'}).")
         else:
             lines.append(f" {things.capitalize()}: unlocked.")
+
+    lines.extend(ability_lines(character, build))
 
     if staff:
         if build is not None and build.reviewed_at:

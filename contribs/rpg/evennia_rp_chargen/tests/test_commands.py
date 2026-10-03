@@ -144,7 +144,20 @@ class StaffCommandTests(ChargenCommandTest):
         cmdset = ChargenCmdSet()
         cmdset.at_cmdset_creation()
         keys = {cmd.key for cmd in cmdset.commands}
-        self.assertEqual(keys, {"+sheet", "+stats", "+pips", "+lock", "+unlock", "+chargen"})
+        self.assertEqual(
+            keys,
+            {
+                "+sheet",
+                "+stats",
+                "+pips",
+                "+lock",
+                "+unlock",
+                "+abilities",
+                "+spend",
+                "+upgrade",
+                "+chargen",
+            },
+        )
 
 
 class SystemCheckTests(ChargenCommandTest):

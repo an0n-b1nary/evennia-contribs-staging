@@ -37,9 +37,13 @@ packages = [
     "evennia_rp_chargen",
     "evennia_rp_chargen.migrations",
     "evennia_rp_chargen.integrations",
+    "evennia_rp_chargen.management",
+    "evennia_rp_chargen.management.commands",
 ]
 
 [tool.setuptools.package-dir]
 "evennia_rp_chargen" = "."
 "evennia_rp_chargen.migrations" = "migrations"
 "evennia_rp_chargen.integrations" = "integrations"
+"evennia_rp_chargen.management" = "management"
+"evennia_rp_chargen.management.commands" = "management/commands"

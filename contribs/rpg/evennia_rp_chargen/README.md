@@ -11,6 +11,9 @@ built on [`evennia-rp-rules`](../evennia_rp_rules/README.md). It provides:
 - **edge** and **weakness** pips under a pip policy;
 - a draft → finalized (→ approved) life cycle, with no staff bottleneck by
   default;
+- an **ability catalog** of abilities and flaws, with effects stored as data,
+  per-tag templates, levels, and a budgeted loadout;
+- spending, from a starting allowance first and then from XP;
 - **build locks** that freeze edge and loadout while a character is in a scene.
 
 Stat names, rungs and numbers all come from the game's ruleset; this package
@@ -70,6 +73,41 @@ are edge pips and the ability loadout by default.
   are told only to the character.
 - **Drafts.** A draft sheet never locks.
 
+**Abilities.** Each catalog entry is an ability or a flaw, and its effects
+are evennia-rp-rules effect specs stored as data:
+
+```python
+{"key": "domain-expertise", "name": "Domain Expertise", "tag_kind": "domain",
+ "acquisition": "xp", "xp_cost": 3, "max_level": 5, "budget_cost": 10,
+ "effects": [{"kind": "tag_bonus", "tags": ["@tag"], "score": 8, "per_level": 1}]}
+```
+
+- **Templates.** An entry with `tag_kind` is a template, acquired once per
+  tag of that kind. `@tag` in its effects stands for the chosen tag, so one
+  entry covers every domain ("Domain Expertise: Performance"), including
+  domains staff add later.
+- **Equipping.** Equipped copies count against `RP_CHARGEN_LOADOUT_BUDGET`
+  and reach checks as modifiers. The loadout is frozen while the build is
+  locked.
+- **Flaws.** Flaws are free, self-service, always in effect, and give
+  nothing back. Staff-only flaws can't be shed by players.
+- **One ability model.** There's only one, and it's this one. A combat
+  system adds abilities as catalog entries using its own effect kinds
+  (`RP_RULES_EFFECT_KINDS`); it doesn't define a second model.
+
+**Spending.** Abilities and their upgrades are paid for from the sheet's
+starting allowance first, then from XP through `RP_CHARGEN_XP_LEDGER`.
+Without a ledger, the allowance is the limit. Each purchase writes an
+`AbilityTransaction` recording how it was funded, so a staff refund returns
+exactly what was paid. Upgrade *n* costs `base × factor^(n−1)`
+(`RP_CHARGEN_UPGRADE_COST`). The allowance is not XP: it never counts toward
+XP totals.
+
+**Tags.** The ruleset's tags seed the vocabulary. `TagDefinition` rows add
+to it, rename tags, or archive them (`+chargen/tag`, or the admin). Set
+`RP_RULES_VOCABULARY = "evennia_rp_chargen.vocabulary.DBVocabulary"` so
+checks and commands see the same vocabulary.
+
 ---
 
 ## Quick start
@@ -91,6 +129,17 @@ RP_CHARGEN_ALLOCATION = {
 }
 RP_CHARGEN_PIP_BUDGET = 10
 RP_CHARGEN_PIP_CAP = 5
+RP_RULES_VOCABULARY = "evennia_rp_chargen.vocabulary.DBVocabulary"
+RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG"   # a list of catalog entries
+RP_CHARGEN_LOADOUT_BUDGET = 100
+RP_CHARGEN_STARTING_ALLOWANCE = 10
+```
+
+Then seed the vocabulary and catalog. The command is idempotent; add
+`--update` to overwrite existing rows from the seed:
+
+```bash
+evennia rp_chargen_seed
 ```
 
 ```python
@@ -137,7 +186,11 @@ The other triggers need no wiring:
 | `+stats`, `+stats <stat>=<rung>`, `/clear`, `/finalize` | owner | Choose rungs on a draft, then finalize |
 | `+pips <stat>=<n>`, `/set`, `/clear`, `/weakness` | owner | Edge and weakness; counts may be numbers or `+++` / `--` |
 | `+lock`, `+unlock` | owner | Lock or unlock edge and loadout, announced |
+| `+abilities`, `/list`, `/info`, `/equip`, `/unequip`, `/flaw`, `/unflaw` | owner | Your abilities and flaws, the catalog, and the loadout |
+| `+spend`, `+spend/ability <ability>[: <tag>]` | owner | Your allowance and XP; buy an ability |
+| `+upgrade <ability>[: <tag>]` | owner | Raise an ability a level |
 | `+chargen`, `/list`, `/approve`, `/reopen`, `/setstat` | staff | List, view, approve and reopen sheets, and set any rating directly |
+| `+chargen/grant`, `/revoke[/refund]`, `/allowance`, `/tag` | staff | Give, set the level of, or take away abilities; set allowances; add tags |
 
 `/setstat` bypasses allocation and pip limits, and reports anything it breaks.
 Nobody but the owner and staff can see a sheet, and it never shows scores.
@@ -182,6 +235,13 @@ a `CheckError` that tells the player to finish it.
 | `RP_CHARGEN_LOCK_TTL` | `10800` (3 hours) | Seconds after the last IC action that a lock lapses; `None` to disable |
 | `RP_CHARGEN_REQUIRE_APPROVAL` | `False` | Make approval a gate |
 | `RP_CHARGEN_RPTRACKER_APP_LABEL` | `"evennia_rptracker"` | The tracker whose session end releases locks |
+| `RP_CHARGEN_LOADOUT_BUDGET` | `None` | Total `budget_cost` of equipped abilities (`None`: no limit) |
+| `RP_CHARGEN_LOADOUT_UNIT` | `"points"` | What the loadout budget is counted in |
+| `RP_CHARGEN_STARTING_ALLOWANCE` | `0` | Every sheet's allowance, unless staff set one |
+| `RP_CHARGEN_ALLOWANCE_NOUN` | `"starting allowance"` | What the allowance is called |
+| `RP_CHARGEN_UPGRADE_COST` | `{"base": 1, "factor": 2}` | Upgrade *n* costs `base × factor^(n−1)` |
+| `RP_CHARGEN_XP_LEDGER` | `None` | Dotted path to an XP ledger factory; without one, only the allowance pays |
+| `RP_CHARGEN_CATALOG_SEED` | `None` | Dotted path to the catalog seed list |
 
 System checks: `evennia_rp_chargen.E001` (the allocation can't be built or
 doesn't fit the ruleset) and `E002` (a pip setting isn't a whole number).
@@ -190,7 +250,6 @@ doesn't fit the ruleset) and `E002` (a pip setting isn't a whole number).
 
 ## Roadmap
 
-The next release adds the ability catalog: tags, abilities and flaws, the
-Memory-budgeted loadout, staff grants, and Domain Expertise as a `tag_bonus`
-modifier that reaches checks through `ChargenSubject`. Spending XP on
-abilities follows.
+XP spending through the `RP_CHARGEN_XP_LEDGER` seam comes next, with an
+`evennia-xp` ledger. Combat will add its abilities as catalog entries using
+new effect kinds, rather than defining an ability model of its own.

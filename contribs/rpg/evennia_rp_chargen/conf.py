@@ -18,11 +18,19 @@ Every setting is read when needed, so `override_settings` works in tests.
                                  (None: only an unlock or a session end releases it)
     RP_CHARGEN_REQUIRE_APPROVAL  True: a finalized sheet needs staff approval to play
     RP_CHARGEN_RPTRACKER_APP_LABEL  app label of the RP tracker partner
+    RP_CHARGEN_LOADOUT_BUDGET    total budget cost of equipped abilities (None: no limit)
+    RP_CHARGEN_LOADOUT_UNIT      what the loadout budget is counted in ("points")
+    RP_CHARGEN_STARTING_ALLOWANCE  XP-like allowance every sheet starts with, spent first
+    RP_CHARGEN_ALLOWANCE_NOUN    what the allowance is called ("starting allowance")
+    RP_CHARGEN_UPGRADE_COST      {"base": b, "factor": f}: upgrade n costs b * f ** (n - 1)
+    RP_CHARGEN_XP_LEDGER         dotted path to an XP ledger factory (None: allowance only)
+    RP_CHARGEN_CATALOG_SEED      dotted path to the ability catalog seed (a list of dicts)
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 
@@ -40,6 +48,13 @@ DEFAULTS = {
     "RP_CHARGEN_LOCK_TTL": 3 * 60 * 60,
     "RP_CHARGEN_REQUIRE_APPROVAL": False,
     "RP_CHARGEN_RPTRACKER_APP_LABEL": "evennia_rptracker",
+    "RP_CHARGEN_LOADOUT_BUDGET": None,
+    "RP_CHARGEN_LOADOUT_UNIT": "points",
+    "RP_CHARGEN_STARTING_ALLOWANCE": 0,
+    "RP_CHARGEN_ALLOWANCE_NOUN": "starting allowance",
+    "RP_CHARGEN_UPGRADE_COST": {"base": 1, "factor": 2},
+    "RP_CHARGEN_XP_LEDGER": None,
+    "RP_CHARGEN_CATALOG_SEED": None,
 }
 
 PIPS = "pips"
@@ -78,6 +93,18 @@ def locked_things() -> str:
     if len(nouns) <= 1:
         return "".join(nouns) or "build"
     return f"{', '.join(nouns[:-1])} and {nouns[-1]}"
+
+
+def starting_allowance() -> Decimal:
+    return Decimal(str(get("RP_CHARGEN_STARTING_ALLOWANCE") or 0))
+
+
+def upgrade_cost(upgrade: int) -> Decimal:
+    """XP for the `upgrade`th upgrade (1 takes level 1 to 2): `base * factor ** (n - 1)`."""
+    config = get("RP_CHARGEN_UPGRADE_COST") or {}
+    base = Decimal(str(config.get("base", 1)))
+    factor = Decimal(str(config.get("factor", 2)))
+    return base * factor ** (upgrade - 1)
 
 
 def require_approval() -> bool:

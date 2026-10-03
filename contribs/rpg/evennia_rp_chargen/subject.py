@@ -56,7 +56,13 @@ class ChargenSubject:
         return StatHandler(self.character).get(stat_key)
 
     def get_modifiers(self, check) -> list:
-        return []
+        """Modifiers from equipped abilities and flaws (each still checks it applies)."""
+        build = self.build
+        if build is None or not build.is_playable:
+            return []
+        from evennia_rp_chargen.catalog import modifiers_for
+
+        return modifiers_for(self.character)
 
 
 def subject_adapter(obj) -> ChargenSubject | None:
