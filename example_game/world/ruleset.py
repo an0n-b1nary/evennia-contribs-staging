@@ -67,6 +67,17 @@ Decisions log
   Darkness. The earlier list was specific to one setting, and this sandbox
   is a generic reference game. A game swaps in its own elements; nothing in
   the contribs depends on which exist.
+
+2026-10-02, abilities (P3):
+
+- Abilities wait for combat; for now the catalog is Domain Expertise only.
+- Families are templates, acquired once per tag: one Domain Expertise entry
+  covers every domain, including ones staff add later.
+- Flaws start as templated inversions of Domain Expertise, Resistance and
+  Receptivity, at -8 (mirroring Expertise's base). The Receptivity flaw has
+  no effect until support abilities exist.
+- Players spend their starting allowance on abilities from P3; XP joins as
+  the second source of payment in P6.
 """
 
 RULESET = {
@@ -216,3 +227,70 @@ DIFFICULTY_ALLOWS_PIPS = True
 STARTING_ALLOWANCE = 10
 ABILITY_XP_COST = {"domain_expertise": 3}
 UPGRADE_COST = {"base": 2, "factor": 2}
+
+# P3: the ability catalog seed (RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG").
+# Only Domain Expertise for now; the full list waits for combat. Every entry is
+# a template, acquired once per domain ("Domain Expertise: Performance"), so a
+# domain added at runtime is available at once. The flaws invert Expertise,
+# Resistance and Receptivity: free, self-service, always in effect.
+FLAW_PENALTY = DOMAIN_EXPERTISE["score"]
+
+CATALOG = [
+    {
+        "key": "domain-expertise",
+        "name": "Domain Expertise",
+        "category": "domain",
+        "tag_kind": "domain",
+        "acquisition": "xp",
+        "xp_cost": ABILITY_XP_COST["domain_expertise"],
+        "max_level": DOMAIN_EXPERTISE["max_level"],
+        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "description": "A bonus on every test in the domain, growing a little with each level.",
+        "effects": [
+            {
+                "kind": "tag_bonus",
+                "tags": ["@tag"],
+                "score": DOMAIN_EXPERTISE["score"],
+                "per_level": DOMAIN_EXPERTISE["per_level"],
+            }
+        ],
+    },
+    {
+        "key": "domain-ineptitude",
+        "name": "Domain Ineptitude",
+        "category": "domain",
+        "tag_kind": "domain",
+        "is_flaw": True,
+        "acquisition": "free",
+        "description": "Expertise turned inside out: a penalty on your own tests in the domain.",
+        "effects": [{"kind": "tag_bonus", "tags": ["@tag"], "score": -FLAW_PENALTY}],
+    },
+    {
+        "key": "domain-vulnerability",
+        "name": "Domain Vulnerability",
+        "category": "domain",
+        "tag_kind": "domain",
+        "is_flaw": True,
+        "acquisition": "free",
+        "description": (
+            "Resistance turned inside out: a penalty when someone else's opposed test "
+            "against you is in the domain."
+        ),
+        "effects": [
+            {"kind": "tag_bonus", "tags": ["@tag"], "score": -FLAW_PENALTY, "match": "opposing"}
+        ],
+    },
+    {
+        "key": "domain-aversion",
+        "name": "Domain Aversion",
+        "category": "domain",
+        "tag_kind": "domain",
+        "is_flaw": True,
+        "acquisition": "free",
+        "description": (
+            "Receptivity turned inside out: help in the domain does you less good. No "
+            "effect yet; it takes hold once support abilities exist."
+        ),
+        "effects": [],
+    },
+]
