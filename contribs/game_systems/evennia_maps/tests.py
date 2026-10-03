@@ -83,6 +83,9 @@ _STUB_URL_NAMES = {
 }
 """MAPS_OVERLAY_URL_NAMES pointing at the stub routes below."""
 
+_UNMOUNTED_URL_NAMES = {role: f"missing_partner:{role}" for role in DEFAULT_OVERLAY_URL_NAMES}
+"""Explicitly unresolved routes, independent of the host game's link table."""
+
 
 # Evennia's own routes come along because website/base.html — which every
 # template here extends — reverses "index" and the account routes. Rendering
@@ -1154,6 +1157,7 @@ class TestUnmappableRoomTypes(MapsTestCase):
             self.exit_typeclass, key="north", location=self.room1, destination=self.room2
         )
 
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=())
     def test_unset_setting_maps_every_room_type(self):
         # The default is empty, so an install that never heard of this
         # setting behaves exactly as it did before it existed.
@@ -1593,6 +1597,7 @@ class TestCmdMapCheck(MapsCommandTestCase):
         result = self.call(CmdMap(), "/check", caller=self.char1)
         self.assertIn("Unmapped neighbors (canonical exit, no destination tile): 0", result)
 
+    @override_settings(MAPS_UNMAPPABLE_ROOM_TYPES=())
     def test_check_is_silent_about_off_map_types_when_unset(self):
         # No setting, no section: a game that never declared any off-map
         # room types should not see a line about them at all.
@@ -1725,9 +1730,10 @@ class TestCollectOverlays(MapsTestCase):
 class TestOverlayUrlTemplates(MapsTestCase):
     """Outbound links resolve only when the owning contrib's routes exist."""
 
+    @override_settings(MAPS_OVERLAY_URL_NAMES=_UNMOUNTED_URL_NAMES)
     def test_unmounted_partners_are_absent(self):
-        # The default names are namespaced at evennia_regions/scenes/calendar,
-        # none of which the test URLconf mounts.
+        # A host may configure its own link names; explicitly test routes
+        # that are not mounted rather than relying on its defaults.
         self.assertEqual(overlay_url_templates(), {})
 
     @override_settings(ROOT_URLCONF=__name__, MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
@@ -1975,6 +1981,7 @@ class TestPlaneMapView(MapsWebTestCase):
         self.assertEqual(tile["region_url"], "/regions/7/")
         self.assertEqual(tile["latest_scene_url"], "/scenes/11/")
 
+    @override_settings(MAPS_OVERLAY_URL_NAMES=_UNMOUNTED_URL_NAMES)
     def test_provider_data_renders_no_link_when_routes_are_unmounted(self):
         # evennia_regions installed but its URLs not wired: name the region,
         # don't link to a page that does not exist.
@@ -2065,7 +2072,7 @@ class TestPlaneLiveMapView(MapsWebTestCase):
         under.archive()
         self.assertEqual([layer["id"] for layer in self._context(surface)["layers"]], [surface.pk])
 
-    @override_settings(MAPS_TILES_URL_NAME="")
+    @override_settings(MAPS_TILES_URL_NAME="", MAPS_OVERLAY_URL_NAMES=_UNMOUNTED_URL_NAMES)
     def test_link_templates_absent_when_partners_are_unmounted(self):
         context = self._context(_make_plane())
         self.assertEqual(context["tiles_url_template"], "")

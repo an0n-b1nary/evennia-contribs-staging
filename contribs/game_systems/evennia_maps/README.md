@@ -172,6 +172,32 @@ Tiles require an authenticated account; the SVG page does not.
 without third-party CDN access, override that template and serve Leaflet yourself —
 the static SVG map has no JavaScript dependency at all.
 
+### Browsable API with Evennia's API disabled
+
+With `REST_API_ENABLED = False`, mounting this router still serves JSON, but
+Evennia's global `rest_framework/api.html` theme tries to reverse the absent
+`api:openapi` and `api:redoc` routes when a browser requests HTML. Add a
+game-level override at **`web/templates/rest_framework/api.html`**:
+
+```django
+{% extends "rest_framework/base.html" %}
+{% block userlinks %}
+  {{ block.super }}
+  {% url 'api:openapi' as openapi_url %}
+  {% url 'api:redoc' as redoc_url %}
+  {% if openapi_url %}<li><a href="{{ openapi_url }}">Schema</a></li>{% endif %}
+  {% if redoc_url %}<li><a href="{{ redoc_url }}">Documentation</a></li>{% endif %}
+{% endblock %}
+```
+
+Extend DRF's `base.html` directly; extending `rest_framework/api.html` inherits
+the unconditional Evennia links again. The `as` form makes each reverse
+optional, so this override also works when Evennia's API is enabled later.
+The game template directory must precede app templates in your Django template
+loader configuration (the standard Evennia game scaffold already does this).
+Restart the web server and check an authenticated HTML request to the router
+root and resource list; successful JSON responses alone do not verify this.
+
 ### Privacy
 
 A map tile exposes an individual room's identity **and its position**, so tiles for
