@@ -1651,6 +1651,8 @@ class TestPhaseOneWebUi(SeededSandboxMixin, EvenniaTest):
         self.assertIn("Public Phase One", html)
 
     def test_api_root_and_webclient_shell_render_game_overrides(self):
+        from pathlib import Path
+
         from django.contrib.staticfiles import finders
         from django.urls import resolve, reverse
 
@@ -1669,8 +1671,12 @@ class TestPhaseOneWebUi(SeededSandboxMixin, EvenniaTest):
 
         custom_css = finders.find("webclient/css/custom.css")
         layout_config = finders.find("webclient/js/plugins/goldenlayout_default_config.js")
-        self.assertIn("example_game", str(custom_css))
-        self.assertIn("example_game", str(layout_config))
+        static_root = Path(settings.GAME_DIR) / "web" / "static"
+        self.assertEqual(Path(custom_css).resolve(), static_root / "webclient/css/custom.css")
+        self.assertEqual(
+            Path(layout_config).resolve(),
+            static_root / "webclient/js/plugins/goldenlayout_default_config.js",
+        )
 
 
 @override_settings(ROOT_URLCONF=__name__)

@@ -149,3 +149,42 @@ jobs:
         run: evennia migrate --noinput < /dev/null
       - name: Contest seams with verified partner absence
         run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
+
+  rp-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-scenes
+            excludes: "--exclude evennia-scenes"
+            absent: "--absent evennia_scenes"
+          - profile: no-tracker
+            excludes: "--exclude evennia-rptracker"
+            absent: "--absent evennia_rptracker"
+          - profile: no-xp
+            excludes: "--exclude evennia-xp"
+            absent: "--absent evennia_xp"
+          - profile: no-chargen
+            excludes: "--exclude evennia-rp-chargen"
+            absent: "--absent evennia_rp_chargen"
+          - profile: no-contest
+            excludes: "--exclude evennia-rp-contest"
+            absent: "--absent evennia_rp_contest"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize dependency installation host
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected partners
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Sandbox gate with verified partner absence
+        run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}

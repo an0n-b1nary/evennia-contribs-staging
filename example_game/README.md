@@ -3,7 +3,7 @@
 A persistent, hand-tested downstream Evennia 6.0 game that installs and wires
 together every contrib in this repo. It exists for two reasons:
 
-1. **Reference integration.** It's the "how do these 12 contribs actually get
+1. **Reference integration.** It's the "how do these contribs actually get
    wired into a real game" example this repo otherwise lacks — settings,
    cmdsets, server hooks, and the typeclass seams that can't auto-wire.
 2. **A living sandbox to hand-test against**, as new contribs (crafting) get
@@ -16,18 +16,19 @@ part of this repo).
 
 ## What's wired up
 
-All 14 current contribs, in dependency order — `evennia_links` first, then
+All 17 current contribs, in dependency order — `evennia_links` first, then
 the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
 `evennia_maps`), then the standalone apps (`evennia_calendar`,
 `evennia_jobs`, `evennia_xp`, `evennia_accessibility`), then the pose/social
 layer (`evennia_posing` before `evennia_social` — social hard-depends on
-posing). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
+posing), and the RP cluster (`evennia_rp_rules` before `evennia_rp_chargen`
+and `evennia_rp_contest`). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
 every XP/rptracker/lore/boards/plots/regions/maps/posing/social setting.
 
 **Settings hooks point at the contribs' own shipped integration functions**
 (`evennia_*.integrations.*`), not at hand-written glue — except the
-dotted-path settings below (three wired to `world/sandbox/glue.py`, two
+dotted-path settings below (five wired to `world/sandbox/glue.py`, two
 deliberately omitted):
 
 | Setting | Wired to |
@@ -35,6 +36,8 @@ deliberately omitted):
 | `RPTRACKER_FLAG_REVIEW_HOOK` | `world/sandbox/glue.py` → files an `evennia_jobs` ticket |
 | `BOARDS_ANTIGAMING_REPORTER` | `world/sandbox/glue.py` → files an `evennia_jobs` ticket |
 | `LORE_SESSION_CONTEXT_PROVIDER` | `world/sandbox/glue.py` → resolves room/scene context via rptracker + plots |
+| `RP_RULES_SUBJECT_ADAPTER` | `world/sandbox/glue.py` → chargen sheet, else a sandbox stat block |
+| `RP_RULES_VOCABULARY` | `world/sandbox/glue.py` → chargen's DB vocabulary, else ruleset tags |
 | `RPTRACKER_XP_PROJECTION` | left `None` (cosmetic-only `+activity` lines) |
 | plots' `XP_POST_BATCH_HOOKS` entry | omitted — no `flip_thread_flags` equivalent ships |
 
@@ -47,7 +50,10 @@ chain, so its position is free). Pose/say/emit activity reaches
 `evennia_rptracker` and `evennia_scenes` through `evennia_posing`'s
 `pose_recorded` signal: `world/sandbox/apps.py` connects it, at server
 start, to the single ordered listener in `world/sandbox/glue.py`, which
-calls `capture_to_scene` then `record_rp_activity`. The one seam that still
+calls `capture_to_scene`, then `record_rp_activity`, then chargen's
+`note_ic_action`. The last call runs after tracking so expiry of an old session
+cannot leave the new pose unlocked. OOC text is logged but never locks a build
+or counts as IC activity. The one seam that still
 can't auto-wire is `Room.at_object_receive` → `evennia_scenes`'
 `register_room_entry`, per that contrib's README ("Evennia ships no
 room-receive signal; you must call this manually").
@@ -128,7 +134,7 @@ layout preferences are not rewritten.
 
 The world is in two halves, and the split is the tutorial.
 
-**The OOC wing** is eight rooms, hub-and-spoke off the **Arrival Hall**, which
+**The OOC wing** is nine rooms, hub-and-spoke off the **Arrival Hall**, which
 is also where new characters spawn and where `+ooc` returns you. Each spoke
 carries one command family and one brass plaque naming its commands:
 
@@ -142,6 +148,62 @@ carries one command family and one brass plaque naming its commands:
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
 | Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
+| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-contest` | `+sheet`, `+stats`, `+edge`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen` |
+
+### RP checks in the Proving Grounds
+
+Take `proving` from the Arrival Hall and read the plaque. The seven stats are
+Prowess, Toughness, Wit, Sensitivity, Charisma, Will and Agility. A simple
+starting sheet sets every stat to B (14 allocation points), then finalizes:
+
+```text
++stats Prowess=B
++stats Toughness=B
++stats Wit=B
++stats Sensitivity=B
++stats Charisma=B
++stats Will=B
++stats Agility=B
++stats/finalize
++edge/set Wit=3
++edge/set Agility=2
++spend/ability Domain Expertise:Athletics
++upgrade Domain Expertise:Athletics
++sheet
++test/list
++test #2=Agility/Athletics~I leap across.
+```
+
+Domains suggest an approach in their descriptions; any stat/tag pairing is
+legal. Elements are Fire, Water, Air, Earth, Light and Darkness. The seeded
+Storyteller has Domain Expertise:Performance, the Visitor has Elemental
+Focus:Water, and both have finalized sheets and a flaw. Builder mode lets you
+inspect them with `+sheet <name>`. The Stat-block Dummy has C in every stat
+and no chargen sheet; puppet it to exercise the adapter fallback.
+
+Challenge #1 suggests Charisma/Performance at A; #2 is the prompt-only B
+challenge “Cross the chasm.” Choose a different approach with
+`+test #1=Wit/Deception`; the result marks it as an alternative. Anyone can
+set a challenge, including `+test/set/once B~Cross the chasm`. Its setter or
+staff can edit, void attempts, and close it. Room messages and public scene
+logs show outcomes; grades stay private and only staff `+test/review` sees
+dice and the resolution ledger.
+
+IC poses and checks lock Edge and the ability loadout. `+unlock` announces
+your change; the next IC pose locks again. An OOC message does not lock the
+build. Tracker session end or three idle hours releases it. Abilities use
+a 100 Memory loadout; Expertise and Focus cost 10 each, flaws cost none.
+The starting allowance is 10, acquisitions cost 3, and upgrades cost 2, 4,
+8, then 16. P5 spends only that allowance; the earned-XP ledger is P6.
+
+The CI `rp-sandbox` job runs the full sandbox gate with all partners, then
+fresh environments with scenes, tracker, XP, chargen or contest physically
+absent. For a local drill, create a fresh venv, install Evennia 6.0.0, and use
+`ci_install_contribs.py <install-game> --exclude <distribution>` before
+`ci_run_rp_sandbox_tests.py <new-game-dir> --absent <app_label>`.
+The runner verifies the package is unimportable, copies the sandbox without
+databases or secrets, and requires a positive test count. Without chargen,
+stat blocks and ruleset tags still work; without contest, sheet commands do.
 
 `evennia_accessibility` and `evennia_links` get no room: the first has no
 commands at all (it is web/MXP-side, and shows up in the account options and
@@ -331,7 +393,10 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_xp \
          contribs/utils/evennia_accessibility \
          contribs/game_systems/evennia_posing \
-         contribs/game_systems/evennia_social; do
+         contribs/game_systems/evennia_social \
+         contribs/rpg/evennia_rp_rules \
+         contribs/rpg/evennia_rp_chargen \
+         contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
 cd example_game
@@ -489,7 +554,10 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_xp \
          contribs/utils/evennia_accessibility \
          contribs/game_systems/evennia_posing \
-         contribs/game_systems/evennia_social; do
+         contribs/game_systems/evennia_social \
+         contribs/rpg/evennia_rp_rules \
+         contribs/rpg/evennia_rp_chargen \
+         contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
 ```
@@ -535,34 +603,25 @@ cannot be left to the service — do it now, then hand the running game to syste
 evennia seed_sandbox   # rerunnable; idempotent
 ```
 
-### 6. Snapshot the golden DB — *shelved*
+### 6. Snapshot the golden DB
 
-> **Skip this step for now.** No golden snapshot is committed, and
-> `scripts/reset_to_golden.sh` fails closed without one. The snapshot must be
-> retaken after every `evennia migrate`; while the contribs are still churning
-> through migrations that upkeep outweighs the benefit, and a stale golden DB is
-> worse than none. Use `+sandbox/reset` or `evennia seed_sandbox` for content
-> resets — neither touches accounts. Revive this step when migrations settle.
+The RP playtest restores the golden baseline. Generate it from a fresh local
+database after each migration change. The snapshot builder copies the game
+without existing databases or secret settings, migrates, creates a single
+purpose-made `admin` account with an empty email and a random password, seeds
+the sandbox, and checks the result before writing the snapshot:
+
+```bash
+python example_game/scripts/snapshot_golden.py
+```
+
+The generated credentials are saved under the gitignored `ci_game/` directory;
+move the password into your password manager. This command never reads the live
+database or changes an existing account. Keep production password hashers.
 
 **The golden snapshot is generated locally, not on the droplet, and the droplet
 never pushes.** It is committed as `server/evennia_default.db3`; the droplet only
 ever pulls it. Re-snapshot after every `evennia migrate` and commit the result.
-
-From a local clone, with the contribs installed and no server running:
-
-```bash
-cd example_game
-rm -f server/evennia.db3 server/evennia.db3-wal server/evennia.db3-shm
-evennia migrate
-EVENNIA_SUPERUSER_USERNAME=admin EVENNIA_SUPERUSER_EMAIL= EVENNIA_SUPERUSER_PASSWORD='<28+ random chars>' evennia start
-evennia seed_sandbox
-evennia stop            # wait for server/*.pid to clear before copying
-cp server/evennia.db3 server/evennia_default.db3
-git add server/evennia_default.db3 && git commit -m "chore: snapshot golden sandbox DB"
-```
-
-Evennia reads those three env vars in `create_superuser()`, so first boot needs no
-interactive prompt. Email is optional and **must be left empty.**
 
 Why local rather than from the deployed sandbox, which is the more obvious choice:
 a snapshot taken from the droplet carries that server's real `accounts_accountdb`
@@ -575,10 +634,10 @@ Two rules follow from the file being public:
 
 - **The password must be high-entropy** (28+ random characters) and stored in a
   password manager, because its hash is published. Changing it means re-snapshotting.
-- **The account must have an empty email.** Nothing here is scanned by the anonymity
-  guards: they are `types: [text]`, so a binary `.db3` passes through untouched, and
-  the CI sweep runs those same hooks. This file is outside that safety net — check it
-  by hand before committing:
+- **The account must have an empty email.** The snapshot builder checks the
+  account, production hasher, SQLite integrity and foreign keys, and scans the
+  binary for the local anonymity patterns. Ordinary pre-commit text hooks do
+  not scan `.db3`. You can also inspect the result before committing:
 
 ```bash
 python - <<'SCAN'
@@ -857,7 +916,7 @@ Three mechanisms, for three different needs:
   plane and its tiles, and the two scenes that light the tile overlays
   (tagged/name-matched, so reruns don't duplicate). Keeps accounts and
   characters.
-- **`scripts/reset_to_golden.sh`** — *shelved; see step 6.* Full wipe when
+- **`scripts/reset_to_golden.sh`** — see step 6. Full wipe when
   revived. Stops the server, swaps in
   the committed `server/evennia_default.db3`, restarts. Wipes accounts too.
   Re-snapshot the golden file after every `evennia migrate` (see step 6).
@@ -904,10 +963,14 @@ Three mechanisms, for three different needs:
    Drafting Room** and still hold their scratch-plane tiles — that room and
    the scratch plane are both exempt from the purge precisely so the reset
    cannot orphan what a playtester built.
-9. **Golden reset works** — *skipped while step 6 is shelved.* With no
-   snapshot committed, `scripts/reset_to_golden.sh` should exit 1 with
-   "no golden snapshot at ..." and change nothing. That clean refusal is
-   the only thing to verify here for now.
+9. **Golden reset works** — in a disposable game copy, restore
+   `server/evennia_default.db3` as `server/evennia.db3`, then run
+   `evennia migrate --noinput` and `evennia seed_sandbox`. Reseeding refreshes
+   dated fixtures so the demo challenges don't expire from time spent in Git.
+   The Proving Grounds should contain both
+   demo sheets, the dummy and two open challenges. A deployed full wipe
+   uses `scripts/reset_to_golden.sh`; keep the generated admin credential
+   from step 6 in your password manager.
 10. **The map renders, in a browser** — `/map/` lists four planes:
     `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior` and
     `Sandbox Scratch`. `/map/<pk>/` for the overworld draws eight tiles as an

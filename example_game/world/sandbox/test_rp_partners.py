@@ -1,0 +1,141 @@
+"""Real sandbox seams, runnable after physically uninstalling RP partners."""
+
+from importlib import import_module
+from unittest import mock
+
+from django.apps import apps
+from django.core.management import call_command
+from django.test import RequestFactory
+from evennia.utils.search import search_object
+from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import Character
+from typeclasses.rooms import Room
+
+from evennia_rp_rules.dice import ScriptedRoller
+from evennia_rp_rules.subjects import DictStatSource, get_subject
+from world.sandbox import content, glue
+
+
+class RPSeedMixin:
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def setUp(self):
+        super().setUp()
+        origin = self.settings(START_LOCATION=f"#{self.room1.id}")
+        origin.enable()
+        self.addCleanup(origin.disable)
+        if apps.is_installed("evennia_rptracker"):
+            from evennia_rptracker.tracker import _active_sessions
+
+            _active_sessions.clear()
+            self.addCleanup(_active_sessions.clear)
+        call_command("seed_sandbox", verbosity=0)
+        self.grounds = search_object("Proving Grounds")[0]
+        self.dummy = search_object(content.RP_DUMMY_NAME)[0]
+        self.samples = [search_object(name)[0] for name in content.SCENE_SPEAKERS]
+
+
+class TestRPPartners(RPSeedMixin, EvenniaTest):
+    def test_stat_block_fallback_without_creating_a_sheet(self):
+        subject = get_subject(self.dummy)
+        self.assertIsInstance(subject, DictStatSource)
+        self.assertEqual(subject.get_rating("wit").display(), "C")
+        if apps.is_installed("evennia_rp_chargen"):
+            from evennia_rp_chargen.models import CharacterBuild
+
+            self.assertFalse(CharacterBuild.objects.filter(character=self.dummy).exists())
+
+    def test_runtime_vocabulary_or_ruleset_fallback(self):
+        vocabulary = glue.rp_vocabulary()
+        self.assertIsNotNone(vocabulary.find("Ritual", kind="domain"))
+        self.assertIsNotNone(vocabulary.find("Water", kind="element"))
+
+    def test_commands_follow_installed_apps(self):
+        from evennia.commands.command import CMD_IGNORE_PREFIXES
+
+        self.char2.cmdset.update()
+        commands = list(self.char2.cmdset.current)
+        for label, keys in (
+            ("evennia_rp_contest", ("test",)),
+            (
+                "evennia_rp_chargen",
+                (
+                    "sheet",
+                    "stats",
+                    "edge",
+                    "abilities",
+                    "lock",
+                    "unlock",
+                    "spend",
+                    "upgrade",
+                    "chargen",
+                ),
+            ),
+            ("evennia_scenes", ("scene", "log")),
+            ("evennia_rptracker", ("activity",)),
+            ("evennia_xp", ("xp",)),
+        ):
+            modules = {f"{label}.commands"}
+            if label == "evennia_rp_chargen":
+                modules.add("commands.rp")
+            names = {
+                command.key.lstrip(CMD_IGNORE_PREFIXES)
+                for command in commands
+                if type(command).__module__ in modules
+            }
+            for key in keys:
+                self.assertEqual(key in names, apps.is_installed(label), (label, key))
+
+    def test_actual_pose_and_disconnect_hooks(self):
+        sample = self.samples[0]
+        sample.record_pose("waves to the playtesters.", pose_type="pose")
+        if apps.is_installed("evennia_rp_chargen"):
+            from evennia_rp_chargen import locks
+
+            self.assertTrue(locks.is_locked(sample))
+        sample.at_post_unpuppet()
+
+    def test_dummy_can_resolve_a_real_test(self):
+        if not apps.is_installed("evennia_rp_contest"):
+            return
+        from evennia_rp_contest import services
+        from evennia_rp_contest.parsing import parse_test
+
+        record = services.perform_test(
+            self.dummy, parse_test("#2=Wit/Water"), roller=ScriptedRoller([0])
+        )
+        self.assertEqual(record.challenge.number, 2)
+        self.assertEqual(record.rating_display, "C")
+        self.assertIsNone(record.scene_id)
+
+    def test_rendered_home_page_and_urls(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import override_settings
+        from django.urls import reverse
+        from web.website.views.index import SandboxIndexView
+
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        with override_settings(ROOT_URLCONF="web.urls"):
+            self.assertEqual(reverse("index"), "/")
+            response = SandboxIndexView.as_view()(request)
+            response.render()
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        for label in ("evennia_rp_rules", "evennia_rp_chargen", "evennia_rp_contest"):
+            self.assertEqual(label in html, apps.is_installed(label))
+
+    def test_start_and_stop_with_real_installed_partners(self):
+        from django.conf import settings
+        from django.utils.module_loading import import_string
+
+        for _category, collector in settings.XP_COLLECTORS:
+            self.assertTrue(callable(import_string(collector)))
+        for hook in [*settings.XP_ANTIGAMING_SWEEPS, *settings.XP_POST_BATCH_HOOKS]:
+            self.assertTrue(callable(import_string(hook)))
+        hooks = import_module("server.conf.at_server_startstop")
+        # Keep the real import/registry path; don't start persistent timers in a test.
+        with mock.patch("evennia_calendar.scheduler.ensure_calendar_script_running"):
+            hooks.at_server_start()
+            hooks.at_server_stop()

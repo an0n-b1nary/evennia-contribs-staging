@@ -61,9 +61,12 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
         """
         super().at_post_unpuppet(account=account, session=session, **kwargs)
 
-        from evennia_rptracker import end_session
+        from django.apps import apps
 
-        end_session(self.id, manual=False)
+        if apps.is_installed("evennia_rptracker"):
+            from evennia_rptracker import end_session
+
+            end_session(self.id, manual=False)
 
         from django.utils import timezone
 

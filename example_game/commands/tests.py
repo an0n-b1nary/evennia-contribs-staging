@@ -95,6 +95,32 @@ class TestCharacterCmdSet(EvenniaTest):
         self.assertIsNotNone(cmd, "no command resolved for '+sandbox'")
         self.assertIs(type(cmd), CmdSandbox)
 
+    def test_rp_commands_resolve_to_their_implementations(self):
+        from evennia.commands.cmdparser import cmdparser
+        from evennia_rp_contest.commands import CmdTest
+
+        from commands.rp import CmdEdge
+
+        expected = {"+edge": CmdEdge, "+pips": CmdEdge, "+test": CmdTest}
+        chargen = importlib.import_module("evennia_rp_chargen.commands")
+        for name in (
+            "Sheet",
+            "Stats",
+            "Abilities",
+            "Lock",
+            "Unlock",
+            "Spend",
+            "Upgrade",
+            "Chargen",
+        ):
+            expected[f"+{name.lower()}"] = getattr(chargen, f"Cmd{name}")
+        for name, command_class in expected.items():
+            # Evennia prefers explicit prefixes before its fallback stripping;
+            # +lock and the stock @lock intentionally coexist.
+            matches = cmdparser(name, self.cmdset, self.char1)
+            self.assertEqual(len(matches), 1, name)
+            self.assertIs(type(matches[0][2]), command_class, name)
+
 
 def _has_builder(obj):
     return "builder" in [perm.lower() for perm in obj.permissions.all()]

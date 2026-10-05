@@ -2,17 +2,12 @@
 # Full wipe-to-default reset for the example_game contrib sandbox.
 #
 # ---------------------------------------------------------------------
-# SHELVED. There is deliberately no golden snapshot in the tree, so this
-# script exits 1 and does nothing. That is the intended state, not a bug.
-#
 # The snapshot has to be retaken and recommitted after every `evennia
-# migrate`, or it restores a schema the code no longer matches. While the
-# contribs are still churning through migrations that cost outweighs the
-# benefit, and a stale golden DB is worse than none - it looks like a
-# safety net and isn't. Use `+sandbox/reset` or `evennia seed_sandbox`
+# migrate`, or it restores a schema the code no longer matches.
+# Use `+sandbox/reset` or `evennia seed_sandbox`
 # for content resets; neither touches accounts.
 #
-# To bring it back once migrations settle, follow README step 6. Generate
+# To rebuild it, follow README step 6 or run scripts/snapshot_golden.py. Generate
 # it locally, never from the droplet: a droplet-born snapshot publishes
 # that server's superuser email and password hash, and a golden reset
 # restores those rows, making the published hash the live admin
@@ -20,7 +15,7 @@
 # ---------------------------------------------------------------------
 #
 # Stops the server, swaps the live database for the committed golden
-# snapshot (server/evennia_default.db3), and restarts. This resets
+# snapshot (server/evennia_default.db3), refreshes dated fixtures, and restarts. This resets
 # EVERYTHING — accounts, characters, and content — not just seeded content.
 # For a content-only reset that keeps accounts, use `evennia seed_sandbox`
 # instead (world/sandbox/management/commands/seed_sandbox.py).
@@ -29,11 +24,8 @@
 #   example_game/scripts/reset_to_golden.sh
 #
 # The golden snapshot must be re-taken after any `evennia migrate`:
-#   cd example_game
-#   evennia stop
-#   cp server/evennia.db3 server/evennia_default.db3
+#   python example_game/scripts/snapshot_golden.py
 #   git add server/evennia_default.db3 && git commit -m "..."
-#   evennia start
 
 set -euo pipefail
 
@@ -44,7 +36,7 @@ LIVE_DB="$GAME_DIR/server/evennia.db3"
 if [ ! -f "$GOLDEN_DB" ]; then
     echo "error: no golden snapshot at $GOLDEN_DB" >&2
     echo "Take one first:" >&2
-    echo "  cd $GAME_DIR && evennia stop && cp server/evennia.db3 server/evennia_default.db3" >&2
+    echo "  python $GAME_DIR/scripts/snapshot_golden.py" >&2
     exit 1
 fi
 
@@ -84,6 +76,10 @@ cp "$GOLDEN_DB" "$LIVE_DB"
 rm -f "$LIVE_DB-wal" "$LIVE_DB-shm"
 
 echo "Starting example_game..."
+# Dates in a committed snapshot age while it sits in Git. Refresh the fixtures
+# so demo challenges aren't already idle-expired when the reset starts up.
+evennia migrate --noinput < /dev/null
+evennia seed_sandbox < /dev/null
 evennia start
 
 echo "Done. example_game restored to golden snapshot."

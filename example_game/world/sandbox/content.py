@@ -65,7 +65,7 @@ class IcRoom:
 # ---------------------------------------------------------------------------
 # Laid out hub-and-spoke: ARRIVAL in the middle, every other room one
 # direction-less exit away and back. Two moves reaches anything, which is what
-# makes eight rooms cheaper to walk than five would be in a line - and lets each
+# makes the rooms quick to reach - and lets each
 # room carry one command family instead of three.
 #
 # ARRIVAL is special three ways over: it is dbref #2 (so START_LOCATION and
@@ -195,6 +195,39 @@ OOC_ROOMS = (
         commands=("+bb", "+jobs", "+request", "+bug", "+issue", "+discuss", "+xp"),
     ),
     OocRoom(
+        slug="proving",
+        name="Proving Grounds",
+        desc="[Placeholder] A workshop for character sheets, abilities and shared RP challenges.",
+        plaque=(
+            "[Placeholder] Start a sheet with +stats, choose a grade for every stat, "
+            "then +stats/finalize. +edge sets Edge and Weakness; +spend/ability "
+            "buys a specialization from your starting allowance. Anyone may set "
+            "a challenge with +test/set. Choose an approach; suggestions are optional. "
+            "IC poses and tests lock Edge and loadout. +unlock announces a change. "
+            "The two demonstration characters have finalized sheets; Builder mode "
+            "lets you inspect them with +sheet <name> or puppet the stat-block dummy."
+        ),
+        commands=(
+            "+sheet",
+            "+stats",
+            "+stats/finalize",
+            "+edge/set",
+            "+edge/weakness",
+            "+abilities",
+            "+spend/ability",
+            "+upgrade",
+            "+lock",
+            "+unlock",
+            "+test",
+            "+test/set",
+            "+test/edit",
+            "+test/void",
+            "+test/history",
+            "+test/review",
+            "+chargen",
+        ),
+    ),
+    OocRoom(
         slug="drafting",
         name="Drafting Room",
         desc=(
@@ -231,6 +264,7 @@ OOC_SPOKE_EXIT_KEYS = {
     "story": ("story", "back"),
     "lore": ("lore", "back"),
     "helpdesk": ("helpdesk", "back"),
+    "proving": ("proving", "back"),
     "drafting": ("drafting", "back"),
 }
 
@@ -632,6 +666,30 @@ BOARD_SECOND_POST = {
 }
 
 SCENE_SPEAKERS = ("Sandbox Storyteller", "Sandbox Visitor")
+
+# RP fixtures belong only to the tagged demo characters, never player sheets.
+RP_SAMPLE_BUILDS = (
+    {
+        "edge": {"charisma": 2, "agility": 3},
+        "weakness": {"toughness": 1},
+        "abilities": (("domain-expertise", "performance"), ("domain-ineptitude", "thievery")),
+    },
+    {
+        "edge": {"sensitivity": 2, "wit": 3},
+        "weakness": {"prowess": 1},
+        "abilities": (("elemental-focus", "water"), ("elemental-vulnerability", "fire")),
+    },
+)
+RP_CHALLENGES = (
+    "A=Charisma/Performance~Hold the audience's attention",
+    "B~Cross the chasm",
+)
+RP_DUMMY_NAME = "Stat-block Dummy"
+RP_DUMMY_DESC = "[Placeholder] A demonstration character with a stat block and no chargen sheet."
+RP_DUMMY_STAT_BLOCK = {
+    key: "C"
+    for key in ("prowess", "toughness", "wit", "sensitivity", "charisma", "will", "agility")
+}
 
 BOARD_POSTS = (BOARD_FIRST_POST, BOARD_SECOND_POST)
 

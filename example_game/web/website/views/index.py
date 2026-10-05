@@ -3,7 +3,7 @@
 Stock Evennia's index shows account counts and database stats. That is the right
 default for a fresh game and the wrong one here: this site exists so a playtester
 can find the play, and so a developer evaluating the contribs can see at a glance
-what the fourteen of them actually put on a website. So the widgets are (1) what
+what the installed contribs actually put on a website. So the widgets are (1) what
 is happening now, (2) what has happened lately, and (3) an inventory of the
 systems themselves.
 
@@ -50,6 +50,9 @@ IN_GAME_ONLY = (
     ("evennia_posing", "Pose, emit, semipose and pose-order tracking"),
     ("evennia_social", "Profiles, discovery, paging, filtering, teleport"),
     ("evennia_accessibility", "Screenreader mode and accessible form partials"),
+    ("evennia_rp_rules", "Shared graded ratings and RP check resolution"),
+    ("evennia_rp_chargen", "Private character sheets, Edge and ability loadouts"),
+    ("evennia_rp_contest", "Player-led tests, room challenges and result history"),
 )
 
 

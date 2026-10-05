@@ -14,15 +14,15 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 
 """
 
+from importlib import import_module
+
+from django.apps import apps
 from evennia import default_cmds
 from evennia_boards.commands import CmdBoard
 from evennia_calendar.commands import CmdCalendar, CmdRsvp
 from evennia_jobs.commands import CmdBug, CmdDiscuss, CmdIssue, CmdJobs, CmdRequest
 from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, CmdShare
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
-from evennia_rptracker.commands import CmdActivity, CmdRPTrackerStaff
-from evennia_scenes.commands import CmdLog, CmdScene
-from evennia_xp.commands import CmdXp
 
 from commands.sandbox import CmdSandbox
 from evennia_maps.commands import CmdMap
@@ -51,6 +51,14 @@ from evennia_social.commands import (
     CmdTel,
     CmdWhere,
 )
+
+
+def _optional_commands(app_label, *names):
+    """A restart without an optional RP partner removes its commands too."""
+    if not apps.is_installed(app_label):
+        return ()
+    module = import_module(f"{app_label}.commands")
+    return tuple(getattr(module, name) for name in names)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -94,12 +102,32 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdTel)
 
         # RP session tracking
-        self.add(CmdActivity)
-        self.add(CmdRPTrackerStaff)
+        for command in _optional_commands("evennia_rptracker", "CmdActivity", "CmdRPTrackerStaff"):
+            self.add(command)
 
         # Scenes
-        self.add(CmdScene)
-        self.add(CmdLog)
+        for command in _optional_commands("evennia_scenes", "CmdScene", "CmdLog"):
+            self.add(command)
+
+        # RP checks and private builds need no character typeclass changes.
+        for command in _optional_commands(
+            "evennia_rp_chargen",
+            "CmdSheet",
+            "CmdStats",
+            "CmdAbilities",
+            "CmdLock",
+            "CmdUnlock",
+            "CmdSpend",
+            "CmdUpgrade",
+            "CmdChargen",
+        ):
+            self.add(command)
+        if apps.is_installed("evennia_rp_chargen"):
+            from commands.rp import CmdEdge
+
+            self.add(CmdEdge)
+        for command in _optional_commands("evennia_rp_contest", "CmdTest"):
+            self.add(command)
 
         # Boards
         self.add(CmdBoard)
@@ -130,7 +158,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdMap)
 
         # XP
-        self.add(CmdXp)
+        for command in _optional_commands("evennia_xp", "CmdXp"):
+            self.add(command)
 
         # Jobs
         self.add(CmdRequest)

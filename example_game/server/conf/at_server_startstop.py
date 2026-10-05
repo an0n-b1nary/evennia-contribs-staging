@@ -17,6 +17,8 @@ at_server_cold_stop()
 
 """
 
+from django.apps import apps
+
 
 def at_server_init():
     """
@@ -32,10 +34,11 @@ def at_server_start():
     """
     # evennia_rptracker — recover DB sessions orphaned by a crash/kill,
     # then ensure the idle-check Script is running.
-    from evennia_rptracker import ensure_idle_check_running, recover_orphaned_sessions
+    if apps.is_installed("evennia_rptracker"):
+        from evennia_rptracker import ensure_idle_check_running, recover_orphaned_sessions
 
-    recover_orphaned_sessions()
-    ensure_idle_check_running()
+        recover_orphaned_sessions()
+        ensure_idle_check_running()
 
     # evennia_calendar — start the lottery/RSVP-expiry/reminder maintenance
     # Script. Evennia has no server-start signal the contrib can hook itself,
@@ -46,9 +49,10 @@ def at_server_start():
     ensure_calendar_script_running()
 
     # evennia_xp — start the weekly (Monday 00:00 UTC) batch Script.
-    from evennia_xp.scripts import ensure_xp_batch_script_running
+    if apps.is_installed("evennia_xp"):
+        from evennia_xp.scripts import ensure_xp_batch_script_running
 
-    ensure_xp_batch_script_running()
+        ensure_xp_batch_script_running()
 
 
 def at_server_stop():
@@ -58,9 +62,10 @@ def at_server_stop():
     """
     # evennia_rptracker — flush all in-memory session state to the DB
     # before shutdown so no pose counts or sessions are lost.
-    from evennia_rptracker import flush_all_sessions
+    if apps.is_installed("evennia_rptracker"):
+        from evennia_rptracker import flush_all_sessions
 
-    flush_all_sessions()
+        flush_all_sessions()
 
 
 def at_server_reload_start():

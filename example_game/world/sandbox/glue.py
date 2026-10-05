@@ -13,22 +13,54 @@ such in its owning contrib's README/settings-reference table):
 - LORE_SESSION_CONTEXT_PROVIDER — no shipped default (degrades gracefully
   without one, but this sandbox wires a real one so +lore's passive trickle
   has room/scene signal to work with)
-
-That these three must be hand-written here — instead of shipping as optional
-adapters inside evennia_rptracker/evennia_boards/evennia_lore — is itself a
-sandboxing finding worth feeding back upstream.
+- RP_RULES_SUBJECT_ADAPTER / RP_RULES_VOCABULARY — select installed chargen
+  sheets and catalog tags, with stat-block and ruleset fallbacks
 
 This module also holds `on_pose_recorded`, the single ordered listener for
 `evennia_posing.pose_recorded` (see that contrib's README §"Wire the
-pose_recorded signal"). Unlike the three hooks above, it isn't a dotted-path
+pose_recorded signal"). Unlike the hooks above, it isn't a dotted-path
 setting — it's connected once in `world/sandbox/apps.py`'s `SandboxConfig.
 ready()` with a `dispatch_uid`. It fans each recorded pose/emit/say out to
-evennia_scenes and evennia_rptracker in a fixed order.
+scenes, tracker and chargen in that order. Each consumer is optional.
 """
 
 import logging
 
+from django.apps import apps
+
 _logger = logging.getLogger(__name__)
+
+
+def rp_subject_adapter(obj):
+    """Use a real chargen sheet, or the object's sandbox stat block.
+
+    `rp_stat_block` in Attribute category `sandbox` holds {stat_key: rating}.
+    No RP typeclass mixin is required, and a missing chargen app never imports it.
+    """
+    if apps.is_installed("evennia_rp_chargen"):
+        from evennia_rp_chargen.subject import subject_adapter
+
+        subject = subject_adapter(obj)
+        if subject is not None:
+            return subject
+    attributes = getattr(obj, "attributes", None)
+    ratings = attributes.get("rp_stat_block", category="sandbox") if attributes else None
+    if ratings:
+        from evennia_rp_rules.subjects import DictStatSource
+
+        return DictStatSource(ratings, name=obj.key)
+    return None
+
+
+def rp_vocabulary():
+    """Runtime catalog tags with chargen; the ruleset vocabulary without it."""
+    if apps.is_installed("evennia_rp_chargen"):
+        from evennia_rp_chargen.vocabulary import DBVocabulary
+
+        return DBVocabulary()
+    from evennia_rp_rules.vocabulary import RulesetVocabulary
+
+    return RulesetVocabulary()
 
 
 def rptracker_flag_review_hook(title, description):
@@ -100,7 +132,7 @@ def on_pose_recorded(sender, character, pose_text, pose_type, location, **kwargs
 
     Connected once in world/sandbox/apps.py (SandboxConfig.ready) with a
     dispatch_uid. Django does not guarantee delivery order across multiple
-    independent receivers, so both downstream consumers are called from
+    independent receivers, so the downstream consumers are called from
     this one receiver, in this order:
 
     1. evennia_scenes.capture.capture_to_scene — scene state first, so
@@ -110,24 +142,37 @@ def on_pose_recorded(sender, character, pose_text, pose_type, location, **kwargs
     2. evennia_rptracker.record_rp_activity — skipped when location is
        None (the signal allows a None location; rptracker needs a room).
 
-    Each call is wrapped so one failing consumer cannot break the other
-    or the caller — record_pose() fires this synchronously from the
+    3. evennia_rp_chargen.locks.note_ic_action — IC actions only. This runs
+       after tracking, because recording a new pose can expire an old session
+       and release its lock; the new action must then lock the new build again.
+
+    Each call is gated on the app registry and wrapped so one failing consumer
+    cannot break the others or the caller — record_pose() fires this synchronously from the
     pose/say code path, so an escaping exception would surface to the
     posing player. Failures are logged with traceback.
     """
-    from evennia_scenes.capture import capture_to_scene
+    if apps.is_installed("evennia_scenes"):
+        try:
+            from evennia_scenes.capture import capture_to_scene
 
-    try:
-        capture_to_scene(character, pose_text, log_type=pose_type)
-    except Exception:
-        _logger.exception("on_pose_recorded: capture_to_scene failed")
+            capture_to_scene(character, pose_text, log_type=pose_type)
+        except Exception:
+            _logger.exception("on_pose_recorded: capture_to_scene failed")
 
-    if location is None:
+    if pose_type == "ooc":
         return
+    if location is not None and apps.is_installed("evennia_rptracker"):
+        try:
+            from evennia_rptracker import record_rp_activity
 
-    from evennia_rptracker import record_rp_activity
+            record_rp_activity(character, location)
+        except Exception:
+            _logger.exception("on_pose_recorded: record_rp_activity failed")
 
-    try:
-        record_rp_activity(character, location)
-    except Exception:
-        _logger.exception("on_pose_recorded: record_rp_activity failed")
+    if apps.is_installed("evennia_rp_chargen"):
+        try:
+            from evennia_rp_chargen.locks import note_ic_action
+
+            note_ic_action(character)
+        except Exception:
+            _logger.exception("on_pose_recorded: note_ic_action failed")

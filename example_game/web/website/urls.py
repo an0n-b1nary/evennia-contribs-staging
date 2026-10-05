@@ -38,6 +38,7 @@ entries into plain text - a whole overlay feature hidden behind a no-op rather
 than an error.
 """
 
+from django.apps import apps
 from django.urls import include, path
 from evennia.web.website.urls import urlpatterns as evennia_website_urlpatterns
 
@@ -75,12 +76,15 @@ urlpatterns = [
     path("regions/", include("evennia_regions.urls")),
     path("calendar/", include("evennia_calendar.urls")),
     path("plots/", include("evennia_plots.urls")),
-    path("", include(("evennia_scenes.urls", "evennia_scenes"))),
     path("", include(("evennia_boards.urls", "evennia_boards"))),
     path("lore/", include("evennia_lore.urls")),
     path("jobs/", include("evennia_jobs.urls")),
-    path("xp/", include("evennia_xp.urls")),
 ]
+
+if apps.is_installed("evennia_scenes"):
+    urlpatterns.append(path("", include(("evennia_scenes.urls", "evennia_scenes"))))
+if apps.is_installed("evennia_xp"):
+    urlpatterns.append(path("xp/", include("evennia_xp.urls")))
 
 # read by Django
 urlpatterns = urlpatterns + evennia_website_urlpatterns

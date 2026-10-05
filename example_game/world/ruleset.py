@@ -78,10 +78,21 @@ Decisions log
   no effect until support abilities exist.
 - Players spend their starting allowance on abilities from P3; XP joins as
   the second source of payment in P6.
+
+2026-10-05, vocabulary and sandbox playtest:
+
+- Wit and Sensitivity replace Magic and Aura. Methodical work belongs to
+  Will; cunning belongs to Wit.
+- Sixteen domains include Ritual. Scholarship covers natural philosophy
+  and magitech; Alchemy covers identifying and handling substances.
+- Suggested stats guide an approach; any stat/tag pairing is allowed.
+- Elemental Focus mirrors Domain Expertise on the six conventional elements.
+- Domain Receptivity and Aversion are retired. Resistance and Vulnerability
+  remain, for both domains and elements.
 """
 
 RULESET = {
-    "version": "sandbox-1",
+    "version": "sandbox-2",
     "scales": {
         "grade": {
             "name": "Grade",
@@ -101,67 +112,128 @@ RULESET = {
             "key": "prowess",
             "name": "Prowess",
             "category": "physical",
-            "description": "Physical power: force, feats of strength, hitting hard.",
+            "description": "Force, strength, martial skill and finesse with a weapon.",
         },
         {
             "key": "toughness",
             "name": "Toughness",
             "category": "physical",
-            "description": "Physical resilience: endurance, shrugging off hardship and harm.",
+            "description": "Endurance: weathering pain, poison, cold and hardship.",
         },
         {
-            "key": "magic",
-            "name": "Magic",
-            "category": "magical",
-            "description": "Magical power: working spells and bending magic to purpose.",
+            "key": "wit",
+            "name": "Wit",
+            "category": "mental",
+            "description": "Thinking fast, improvising, misdirection and cunning.",
         },
         {
-            "key": "aura",
-            "name": "Aura",
-            "category": "magical",
-            "description": "Magical resilience: warding off and weathering magic.",
+            "key": "sensitivity",
+            "name": "Sensitivity",
+            "category": "mental",
+            "description": "Empathy, intuition, noticing and feeling the metaphysical.",
         },
         {
             "key": "charisma",
             "name": "Charisma",
             "category": "social",
-            "description": (
-                "Affecting things without force: presence, allure, cunning, "
-                "opportunism, dynamism, leadership."
-            ),
+            "description": "Presence, allure, leadership and performance.",
         },
         {
             "key": "will",
             "name": "Will",
             "category": "social",
-            "description": "Resolve and composure: holding steady under pressure.",
+            "description": "Resolve, discipline, patience and methodical work.",
         },
         {
             "key": "agility",
             "name": "Agility",
             "category": "physical",
-            "description": "Speed, reflexes and deftness.",
+            "description": "Speed, reflexes, balance and quick movement.",
         },
     ],
     # Seed vocabulary only; chargen's DB vocabulary grows from here at runtime
-    # as players propose new tags. Candidate list, not a closed set.
+    # as players propose new tags. Suggested stats are guidance, not limits.
     "tags": [
-        {"key": "acrobatics", "name": "Acrobatics"},
-        {"key": "alchemy", "name": "Alchemy"},
-        {"key": "athletics", "name": "Athletics"},
-        {"key": "deception", "name": "Deception"},
-        {"key": "insight", "name": "Insight"},
-        {"key": "intimidation", "name": "Intimidation"},
-        {"key": "medicine", "name": "Medicine"},
-        {"key": "perception", "name": "Perception"},
-        {"key": "performance", "name": "Performance"},
-        {"key": "persuasion", "name": "Persuasion"},
-        {"key": "scholarship", "name": "Scholarship"},
-        {"key": "seduction", "name": "Seduction"},
-        {"key": "stealth", "name": "Stealth"},
-        {"key": "survival", "name": "Survival"},
-        {"key": "thievery", "name": "Thievery"},
-        {"key": "tinkering", "name": "Tinkering"},
+        {
+            "key": "acrobatics",
+            "name": "Acrobatics",
+            "description": "Balance, tumbling, falls and aerial movement. Suggested: Agility, Prowess.",
+        },
+        {
+            "key": "alchemy",
+            "name": "Alchemy",
+            "description": "Identifying and handling substances: potions, poisons and reagents. Suggested: Will, Wit.",
+        },
+        {
+            "key": "athletics",
+            "name": "Athletics",
+            "description": "Climbing, swimming, lifting, running and grappling. Suggested: Prowess, Toughness.",
+        },
+        {
+            "key": "deception",
+            "name": "Deception",
+            "description": "Lies, disguise, bluffing and forgery. Suggested: Wit, Charisma.",
+        },
+        {
+            "key": "insight",
+            "name": "Insight",
+            "description": "Reading motives, lies and moods. Suggested: Sensitivity, Wit.",
+        },
+        {
+            "key": "intimidation",
+            "name": "Intimidation",
+            "description": "Threats, menace and interrogation. Suggested: Charisma, Prowess.",
+        },
+        {
+            "key": "medicine",
+            "name": "Medicine",
+            "description": "Wounds, illness, diagnosis and surgery. Suggested: Sensitivity, Will.",
+        },
+        {
+            "key": "perception",
+            "name": "Perception",
+            "description": "Noticing, searching and spotting danger. Suggested: Sensitivity, Wit.",
+        },
+        {
+            "key": "performance",
+            "name": "Performance",
+            "description": "Music, oratory, dance and acting. Suggested: Charisma, Sensitivity.",
+        },
+        {
+            "key": "persuasion",
+            "name": "Persuasion",
+            "description": "Argument, negotiation, diplomacy and rallying. Suggested: Charisma, Wit.",
+        },
+        {
+            "key": "ritual",
+            "name": "Ritual",
+            "description": "Rites, wards, spirits, curses and sensing the metaphysical. Suggested: Will, Sensitivity.",
+        },
+        {
+            "key": "scholarship",
+            "name": "Scholarship",
+            "description": "History, languages, law and natural philosophy, including magitech. Suggested: Will, Wit.",
+        },
+        {
+            "key": "seduction",
+            "name": "Seduction",
+            "description": "Charm, allure and flirtation. Suggested: Charisma, Sensitivity.",
+        },
+        {
+            "key": "stealth",
+            "name": "Stealth",
+            "description": "Sneaking, hiding and shadowing someone. Suggested: Agility, Sensitivity.",
+        },
+        {
+            "key": "survival",
+            "name": "Survival",
+            "description": "Wilderness, tracking, beasts, weather and hardship. Suggested: Toughness, Sensitivity.",
+        },
+        {
+            "key": "thievery",
+            "name": "Thievery",
+            "description": "Pickpocketing, locks, palming and sleight of hand. Suggested: Wit, Agility.",
+        },
         {"key": "fire", "name": "Fire", "kind": "element"},
         {"key": "water", "name": "Water", "kind": "element"},
         {"key": "air", "name": "Air", "kind": "element"},
@@ -196,9 +268,7 @@ RULESET = {
 }
 
 # ---------------------------------------------------------------------------
-# Candidate numbers for later phases. Not read by anything yet: each block
-# names the phase that will wire it into settings. Kept here so the whole
-# rules sign-off happens in one file.
+# The sandbox settings import these values. Keep numeric tuning in one place.
 # ---------------------------------------------------------------------------
 
 # P1/P3: Domain Expertise is a flat score bonus on tests tagged with its
@@ -229,10 +299,8 @@ ABILITY_XP_COST = {"domain_expertise": 3}
 UPGRADE_COST = {"base": 2, "factor": 2}
 
 # P3: the ability catalog seed (RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG").
-# Only Domain Expertise for now; the full list waits for combat. Every entry is
-# a template, acquired once per domain ("Domain Expertise: Performance"), so a
-# domain added at runtime is available at once. The flaws invert Expertise,
-# Resistance and Receptivity: free, self-service, always in effect.
+# Families are templates acquired once per tag. The combat-specific behavior
+# waits for a combat contrib; these effects apply only to the shared RP checks.
 FLAW_PENALTY = DOMAIN_EXPERTISE["score"]
 
 CATALOG = [
@@ -252,6 +320,65 @@ CATALOG = [
                 "tags": ["@tag"],
                 "score": DOMAIN_EXPERTISE["score"],
                 "per_level": DOMAIN_EXPERTISE["per_level"],
+            }
+        ],
+    },
+    {
+        "key": "elemental-focus",
+        "name": "Elemental Focus",
+        "category": "element",
+        "tag_kind": "element",
+        "acquisition": "xp",
+        "xp_cost": ABILITY_XP_COST["domain_expertise"],
+        "max_level": DOMAIN_EXPERTISE["max_level"],
+        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "description": "A bonus on tests carrying the element, growing a little with each level.",
+        "effects": [
+            {
+                "kind": "tag_bonus",
+                "tags": ["@tag"],
+                "score": DOMAIN_EXPERTISE["score"],
+                "per_level": DOMAIN_EXPERTISE["per_level"],
+            }
+        ],
+    },
+    {
+        "key": "domain-resistance",
+        "name": "Domain Resistance",
+        "category": "domain",
+        "tag_kind": "domain",
+        "acquisition": "xp",
+        "xp_cost": ABILITY_XP_COST["domain_expertise"],
+        "max_level": DOMAIN_EXPERTISE["max_level"],
+        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "description": "A bonus against someone else's opposed test carrying the domain.",
+        "effects": [
+            {
+                "kind": "tag_bonus",
+                "tags": ["@tag"],
+                "score": DOMAIN_EXPERTISE["score"],
+                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "match": "opposing",
+            }
+        ],
+    },
+    {
+        "key": "elemental-resistance",
+        "name": "Elemental Resistance",
+        "category": "element",
+        "tag_kind": "element",
+        "acquisition": "xp",
+        "xp_cost": ABILITY_XP_COST["domain_expertise"],
+        "max_level": DOMAIN_EXPERTISE["max_level"],
+        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "description": "A bonus against someone else's opposed test carrying the element.",
+        "effects": [
+            {
+                "kind": "tag_bonus",
+                "tags": ["@tag"],
+                "score": DOMAIN_EXPERTISE["score"],
+                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "match": "opposing",
             }
         ],
     },
@@ -281,16 +408,17 @@ CATALOG = [
         ],
     },
     {
-        "key": "domain-aversion",
-        "name": "Domain Aversion",
-        "category": "domain",
-        "tag_kind": "domain",
+        "key": "elemental-vulnerability",
+        "name": "Elemental Vulnerability",
+        "category": "element",
+        "tag_kind": "element",
         "is_flaw": True,
         "acquisition": "free",
         "description": (
-            "Receptivity turned inside out: help in the domain does you less good. No "
-            "effect yet; it takes hold once support abilities exist."
+            "A penalty when someone else's opposed test against you carries the element."
         ),
-        "effects": [],
+        "effects": [
+            {"kind": "tag_bonus", "tags": ["@tag"], "score": -FLAW_PENALTY, "match": "opposing"}
+        ],
     },
 ]

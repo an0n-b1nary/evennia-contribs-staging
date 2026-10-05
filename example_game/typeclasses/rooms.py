@@ -76,7 +76,9 @@ class Room(MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, Defaul
         manually (see its README §"Capture hooks").
         """
         super().at_object_receive(moved_obj, source_location, move_type=move_type, **kwargs)
-        if moved_obj.has_account:
+        from django.apps import apps
+
+        if moved_obj.has_account and apps.is_installed("evennia_scenes"):
             from evennia_scenes.capture import register_room_entry
 
             register_room_entry(self, moved_obj)

@@ -5,7 +5,8 @@ Idempotent content-only reset: purges everything this command previously
 created, then rebuilds a default world touching every installed contrib, so a
 fresh sandbox has populated data to test against immediately.
 
-Does NOT touch accounts/characters — see scripts/reset_to_golden.sh for a
+Does NOT touch player accounts/characters; tagged demo characters are rebuilt.
+See scripts/reset_to_golden.sh for a
 full wipe-to-default (accounts included).
 
 **No prose lives here.** Every player-visible string comes from
@@ -155,11 +156,19 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _purge(self, dry_run):
+        from django.apps import apps
         from evennia.utils.search import search_tag
 
         counts = {}
 
         objs = search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+        if apps.is_installed("evennia_rp_contest"):
+            from evennia_rp_contest.models import Challenge
+
+            challenges = Challenge.all_objects.filter(room_id__in=[obj.pk for obj in objs])
+            counts["rp_challenges"] = challenges.count()
+            if not dry_run:
+                challenges.delete()
         counts["evennia_objects"] = len(objs)
         if not dry_run:
             # Deleting a room cascades to its contents (exits, plain
@@ -233,12 +242,13 @@ class Command(BaseCommand):
         if not dry_run:
             planes.delete()  # cascades to RoomTile
 
-        from evennia_scenes.models import Scene
+        if apps.is_installed("evennia_scenes"):
+            from evennia_scenes.models import Scene
 
-        scenes = Scene.all_objects.filter(title__in=SCENE_TITLES)
-        counts["scenes"] = scenes.count()
-        if not dry_run:
-            scenes.delete()
+            scenes = Scene.all_objects.filter(title__in=SCENE_TITLES)
+            counts["scenes"] = scenes.count()
+            if not dry_run:
+                scenes.delete()
 
         return counts
 
@@ -270,6 +280,61 @@ class Command(BaseCommand):
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
+        counts.update(self._create_rp_playground(rooms, authors))
+        return counts
+
+    def _create_rp_playground(self, rooms, authors):
+        """Catalog, finalized demo builds, a stat-block dummy and two challenges."""
+        from django.apps import apps
+        from evennia.utils.create import create_object
+
+        room = rooms["proving"]
+        dummy = create_object(
+            "typeclasses.characters.Character",
+            key=content.RP_DUMMY_NAME,
+            location=room,
+            tags=[(SANDBOX_TAG, SANDBOX_TAG_CATEGORY)],
+            attributes=[
+                ("desc", content.RP_DUMMY_DESC),
+                ("rp_stat_block", content.RP_DUMMY_STAT_BLOCK, "sandbox"),
+            ],
+        )
+        dummy.db.sandbox_slug = "rp-dummy"
+        for author in authors:
+            author.location = room
+        counts = {"rp_stat_blocks": 1, "rp_builds": 0, "rp_challenges": 0}
+        if apps.is_installed("evennia_rp_chargen"):
+            from evennia_rp_chargen import abilities, services
+            from evennia_rp_chargen.catalog import seed_catalog
+            from evennia_rp_chargen.models import AbilityDefinition, TagDefinition
+
+            from evennia_rp_rules.ruleset import get_ruleset
+
+            seed_catalog(update=True)
+            # Retain old copies and references for players, but retire these
+            # entries from the public catalog if an earlier seed created them.
+            for row in TagDefinition.objects.filter(key="tinkering"):
+                row.archive()
+            for row in AbilityDefinition.objects.filter(key="domain-aversion"):
+                row.archive()
+            for author, spec in zip(authors, content.RP_SAMPLE_BUILDS, strict=True):
+                for stat in get_ruleset().stats:
+                    services.set_stat(author, stat, "B")
+                services.finalize(author)
+                for stat, count in spec["edge"].items():
+                    services.set_edge(author, stat, count)
+                for stat, count in spec["weakness"].items():
+                    services.set_weakness(author, stat, count)
+                for ability, tag in spec["abilities"]:
+                    abilities.grant(author, ability, tag)
+                counts["rp_builds"] += 1
+        if apps.is_installed("evennia_rp_contest"):
+            from evennia_rp_contest.parsing import parse_challenge
+            from evennia_rp_contest.services import open_challenge
+
+            for text in content.RP_CHALLENGES:
+                open_challenge(authors[0], parse_challenge(text))
+                counts["rp_challenges"] += 1
         return counts
 
     def _tag(self, obj):
@@ -801,6 +866,11 @@ class Command(BaseCommand):
         """
         from datetime import timedelta
 
+        from django.apps import apps
+
+        if not apps.is_installed("evennia_scenes"):
+            return {}
+
         from django.utils import timezone
         from evennia_scenes.models import LogEntry, Scene
 
@@ -874,17 +944,23 @@ class Command(BaseCommand):
             count += 1
 
         for entry_slug, scene_slug in content.LORE_SCENE_LINKS:
+            if scene_slug not in scenes:
+                continue
             LoreSceneLink.objects.create(entry=entries[entry_slug], scene_id=scenes[scene_slug].pk)
             count += 1
 
         thread = PlotThread.objects.get(name=content.PLOT_THREAD["name"])
         thread.activate()
         for scene_slug in content.PLOT_SCENE_SLUGS:
+            if scene_slug not in scenes:
+                continue
             ScenePlotLink.create_link(scene=scenes[scene_slug], thread=thread)
             count += 1
         # An event reaches the map only through a scene - there is no
         # CalendarEvent -> Room field anywhere in the calendar.
         for spec in content.CALENDAR_EVENTS:
+            if spec["scene_slug"] not in scenes:
+                continue
             SceneCalendarLink.objects.create(
                 event=events[spec["slug"]], scene_id=scenes[spec["scene_slug"]].pk
             )

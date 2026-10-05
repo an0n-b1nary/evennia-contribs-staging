@@ -68,6 +68,10 @@ INSTALLED_APPS += [
     "evennia_accessibility",
     "evennia_posing",
     "evennia_social",
+    # RP kernel first; both character builds and contests depend on it.
+    "evennia_rp_rules",
+    "evennia_rp_chargen",
+    "evennia_rp_contest",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -75,6 +79,57 @@ INSTALLED_APPS += [
     # discovered and its ready() runs.
     "world.sandbox",
 ]
+
+######################################################################
+# RP rules (evennia-rp-rules) — game values and optional sheet/stat-block seams
+######################################################################
+
+RP_RULES_RULESET = "world.ruleset"
+RP_RULES_SUBJECT_ADAPTER = "world.sandbox.glue.rp_subject_adapter"
+RP_RULES_VOCABULARY = "world.sandbox.glue.rp_vocabulary"
+RP_RULES_MODIFIER_PROVIDERS = []
+
+######################################################################
+# RP character builds (evennia-rp-chargen) — no typeclass mixin required
+######################################################################
+
+from world import ruleset as rp_values
+
+RP_CHARGEN_STAFF_LOCK = "cmd:perm(Builder)"
+RP_CHARGEN_ALLOCATION = {
+    "path": "evennia_rp_chargen.allocation.PointBuyAllocation",
+    "params": rp_values.POINT_BUY,
+}
+RP_CHARGEN_ALLOCATION_NOUN = "build points"
+RP_CHARGEN_PIP_BUDGET = rp_values.PIPS["edge_budget"]
+RP_CHARGEN_PIP_CAP = rp_values.PIPS["edge_cap"]
+RP_CHARGEN_WEAKNESS_CAP = rp_values.PIPS["weakness_cap"]
+RP_CHARGEN_PIP_NOUN = "Edge"
+RP_CHARGEN_LOADOUT_BUDGET = rp_values.MEMORY_BUDGET
+RP_CHARGEN_LOADOUT_NOUN = "loadout"
+RP_CHARGEN_LOADOUT_UNIT = "Memory"
+RP_CHARGEN_LOCK_SCOPES = ("pips", "loadout")
+RP_CHARGEN_LOCK_TTL = 3 * 60 * 60
+RP_CHARGEN_REQUIRE_APPROVAL = False
+RP_CHARGEN_RPTRACKER_APP_LABEL = "evennia_rptracker"
+RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG"
+RP_CHARGEN_STARTING_ALLOWANCE = rp_values.STARTING_ALLOWANCE
+RP_CHARGEN_UPGRADE_COST = rp_values.UPGRADE_COST
+# P6 will connect the earned-XP ledger. Until then purchases use the allowance.
+RP_CHARGEN_XP_LEDGER = None
+
+######################################################################
+# RP contests (evennia-rp-contest) — informal storytellers and chosen approaches
+######################################################################
+
+RP_CONTEST_STAFF_LOCK = "cmd:perm(Builder)"
+RP_CONTEST_CAN_SET_CHALLENGE = "cmd:all()"
+RP_CONTEST_DEFAULT_DIFFICULTY = rp_values.DEFAULT_DIFFICULTY
+RP_CONTEST_TAG_KIND = ["domain", "element"]
+RP_CONTEST_SHOW_RATINGS_TO_ROOM = False
+RP_CONTEST_CHALLENGE_IDLE_TTL = 3 * 60 * 60
+RP_CONTEST_SCENES_APP_LABEL = "evennia_scenes"
+RP_CONTEST_RPTRACKER_APP_LABEL = "evennia_rptracker"
 
 ######################################################################
 # Accessibility (evennia-accessibility)
@@ -270,6 +325,16 @@ XP_POST_BATCH_HOOKS = [
     "evennia_rptracker.integrations.xp.flip_session_flags",
 ]
 
+# Removing a partner also removes its scheduled XP imports. The remaining
+# collectors keep running rather than aborting the whole weekly batch.
+XP_COLLECTORS = [item for item in XP_COLLECTORS if item[1].split(".", 1)[0] in INSTALLED_APPS]
+XP_ANTIGAMING_SWEEPS = [
+    hook for hook in XP_ANTIGAMING_SWEEPS if hook.split(".", 1)[0] in INSTALLED_APPS
+]
+XP_POST_BATCH_HOOKS = [
+    hook for hook in XP_POST_BATCH_HOOKS if hook.split(".", 1)[0] in INSTALLED_APPS
+]
+
 ######################################################################
 # RPTracker configuration
 ######################################################################
@@ -292,7 +357,9 @@ RPTRACKER_POSE_SPAM_MAX_SECONDS = 600
 # is a plain PositiveBigIntegerField soft-ref resolved dynamically via
 # apps.get_model(label, "Scene"), so the code default is correct as-is.)
 
-RPTRACKER_SCENE_DISPLAY = "evennia_scenes.display.render_scene_ref"
+RPTRACKER_SCENE_DISPLAY = (
+    "evennia_scenes.display.render_scene_ref" if "evennia_scenes" in INSTALLED_APPS else None
+)
 RPTRACKER_XP_PROJECTION = None  # no shipped default; cosmetic-only, omitted
 RPTRACKER_FLAG_REVIEW_HOOK = "world.sandbox.glue.rptracker_flag_review_hook"
 
