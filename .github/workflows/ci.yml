@@ -110,3 +110,42 @@ jobs:
         run: evennia migrate --noinput < /dev/null
       - name: Fresh-process partner seams and host-configured maps suite
         run: python scripts/ci_run_partner_tests.py ci_game --calendar ${{ matrix.calendar }}
+
+  rp-contest-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-scenes
+            excludes: "--exclude evennia-scenes"
+            absent: "--absent evennia_scenes"
+          - profile: no-tracker
+            excludes: "--exclude evennia-rptracker"
+            absent: "--absent evennia_rptracker"
+          - profile: no-chargen
+            excludes: "--exclude evennia-rp-chargen"
+            absent: "--absent evennia_rp_chargen"
+          - profile: kernel-only
+            excludes: "--exclude evennia-scenes --exclude evennia-rptracker --exclude evennia-rp-chargen"
+            absent: "--absent evennia_scenes --absent evennia_rptracker --absent evennia_rp_chargen"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize disposable game
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected partners
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: Contest seams with verified partner absence
+        run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
