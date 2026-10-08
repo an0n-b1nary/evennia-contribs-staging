@@ -180,7 +180,9 @@ unknown privacy tiers fail closed. Public scenes can be spectated anonymously;
 posing still requires the existing in-game permissions. No separate publish
 step is needed. The authenticated REST API defaults its list to closed scenes,
 accepts `?status=open` / `?status=active`, and serves live detail/log routes
-without a status parameter. Its existing public-only privacy policy is unchanged.
+without a status parameter. `?created_after=` and `?created_before=` narrow the
+list by creation time: inclusive, ISO 8601 date or datetime (a bare date means
+midnight), combinable with `?status=`; an unparseable value is a 400. Its existing public-only privacy policy is unchanged.
 
 If you add your own web surface (a map overlay, a search index, a digest
 email), decide visibility with the model's own rule rather than rewriting the

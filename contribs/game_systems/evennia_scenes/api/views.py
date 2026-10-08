@@ -7,12 +7,18 @@ Authentication: SessionAuthentication (explicit — does not rely on global
 REST_FRAMEWORK defaults). Requires IsAuthenticated.
 
 SceneViewSet is read-only. Scenes can be filtered by status with
-?status=<value>. Log entries for a scene are accessible at
-/api/v1/scenes/<pk>/log/.
+?status=<value> and by creation time with ?created_after= / ?created_before=
+(ISO 8601 date or datetime, inclusive). Log entries for a scene are accessible
+at /api/v1/scenes/<pk>/log/.
 """
 
+from datetime import datetime, time
+
+from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -37,6 +43,7 @@ class SceneViewSet(ReadOnlyModelViewSet):
         /api/v1/scenes/<pk>/log/
         /api/v1/scenes/?status=closed
         /api/v1/scenes/?status=active
+        /api/v1/scenes/?created_after=2026-05-01&created_before=2026-05-31T23:59:59
     """
 
     serializer_class = SceneSerializer
@@ -54,7 +61,37 @@ class SceneViewSet(ReadOnlyModelViewSet):
             qs = qs.filter(status=status)
         elif getattr(self, "action", "list") == "list":
             qs = qs.filter(status=Scene.Status.CLOSED)
+        created_after = self._time_bound("created_after")
+        if created_after is not None:
+            qs = qs.filter(created_at__gte=created_after)
+        created_before = self._time_bound("created_before")
+        if created_before is not None:
+            qs = qs.filter(created_at__lte=created_before)
         return qs
+
+    def _time_bound(self, name):
+        """Parse an inclusive ``created_at`` bound from the query string.
+
+        Accepts an ISO 8601 datetime or a bare date (midnight, as a datetime
+        filter reads one). A naive value is taken in the server's timezone.
+        Anything unparseable is a 400 rather than a silently ignored filter,
+        which would return a wider result than the caller asked for.
+        """
+        raw = self.request.query_params.get(name)
+        if not raw:
+            return None
+        try:
+            value = parse_datetime(raw)
+            if value is None:
+                day = parse_date(raw)
+                value = datetime.combine(day, time.min) if day else None
+        except ValueError:
+            value = None
+        if value is None:
+            raise ValidationError({name: "Enter an ISO 8601 date or datetime."})
+        if timezone.is_naive(value):
+            value = timezone.make_aware(value)
+        return value
 
     @action(detail=True, url_path="log", url_name="log")
     def log(self, request, pk=None):

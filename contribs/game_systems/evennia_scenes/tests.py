@@ -1563,3 +1563,75 @@ class TestLiveSceneReading(EvenniaTest):
         self.scene.save()
         self.assertEqual(provide(None, [self.room1.pk], False)["active_scenes"], {})
         self.assertTrue(provide(None, [self.room1.pk], True)["active_scenes"])
+
+
+class TestSceneApiDateFilters(EvenniaTest):
+    """?created_after / ?created_before on the scenes API (inclusive bounds)."""
+
+    def setUp(self):
+        super().setUp()
+        from datetime import datetime
+
+        self.scenes = {}
+        for title, day in (("April", 20), ("May", 10), ("June", 5)):
+            scene = _open_scene(self.room1, self.char1, title=title)
+            scene.close()
+            month = {"April": 4, "May": 5, "June": 6}[title]
+            stamp = timezone.make_aware(datetime(2026, month, day, 12, 0))
+            Scene.objects.filter(pk=scene.pk).update(created_at=stamp)
+            self.scenes[title] = scene
+
+    def titles(self, query):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from evennia_scenes.api.views import SceneViewSet
+
+        request = APIRequestFactory().get("/api/v1/scenes/" + query)
+        force_authenticate(request, user=self.account)
+        response = SceneViewSet.as_view({"get": "list"})(request)
+        if response.status_code != 200:
+            return response
+        return sorted(row["title"] for row in response.data["results"])
+
+    def test_no_bounds_returns_the_whole_archive(self):
+        self.assertEqual(self.titles(""), ["April", "June", "May"])
+
+    def test_lower_bound_is_inclusive(self):
+        self.assertEqual(self.titles("?created_after=2026-05-10T12:00:00"), ["June", "May"])
+
+    def test_upper_bound_is_inclusive(self):
+        self.assertEqual(self.titles("?created_before=2026-05-10T12:00:00"), ["April", "May"])
+
+    def test_both_bounds_make_a_window(self):
+        self.assertEqual(
+            self.titles("?created_after=2026-05-01&created_before=2026-05-31"), ["May"]
+        )
+
+    def test_a_bare_date_means_midnight(self):
+        # June's scene is at noon on the 5th, so "before the 5th" excludes it.
+        self.assertEqual(self.titles("?created_before=2026-06-05"), ["April", "May"])
+
+    def test_an_offset_is_honoured(self):
+        # 12:00 UTC on May 10th is 13:00 at +01:00, so a 13:30+01:00 floor excludes May.
+        self.assertEqual(self.titles("?created_after=2026-05-10T13:30:00%2B01:00"), ["June"])
+
+    def test_bounds_combine_with_the_status_filter(self):
+        live = _open_scene(self.room2, self.char2, title="Live May")
+        live.privacy = Scene.Privacy.PUBLIC
+        live.save()
+        from datetime import datetime
+
+        Scene.objects.filter(pk=live.pk).update(
+            created_at=timezone.make_aware(datetime(2026, 5, 20, 12, 0))
+        )
+        self.assertEqual(
+            self.titles("?status=open&created_after=2026-05-01&created_before=2026-05-31"),
+            ["Live May"],
+        )
+
+    def test_unparseable_bounds_are_a_400_not_a_wider_result(self):
+        for query in ("?created_after=last-week", "?created_before=2026-13-01"):
+            with self.subTest(query=query):
+                response = self.titles(query)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(query[1:].split("=")[0], response.data)

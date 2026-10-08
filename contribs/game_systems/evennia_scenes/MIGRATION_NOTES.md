@@ -94,3 +94,20 @@ Evennia ships no room-receive signal (`at_object_receive` is a typeclass hook).
 `ScenesConfig.ready()` therefore does **not** attempt to auto-wire this hook.
 Your game must call `register_room_entry(room, character)` manually from
 `Room.at_object_receive` (or equivalent). See `capture.py` module docstring.
+
+### API date filters (0.6.0)
+
+The source REST API used a `django_filters.FilterSet` (`SceneFilter`) with
+`created_after`, `created_before` and `privacy`. The contrib's viewset filters
+by hand (`?status=`) and does not depend on `django-filter`, so the two date
+bounds are parsed in `SceneViewSet._time_bound` instead, keeping the
+dependency list unchanged. Behavioural notes:
+
+- Bounds are inclusive (`gte` / `lte`), as `DateTimeFilter` was.
+- A bare date reads as midnight, as `DateTimeFilter` read one.
+- An unparseable value is a 400 naming the parameter (`DateTimeFilter` also
+  rejected it); a silently ignored bound would return a wider result than asked.
+- `privacy` is not ported: the API only ever exposes `WEB_READABLE_PRIVACY`
+  tiers, so the filter could only narrow within those two.
+- The source's `LogEntryFilter` (`scene`, `log_type`) is already covered: the
+  log route is per-scene and filters `?log_type=` by hand.

@@ -1,5 +1,14 @@
 # Changelog — evennia-scenes
 
+## [0.6.0] - 2026-10-07
+
+- **Added:** `?created_after=` and `?created_before=` on `/api/v1/scenes/`.
+  Inclusive bounds on `created_at`; each takes an ISO 8601 datetime (with or
+  without an offset; naive values are read in the server timezone) or a bare
+  date, meaning midnight. They combine with `?status=` and with the archive
+  default. An unparseable bound is a 400 naming the parameter, never a silently
+  dropped filter. Ported from the source project's REST API filters.
+
 ## [0.5.2] - 2026-10-02
 
 - **Fixed:** command helpers import the public accessibility export so the installed
