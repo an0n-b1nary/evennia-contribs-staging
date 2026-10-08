@@ -25,6 +25,7 @@ from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, C
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
 
 from commands.sandbox import CmdSandbox
+from evennia_accessibility.commands import CmdScreenreader
 from evennia_maps.commands import CmdMap
 from evennia_posing.commands import (
     CmdEmit,
@@ -193,6 +194,12 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # Boards support account-level (pre-puppet) reading and subscription,
         # per evennia_boards' README — expose +bb without a puppet too.
         self.add(CmdBoard)
+
+        # Accessibility (evennia_accessibility). Account-level so the toggle is
+        # reachable before puppeting — a screen-reader user should not have to
+        # read a character-select table to find it. The account cmdset merges
+        # into the puppet's, so it works in character too.
+        self.add(CmdScreenreader)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

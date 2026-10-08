@@ -208,9 +208,10 @@ The runner verifies the package is unimportable, copies the sandbox without
 databases or secrets, and requires a positive test count. Without chargen,
 stat blocks and ruleset tags still work; without contest, sheet commands do.
 
-`evennia_accessibility` and `evennia_links` get no room: the first has no
-commands at all (it is web/MXP-side, and shows up in the account options and
-the site), the second is a pure seam library.
+`evennia_accessibility` and `evennia_links` get no room: the first has one
+command, `+screenreader`, mounted on the *account* cmdset so it works anywhere
+(including before puppeting), and is otherwise web/MXP-side; the second is a
+pure seam library.
 
 **The IC world** is reached through the single direction-less `grid` exit from
 the hall: seventeen rooms on three planes, mapped, region-membered, and

@@ -127,6 +127,26 @@ class TestScreenreaderCommandSeam(EvenniaTest):
                     self.assertIs(consumer.uses_screenreader, uses_screenreader)
                     self.assertEqual(consumer.uses_screenreader(self.char1), enabled)
 
+    def test_account_cmdset_toggle_drives_every_consumer(self):
+        """+screenreader, as the game mounts it, writes what the consumers read.
+
+        Runs against the game's own OPTIONS_ACCOUNT_DEFAULT registration - the
+        contrib suite has to fake that with override_settings.
+        """
+        from commands.default_cmdsets import AccountCmdSet
+
+        command = next(c for c in AccountCmdSet().commands if c.key == "+screenreader")
+        command.caller = self.char1
+        command.args = ""
+        for switch, expected in (("on", True), ("off", False)):
+            command.switches = [switch]
+            with mock.patch.object(self.char1, "msg"):
+                command.func()
+            for name in ("boards", "calendar", "plots", "scenes"):
+                with self.subTest(switch=switch, contrib=name):
+                    consumer = import_module(f"evennia_{name}.commands")
+                    self.assertEqual(consumer.uses_screenreader(self.char1), expected)
+
     def test_enabled_preference_selects_plain_command_output(self):
         from datetime import timedelta
 
