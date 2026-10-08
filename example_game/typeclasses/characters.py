@@ -28,6 +28,12 @@ processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
   optional RP partner here (`ci_run_rp_sandbox_tests.py --absent evennia_xp`)
   and a mixin would have to be imported unconditionally.
 
+- `get_display_desc` / `filter_visible` overrides — call evennia_rp_equipment's
+  display helpers (worn lines in the description, worn items out of "You see")
+  rather than mixing in `EquipmentCharacterMixin`, for the same reason as the
+  XP summary: equipment requires chargen, an optional RP partner here, so it is
+  absent whenever chargen is (`ci_run_rp_sandbox_tests.py --absent`).
+
 - `at_post_unpuppet` override — kept here because it's game glue, not
   contrib behavior: `super()` (via `PosingCharacterMixin`) clears the pose
   timer; this override additionally ends any active RPTracker session, per
@@ -66,6 +72,28 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
             from evennia_xp.summary import notify_xp_summary
 
             notify_xp_summary(self)
+
+    def get_display_desc(self, looker, **kwargs):
+        """The description, followed by worn lines when evennia_rp_equipment is installed."""
+        from django.apps import apps
+
+        desc = super().get_display_desc(looker, **kwargs)
+        if apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_equipment.display import with_worn
+
+            desc = with_worn(self, looker, desc)
+        return desc
+
+    def filter_visible(self, obj_list, looker, **kwargs):
+        """Leave worn items out of "You see"; their worn lines describe them."""
+        from django.apps import apps
+
+        visible = super().filter_visible(obj_list, looker, **kwargs)
+        if apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_equipment.display import hide_worn
+
+            visible = hide_worn(visible)
+        return visible
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs):
         """Clear the pose timer (PosingCharacterMixin, via super) and end

@@ -71,6 +71,9 @@ INSTALLED_APPS += [
     # RP kernel first; both character builds and contests depend on it.
     "evennia_rp_rules",
     "evennia_rp_chargen",
+    # Equipment requires chargen (worn gear's requirements and the change guard),
+    # so it is absent whenever chargen is.
+    "evennia_rp_equipment",
     "evennia_rp_contest",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
@@ -121,6 +124,16 @@ RP_CHARGEN_STARTING_ALLOWANCE = rp_values.STARTING_ALLOWANCE
 RP_CHARGEN_UPGRADE_COST = rp_values.UPGRADE_COST
 # Purchases use the starting allowance first, then earned XP when installed.
 RP_CHARGEN_XP_LEDGER = "evennia_rp_chargen.integrations.xp.EvenniaXPLedger"
+
+######################################################################
+# RP equipment (evennia-rp-equipment) — display hooks in typeclasses/characters.py
+######################################################################
+
+# Plain gear anyone can make; requirements commit a build and grant nothing.
+RP_EQUIPMENT_TYPECLASS = "evennia_rp_equipment.typeclasses.Equipment"
+RP_EQUIPMENT_SLOTS = ("head", "body", "hands", "feet", "weapon", "accessory")
+RP_EQUIPMENT_ITEM_CAP = 20
+RP_EQUIPMENT_STAFF_LOCK = "cmd:perm(Builder)"
 
 ######################################################################
 # RP contests (evennia-rp-contest) — informal storytellers and chosen approaches

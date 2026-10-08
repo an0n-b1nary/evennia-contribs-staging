@@ -63,12 +63,12 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - [`evennia-rp-chargen`](contribs/rpg/evennia_rp_chargen/README.md) (rpg) — preview 0.3.0; sheets, allocation, pips, catalog, loadouts, allowance/XP spending, build locks and change guards; depends on rules and links
 - [`evennia-rp-contest`](contribs/rpg/evennia_rp_contest/README.md) (rpg) — preview 0.1.0; playable `+test` checks and player-led room challenges with private audits; depends on rules and links, with optional chargen, scenes and session integration
 - `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
-- `evennia-rp-equipment` (rpg) — equipment slots with stat modifiers
+- [`evennia-rp-equipment`](contribs/rpg/evennia_rp_equipment/README.md) (rpg) — preview 0.1.0; wearable gear anyone can make, with worn lines and requirements on the wearer's build that grant nothing; worn gear holds the pips and abilities it needs through chargen's change guard; depends on rules and chargen
 - `evennia-rp-party` (rpg) — party coordination for group combat
 - `evennia-rp-crafting` (game_systems) — IC crafting economy: resources, workshops, crafted items with cosmetic features, player-run storefronts
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
 
-The three shipped RP packages are a **contrib-native pilot**: their generic code
+The first three shipped RP packages (rules, chargen, contest) are a **contrib-native pilot**: their generic code
 was authored here, wired into [`example_game`](example_game/README.md), and then
 consumed by the source project through pinned dependencies and thin adapters.
 Shared behavior and reusable integrations across all contribs are developed

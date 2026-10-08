@@ -20,6 +20,7 @@ PARTNERS = (
     "evennia_rptracker",
     "evennia_xp",
     "evennia_rp_chargen",
+    "evennia_rp_equipment",
     "evennia_rp_contest",
 )
 

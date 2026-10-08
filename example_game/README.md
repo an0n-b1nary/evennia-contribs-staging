@@ -16,14 +16,14 @@ part of this repo).
 
 ## What's wired up
 
-All 17 current contribs, in dependency order — `evennia_links` first, then
+All 18 current contribs, in dependency order — `evennia_links` first, then
 the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
 `evennia_maps`), then the standalone apps (`evennia_calendar`,
 `evennia_jobs`, `evennia_xp`, `evennia_accessibility`), then the pose/social
 layer (`evennia_posing` before `evennia_social` — social hard-depends on
-posing), and the RP cluster (`evennia_rp_rules` before `evennia_rp_chargen`
-and `evennia_rp_contest`). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
+posing), and the RP cluster (`evennia_rp_rules` before `evennia_rp_chargen`,
+`evennia_rp_equipment` and `evennia_rp_contest`; equipment requires chargen). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
 every XP/rptracker/lore/boards/plots/regions/maps/posing/social setting.
 
 **Settings hooks point at the contribs' own shipped integration functions**
@@ -148,7 +148,7 @@ carries one command family and one brass plaque naming its commands:
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
 | Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
-| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen` |
+| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-equipment`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen`, `+gear`, `+wear`, `+remove`, `+worn` |
 
 ### RP checks in the Proving Grounds
 
@@ -200,6 +200,33 @@ playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10:Playtest`
 `+spend` shows both balances. Staff can revoke with an exact refund using
 `+chargen/revoke/refund <character>/<ability>:<tag>`.
 
+**Practice gear.** Equipment grants nothing; it asks a build to commit. The
+Proving Grounds floor holds a travelling cloak that asks for nothing and a
+heavy maul that asks for Strength `++`. The Storyteller wears duelist's gloves
+(Agility `++`) and the Visitor a blade charm (Combat Focus:Blades equipped),
+so `look Storyteller` shows a *Wearing* section and the gloves leave the
+"You see" list. Try `+gear/info maul`, then make your own:
+
+```text
++gear/make Cursed Axe=weapon
++gear/line axe=a cursed axe of black iron
++gear/require axe=Agility +2
++wear axe
++pips/set Agility=1
+```
+
+The last line is refused: *Agility ++ is held by your Cursed Axe. Take that
+off first.* Staff get the same refusal; there is no override. `+remove axe`
+frees the pips. Wearing and removing freeze with the build lock, and worn gear
+can't be dropped or given. An ability you don't own yet only marks the gear
+"not fully attuned". Only an item's maker can change it, until someone else
+has held it. `at_server_start()` logs any worn gear whose requirements no
+longer resolve; `+gear/audit` lists the same for staff.
+
+The Character typeclass calls the contrib's display helpers rather than mixing
+in `EquipmentCharacterMixin`, because equipment requires chargen and is absent
+whenever chargen is.
+
 Every name above belongs to the game, not the contribs. Stats, domains, styles
 and abilities are named in `world/ruleset.py`. The sheet's nouns (pips,
 weakness, loadout, points) are set in the RP block of `server/conf/settings.py`,
@@ -208,13 +235,14 @@ and their contrib defaults are listed there. To rename a command such as
 [rp-chargen README](../contribs/rpg/evennia_rp_chargen/README.md#renaming-things-for-your-game).
 
 The CI `rp-sandbox` job runs the full sandbox gate with all partners, then
-fresh environments with scenes, tracker, XP, chargen or contest physically
-absent. For a local drill, create a fresh venv, install Evennia 6.0.0, and use
+fresh environments with scenes, tracker, XP, chargen, equipment or contest
+physically absent (equipment leaves with chargen, which it requires). For a local drill, create a fresh venv, install Evennia 6.0.0, and use
 `ci_install_contribs.py <install-game> --exclude <distribution>` before
 `ci_run_rp_sandbox_tests.py <new-game-dir> --absent <app_label>`.
 The runner verifies the package is unimportable, copies the sandbox without
 databases or secrets, and requires a positive test count. Without chargen,
-stat blocks and ruleset tags still work; without contest, sheet commands do.
+stat blocks and ruleset tags still work; without contest, sheet commands do;
+without equipment, no gear is seeded and `look` shows no *Wearing* section.
 
 `evennia_accessibility` and `evennia_links` get no room: the first has one
 command, `+screenreader`, mounted on the *account* cmdset so it works anywhere
@@ -408,6 +436,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_social \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
+         contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -569,6 +598,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_social \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
+         contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done

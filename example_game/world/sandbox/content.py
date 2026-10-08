@@ -205,7 +205,10 @@ OOC_ROOMS = (
             "a challenge with +test/set. Choose an approach; suggestions are optional. "
             "IC poses and tests lock pips and loadout. +unlock announces a change. "
             "The two demonstration characters have finalized sheets; Builder mode "
-            "lets you inspect them with +sheet <name> or puppet the stat-block dummy."
+            "lets you inspect them with +sheet <name> or puppet the stat-block dummy. "
+            "The practice gear here grants nothing; +gear/info shows what it asks of "
+            "your build, and while you wear it those pips and abilities can't move. "
+            "Make your own with +gear/make."
         ),
         commands=(
             "+sheet",
@@ -225,6 +228,11 @@ OOC_ROOMS = (
             "+test/history",
             "+test/review",
             "+chargen",
+            "+gear",
+            "+gear/make",
+            "+wear",
+            "+remove",
+            "+worn",
         ),
     ),
     OocRoom(
@@ -695,6 +703,45 @@ RP_CHALLENGES = (
     "A=Presence/Performance~Hold the audience's attention",
     "B~Cross the chasm",
 )
+# Practice gear in the Proving Grounds (evennia-rp-equipment). `worn_by` is an
+# index into the demonstration characters (SCENE_SPEAKERS order) or None for the
+# floor; each worn item's requirements fit that character's RP_SAMPLE_BUILDS row.
+RP_GEAR_MAKER = "the Proving Grounds quartermaster"
+RP_GEAR = (
+    {
+        "key": "travelling cloak",
+        "slot": "body",
+        "line": "a weatherworn travelling cloak",
+        "desc": "[Placeholder] Plain oiled wool. It asks nothing of whoever wears it.",
+        "requires": (),
+        "worn_by": None,
+    },
+    {
+        "key": "heavy maul",
+        "slot": "weapon",
+        "line": "a heavy two-handed maul slung across the back",
+        "desc": "[Placeholder] Iron-shod and awkward. Wearing it commits two + pips to Strength.",
+        "requires": ("Strength +2",),
+        "worn_by": None,
+    },
+    {
+        "key": "duelist's gloves",
+        "slot": "hands",
+        "line": "supple duelist's gloves",
+        "desc": "[Placeholder] Thin kid leather. Wearing them commits two + pips to Agility.",
+        "requires": ("Agility +2",),
+        "worn_by": 0,
+    },
+    {
+        "key": "blade charm",
+        "slot": "accessory",
+        "line": "a blade-shaped charm on a cord",
+        "desc": "[Placeholder] Wearing it keeps Combat Focus: Blades in the loadout.",
+        "requires": ("ability Combat Focus: Blades",),
+        "worn_by": 1,
+    },
+)
+
 RP_DUMMY_NAME = "Stat-block Dummy"
 RP_DUMMY_DESC = "[Placeholder] A demonstration character with a stat block and no chargen sheet."
 RP_DUMMY_STAT_BLOCK = {
