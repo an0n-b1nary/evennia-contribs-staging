@@ -70,6 +70,10 @@ def ability_lines(character, build=None) -> list[str]:
     used = abilities.loadout_used(character)
     if budget is not None:
         lines.append(f" {noun}: {used} of {budget} {unit} used.")
+        if used > budget:
+            lines.append(
+                " |yOver budget: existing abilities stay equipped. Unequip before adding more.|n"
+            )
     if build is not None and build.allowance_total:
         allowance = conf.get("RP_CHARGEN_ALLOWANCE_NOUN").capitalize()
         lines.append(

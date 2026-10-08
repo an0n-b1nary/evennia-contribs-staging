@@ -520,12 +520,17 @@ class CmdAbilities(_ChargenCommand):
         if not text:
             self.msg("Usage: +abilities/info <ability>")
             return
-        ability_text, _ = split_ability_text(text)
+        ability_text, tag_text = split_ability_text(text)
         ability = self.run(abilities._ability, ability_text)
         if ability is None:
             return
+        tag = None
+        if tag_text:
+            tag = self.run(abilities._tag, ability, tag_text)
+            if tag is None:
+                return
         unit = conf.get("RP_CHARGEN_LOADOUT_UNIT")
-        lines = [f"|w{ability.name}|n" + (" (flaw)" if ability.is_flaw else "")]
+        lines = [f"|w{ability.display_name(tag)}|n" + (" (flaw)" if ability.is_flaw else "")]
         if ability.description:
             lines.append(ability.description)
         if ability.is_template:
@@ -536,7 +541,9 @@ class CmdAbilities(_ChargenCommand):
                 if ability.acquisition == "xp"
                 else "staff grant only"
             )
-            lines.append(f"Cost: {cost}. Loadout: {ability.budget_cost} {unit}.")
+            lines.append(f"Cost: {cost}. Loadout: {ability.budget_cost_for(tag)} {unit}.")
+            if ability.budget_cost_overrides and tag is None:
+                lines.append("Loadout cost varies by tag; use +abilities/info <ability>: <tag>.")
             if ability.max_level > 1 and ability.acquisition == "xp":
                 steps = ", ".join(
                     f"{level + 1}: {abilities.format_amount(conf.upgrade_cost(level))} XP"

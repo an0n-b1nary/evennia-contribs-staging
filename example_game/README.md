@@ -194,7 +194,10 @@ your change; the next IC pose locks again. An OOC message does not lock the
 build. Tracker session end or three idle hours releases it. Abilities use
 a 100 Memory loadout; Expertise and Focus cost 10 each, flaws cost none.
 The starting allowance is 10, acquisitions cost 3, and upgrades cost 2, 4,
-8, then 16. P5 spends only that allowance; the earned-XP ledger is P6.
+8, then 16. Purchases use the allowance first, then earned XP. To top up for
+playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10:Playtest`.
+`+spend` shows both balances. Staff can revoke with an exact refund using
+`+chargen/revoke/refund <character>/<ability>:<tag>`.
 
 The CI `rp-sandbox` job runs the full sandbox gate with all partners, then
 fresh environments with scenes, tracker, XP, chargen or contest physically

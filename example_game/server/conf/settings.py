@@ -115,8 +115,8 @@ RP_CHARGEN_RPTRACKER_APP_LABEL = "evennia_rptracker"
 RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG"
 RP_CHARGEN_STARTING_ALLOWANCE = rp_values.STARTING_ALLOWANCE
 RP_CHARGEN_UPGRADE_COST = rp_values.UPGRADE_COST
-# P6 will connect the earned-XP ledger. Until then purchases use the allowance.
-RP_CHARGEN_XP_LEDGER = None
+# Purchases use the starting allowance first, then earned XP when installed.
+RP_CHARGEN_XP_LEDGER = "evennia_rp_chargen.integrations.xp.EvenniaXPLedger"
 
 ######################################################################
 # RP contests (evennia-rp-contest) — informal storytellers and chosen approaches

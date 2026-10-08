@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import F
+from django.utils import timezone
 
 from evennia_rp_chargen import conf, locks
 from evennia_rp_chargen.catalog import find_ability
@@ -129,10 +130,7 @@ def find_owned(character, ability_text: str, tag_text: str | None = None) -> Cha
 
 
 def loadout_used(character) -> int:
-    used = CharacterAbility.objects.filter(character_id=character.id, equipped=True).aggregate(
-        total=Sum("ability__budget_cost")
-    )["total"]
-    return used or 0
+    return sum(copy.budget_cost for copy in owned(character) if copy.equipped)
 
 
 def loadout_budget() -> int | None:
@@ -158,7 +156,7 @@ def _budget_error(character, copy: CharacterAbility) -> ChargenError:
     budget = loadout_budget()
     used = loadout_used(character)
     return ChargenError(
-        f"{copy.display_name} needs {copy.ability.budget_cost} {unit}; you have "
+        f"{copy.display_name} needs {copy.budget_cost} {unit}; you have "
         f"{budget - used} of {budget} free. Unequip something first."
     )
 
@@ -168,7 +166,7 @@ def equip(character, ability_text: str, tag_text: str | None = None) -> Characte
     if copy.equipped:
         raise ChargenError(f"{copy.display_name} is already equipped.")
     _check_unlocked(character)
-    if not _fits(character, copy.ability.budget_cost):
+    if not _fits(character, copy.budget_cost):
         raise _budget_error(character, copy)
     copy.equipped = True
     copy.save(update_fields=["equipped", "updated_at"])
@@ -212,7 +210,8 @@ def _pay(character, build: CharacterBuild, amount: Decimal, tx: AbilityTransacti
             get_ledger().spend(character, from_xp, ref_key=ref, reason=tx.ability_name)
         except LedgerUnavailable:
             raise ChargenError(
-                f"That costs {format_amount(amount)}, and you have {format_amount(left)} {noun} left."
+                f"That costs {format_amount(amount)}, and you have {format_amount(left)} {noun} left. "
+                "XP spending isn't available in this game."
             ) from None
         except InsufficientXP:
             raise ChargenError(
@@ -272,14 +271,14 @@ def acquire(character, ability_text: str, tag_text: str | None = None, *, by=Non
         tx = _record(character, ability, tag, Kind.ACQUIRE, level_to=1, by=by)
         payment = _pay(character, build, ability.xp_cost, tx)
         copy = CharacterAbility.objects.create(character_id=character.id, ability=ability, tag=tag)
-    _auto_equip(character, copy)
+        _auto_equip(character, copy)
     return copy, payment
 
 
 def _auto_equip(character, copy: CharacterAbility) -> None:
     build = ensure_build(character)
     locked = not build.is_draft and locks.scope_locked(character, conf.LOADOUT)
-    if not locked and _fits(character, copy.ability.budget_cost):
+    if not locked and _fits(character, copy.budget_cost):
         copy.equipped = True
         copy.save(update_fields=["equipped", "updated_at"])
 
@@ -314,8 +313,13 @@ def upgrade(character, ability_text: str, tag_text: str | None = None, *, by=Non
             by=by,
         )
         payment = _pay(character, build, cost, tx)
-        copy.level += 1
-        copy.save(update_fields=["level", "updated_at"])
+        # Do not charge twice for the same level when two commands read it together.
+        updated = CharacterAbility.objects.filter(pk=copy.pk, level=copy.level).update(
+            level=F("level") + 1, updated_at=timezone.now()
+        )
+        if updated != 1:
+            raise ChargenError("Your ability changed while you were upgrading it; try again.")
+        copy.refresh_from_db()
     return copy, payment
 
 

@@ -291,7 +291,7 @@ MEMORY_BUDGET = 100
 DEFAULT_DIFFICULTY = "C"
 DIFFICULTY_ALLOWS_PIPS = True
 
-# P3/P6: XP. PLACEHOLDERS until the ability catalog is written; expect tuning.
+# P6: XP costs and allowance; expect playtest tuning.
 # The starting allowance is spent before earned XP and never counts toward XP
 # totals. Upgrade n (1-based) costs `base * factor ** (n - 1)`.
 STARTING_ALLOWANCE = 10

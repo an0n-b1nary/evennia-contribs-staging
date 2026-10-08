@@ -103,6 +103,26 @@ exactly what was paid. Upgrade *n* costs `base × factor^(n−1)`
 (`RP_CHARGEN_UPGRADE_COST`). The allowance is not XP: it never counts toward
 XP totals.
 
+To use earned XP, install `evennia-rp-chargen[xp]`, add `evennia_xp` to
+`INSTALLED_APPS`, migrate, and set:
+
+```python
+RP_CHARGEN_XP_LEDGER = "evennia_rp_chargen.integrations.xp.EvenniaXPLedger"
+```
+
+This adapter checks the app registry before importing XP. Without the partner,
+allowance purchases work and purchases needing earned XP report its absence.
+With it, allowance, XP, ability copies and audit rows share one database
+transaction; a failed purchase rolls them all back.
+
+**Per-tag loadout costs.** A template can set `budget_cost_overrides`, such as
+`{"ritual": 15, "performance": 12}`, falling back to `budget_cost` for other
+tags. Use tag keys of the template's kind and nonnegative integer costs.
+`+abilities/info Domain Expertise: Ritual` shows the resolved cost. Costs
+are read from the catalog each time, so rebalancing reaches existing copies.
+An over-budget loadout stays equipped and is flagged on the sheet; new equips
+are blocked until enough abilities are unequipped. Flaws always cost zero.
+
 **Tags.** The ruleset's tags seed the vocabulary. `TagDefinition` rows add
 to it, rename tags, or archive them (`+chargen/tag`, or the admin). Set
 `RP_RULES_VOCABULARY = "evennia_rp_chargen.vocabulary.DBVocabulary"` so
@@ -250,6 +270,6 @@ doesn't fit the ruleset) and `E002` (a pip setting isn't a whole number).
 
 ## Roadmap
 
-XP spending through the `RP_CHARGEN_XP_LEDGER` seam comes next, with an
-`evennia-xp` ledger. Combat will add its abilities as catalog entries using
+XP spending is available through the optional `evennia-xp>=0.2` ledger.
+Combat will add its abilities as catalog entries using
 new effect kinds, rather than defining an ability model of its own.

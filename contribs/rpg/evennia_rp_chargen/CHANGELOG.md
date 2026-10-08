@@ -7,7 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-10-07
+
+- Added the optional `EvenniaXPLedger` adapter (`[xp]` extra): allowance
+  pays first, then earned XP, with full database rollback on failure.
+- Upgrade writes reject stale levels and roll back their debits.
+- Added live `budget_cost_overrides` per template tag (migration `0003`),
+  resolved by equip, auto-equip, loadout totals and `+abilities/info`.
+  Rebalances keep existing loadouts equipped, flag over-budget sheets and
+  block new equips until the budget permits them. Flaws cost zero.
+
+## [0.1.0] - 2026-10-02
 
 ### Added
 

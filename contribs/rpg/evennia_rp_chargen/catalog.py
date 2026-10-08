@@ -42,6 +42,7 @@ SEED_FIELDS = {
     "xp_cost",
     "max_level",
     "budget_cost",
+    "budget_cost_overrides",
     "tag_kind",
     "effects",
 }
@@ -73,6 +74,22 @@ def definition_problems(ability: AbilityDefinition) -> list[str]:
     if ability.is_flaw and ability.acquisition == AbilityDefinition.Acquisition.XP:
         problems.append("flaws aren't bought with XP; use 'free' or 'staff'")
     vocabulary = DBVocabulary()
+    overrides = ability.budget_cost_overrides
+    if not isinstance(overrides, dict):
+        problems.append("budget_cost_overrides must be a dict of tag keys and nonnegative integers")
+    elif overrides:
+        if not ability.is_template:
+            problems.append("budget_cost_overrides requires a template (tag_kind)")
+        known = {tag.key for tag in vocabulary.tags(ability.tag_kind)}
+        # Existing copies keep working after a tag is archived.
+        known.update(
+            TagDefinition.all_objects.filter(kind=ability.tag_kind).values_list("key", flat=True)
+        )
+        for key, cost in overrides.items():
+            if key not in known:
+                problems.append(f"budget_cost_overrides: unknown {ability.tag_kind} tag {key!r}")
+            if type(cost) is not int or cost < 0:
+                problems.append(f"budget_cost_overrides[{key!r}] must be a nonnegative integer")
     sample = None
     if ability.tag_kind:
         candidates = vocabulary.tags(ability.tag_kind)

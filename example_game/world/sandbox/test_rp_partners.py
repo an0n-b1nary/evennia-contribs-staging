@@ -51,6 +51,47 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
         self.assertIsNotNone(vocabulary.find("Ritual", kind="domain"))
         self.assertIsNotNone(vocabulary.find("Water", kind="element"))
 
+    def test_allowance_then_real_xp_or_unavailable_partner(self):
+        if not apps.is_installed("evennia_rp_chargen"):
+            return
+        from evennia_rp_chargen import abilities
+        from evennia_rp_chargen.models import AbilityTransaction, CharacterBuild
+        from evennia_rp_chargen.services import ChargenError
+
+        sample = self.samples[0]
+        abilities.set_allowance(sample, 1)
+        if apps.is_installed("evennia_xp"):
+            from evennia_xp.awards import record_xp
+            from evennia_xp.models import CharacterXP, XPLog, XPSpend
+
+            record_xp(sample.pk, 10, XPLog.SourceType.MANUAL_GRANT, 0)
+            _copy, paid = abilities.acquire(sample, "elemental-focus", "water")
+            self.assertEqual((paid.allowance, paid.xp), (1, 2))
+            self.assertEqual(
+                XPSpend.objects.get().ref_key,
+                AbilityTransaction.objects.get(ledger_ref__gt="").ledger_ref,
+            )
+            self.assertEqual(CharacterXP.objects.get(character_id=sample.pk).total_earned, 10)
+            self.assertEqual(abilities.balance(sample), (0, 8))
+            # Upgrades compound (2, then 4), entirely from earned XP here.
+            abilities.upgrade(sample, "elemental-focus", "water")
+            abilities.upgrade(sample, "elemental-focus", "water")
+            with self.assertRaises(ChargenError):
+                abilities.upgrade(sample, "elemental-focus", "water")
+            self.assertEqual(abilities.find_owned(sample, "elemental-focus", "water").level, 3)
+            self.assertEqual(XPSpend.objects.count(), 3)
+            _, returned, kept = abilities.revoke(sample, "elemental-focus", "water", refund=True)
+            self.assertEqual((returned.allowance, returned.xp, kept), (1, 8, 0))
+            self.assertEqual(abilities.balance(sample), (1, 10))
+            self.assertEqual(XPSpend.objects.filter(refunded_at__isnull=False).count(), 3)
+        else:
+            self.assertEqual(abilities.balance(sample), (1, None))
+            before = AbilityTransaction.objects.count()
+            with self.assertRaisesMessage(ChargenError, "XP spending isn't available"):
+                abilities.acquire(sample, "elemental-focus", "water")
+            self.assertEqual(AbilityTransaction.objects.count(), before)
+            self.assertEqual(CharacterBuild.objects.get(character=sample).allowance_spent, 0)
+
     def test_commands_follow_installed_apps(self):
         from evennia.commands.command import CMD_IGNORE_PREFIXES
 

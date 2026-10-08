@@ -164,6 +164,11 @@ class AbilityDefinition(AbstractArchived):
     budget_cost = models.PositiveIntegerField(
         default=0, help_text="Loadout budget used while equipped."
     )
+    budget_cost_overrides = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Template tag keys mapped to loadout costs; other tags use budget_cost.",
+    )
     tag_kind = models.SlugField(
         max_length=32,
         blank=True,
@@ -188,6 +193,13 @@ class AbilityDefinition(AbstractArchived):
 
     def display_name(self, tag=None) -> str:
         return f"{self.name}: {tag.name}" if tag is not None else self.name
+
+    def budget_cost_for(self, tag=None) -> int:
+        """Resolve the current catalog cost; flaws always use zero budget."""
+        if self.is_flaw:
+            return 0
+        key = tag.key if tag is not None else None
+        return self.budget_cost_overrides.get(key, self.budget_cost)
 
     def effects_for(self, tag=None) -> list:
         """The effect specs with the template tag filled in."""
@@ -249,6 +261,10 @@ class CharacterAbility(models.Model):
     @property
     def display_name(self) -> str:
         return self.ability.display_name(self.tag)
+
+    @property
+    def budget_cost(self) -> int:
+        return self.ability.budget_cost_for(self.tag)
 
     @property
     def modifier_key(self) -> str:
