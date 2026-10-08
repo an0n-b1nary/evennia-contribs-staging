@@ -180,3 +180,33 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
         with mock.patch("evennia_calendar.scheduler.ensure_calendar_script_running"):
             hooks.at_server_start()
             hooks.at_server_stop()
+
+
+class TestLoginXPSummary(EvenniaTest):
+    """The first-login summary through the game's real puppet hook.
+
+    Lives here so the absent-partner run covers it too: without evennia_xp the
+    hook must still complete quietly.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_summary_once_per_batch_or_quiet_without_xp(self):
+        if apps.is_installed("evennia_xp"):
+            from evennia_xp.awards import record_xp
+            from evennia_xp.models import XPLog
+
+            record_xp(self.char1.pk, 2, XPLog.SourceType.RP_SESSION, 501, week="2026-W40")
+        with mock.patch.object(self.char1, "msg") as message:
+            self.char1.at_post_puppet()
+            self.char1.at_post_puppet()
+        summaries = [
+            call.args[0] for call in message.call_args_list if "XP awarded for week" in call.args[0]
+        ]
+        if apps.is_installed("evennia_xp"):
+            self.assertEqual(len(summaries), 1)
+            self.assertIn("2026-W40", summaries[0])
+        else:
+            self.assertEqual(summaries, [])
+        self.assertIsNotNone(self.char1.attributes.get("sandbox_last_seen"))

@@ -23,6 +23,11 @@ Mixin order matters: `SocialCharacterMixin` must come *before*
 processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
 "Layering with evennia-social".
 
+- `at_post_puppet` override — calls `evennia_xp.summary.notify_xp_summary`
+  rather than mixing in `XPSummaryCharacterMixin`, because evennia_xp is an
+  optional RP partner here (`ci_run_rp_sandbox_tests.py --absent evennia_xp`)
+  and a mixin would have to be imported unconditionally.
+
 - `at_post_unpuppet` override — kept here because it's game glue, not
   contrib behavior: `super()` (via `PosingCharacterMixin`) clears the pose
   timer; this override additionally ends any active RPTracker session, per
@@ -48,11 +53,19 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
     """
 
     def at_post_puppet(self, **kwargs):
-        """Record character activity independently of account web logins."""
+        """Record character activity independently of account web logins, and
+        show the first-login XP summary after a weekly batch.
+        """
+        from django.apps import apps
         from django.utils import timezone
 
         super().at_post_puppet(**kwargs)
         self.attributes.add("sandbox_last_seen", timezone.now())
+
+        if apps.is_installed("evennia_xp"):
+            from evennia_xp.summary import notify_xp_summary
+
+            notify_xp_summary(self)
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs):
         """Clear the pose timer (PosingCharacterMixin, via super) and end
