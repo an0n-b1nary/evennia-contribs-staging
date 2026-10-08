@@ -4,9 +4,19 @@ The gate installs every contrib, with its web extras where declared, from
 public Git revisions into two fresh Python 3.12 environments. It verifies
 non-editable PEP 610 provenance, versions, dependency consistency, and the
 installed Python files, templates and static assets against the public tree.
+Driver file hashes are recorded independently of the package revisions.
 Existing migration files must be present and unchanged in the target tree;
 dependency locks are retained alongside the per-package provenance.
-The reference game is copied from the corresponding immutable snapshot.
+Fresh installation uses the target reference game. Population, upgrade and
+restore retain the older consumer's scaffold, including settings, ruleset,
+catalog, command aliases, typeclasses and content. Only installed packages
+change during upgrade. Each host uses the bootstrap and gameplay scenarios
+from its consumer's immutable snapshot. Consumers predating the live driver
+use legacy-vocabulary fixtures exported from the separate public pin
+`0d5beef3fcf7ebdcb34eb57f07a4056de1d9a34f`; no packages are installed from that
+fixture revision. Manifests record package, consumer and fixture revisions
+separately. This checks a package upgrade without silently
+replacing the consumer's game rules with a newer reference ruleset.
 One public clone supplies the Git objects for all subdirectory installs through
 a per-process URL rewrite. Requirements and PEP 610 provenance retain the public
 URL and exact SHA; no Git configuration is changed outside the install process.
@@ -44,6 +54,8 @@ Four phases run:
    unauthorized XP grants and a new check. Added rows, columns and tables are
    permitted; changed/deleted old data fails until an explicit expected data
    transformation is implemented. Applied migration differences are recorded.
+   Sheet, ability and check commands use the populated consumer's identifiers,
+   rather than hardcoded current or historical reference vocabulary.
 4. **Restore:** another new host uses the original backup and older packages.
    It repeats data, cross-link, login and gameplay checks. The original backup's
    checksum must remain unchanged. Each host verifies its owned processes stop.
@@ -71,7 +83,8 @@ python scripts/downstream_gate.py \
   --resume .downstream-runs/<id>
 ```
 
-Resume reuses complete isolated environments and successful phase results;
+Resume requires identical driver hashes as well as identical package revisions,
+and reuses complete isolated environments and successful phase results;
 incomplete package installations are retried from the verified public clone.
 failed phases receive new host directories. It is for an interrupted run with
 the same driver, not a substitute for a fresh gate after driver changes.
@@ -86,4 +99,6 @@ python scripts/test_playtest.py
 
 This verifies the selected reference snapshots and SQLite upgrade path.
 Downstream permission/settings/theme overrides, other database backends,
-future data transformations and subjective balance need their own checks.
+intentional ruleset/catalog renames, future data transformations and subjective
+balance need their own checks. Replacing a game's ruleset is a separate data
+migration, not part of this package-only upgrade rehearsal.

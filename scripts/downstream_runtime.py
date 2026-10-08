@@ -134,10 +134,41 @@ def provenance(source, revision, artifact):
     return len(packages)
 
 
+def consumer_snapshot(directory, mode):
+    """A package upgrade retains the populated game's configuration and content."""
+    return directory / ("new" if mode == "fresh" else "old") / "snapshot"
+
+
+def fixture_module(source, name):
+    """Load immutable consumer scenarios while retaining shared protocol helpers."""
+    spec = importlib.util.spec_from_file_location(
+        f"playtesting.snapshot_{name}", source / "scripts/playtesting" / (name + ".py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class SnapshotHost(Host):
-    def __init__(self, revision, **kwargs):
+    def __init__(
+        self,
+        revision,
+        *,
+        consumer_source,
+        consumer_revision,
+        fixture_source=None,
+        fixture_revision=None,
+        **kwargs,
+    ):
         self.snapshot_revision = revision
-        super().__init__(**kwargs)
+        self.consumer_revision = consumer_revision
+        self.fixture_revision = fixture_revision or consumer_revision
+        fixture_source = fixture_source or consumer_source
+        super().__init__(
+            scaffold=consumer_source / "example_game",
+            support=fixture_source / "scripts/playtesting/support",
+            **kwargs,
+        )
 
     def manifest(self):
         self.evidence.write(
@@ -146,6 +177,8 @@ class SnapshotHost(Host):
                 "run_id": self.run_id,
                 "profile": self.profile,
                 "snapshot_revision": self.snapshot_revision,
+                "consumer_revision": self.consumer_revision,
+                "fixture_revision": self.fixture_revision,
                 "python": sys.version,
                 "ports": self.ports,
                 "versions": {
@@ -302,11 +335,20 @@ def preserved(session, baseline):
     for key in ("transactions", "xp", "spends", "checks", "logs"):
         for row in baseline[key]:
             assert row in current[key], f"{key} lost an existing row"
-    for actor, command, pattern in (
-        ("alice", "+sheet", "Charisma"),
-        ("alice", "+abilities", "Expertise"),
-        ("bob", "+xp", "XP"),
-    ):
+    alice = baseline["actors"]["alice"]
+    stats = [key for key, value in alice["stats"].items() if value is not None]
+    assert stats and alice["abilities"], "Preservation requires populated stats and abilities"
+
+    # Keys belong to the consumer, not the current reference game's vocabulary.
+    def label_pattern(key):
+        return r"[\s_-]+".join(re.escape(part) for part in re.split(r"[\s_-]+", key))
+
+    workflows = [("alice", "+sheet", label_pattern(key)) for key in stats]
+    workflows += [
+        ("alice", "+abilities", label_pattern(row["ability__key"])) for row in alice["abilities"]
+    ]
+    workflows.append(("bob", "+xp", "XP"))
+    for actor, command, pattern in workflows:
         output = session.send(actor, command)["output"]
         assert re.search(pattern, output, re.I), output
     denied = session.send("alice", "+xp/grant pt-alice=10:Forbidden")
@@ -316,7 +358,7 @@ def preserved(session, baseline):
         re.I,
     ), denied
     assert session.snapshot()["xp"] == current["xp"], "Ordinary player changed the XP ledger"
-    output = session.send("alice", "+test Charisma~Upgrade and restore confirmation")["output"]
+    output = session.send("alice", f"+test {stats[0]}~Upgrade and restore confirmation")["output"]
     assert re.search("Success|Failure", output, re.I), output
     assert len(session.snapshot()["checks"]) == len(current["checks"]) + 1
 
@@ -328,11 +370,27 @@ def main():
     directory = Path(path).resolve()
     name = "old" if mode in ("populate", "restore") else "new"
     source = directory / name / "snapshot"
+    consumer = consumer_snapshot(directory, mode)
+    fixture = json.loads((directory / "fixtures.json").read_text(encoding="utf-8"))[
+        "new" if mode == "fresh" else "old"
+    ]
+    fixture_source = directory / fixture["directory"]
+    consumer_revision = revision
+    if mode != "fresh":
+        consumer_revision = re.search(
+            r"@([0-9a-f]{40})#", (directory / "old/requirements.txt").read_text(encoding="utf-8")
+        ).group(1)
     phase = Path(tempfile.mkdtemp(prefix=mode + "-", dir=directory))
     artifacts = phase / "evidence"
     artifacts.mkdir()
     os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", "")
-    result = {"passed": False, "revision": revision, "evidence": str(artifacts)}
+    result = {
+        "passed": False,
+        "revision": revision,
+        "evidence": str(artifacts),
+        "consumer_revision": consumer_revision,
+        "fixture_revision": fixture["revision"],
+    }
     backup = directory / "backup"
     hosts = []
     try:
@@ -341,7 +399,13 @@ def main():
             result["integration_tests"] = integration(source, phase, artifacts)
         restore = backup if mode in ("upgrade", "restore") else None
         host = SnapshotHost(
-            revision, scaffold=source / "example_game", output_root=phase / "hosts", restore=restore
+            revision,
+            consumer_source=consumer,
+            consumer_revision=consumer_revision,
+            fixture_source=fixture_source,
+            fixture_revision=fixture["revision"],
+            output_root=phase / "hosts",
+            restore=restore,
         )
         hosts.append(host)
         # The upgrade comparison happens after migrate and before server hooks
@@ -386,7 +450,7 @@ def main():
                 result["preserved_rows"] = sum(counts.values())
                 result["ordinary_workflows"] = True
             else:
-                from playtesting.scenarios import run_rp
+                scenarios = fixture_module(fixture_source, "scenarios")
 
                 allowance_only = (
                     mode == "populate"
@@ -396,9 +460,7 @@ def main():
                     ).exists()
                 )
                 if allowance_only:
-                    from playtesting.scenarios import Suite
-
-                    suite = Suite(session)
+                    suite = scenarios.Suite(session)
                     for operation in (
                         suite.prepare,
                         suite.sheets,
@@ -417,11 +479,9 @@ def main():
                     cases = suite.results
                     suite.command("staff", "+xp/grant pt-bob=10:Upgrade fixture", "10")
                 else:
-                    cases = run_rp(session)
+                    cases = scenarios.run_rp(session)
                 if mode == "fresh":
-                    from playtesting.browser import run_browser
-
-                    cases.extend(run_browser(session))
+                    cases.extend(fixture_module(fixture_source, "browser").run_browser(session))
                 assert cases and all(case["passed"] for case in cases), cases
                 write(artifacts / "cases.json", cases)
                 result["live_cases"] = len(cases)
@@ -473,16 +533,17 @@ def main():
             normal = SnapshotHost(
                 revision,
                 profile="normal",
-                scaffold=source / "example_game",
+                consumer_source=consumer,
+                consumer_revision=consumer_revision,
+                fixture_source=fixture_source,
+                fixture_revision=fixture["revision"],
                 output_root=phase / "hosts",
             )
             hosts.append(normal)
             session = Session(normal)
             try:
                 normal.start()
-                from playtesting.scenarios import run_rp
-
-                cases = run_rp(session, smoke=True)
+                cases = scenarios.run_rp(session, smoke=True)
                 assert cases and all(case["passed"] for case in cases), cases
                 result["normal_cases"] = len(cases)
                 write(artifacts / "normal-cases.json", cases)

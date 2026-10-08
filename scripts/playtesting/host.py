@@ -10,7 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import time
-from contextlib import suppress
+from contextlib import closing, suppress
 from datetime import UTC, datetime
 from importlib.metadata import distributions, version
 from pathlib import Path
@@ -77,12 +77,14 @@ class Host:
         shutdown=30,
         *,
         scaffold=None,
+        support=None,
         output_root=None,
         restore=None,
     ):
         self.run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
         self.directory = (output_root or ROOT / ".playtest-runs") / self.run_id
         self.scaffold = scaffold or ROOT / "example_game"
+        self.support = support or Path(__file__).parent / "support"
         self.restore = restore
         self.game = (self.directory / "game").resolve()
         self.artifacts = self.directory / "evidence"
@@ -160,7 +162,7 @@ class Host:
             ),
         )
         shutil.copytree(
-            Path(__file__).parent / "support",
+            self.support,
             self.game / "playtest_support",
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
@@ -177,7 +179,7 @@ class Host:
         database = self.game / "server/evennia.db3"
         if not database.is_file():
             raise HostError("Migration created no database; see launcher.log")
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             if not connection.execute(
                 "SELECT name FROM sqlite_master WHERE name='accounts_accountdb'"
             ).fetchone():
