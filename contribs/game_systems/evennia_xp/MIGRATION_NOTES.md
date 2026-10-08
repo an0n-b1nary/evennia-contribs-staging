@@ -19,7 +19,7 @@ settings-driven registry that ships here.
 | `gating.py` | New — `XP_MULTIPLIER_RESOLVER` seam wrapping `world/utils/xp_gating.py`'s role |
 | `antigaming.py` | `_find_burst`/`_item_time` only (extracted from `world/xp/antigaming.py`) |
 | `scripts.py` | Copy of `world/xp/scripts.py` (import paths updated) |
-| `commands.py` | Adapted from `commands/xp.py` (no projection section; generic sources list) |
+| `commands.py` | Adapted from `commands/xp.py` (generic sources list; projection block since 0.4.0) |
 | `permissions.py` | New — copy of `web/website/permissions.py` keyed to `XP_STAFF_LOCK` |
 | `views.py` | Adapted from `web/website/views/xp.py` (gating seam, no arc object) |
 | `api/` | Adapted from `web/api/` XP fragments |
@@ -41,7 +41,7 @@ since landed in the indicated contrib package.
 | `world/xp/collectors.py` — `collect_thread_bonuses` + `PlotBonusCredit` + `_flag_thread_gaming`, `sweep()` | PlotThread, PlotParticipant | **Shipped** — `evennia-plots` 0.2.0 (`integrations/xp.py` + `integrations/antigaming.py`; `PlotBonusCredit` intra-domain FK is fine) |
 | `world/utils/xp_gating.py` — `resolve_xp_multiplier`, `resolve_active_arc` | PlotArc | **Shipped** — `evennia-plots` 0.2.0 (`integrations/gating.py`), registered via `XP_MULTIPLIER_RESOLVER` |
 | `world/xp/hooks.py` — `_flip_session_flags` | RPSession | **Shipped** — `evennia-rptracker` 0.1.1 (`integrations/xp.flip_session_flags`) |
-| `world/xp/collectors.py` — `project_for_character` (balance projection) | RPSession, LoreEntry, Post, PlotThread | Not yet shipped — game-specific projection across multiple domains |
+| `world/xp/collectors.py` — `project_for_character` (balance projection), `world/xp/projection_adapter.py` | RPSession, LoreEntry, Post, PlotThread | **Shipped** — `evennia-xp` 0.4.0 (`projection.py`): generic over `XP_COLLECTORS`, so it reads no other domain directly |
 | `+spend`/`+upgrade` commands | Combat stats | Not yet shipped — requires Phase 6 combat-stats system |
 
 ## Divergences from the source
@@ -68,9 +68,13 @@ since landed in the indicated contrib package.
 - **`+xp/sources` is generic.** The source listed game-specific sources with
   hardcoded rates. The contrib lists registered `XP_COLLECTORS` keys.
 
-- **No balance projection.** The source `+xp` balance showed "projected XP"
-  for the current week using game-specific collectors. The contrib omits this;
-  games can implement it via a custom command or subclass.
+- **Projection (0.4.0).** The source `+xp` and `+activity` showed projected
+  XP using hardcoded source keys (`rp_session`, `lore_authored`, …); 0.1–0.3
+  left it out. `projection.py` now builds it from whatever `XP_COLLECTORS`
+  holds, labelled from `XPLog.SourceType`. It differs from the source in two
+  ways. Awards already in the ledger are left out, because the source relied
+  on each collector filtering them. `+activity` lists only the sources with
+  something pending.
 
 - **Spending (0.2.0).** `XPSpend`, `spend_xp`/`refund_xp`, and their post-commit
   signals were implemented and regression-tested in the source project first,

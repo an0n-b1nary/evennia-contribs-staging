@@ -6,7 +6,7 @@
 CmdXp — balance, award log, registered sources, and staff manual grant.
 
 Usage:
-    +xp                                  View your XP balance
+    +xp                                  View your XP balance and projected XP
     +xp/log                              View your last 20 XP awards
     +xp/log <N>                          View your last N awards (max 100)
     +xp/sources                          List registered XP sources
@@ -53,7 +53,8 @@ class CmdXp(MuxCommand):
         +xp/grant <character>=<amt>:<reason>  Award XP manually (staff)
 
     XP is earned automatically every Monday from activities registered in
-    XP_COLLECTORS. Use +xp/sources for a list of active sources.
+    XP_COLLECTORS. +xp also shows what you have earned since then that has
+    not been awarded yet. Use +xp/sources for a list of active sources.
     """
 
     key = "+xp"
@@ -106,6 +107,25 @@ class CmdXp(MuxCommand):
         except Exception:
             pass
 
+        # Projected XP: what the collectors would pay now, not yet awarded.
+        projected_lines = []
+        if getattr(settings, "XP_COLLECTORS", []):
+            try:
+                from evennia_xp.projection import project_for_character, source_label
+
+                projection = project_for_character(caller.pk)
+                projected_lines = [
+                    (source_label(key), amount) for key, amount in projection.by_source.items()
+                ]
+                projected_lines.append(("Total", projection.total))
+            except Exception:
+                import logging
+
+                logging.getLogger("evennia").exception(
+                    "+xp: projection failed for character #%s", caller.pk
+                )
+                projected_lines = []
+
         # Last payout breakdown (XPLog rows for the last payout week).
         last_payout_lines = []
         if last_week != "—":
@@ -126,6 +146,11 @@ class CmdXp(MuxCommand):
             lines.append(f"Last payout week: {last_week}")
             if downtime_banner:
                 lines.append(downtime_banner)
+            if projected_lines:
+                lines.append("")
+                lines.append("Projected, not yet awarded:")
+                for src, amt in projected_lines:
+                    lines.append(f"  {src}: {amt}")
             if last_payout_lines:
                 lines.append("")
                 lines.append(f"Last payout ({last_week}):")
@@ -141,6 +166,13 @@ class CmdXp(MuxCommand):
                 lines.append(sep)
             lines.append(f"  Balance : |w{balance}|n XP  (total earned: {total_earned})")
             lines.append(f"  Last payout : {last_week}")
+            if projected_lines:
+                lines.append(sep)
+                lines.append("  |wProjected|n (not yet awarded):")
+                *sources, (total_label, total) = projected_lines
+                for src, amt in sources:
+                    lines.append(f"    {src:<20} {amt}")
+                lines.append(f"    {total_label:<20} |w{total}|n XP")
             if last_payout_lines:
                 lines.append(sep)
                 lines.append(f"  |wLast payout ({last_week})|n:")

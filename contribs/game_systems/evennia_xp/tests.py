@@ -486,6 +486,200 @@ class TestCmdXpBalance(EvenniaCommandTest):
 
 
 # ---------------------------------------------------------------------------
+# Projected XP (projection.py, +xp, the +activity hook)
+# ---------------------------------------------------------------------------
+
+_PROJECTED = {"rp_session": [], "lore_authored": []}
+
+
+def _projected_sessions(window_end):
+    yield from _PROJECTED["rp_session"]
+
+
+def _projected_lore(window_end):
+    yield from _PROJECTED["lore_authored"]
+
+
+def _exploding_collector(window_end):
+    raise RuntimeError("collector exploded")
+
+
+_PROJECTION_COLLECTORS = [
+    ("rp_session", "evennia_xp.tests._projected_sessions"),
+    ("lore_authored", "evennia_xp.tests._projected_lore"),
+]
+
+
+def _pending(char, amount, source_type, ref_id):
+    return Award(
+        character_id=char.pk,
+        amount=Decimal(amount),
+        source_type=source_type,
+        source_ref_id=ref_id,
+        multiplier=Decimal("1.0"),
+        reason="projection test",
+    )
+
+
+class _ProjectionFixture:
+    """char1 has 1.00 + 0.50 of RP sessions pending; char2 has 3.00."""
+
+    def setUp(self):
+        super().setUp()
+        for awards in _PROJECTED.values():
+            awards.clear()
+        rp = XPLog.SourceType.RP_SESSION
+        _PROJECTED["rp_session"].extend(
+            [
+                _pending(self.char1, "1.00", rp, 501),
+                _pending(self.char1, "0.50", rp, 502),
+                _pending(self.char2, "3.00", rp, 503),
+            ]
+        )
+
+    def tearDown(self):
+        for awards in _PROJECTED.values():
+            awards.clear()
+        super().tearDown()
+
+
+@override_settings(XP_COLLECTORS=_PROJECTION_COLLECTORS, XP_MULTIPLIER_RESOLVER=None)
+class TestProjectForCharacter(_ProjectionFixture, EvenniaTest):
+    def _project(self, char=None):
+        from evennia_xp.projection import project_for_character
+
+        return project_for_character((char or self.char1).pk)
+
+    def test_sums_this_characters_awards_per_source_in_registry_order(self):
+        projection = self._project()
+        self.assertEqual(list(projection.by_source), ["rp_session", "lore_authored"])
+        self.assertEqual(projection.by_source["rp_session"], Decimal("1.50"))
+        self.assertEqual(projection.by_source["lore_authored"], Decimal("0.00"))
+        self.assertEqual(projection.total, Decimal("1.50"))
+        self.assertEqual(self._project(self.char2).total, Decimal("3.00"))
+
+    def test_awards_already_in_the_ledger_are_left_out(self):
+        record_xp(self.char1.pk, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 501, week="2026-W40")
+        # Same ref id under another source is a different award.
+        record_xp(
+            self.char1.pk, Decimal("9.00"), XPLog.SourceType.LORE_AUTHORED, 502, week="2026-W40"
+        )
+        self.assertEqual(self._project().total, Decimal("0.50"))
+
+    def test_projection_writes_nothing(self):
+        self._project()
+        self.assertFalse(XPLog.objects.exists())
+        self.assertFalse(CharacterXP.objects.exists())
+
+    @override_settings(
+        XP_COLLECTORS=[
+            ("rp_session", "evennia_xp.tests._projected_sessions"),
+            ("cutscene", "evennia_xp.tests._exploding_collector"),
+        ]
+    )
+    def test_a_failing_collector_counts_as_zero_and_is_logged(self):
+        with self.assertLogs("evennia", level="ERROR") as logs:
+            projection = self._project()
+        self.assertEqual(projection.by_source["cutscene"], Decimal("0.00"))
+        self.assertEqual(projection.total, Decimal("1.50"))
+        self.assertIn("cutscene", logs.output[0])
+
+    def test_source_labels(self):
+        from evennia_xp.projection import source_label
+
+        self.assertEqual(source_label("rp_session"), "RP Session")
+        self.assertEqual(source_label("tavern_tales"), "Tavern Tales")
+
+
+@override_settings(XP_COLLECTORS=_PROJECTION_COLLECTORS, XP_MULTIPLIER_RESOLVER=None)
+class TestActivityLines(_ProjectionFixture, EvenniaTest):
+    def _lines(self, char=None):
+        from django.utils import timezone
+
+        from evennia_xp.projection import activity_lines
+
+        return activity_lines((char or self.char1).pk, timezone.now())
+
+    def test_pending_sources_and_total(self):
+        lines = self._lines()
+        self.assertEqual(lines[0], "-" * 50)
+        self.assertIn("RP Session +1.50", lines[1])
+        self.assertIn("Total |w1.50|n", lines[1])
+        self.assertNotIn("Lore Authored", lines[1])  # nothing pending there
+        self.assertIn("+xp", lines[2])
+
+    def test_nothing_pending(self):
+        _PROJECTED["rp_session"].clear()
+        self.assertIn("nothing pending yet", self._lines()[1])
+
+    def test_screenreader_output_is_plain(self):
+        with patch("evennia_xp.projection.uses_screenreader", return_value=True):
+            lines = self._lines()
+        self.assertEqual(lines[0], "Projected XP, not yet awarded: RP Session 1.50. Total 1.50.")
+        self.assertFalse(any("|" in line or "---" in line for line in lines))
+
+    @override_settings(XP_COLLECTORS=[])
+    def test_no_collectors_means_no_lines(self):
+        self.assertEqual(self._lines(), [])
+
+    def test_a_failure_is_logged_and_returns_nothing(self):
+        with (
+            patch(
+                "evennia_xp.projection.project_for_character",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("evennia", level="ERROR"),
+        ):
+            self.assertEqual(self._lines(), [])
+
+
+@override_settings(
+    XP_COLLECTORS=_PROJECTION_COLLECTORS,
+    XP_ANTIGAMING_SWEEPS=[],
+    XP_POST_BATCH_HOOKS=[],
+    XP_MULTIPLIER_RESOLVER=None,
+)
+class TestCmdXpProjected(_ProjectionFixture, EvenniaCommandTest):
+    def test_balance_shows_every_source_and_the_total(self):
+        from evennia_xp.commands import CmdXp
+
+        result = self.call(CmdXp(), "", None, caller=self.char1)
+        self.assertIn("Projected (not yet awarded):", result)
+        self.assertRegex(result, r"RP Session\s+1\.50")
+        self.assertRegex(result, r"Lore Authored\s+0\.00")
+        self.assertRegex(result, r"Total\s+1\.50 XP")
+
+    def test_screenreader_balance(self):
+        from evennia_xp.commands import CmdXp
+
+        with patch("evennia_xp.commands.uses_screenreader", return_value=True):
+            result = self.call(CmdXp(), "", None, caller=self.char1)
+        self.assertIn("Projected, not yet awarded:", result)
+        self.assertIn("RP Session: 1.50", result)
+        self.assertIn("Total: 1.50", result)
+
+    @override_settings(XP_COLLECTORS=[])
+    def test_no_collectors_no_block(self):
+        from evennia_xp.commands import CmdXp
+
+        self.assertNotIn("Projected", self.call(CmdXp(), "", None, caller=self.char1))
+
+    def test_a_failed_projection_still_shows_the_balance(self):
+        from evennia_xp.commands import CmdXp
+
+        with (
+            patch(
+                "evennia_xp.projection.project_for_character",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("evennia", level="ERROR"),
+        ):
+            result = self.call(CmdXp(), "", None, caller=self.char1)
+        self.assertIn("Balance", result)
+        self.assertNotIn("Projected", result)
+
+
+# ---------------------------------------------------------------------------
 # Web view
 # ---------------------------------------------------------------------------
 

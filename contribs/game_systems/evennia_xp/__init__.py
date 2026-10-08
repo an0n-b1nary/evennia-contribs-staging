@@ -25,13 +25,18 @@ First-login summary (after each weekly batch):
     from evennia_xp.typeclasses import XPSummaryCharacterMixin
     from evennia_xp.summary import notify_xp_summary   # or call it yourself
 
+Projected XP (unawarded, from the registered collectors):
+
+    from evennia_xp.projection import project_for_character
+    RPTRACKER_XP_PROJECTION = "evennia_xp.projection.activity_lines"
+
 Web/API surface (requires [web] extra):
 
     from evennia_xp.views import XPSummaryView
     from evennia_xp.api.views import XPLogViewSet
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from evennia_xp.signals import xp_awarded, xp_batch_completed, xp_refunded, xp_spent
 
@@ -43,6 +48,7 @@ _LAZY = {
     "refund_xp": "spending",
     "InsufficientXP": "spending",
     "notify_xp_summary": "summary",
+    "project_for_character": "projection",
     "XPSummaryCharacterMixin": "typeclasses",
 }
 
@@ -53,6 +59,7 @@ __all__ = [
     "XPSpend",
     "XPSummaryCharacterMixin",
     "notify_xp_summary",
+    "project_for_character",
     "refund_xp",
     "spend_xp",
     "xp_awarded",
