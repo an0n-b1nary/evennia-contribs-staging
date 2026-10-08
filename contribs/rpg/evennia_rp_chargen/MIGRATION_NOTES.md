@@ -19,6 +19,13 @@ as the ledger behind `RP_CHARGEN_XP_LEDGER` when retaining a native XP app;
 the ledger must participate in the same database transaction. Starting
 allowance is chargen-owned and must never inflate earned-XP totals.
 
+## 0.3.0
+
+No migration and no settings change. Builds behave as before until an app
+connects a receiver to `guards.build_change_requested`. Once one does, staff
+tools are refused like any other change when it objects; resolve the conflict
+in that app first (remove the gear, for instance), then make the change.
+
 ## 0.2.1
 
 No migration. The default `RP_CHARGEN_PIP_NOUN` is now `"pips"`; a game that
