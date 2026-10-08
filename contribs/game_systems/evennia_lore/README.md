@@ -76,7 +76,7 @@ class CharacterCmdSet(CmdSet):
 | `LORE_REQUIRE_APPROVAL` | `False` | When True, submissions start as SUBMITTED (awaiting staff review) instead of PUBLISHED |
 | `LORE_PASSIVE_WEEKLY_CEILING` | `5` | Max passive acquisitions per character per week |
 | `LORE_PASSIVE_LEAN_MULTIPLIER` | `Decimal("2.0")` | Weight multiplier for lean-matching entries |
-| `LORE_SESSION_CONTEXT_PROVIDER` | `None` | Dotted path to your session context provider (see below) |
+| `LORE_SESSION_CONTEXT_PROVIDER` | `None` | Dotted path to a session context provider: the shipped one or your own (see below) |
 | `LORE_RPTRACKER_APP_LABEL` | `"evennia_rptracker"` | App label for the rptracker contrib |
 | `LORE_SCENES_APP_LABEL` | `"evennia_scenes"` | App label for scenes (used for scene links + hint regions) |
 | `LORE_PLOTS_APP_LABEL` | `"evennia_plots"` | App label for plots (used for plot-lore links and lean) |
@@ -121,35 +121,34 @@ def get_session_context(session) -> dict:
     """
 ```
 
-**Worked example using the rptracker + scenes + plots contribs:**
+**Shipped provider.** If your game uses the sibling contribs, point the setting at the
+one this contrib ships:
+
+```python
+# settings.py
+LORE_SESSION_CONTEXT_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
+```
+
+| Key | Source | Without the partner |
+|---|---|---|
+| `room_id` | the session's room | (always available) |
+| `region_id` | `RegionMembership.primary_for(room)` from `LORE_REGIONS_APP_LABEL` | `None` |
+| `thread_ids` | the session's scene links (evennia-rptracker), then `ScenePlotLink` from `LORE_PLOTS_APP_LABEL` | empty set |
+
+Partners are found through the app registry, so nothing is imported from one that
+isn't installed. If one lookup fails, it is logged and the other keys are still returned.
+
+**Your own provider.** Any callable with the contract above works. Write one when room,
+region or story context comes from somewhere else in your game:
 
 ```python
 # my_game/lore_provider.py
 def get_session_context(session):
-    room_id = session.room.pk if session.room else None
-    region_id = None
-    thread_ids = set()
-
-    if room_id:
-        from evennia_lore.models import LoreRegionLink
-        # Resolve region via your region membership bridge
-        from my_game.regions import RegionMembership
-        membership = RegionMembership.objects.filter(room_id=room_id).first()
-        if membership:
-            region_id = membership.region_id
-
-    # Resolve active plot threads via scene links
-    from evennia_rptracker.models import RPSessionSceneLink
-    from evennia_scenes.models import ScenePlotLink  # if you have this
-    scene_ids = set(
-        RPSessionSceneLink.objects.filter(session=session).values_list("scene_id", flat=True)
-    )
-    if scene_ids:
-        thread_ids = set(
-            ScenePlotLink.objects.filter(scene_id__in=scene_ids).values_list("thread_id", flat=True)
-        )
-
-    return {"room_id": room_id, "region_id": region_id, "thread_ids": thread_ids}
+    return {
+        "room_id": session.room_id,
+        "region_id": my_region_for(session.room_id),
+        "thread_ids": my_threads_for(session),
+    }
 
 # settings.py
 LORE_SESSION_CONTEXT_PROVIDER = "my_game.lore_provider.get_session_context"

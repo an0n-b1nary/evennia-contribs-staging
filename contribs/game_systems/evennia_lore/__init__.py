@@ -21,13 +21,17 @@ Commands (import explicitly):
 
     from evennia_lore.commands import CmdLore, CmdInvestigate, CmdShare, CmdHint, CmdForget
 
+Shipped session-context provider for the passive trickle (see README):
+
+    LORE_SESSION_CONTEXT_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
+
 Web/API surface (requires [web] extra):
 
     from evennia_lore.views import LoreListView, LoreDetailView, ...
     from evennia_lore.api.views import LoreEntryViewSet, LoreTagViewSet
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from evennia_lore.signals import (
     lore_acquired,

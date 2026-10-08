@@ -54,9 +54,13 @@ resolve session context (room_id / region_id / thread_ids). The contrib exposes 
 settings-resolved callable so the trickle engine works standalone. Without a provider,
 the engine degrades to tag-only weighting.
 
-**`world/lore/providers.py` not shipped.** This is the source game's concrete provider
-that reads `RPSessionSceneLink → ScenePlotLink → thread_ids` and `RegionMembership →
-region_id`. Consumers write their own provider returning the required context dict.
+**`world/lore/providers.py` → `integrations/session_context.py` (0.4.0).** The source
+game's concrete provider (`RPSessionSceneLink → ScenePlotLink → thread_ids`,
+`RegionMembership → region_id`) was left out of 0.1–0.3 as game glue. Every game wiring
+the trickle rewrote it, so 0.4.0 ships it. Differences from the source: partners are
+found through `LORE_REGIONS_APP_LABEL` / `LORE_PLOTS_APP_LABEL` and `apps.get_model`
+rather than imported, the scene links come from the session's own `scene_links`
+relation, and a failed lookup is logged instead of silently passed.
 
 **Staff permission configurable via `LORE_STAFF_LOCK`.** The source game hardcoded
 `perm(Builder)` in commands and web views. The contrib resolves this from the setting,
