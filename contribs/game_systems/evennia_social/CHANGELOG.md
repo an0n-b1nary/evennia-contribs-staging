@@ -2,6 +2,24 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.2.0 — 2026-10-07
+
+- **Added:** room mood. `SocialRoomMixin` now owns `room_mood` and
+  `room_mood_setter` and shows the mood under the room's description in
+  `look`, attributed to whoever set it. New `+mood` command: bare shows the
+  mood, `+mood <text>` sets it (up to 200 characters, announced to the room),
+  `+mood/clear` removes it. `+roomconfig` shows the setter too.
+- **Added:** mood permissions (`evennia_social.mood.can_set_mood`). The room's
+  owner or Builder+ staff, always. With `evennia-scenes` installed and a scene
+  running in the room, any active participant of a public scene, or only the
+  host of a scene with any other privacy tier (an unknown tier counts as
+  private). `evennia-scenes` stays optional, found through
+  `SOCIAL_SCENES_APP_LABEL` (default `"evennia_scenes"`).
+- **Changed:** `room_mood` is no longer documented as an attribute "read but
+  not owned"; games that defined it themselves can drop their own definition.
+  `+hangouts` and `+roomconfig` still read it defensively, so a Room without
+  the mixin keeps working.
+
 ## 0.1.0 — 2026-07-15
 
 Initial extraction from a source MUSH project's social quality-of-life

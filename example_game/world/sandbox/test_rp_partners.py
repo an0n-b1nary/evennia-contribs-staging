@@ -180,3 +180,81 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
         with mock.patch("evennia_calendar.scheduler.ensure_calendar_script_running"):
             hooks.at_server_start()
             hooks.at_server_stop()
+
+
+class TestLoginXPSummary(EvenniaTest):
+    """The first-login summary through the game's real puppet hook.
+
+    Lives here so the absent-partner run covers it too: without evennia_xp the
+    hook must still complete quietly.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_summary_once_per_batch_or_quiet_without_xp(self):
+        if apps.is_installed("evennia_xp"):
+            from evennia_xp.awards import record_xp
+            from evennia_xp.models import XPLog
+
+            record_xp(self.char1.pk, 2, XPLog.SourceType.RP_SESSION, 501, week="2026-W40")
+        with mock.patch.object(self.char1, "msg") as message:
+            self.char1.at_post_puppet()
+            self.char1.at_post_puppet()
+        summaries = [
+            call.args[0] for call in message.call_args_list if "XP awarded for week" in call.args[0]
+        ]
+        if apps.is_installed("evennia_xp"):
+            self.assertEqual(len(summaries), 1)
+            self.assertIn("2026-W40", summaries[0])
+        else:
+            self.assertEqual(summaries, [])
+        self.assertIsNotNone(self.char1.attributes.get("sandbox_last_seen"))
+
+
+class TestRoomMoodSceneRights(EvenniaTest):
+    """+mood through the game's own cmdset, Room typeclass and scenes partner.
+
+    char2 is an ordinary player. With evennia_scenes installed, joining a
+    public scene in the room is what lets them set the mood; with it absent,
+    the same player is refused and the command still works for staff.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def mood_command(self):
+        from commands.default_cmdsets import CharacterCmdSet
+
+        return next(c for c in CharacterCmdSet().commands if c.key == "+mood")
+
+    def run_mood(self, caller, args):
+        command = self.mood_command()
+        command.caller = caller
+        command.switches = []
+        command.args = args
+        with mock.patch.object(caller, "msg") as replies:
+            command.func()
+        return " ".join(str(call.args[0]) for call in replies.call_args_list if call.args)
+
+    def test_scene_participant_or_refused_without_scenes(self):
+        if apps.is_installed("evennia_scenes"):
+            from evennia_scenes.models import Scene, SceneParticipant
+
+            scene = Scene.objects.create(
+                title="Mood check",
+                room=self.room1,
+                room_name=self.room1.key,
+                creator=self.char1,
+                creator_name=self.char1.key,
+                privacy=Scene.Privacy.PUBLIC,
+            )
+            SceneParticipant.objects.create(
+                scene=scene, character=self.char2, character_name=self.char2.key
+            )
+            self.assertIn("Mood set", self.run_mood(self.char2, "Thunder rolls in."))
+            self.assertIn("Thunder rolls in.", self.room1.return_appearance(self.char1))
+        else:
+            self.assertIn("can't set the mood", self.run_mood(self.char2, "Thunder rolls in."))
+            self.assertIn("Mood set", self.run_mood(self.char1, "Thunder rolls in."))
+            self.assertIn("Thunder rolls in.", self.room1.return_appearance(self.char2))

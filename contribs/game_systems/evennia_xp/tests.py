@@ -919,6 +919,145 @@ class TestXPSummaryRenders(EvenniaTest):
         self.assertNotIn('role="region" aria-label="XP award log"', html)
 
 
+def _award_for_summary(char, amount, source_type, ref_id, week="2026-W18"):
+    """Write an XPLog row and the CharacterXP aggregate, as a batch would."""
+    from evennia_xp.awards import record_xp
+
+    return record_xp(
+        character_id=char.pk,
+        amount=amount,
+        source_type=source_type,
+        source_ref_id=ref_id,
+        week=week,
+        character_name=char.key,
+    )
+
+
+class TestNotifyXpSummary(EvenniaTest):
+    """The first-login summary, ported from the source project's suite."""
+
+    def setUp(self):
+        super().setUp()
+        self.char1.msg = MagicMock()
+
+    def _notify(self):
+        from evennia_xp.summary import notify_xp_summary
+
+        return notify_xp_summary(self.char1)
+
+    def _output(self):
+        return self.char1.msg.call_args[0][0]
+
+    def test_summary_shown_when_payout_week_is_new(self):
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 1001)
+        self.assertTrue(self._notify())
+        self.char1.msg.assert_called_once()
+
+    def test_summary_names_week_source_amount_and_command(self):
+        _award_for_summary(self.char1, Decimal("3.00"), XPLog.SourceType.RP_SESSION, 1002)
+        self._notify()
+        output = self._output()
+        for expected in ("2026-W18", "RP Session", "3.00", "+xp"):
+            self.assertIn(expected, output)
+
+    def test_multiple_sources_are_grouped_and_totalled(self):
+        _award_for_summary(self.char1, Decimal("2.00"), XPLog.SourceType.RP_SESSION, 2001)
+        _award_for_summary(self.char1, Decimal("0.50"), XPLog.SourceType.RP_SESSION, 2002)
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.CUTSCENE, 2003)
+        self._notify()
+        output = self._output()
+        self.assertIn("RP Session (+2.50)", output)
+        self.assertIn("Cutscene (+1.00)", output)
+        self.assertIn("3.50 XP total", output)
+
+    def test_not_shown_twice_for_the_same_week(self):
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 3001)
+        self._notify()
+        self.char1.msg.reset_mock()
+        self.assertFalse(self._notify())
+        self.char1.msg.assert_not_called()
+
+    def test_week_attribute_records_what_was_shown(self):
+        from evennia_xp.summary import SUMMARY_WEEK_ATTRIBUTE
+
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 4001)
+        self.assertIsNone(self.char1.attributes.get(SUMMARY_WEEK_ATTRIBUTE))
+        self._notify()
+        self.assertEqual(self.char1.attributes.get(SUMMARY_WEEK_ATTRIBUTE), "2026-W18")
+
+    def test_a_later_batch_triggers_a_new_summary_for_its_own_week(self):
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 5001)
+        self._notify()
+        self.char1.msg.reset_mock()
+        _award_for_summary(
+            self.char1, Decimal("2.00"), XPLog.SourceType.RP_SESSION, 5002, week="2026-W19"
+        )
+        CharacterXP.objects.filter(character_id=self.char1.pk).update(last_payout_week="2026-W19")
+        self._notify()
+        output = self._output()
+        self.assertIn("2026-W19", output)
+        self.assertIn("2.00", output)
+        self.assertNotIn("2026-W18", output)
+
+    def test_silent_without_any_xp(self):
+        self.assertFalse(self._notify())
+        self.char1.msg.assert_not_called()
+
+    def test_silent_when_already_seen(self):
+        from evennia_xp.summary import SUMMARY_WEEK_ATTRIBUTE
+
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 6001)
+        self.char1.attributes.add(SUMMARY_WEEK_ATTRIBUTE, "2026-W18")
+        self.assertFalse(self._notify())
+        self.char1.msg.assert_not_called()
+
+    def test_another_characters_xp_does_not_leak(self):
+        _award_for_summary(self.char2, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 7001)
+        self.assertFalse(self._notify())
+        self.char1.msg.assert_not_called()
+
+    def test_screenreader_output_drops_colour_and_glyphs(self):
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 8001)
+        with patch("evennia_xp.summary.uses_screenreader", return_value=True):
+            self._notify()
+        output = self._output()
+        self.assertNotIn("|w", output)
+        self.assertNotIn("•", output)
+        self.assertIn("RP Session: +1.00", output)
+
+    def test_a_failure_is_logged_not_raised_and_retried_next_login(self):
+        from evennia_xp.summary import SUMMARY_WEEK_ATTRIBUTE
+
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 9001)
+        self.char1.msg.side_effect = RuntimeError("session went away")
+        with patch("evennia_xp.summary.logger.log_trace") as trace:
+            self.assertFalse(self._notify())
+        trace.assert_called_once()
+        self.assertIsNone(self.char1.attributes.get(SUMMARY_WEEK_ATTRIBUTE))
+
+
+class TestXPSummaryCharacterMixin(EvenniaTest):
+    def test_post_puppet_runs_the_chain_then_the_summary(self):
+        from evennia_xp.typeclasses import XPSummaryCharacterMixin
+
+        calls = []
+
+        class _Base:
+            def at_post_puppet(self, **kwargs):
+                calls.append(("base", kwargs))
+
+        class _Character(XPSummaryCharacterMixin, _Base):
+            pass
+
+        character = _Character()
+        with patch(
+            "evennia_xp.typeclasses.notify_xp_summary",
+            side_effect=lambda obj: calls.append(("summary", obj)),
+        ):
+            character.at_post_puppet(session="s")
+        self.assertEqual(calls, [("base", {"session": "s"}), ("summary", character)])
+
+
 class SpendingTests(TestCase):
     def setUp(self):
         CharacterXP.objects.create(character_id=1, total_earned=10, current_balance=10)

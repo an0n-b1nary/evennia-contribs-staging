@@ -7,6 +7,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] - 2026-10-07
+
+- **Added:** a first-login XP summary. The first time a character is puppeted
+  after a weekly batch paid it, it sees that week's awards grouped by source,
+  with a total and a pointer to `+xp`. Shown once per paying batch (tracked in
+  the `last_xp_summary_week` Attribute); silent on quiet weeks. Plain-text
+  output under `evennia-accessibility`'s screen-reader mode. Wire it with
+  `evennia_xp.typeclasses.XPSummaryCharacterMixin` or call
+  `evennia_xp.summary.notify_xp_summary(character)` from your own
+  `at_post_puppet`. Ported from the source project, which kept it in its
+  character typeclass.
+- A failure inside the summary is logged and never breaks login; the week is
+  not marked seen, so the next login retries.
+
 ## [0.2.0] - 2026-10-07
 
 - Added `XPSpend` and atomic `spend_xp`/`refund_xp` services, mirrored from

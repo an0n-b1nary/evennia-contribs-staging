@@ -143,7 +143,7 @@ carries one command family and one brass plaque naming its commands:
 | Arrival Hall | — | `+sandbox`, `+sandbox/builder` |
 | Posing Studio | `evennia_posing` | `+pot`, `emit`, `semipose`, `+poseheader`, `+highlight`, `+lastpose` |
 | Scene Room | `-scenes`, `-rptracker` | `+scene`, `+log`, `+rptracker`, `+activity` |
-| Social Commons | `-social` | `page`, `+finger`, `+where`, `+hangouts`, `+join`, `+summon`, `+home`, `+ooc`, `+ignore`, `+roomconfig`, `+roulette`, `@tel` |
+| Social Commons | `-social` | `page`, `+finger`, `+where`, `+hangouts`, `+join`, `+summon`, `+home`, `+ooc`, `+ignore`, `+roomconfig`, `+mood`, `+roulette`, `@tel` |
 | Story Office | `-plots`, `-calendar` | `+plot`, `+arc`, `+hook`, `+calendar`, `+rsvp` |
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
@@ -208,9 +208,10 @@ The runner verifies the package is unimportable, copies the sandbox without
 databases or secrets, and requires a positive test count. Without chargen,
 stat blocks and ruleset tags still work; without contest, sheet commands do.
 
-`evennia_accessibility` and `evennia_links` get no room: the first has no
-commands at all (it is web/MXP-side, and shows up in the account options and
-the site), the second is a pure seam library.
+`evennia_accessibility` and `evennia_links` get no room: the first has one
+command, `+screenreader`, mounted on the *account* cmdset so it works anywhere
+(including before puppeting), and is otherwise web/MXP-side; the second is a
+pure seam library.
 
 **The IC world** is reached through the single direction-less `grid` exit from
 the hall: seventeen rooms on three planes, mapped, region-membered, and
