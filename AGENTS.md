@@ -130,10 +130,17 @@ this check for other optional partners that a change touches. See
 - Commit prefixes: `[evennia-<name>]` for per-contrib history
   (`git log --grep="\[evennia-links\]"`); `feat(example_game):`,
   `fix(ci):`, `docs:` conventional style elsewhere.
-- Contrib code is extracted from the source project and synced by hand:
-  substantive changes land in the source first and are mirrored here with a
-  regression test (verified to fail without the fix); staging-originated
-  fixes use `[evennia-<name>] fix:`.
+- Contrib code is developed here first; downstream games consume pinned
+  public snapshots. Shared behavior and reusable integrations belong in the
+  owning contrib; game content, ruleset values, themes and composition stay
+  downstream. Fixes require a regression test verified to fail without the
+  fix, plus the relevant reference-game seams. Use `[evennia-<name>] fix:`
+  for contrib fixes. Do not mirror changes into legacy downstream copies
+  unless a separately authorized maintenance task requires it.
+- Preserve migration history shipped in public snapshots. Verify upgrades
+  with populated databases as well as fresh installs; stable ruleset and
+  catalog identifiers are data compatibility contracts too. Never regenerate
+  or squash migrations already consumed by a downstream game.
 - Model-bearing contribs: generate migrations, never hand-write; verify
   `makemigrations --check` is clean. Optional partners are integer
   soft-references + gated listeners (see `evennia_links`' README).

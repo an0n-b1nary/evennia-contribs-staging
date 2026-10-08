@@ -7,7 +7,7 @@ Thanks for your interest. This repo is a staging ground — its primary job is t
 1. Read the contrib's own `README.md` first. It lists dependencies, install steps, settings hooks, and any caveats.
 2. Install via pip subdirectory (preferred):
    ```bash
-   pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#subdirectory=contribs/<category>/<contrib_name>&egg=<contrib_name>"
+   pip install "evennia-<name> @ git+https://github.com/an0n-b1nary/evennia-contribs-staging.git@<full-sha>#subdirectory=contribs/<category>/<contrib_name>"
    ```
 3. If pip-from-subdirectory hits friction, copy the package directly into your game's local `contrib/` directory and document the version/commit you pulled from.
 4. **Pin to a commit.** APIs may change between syncs. Don't track `main`.
@@ -30,11 +30,18 @@ Include:
 
 ## Submitting code
 
-This repo is primarily a one-way extraction channel from upstream consumers, not a community fork. That said, if you have a clear bug fix:
+Shared contrib behavior and reusable integrations are developed here first.
+Downstream games consume pinned public snapshots and own their content,
+ruleset values, themes, and game composition.
 
 1. Open an issue first to confirm the bug is in scope for the contrib (vs. specific to your game).
 2. PRs are welcome for documentation fixes, typos, and small bug fixes against existing contribs.
-3. Larger API changes should land in the source-of-truth project first and be re-extracted; please file an issue rather than opening a PR.
+3. Discuss larger API changes in an issue before implementation. Develop accepted changes in the owning contrib, with reference-game wiring and relevant seam tests.
+
+Fixes need a regression test demonstrated to fail without the fix. Preserve
+published migration history and verify populated-database upgrades alongside
+fresh installation. Editable installs are for local development; deployment
+and release verification use non-editable public snapshot pins.
 
 ## Maintainer setup (anonymity guards)
 
