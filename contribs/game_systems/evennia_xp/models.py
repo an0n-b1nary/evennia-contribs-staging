@@ -173,3 +173,22 @@ class CharacterXP(models.Model):
 
     def __str__(self):
         return f"CharacterXP: {self.character_name} ({self.current_balance} XP balance)"
+
+
+class XPSpend(models.Model):
+    """One debit with a permanent reference and an optional one-time refund."""
+
+    character_id = models.PositiveIntegerField(db_index=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    category = models.CharField(max_length=64)
+    ref_key = models.CharField(max_length=128, unique=True)
+    reason = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refunded_by_id = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]  # noqa: RUF012
+
+    def __str__(self):
+        return f"XPSpend #{self.pk}: character {self.character_id} -{self.amount} XP"

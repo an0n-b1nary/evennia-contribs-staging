@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] - 2026-10-07
+
+- Added `XPSpend` and atomic `spend_xp`/`refund_xp` services, mirrored from
+  the source project after regression testing. Debits use conditional balance
+  updates, globally unique references, and a one-time refund audit trail.
+- Added post-commit `xp_spent`/`xp_refunded` signals and read-only spend admin.
+  Earnings and weekly payout accounting remain in `XPLog`.
+- Migration `0002_xpspend` creates the spend ledger.
+
 ## [0.1.5] - 2026-10-02
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and

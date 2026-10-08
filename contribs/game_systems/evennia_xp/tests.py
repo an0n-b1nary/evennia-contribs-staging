@@ -14,13 +14,16 @@ Run:
     evennia test --settings test_xp_settings.py evennia_xp
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
 from decimal import Decimal
 from importlib import import_module
-from unittest.mock import MagicMock, patch
+from threading import Barrier
+from unittest.mock import MagicMock, Mock, patch
 
 from django.conf import settings
-from django.test import RequestFactory, override_settings
+from django.db import close_old_connections, transaction
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
@@ -34,7 +37,9 @@ from evennia_xp.batch import (
     _window_end_from_week_str,
     run_weekly_batch,
 )
-from evennia_xp.models import CharacterXP, XPLog
+from evennia_xp.models import CharacterXP, XPLog, XPSpend
+from evennia_xp.signals import xp_refunded, xp_spent
+from evennia_xp.spending import InsufficientXP, refund_xp, spend_xp
 from evennia_xp.views import XPSummaryView
 
 # ---------------------------------------------------------------------------
@@ -912,3 +917,116 @@ class TestXPSummaryRenders(EvenniaTest):
         # The linear-list branch replaces both tables with <ul aria-label=...>.
         self.assertIn('aria-label="XP award log"', html)
         self.assertNotIn('role="region" aria-label="XP award log"', html)
+
+
+class SpendingTests(TestCase):
+    def setUp(self):
+        CharacterXP.objects.create(character_id=1, total_earned=10, current_balance=10)
+
+    def test_spend_changes_only_spend_totals(self):
+        spend = spend_xp(1, "2.50", ref_key="purchase")
+        row = CharacterXP.objects.get(character_id=1)
+        self.assertEqual(
+            (row.total_earned, row.total_spent, row.current_balance),
+            (Decimal(10), Decimal("2.50"), Decimal("7.50")),
+        )
+        self.assertEqual(spend.amount, Decimal("2.50"))
+        self.assertFalse(XPLog.objects.exists())
+
+    def test_insufficient_and_missing_balance_leave_no_debit(self):
+        for character_id, amount in ((1, 11), (999, 1)):
+            with self.assertRaises(InsufficientXP):
+                spend_xp(character_id, amount, ref_key="failed")
+        self.assertFalse(XPSpend.objects.exists())
+
+    def test_reference_retry_and_conflict(self):
+        first = spend_xp(1, 10, ref_key="once")
+        self.assertEqual(spend_xp(1, 10, ref_key="once").pk, first.pk)
+        for character, amount, category in ((2, 10, "ability"), (1, 9, "ability"), (1, 10, "move")):
+            with self.assertRaises(ValueError):
+                spend_xp(character, amount, ref_key="once", category=category)
+        self.assertEqual(XPSpend.objects.count(), 1)
+
+    def test_refund_is_once_and_does_not_allow_reference_reuse(self):
+        spend_xp(1, 4, ref_key="refund")
+        self.assertEqual(refund_xp(2, ref_key="refund"), 0)
+        self.assertEqual(refund_xp(1, ref_key="missing"), 0)
+        self.assertEqual(refund_xp(1, ref_key="refund"), 4)
+        self.assertEqual(refund_xp(1, ref_key="refund"), 0)
+        spend_xp(1, 4, ref_key="refund")
+        row = CharacterXP.objects.get(character_id=1)
+        self.assertEqual((row.total_earned, row.total_spent, row.current_balance), (10, 0, 10))
+        self.assertIsNotNone(XPSpend.objects.get().refunded_at)
+
+    def test_invalid_amounts_and_references(self):
+        for value in (0, -1, "NaN", "Infinity", "0.001", "100000000", "bad"):
+            with self.assertRaises(ValueError):
+                spend_xp(1, value, ref_key="invalid")
+        for ref in ("", " ", "x" * 129):
+            with self.assertRaises(ValueError):
+                spend_xp(1, 1, ref_key=ref)
+        self.assertFalse(XPSpend.objects.exists())
+
+    def test_signals_wait_for_outer_commit_and_skip_retries(self):
+        spent, refunded = Mock(), Mock()
+        xp_spent.connect(spent, weak=False)
+        xp_refunded.connect(refunded, weak=False)
+        self.addCleanup(xp_spent.disconnect, spent)
+        self.addCleanup(xp_refunded.disconnect, refunded)
+        with self.captureOnCommitCallbacks(execute=True):
+            spend_xp(1, 2, ref_key="signals")
+            spend_xp(1, 2, ref_key="signals")
+            refund_xp(1, ref_key="signals")
+            refund_xp(1, ref_key="signals")
+            spent.assert_not_called()
+            refunded.assert_not_called()
+        spent.assert_called_once()
+        refunded.assert_called_once()
+
+    def test_outer_rollback_restores_debit_and_refund(self):
+        with (
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+            self.assertRaises(RuntimeError),
+            transaction.atomic(),
+        ):
+            spend_xp(1, 2, ref_key="rollback")
+            raise RuntimeError()
+        self.assertEqual(callbacks, [])
+        self.assertFalse(XPSpend.objects.exists())
+        spend_xp(1, 2, ref_key="refund-rollback")
+        with self.assertRaises(RuntimeError), transaction.atomic():
+            refund_xp(1, ref_key="refund-rollback")
+            raise RuntimeError()
+        self.assertIsNone(XPSpend.objects.get().refunded_at)
+        self.assertEqual(CharacterXP.objects.get().current_balance, 8)
+
+
+class ConcurrentSpendingTests(TransactionTestCase):
+    def test_two_writers_cannot_overspend(self):
+        from django.db import connection
+
+        if connection.vendor == "sqlite" and connection.is_in_memory_db():
+            self.skipTest(
+                "SQLite shared-memory tables fail immediately on locks; use a file test DB"
+            )
+        CharacterXP.objects.create(character_id=1, total_earned=10, current_balance=10)
+        barrier = Barrier(2)
+
+        def buy(ref):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                try:
+                    spend_xp(1, 7, ref_key=ref)
+                    return "paid"
+                except InsufficientXP:
+                    return "short"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(buy, ("one", "two")))
+        self.assertCountEqual(results, ["paid", "short"])
+        row = CharacterXP.objects.get(character_id=1)
+        self.assertEqual((row.current_balance, row.total_spent), (3, 7))
+        self.assertEqual(XPSpend.objects.count(), 1)

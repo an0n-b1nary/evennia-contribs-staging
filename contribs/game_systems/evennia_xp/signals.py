@@ -13,3 +13,7 @@ from django.dispatch import Signal
 
 xp_awarded = Signal()
 xp_batch_completed = Signal()
+
+# After commit: character_id and spend (XPSpend).
+xp_spent = Signal()
+xp_refunded = Signal()

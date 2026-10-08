@@ -26,20 +26,30 @@ Web/API surface (requires [web] extra):
     from evennia_xp.api.views import XPLogViewSet
 """
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
-from evennia_xp.signals import xp_awarded, xp_batch_completed
+from evennia_xp.signals import xp_awarded, xp_batch_completed, xp_refunded, xp_spent
 
 _LAZY = {
     "XPLog": "models",
     "CharacterXP": "models",
+    "XPSpend": "models",
+    "spend_xp": "spending",
+    "refund_xp": "spending",
+    "InsufficientXP": "spending",
 }
 
 __all__ = [
     "CharacterXP",
+    "InsufficientXP",
     "XPLog",
+    "XPSpend",
+    "refund_xp",
+    "spend_xp",
     "xp_awarded",
     "xp_batch_completed",
+    "xp_refunded",
+    "xp_spent",
 ]
 
 

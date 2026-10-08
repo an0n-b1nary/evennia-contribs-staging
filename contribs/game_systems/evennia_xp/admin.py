@@ -4,7 +4,7 @@
 
 from django.contrib import admin
 
-from evennia_xp.models import CharacterXP, XPLog
+from evennia_xp.models import CharacterXP, XPLog, XPSpend
 
 
 @admin.register(XPLog)
@@ -36,6 +36,20 @@ class XPLogAdmin(admin.ModelAdmin):
         "granted_by_name",
     )
     ordering = ("-awarded_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(XPSpend)
+class XPSpendAdmin(admin.ModelAdmin):
+    list_display = ("character_id", "amount", "category", "ref_key", "created_at", "refunded_at")
+    list_filter = ("category",)
+    search_fields = ("ref_key", "reason")
+    readonly_fields = tuple(field.name for field in XPSpend._meta.fields)
 
     def has_add_permission(self, request):
         return False

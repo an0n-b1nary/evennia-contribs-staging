@@ -171,11 +171,30 @@ degrades to 1.0 if the setting is unset or the resolver raises.
 
 ## XP spending
 
-`+spend` and `+upgrade` are game-specific (they tie into your ability/stat
-system). Implement them as separate commands in your game and link them to
-`CharacterXP.total_spent` / `CharacterXP.current_balance`. The `record_xp()`
-service only handles earning; spending is a plain `CharacterXP.objects.update()`
-in the opposite direction.
+Use the spend service rather than updating balances directly:
+
+```python
+from evennia_xp.spending import InsufficientXP, spend_xp, refund_xp
+
+spend_xp(character.pk, 3, ref_key="ability.purchase.123", category="ability", reason="Expertise")
+refund_xp(character.pk, ref_key="ability.purchase.123", by=staff_character)
+```
+
+`spend_xp` writes an `XPSpend` row and conditionally debits the balance in one
+transaction, including on SQLite. Missing or insufficient balances raise
+`InsufficientXP`. Amounts must be positive with at most two decimal places.
+References are globally unique: matching retries return the original row;
+conflicting character, amount or category raises `ValueError`. A refunded
+reference cannot be spent again. `refund_xp` returns the refunded amount, or
+zero for a missing or already refunded reference. Neither service changes
+`total_earned` or writes earn-only `XPLog` rows.
+
+`xp_spent` and `xp_refunded` fire after the outer transaction commits, with
+`character_id` and `spend` (`XPSpend`). Wrap a purchase and its other database
+writes in `transaction.atomic()` to roll everything back together.
+
+`+spend` and `+upgrade` remain consumer commands; `evennia-rp-chargen[xp]`
+provides them and the `EvenniaXPLedger` adapter.
 
 ---
 

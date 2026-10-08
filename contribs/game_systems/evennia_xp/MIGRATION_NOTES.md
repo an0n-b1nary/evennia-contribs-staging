@@ -72,8 +72,12 @@ since landed in the indicated contrib package.
   for the current week using game-specific collectors. The contrib omits this;
   games can implement it via a custom command or subclass.
 
-- **`+spend`/`+upgrade` omitted.** These are stubs in the source that
-  require a combat stats system (Phase 6). Document as consumer-implemented.
+- **Spending (0.2.0).** `XPSpend`, `spend_xp`/`refund_xp`, and their post-commit
+  signals were implemented and regression-tested in the source project first,
+  then mirrored here. Migration `0002_xpspend` adds the debit ledger, using
+  integer character/staff references. `XPLog` remains earn-only. Commands
+  `+spend`/`+upgrade` belong to the consuming ability system; rp-chargen ships
+  those commands and an optional adapter for this ledger.
 
 - **No `evennia-links` dependency.** The source XP app had no bridge models
   and no `AbstractLink`/`Archived` usage. The contrib correctly has zero
