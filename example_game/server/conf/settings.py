@@ -296,7 +296,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 ######################################################################
 # XP integration — collectors/sweeps/hooks shipped by the contribs
 # themselves (not game-local glue). See world/sandbox/glue.py for the
-# handful of dotted-path hooks that have no shipped default.
+# two RP-rules hooks that stay game-local.
 ######################################################################
 
 XP_STAFF_LOCK = "cmd:perm(Builder)"
@@ -360,8 +360,16 @@ RPTRACKER_POSE_SPAM_MAX_SECONDS = 600
 RPTRACKER_SCENE_DISPLAY = (
     "evennia_scenes.display.render_scene_ref" if "evennia_scenes" in INSTALLED_APPS else None
 )
-RPTRACKER_XP_PROJECTION = None  # no shipped default; cosmetic-only, omitted
-RPTRACKER_FLAG_REVIEW_HOOK = "world.sandbox.glue.rptracker_flag_review_hook"
+# Both hooks ship in the partner contrib; each is gated so removing the partner
+# leaves the hook unset instead of pointing at a module that can't import.
+RPTRACKER_XP_PROJECTION = (
+    "evennia_xp.projection.activity_lines" if "evennia_xp" in INSTALLED_APPS else None
+)
+RPTRACKER_FLAG_REVIEW_HOOK = (
+    "evennia_jobs.integrations.staff_review.file_review_job"
+    if "evennia_jobs" in INSTALLED_APPS
+    else None
+)
 
 ######################################################################
 # Scenes configuration
@@ -375,7 +383,11 @@ SCENES_STAFF_LOCK = "cmd:perm(Builder)"
 
 BOARDS_STAFF_LOCK = "cmd:perm(Builder)"
 BOARDS_CALENDAR_APP_LABEL = "evennia_calendar"
-BOARDS_ANTIGAMING_REPORTER = "world.sandbox.glue.boards_antigaming_reporter"
+BOARDS_ANTIGAMING_REPORTER = (
+    "evennia_jobs.integrations.staff_review.file_review_job"
+    if "evennia_jobs" in INSTALLED_APPS
+    else None
+)
 
 ######################################################################
 # Calendar configuration
@@ -409,7 +421,9 @@ LORE_PLOTS_APP_LABEL = "evennia_plots"
 # has_lore map overlay all resolve RegionMembership through this label.
 LORE_REGIONS_APP_LABEL = "evennia_regions"
 
-LORE_SESSION_CONTEXT_PROVIDER = "world.sandbox.glue.lore_session_context_provider"
+# Shipped provider: room, primary region and plot threads, each through the
+# label settings above (an absent partner just drops its part).
+LORE_SESSION_CONTEXT_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
 
 ######################################################################
 # Regions configuration

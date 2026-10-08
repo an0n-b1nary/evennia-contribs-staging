@@ -27,18 +27,18 @@ and `evennia_rp_contest`). See `server/conf/settings.py` for the full `INSTALLED
 every XP/rptracker/lore/boards/plots/regions/maps/posing/social setting.
 
 **Settings hooks point at the contribs' own shipped integration functions**
-(`evennia_*.integrations.*`), not at hand-written glue — except the
-dotted-path settings below (five wired to `world/sandbox/glue.py`, two
-deliberately omitted):
+(`evennia_*.integrations.*`), not at hand-written glue. The table lists the
+hooks that point somewhere other than an `integrations` module or are left
+out, including the two that stay in `world/sandbox/glue.py`:
 
 | Setting | Wired to |
 |---|---|
-| `RPTRACKER_FLAG_REVIEW_HOOK` | `world/sandbox/glue.py` → files an `evennia_jobs` ticket |
-| `BOARDS_ANTIGAMING_REPORTER` | `world/sandbox/glue.py` → files an `evennia_jobs` ticket |
-| `LORE_SESSION_CONTEXT_PROVIDER` | `world/sandbox/glue.py` → resolves room/scene context via rptracker + plots |
+| `RPTRACKER_FLAG_REVIEW_HOOK` | `evennia_jobs.integrations.staff_review.file_review_job` → a staff-only `+discuss` ticket |
+| `BOARDS_ANTIGAMING_REPORTER` | the same jobs reporter |
+| `LORE_SESSION_CONTEXT_PROVIDER` | `evennia_lore.integrations.session_context.get_session_context` → room, primary region, plot threads |
+| `RPTRACKER_XP_PROJECTION` | `evennia_xp.projection.activity_lines` → projected XP under `+activity` (unset without `evennia_xp`) |
 | `RP_RULES_SUBJECT_ADAPTER` | `world/sandbox/glue.py` → chargen sheet, else a sandbox stat block |
 | `RP_RULES_VOCABULARY` | `world/sandbox/glue.py` → chargen's DB vocabulary, else ruleset tags |
-| `RPTRACKER_XP_PROJECTION` | left `None` (cosmetic-only `+activity` lines) |
 | plots' `XP_POST_BATCH_HOOKS` entry | omitted — no `flip_thread_flags` equivalent ships |
 
 **Typeclass seams.** `typeclasses/characters.py` and `typeclasses/rooms.py`
