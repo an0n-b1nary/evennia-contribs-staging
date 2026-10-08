@@ -335,7 +335,40 @@ class Command(BaseCommand):
             for text in content.RP_CHALLENGES:
                 open_challenge(authors[0], parse_challenge(text))
                 counts["rp_challenges"] += 1
+        if apps.is_installed("evennia_rp_equipment"):
+            counts["rp_gear"] = self._create_rp_gear(room, authors)
         return counts
+
+    def _create_rp_gear(self, room, authors):
+        """Practice gear: some on the floor, some worn by the demonstration characters.
+
+        Worn pieces go through the real wear service, so their requirements are
+        checked against the builds seeded just above and the change guard holds
+        those pips and abilities from the start.
+        """
+        from evennia.utils.create import create_object
+        from evennia_rp_equipment import conf as gear_conf
+        from evennia_rp_equipment import services as gear
+        from evennia_rp_equipment.requirements import parse
+
+        for spec in content.RP_GEAR:
+            wearer = None if spec["worn_by"] is None else authors[spec["worn_by"]]
+            item = create_object(
+                gear_conf.get("RP_EQUIPMENT_TYPECLASS"),
+                key=spec["key"],
+                location=wearer or room,
+                home=room,
+                tags=[(SANDBOX_TAG, SANDBOX_TAG_CATEGORY)],
+                attributes=[("desc", spec["desc"])],
+            )
+            item.maker_name = content.RP_GEAR_MAKER
+            item.slot = spec["slot"]
+            item.worn_line = spec["line"]
+            item.requirement_data = [parse(text).to_dict() for text in spec["requires"]]
+            item.sealed = True  # the quartermaster's work; nobody edits it
+            if wearer is not None:
+                gear.wear(wearer, item)
+        return len(content.RP_GEAR)
 
     def _tag(self, obj):
         obj.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)

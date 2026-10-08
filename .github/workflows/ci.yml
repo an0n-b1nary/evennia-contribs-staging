@@ -128,10 +128,10 @@ jobs:
             excludes: "--exclude evennia-rptracker"
             absent: "--absent evennia_rptracker"
           - profile: no-chargen
-            excludes: "--exclude evennia-rp-chargen"
+            excludes: "--exclude evennia-rp-chargen --exclude evennia-rp-equipment"
             absent: "--absent evennia_rp_chargen"
           - profile: kernel-only
-            excludes: "--exclude evennia-scenes --exclude evennia-rptracker --exclude evennia-rp-chargen"
+            excludes: "--exclude evennia-scenes --exclude evennia-rptracker --exclude evennia-rp-chargen --exclude evennia-rp-equipment"
             absent: "--absent evennia_scenes --absent evennia_rptracker --absent evennia_rp_chargen"
     steps:
       - uses: actions/checkout@v7
@@ -170,8 +170,11 @@ jobs:
             excludes: "--exclude evennia-xp"
             absent: "--absent evennia_xp"
           - profile: no-chargen
-            excludes: "--exclude evennia-rp-chargen"
-            absent: "--absent evennia_rp_chargen"
+            excludes: "--exclude evennia-rp-chargen --exclude evennia-rp-equipment"
+            absent: "--absent evennia_rp_chargen --absent evennia_rp_equipment"
+          - profile: no-equipment
+            excludes: "--exclude evennia-rp-equipment"
+            absent: "--absent evennia_rp_equipment"
           - profile: no-contest
             excludes: "--exclude evennia-rp-contest"
             absent: "--absent evennia_rp_contest"

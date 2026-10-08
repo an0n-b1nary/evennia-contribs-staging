@@ -40,6 +40,14 @@ def at_server_start():
         recover_orphaned_sessions()
         ensure_idle_check_running()
 
+    # evennia_rp_equipment — log worn gear whose requirements no longer hold
+    # (a ruleset or catalog edit renamed what they name). Read-only; staff
+    # settle each case by hand, also listed by +gear/audit.
+    if apps.is_installed("evennia_rp_equipment"):
+        from evennia_rp_equipment.audit import log_problems
+
+        log_problems()
+
     # evennia_calendar — start the lottery/RSVP-expiry/reminder maintenance
     # Script. Evennia has no server-start signal the contrib can hook itself,
     # so this call is required (see the contrib's README §"Wire the

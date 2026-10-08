@@ -113,6 +113,7 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
                     "chargen",
                 ),
             ),
+            ("evennia_rp_equipment", ("gear", "wear", "remove", "worn")),
             ("evennia_scenes", ("scene", "log")),
             ("evennia_rptracker", ("activity",)),
             ("evennia_xp", ("xp",)),
@@ -125,6 +126,39 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
             }
             for key in keys:
                 self.assertEqual(key in names, apps.is_installed(label), (label, key))
+
+    def test_worn_gear_holds_the_build_or_is_absent(self):
+        """Seeded gear worn by a demo character: shown in `look`, and its pips held.
+
+        Runs the real chargen services against the real equipment guard, through
+        the game's own Character display hooks. Without equipment (it is absent
+        whenever chargen is), nothing is seeded and `look` is unchanged.
+        """
+        wearer = self.samples[0]  # wears the duelist's gloves (Agility +2)
+        if not apps.is_installed("evennia_rp_equipment"):
+            self.assertFalse(search_object("duelist's gloves").exists())
+            self.assertNotIn("Wearing:", wearer.return_appearance(self.char1))
+            return
+        from evennia_rp_chargen import abilities
+        from evennia_rp_chargen import services as chargen
+        from evennia_rp_chargen.services import ChargenError
+        from evennia_rp_equipment import services as gear
+
+        gloves = search_object("duelist's gloves")[0]
+        charm = search_object("blade charm")[0]
+        self.assertEqual((gloves.wearer, charm.wearer), (wearer, self.samples[1]))
+        self.assertTrue(search_object("heavy maul")[0].location == self.grounds)
+        appearance = wearer.return_appearance(self.char1)
+        self.assertIn("Wearing:", appearance)
+        self.assertIn("supple duelist's gloves", appearance)
+        self.assertNotIn("You see: a duelist's gloves", appearance)
+
+        with self.assertRaisesMessage(ChargenError, "Agility ++ is held by your duelist's gloves."):
+            chargen.set_edge(wearer, "agility", 1)
+        with self.assertRaisesMessage(ChargenError, "Combat Focus: Blades is held by"):
+            abilities.unequip(self.samples[1], "combat focus", "blades")
+        gear.remove(wearer, gloves)
+        chargen.set_edge(wearer, "agility", 1)
 
     def test_actual_pose_and_disconnect_hooks(self):
         sample = self.samples[0]
