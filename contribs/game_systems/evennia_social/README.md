@@ -4,8 +4,8 @@
 
 The social quality-of-life command layer for [Evennia](https://www.evennia.com/)
 games: character profiles, player/venue discovery, private messaging,
-ignore/mute, consensual teleportation, OOC room chat, and navigation
-shortcuts.
+ignore/mute, consensual teleportation, OOC room chat, navigation
+shortcuts, and room mood.
 
 This is a **leaf** layer — it depends on [evennia-posing](../evennia_posing)
 but nothing depends on it. Install it once you have the pose pipeline in
@@ -87,7 +87,7 @@ they touch disjoint state.
 from evennia_social.commands import (
     CmdFinger, CmdWhere, CmdHangouts, CmdIgnore, CmdPage,
     CmdSummon, CmdJoin, CmdOoc, CmdOocTeleport, CmdHome,
-    CmdRoomConfig, CmdRoulette, CmdTel,
+    CmdRoomConfig, CmdRoulette, CmdTel, CmdMood,
 )
 
 class CharacterCmdSet(CmdSet):
@@ -105,6 +105,7 @@ class CharacterCmdSet(CmdSet):
         self.add(CmdRoomConfig)
         self.add(CmdRoulette)
         self.add(CmdTel)   # replaces Evennia's stock @tel
+        self.add(CmdMood)
 ```
 
 ### 3. Register the settings this contrib reads
@@ -138,7 +139,36 @@ Permitted for the room's owner (`control` access) or Builder+ staff. The
 valid types are `evennia_social.HANGOUT_TYPES`. You can equivalently set
 `room.hangout_type = "bar"` from Python.
 
-### 5. Character seams this contrib provides
+### 5. Room mood
+
+A mood is one line of atmosphere shown under the room's description:
+
+```
++mood                       - show the mood and who set it
++mood Rain hammers the shutters; the fire is low.
++mood/clear                 - remove it
+```
+
+Setting or clearing it is announced to the room. `SocialRoomMixin` renders it
+in `look` as `[Mood] <text> (set by <name>)`.
+
+Who can set it:
+
+| Situation | Who |
+|---|---|
+| Always | The room's owner (`control` access) and Builder+ staff |
+| A public scene is running in the room | Also any active participant (not observers) |
+| A scene with any other privacy tier is running | Also its host, and no one else |
+
+The scene rules need [evennia-scenes](../evennia_scenes); without it only
+owners and staff can set a mood. If your scenes app has a different label, set
+`SOCIAL_SCENES_APP_LABEL`. A privacy tier this contrib doesn't recognise is
+treated as private. Closing a scene does not clear the mood.
+
+From Python: `evennia_social.mood.set_mood(room, text, setter)`,
+`clear_mood(room)`, and `can_set_mood(character, room)`.
+
+### 6. Character seams this contrib provides
 
 - `visited_rooms` — feeds `@tel`'s "visited" teleport mode.
 - `home_room` — used by `+home`.
@@ -146,7 +176,7 @@ valid types are `evennia_social.HANGOUT_TYPES`. You can equivalently set
   `page`/`+summon`/`+join`.
 - `profile_*`, `followed_themes` — `+finger` state.
 
-### 6. Optional attributes this contrib *reads* but does not own
+### 7. Optional attributes this contrib *reads* but does not own
 
 Both are read with a defensive default, so a game that never defines them
 behaves sensibly and needs to do nothing here.
@@ -155,7 +185,6 @@ behaves sensibly and needs to do nothing here.
 |---|---|---|---|
 | `room_type` | Room | `"ic"` | `+where`/`+hangouts`/`+summon`/`+join`/`+home` treat `"staff"` rooms as staff-only, and `+where/ic` / `+where/ooc` filter on `"ic"`/`"ooc"`. Owned by no contrib — `evennia-rptracker` and `evennia-scenes` read it too, so it stays a game-level Room attribute. |
 | `combat_state` | Character | `"idle"` | `@tel` refuses to teleport a character whose `combat_state == "in_combat"`, with a clearer message than a generic failure. Purely a nicety: if your game blocks combat movement in `at_pre_move` (the usual place), the move is rejected anyway. |
-| `room_mood` | Room | `""` | Shown in `+hangouts` listings and `+roomconfig`'s display when set. |
 
 ---
 

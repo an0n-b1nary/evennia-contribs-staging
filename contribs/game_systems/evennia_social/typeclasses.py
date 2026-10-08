@@ -206,8 +206,8 @@ class SocialCharacterMixin:
 
 
 class SocialRoomMixin:
-    """Room mixin providing hangout-directory designation and per-room
-    teleport access control.
+    """Room mixin providing hangout-directory designation, per-room teleport
+    access control, and the room mood shown under the description.
     """
 
     # -- Hangout designation: one of HANGOUT_TYPES, or None --
@@ -215,3 +215,16 @@ class SocialRoomMixin:
 
     # -- Teleport access: "public", "private", or "secret" --
     allow_teleport = AttributeProperty(default="public")
+
+    # -- Mood: one line of atmosphere, set with +mood (see mood.py) --
+    room_mood = AttributeProperty(default="", autocreate=False)
+    # Key of the character who set it, kept for attribution.
+    room_mood_setter = AttributeProperty(default=None, autocreate=False)
+
+    def get_display_desc(self, looker, **kwargs):
+        """Room description, with the mood (and who set it) underneath when set."""
+        desc = super().get_display_desc(looker, **kwargs)
+        if self.room_mood:
+            byline = f" |x(set by {self.room_mood_setter})|n" if self.room_mood_setter else ""
+            desc = f"{desc}\n\n|w[Mood]|n {self.room_mood}{byline}"
+        return desc

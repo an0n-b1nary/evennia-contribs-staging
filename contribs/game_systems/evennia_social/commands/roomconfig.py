@@ -90,8 +90,9 @@ class CmdRoomConfig(MuxCommand):
         lines.append(f"|w+{'=' * left}{header}{'=' * right}+|n")
 
         lines.append(f" |wRoom:|n {room.key}")
-        # room_type / room_mood are shared, contrib-agnostic Room attributes
-        # owned by no contrib — read defensively. See README.
+        # room_type is a shared, contrib-agnostic Room attribute owned by no
+        # contrib, and room_mood may be absent on a Room without
+        # SocialRoomMixin — read both defensively. See README.
         room_type = getattr(room, "room_type", "ic") or "ic"
         lines.append(f" |wType:|n {room_type.upper()}")
 
@@ -103,7 +104,9 @@ class CmdRoomConfig(MuxCommand):
 
         mood = getattr(room, "room_mood", "") or ""
         if mood:
-            lines.append(f" |wMood:|n {mood}")
+            setter = getattr(room, "room_mood_setter", None)
+            byline = f" |x(set by {setter})|n" if setter else ""
+            lines.append(f" |wMood:|n {mood}{byline}")
 
         lines.append(f"|w+{'=' * (width - 2)}+|n")
         caller.msg("\n".join(lines))

@@ -117,3 +117,29 @@ signal-based decoupling).
 - **2D (editing framework)** — `+finger`'s bio editor uses plain `EvEditor`
   callbacks, not the source's version-tracked editing mixin, so no editing
   framework was pulled in (confirmed during the scoping pass, `finger.py`).
+
+---
+
+## 0.2.0 — room mood (2026-10-07)
+
+The source declared `room_mood` and `room_mood_setter` on its Room typeclass
+and appended the mood to `get_display_desc()`, but never shipped a command to
+set it: its design notes planned a scene-aware `+mood`. The 0.1.0 extraction
+treated `room_mood` as a game-level attribute owned by no contrib. It now
+belongs here, because this contrib already displayed it (`+hangouts`,
+`+roomconfig`) and its room mixin is where the source rendered it.
+
+| Source | Contrib |
+|---|---|
+| `typeclasses/rooms.py` `room_mood`, `room_mood_setter` AttributeProperties | `SocialRoomMixin` (same keys and defaults, so existing data carries over) |
+| `typeclasses/rooms.py` `get_display_desc()` mood suffix | `SocialRoomMixin.get_display_desc()`, plus a `(set by …)` byline |
+| *(designed, not built)* `+mood` | `commands/mood.py` `CmdMood`; rules in `mood.py` |
+
+The permission model follows the source design for the no-scene case (owner
+or Builder+, the same gate as `+roomconfig`) and its public-scene case (any
+participant). For private scenes the source design distinguished pose-private
+(host plus invited) from view-private (host only). This port uses host-only
+for every non-public tier, fail-closed for tiers it doesn't know, and leaves
+out the design's `+mood/request` approval flow. `evennia-scenes` is a soft
+partner: `SOCIAL_SCENES_APP_LABEL`, model lookup through `apps.get_model`,
+nothing imported when absent.

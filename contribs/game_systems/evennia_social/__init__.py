@@ -4,8 +4,8 @@
 evennia_social — the social quality-of-life command layer for Evennia
 games: character profiles (+finger), player/venue discovery (+where,
 +hangouts), private messaging (page), ignore/mute, consensual teleportation
-(+summon/+join), OOC room chat and navigation shortcuts (+ooc, +home), and
-an enhanced @tel.
+(+summon/+join), OOC room chat and navigation shortcuts (+ooc, +home), room
+mood (+mood), and an enhanced @tel.
 
 No Django models — all state lives on Character/Room AttributeProperty
 fields, so there is nothing to migrate.
@@ -27,7 +27,7 @@ Commands (import explicitly when needed):
     from evennia_social.commands import (
         CmdFinger, CmdWhere, CmdHangouts, CmdIgnore, CmdPage,
         CmdSummon, CmdJoin, CmdOoc, CmdOocTeleport, CmdHome,
-        CmdRoomConfig, CmdRoulette, CmdTel,
+        CmdRoomConfig, CmdRoulette, CmdTel, CmdMood,
     )
 
 Screen-reader support (requires the [accessibility] extra):
@@ -51,7 +51,7 @@ apps.py is discovered during that phase, since evennia_social is itself
 listed in INSTALLED_APPS).
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 _LAZY = {
     "SocialCharacterMixin": "typeclasses",
