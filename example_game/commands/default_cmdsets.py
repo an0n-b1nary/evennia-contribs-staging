@@ -117,6 +117,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "evennia_rp_chargen",
             "CmdSheet",
             "CmdStats",
+            "CmdPips",
             "CmdAbilities",
             "CmdLock",
             "CmdUnlock",
@@ -125,10 +126,6 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdChargen",
         ):
             self.add(command)
-        if apps.is_installed("evennia_rp_chargen"):
-            from commands.rp import CmdEdge
-
-            self.add(CmdEdge)
         for command in _optional_commands("evennia_rp_contest", "CmdTest"):
             self.add(command)
 

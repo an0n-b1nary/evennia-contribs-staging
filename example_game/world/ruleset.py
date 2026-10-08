@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""The sandbox's ruleset: seven graded stats, D-S, with Edge and Weakness pips.
+"""The sandbox's ruleset: seven graded stats, D-S, with + and weakness pips.
 
 STATUS: SIGNED OFF 2026-10-02 for playtesting (see the decisions log at the
 end of this docstring). Retune with the odds tool, run from `example_game/`,
@@ -12,12 +12,13 @@ and log any change below:
 
 Nothing here is player-facing except names: players see grades, `+`/`-` pips
 and outcome labels, never scores. Retuning never changes what a sheet shows.
+Every name is the game's to change; a sheet stores keys, never names.
 
 How the numbers fit together
 ----------------------------
 
 - Grades sit 20 points apart: D 0, C 20, B 40, A 60, S 80.
-- Edge pips depreciate (5, 4, 3, 2, 2: 16 points for all five) and are worth
+- `+` pips depreciate (5, 4, 3, 2, 2: 16 points for all five) and are worth
   less on higher grades (factor 1.0 at D down to 0.6 at S), so `D +++++` is
   most of the way to C (16 of 20) while `S +++++` is under half a grade (9.6).
   The last two pips are equal so the fifth still counts on S (2 x 0.6 = 1.2);
@@ -89,10 +90,28 @@ Decisions log
 - Elemental Focus mirrors Domain Expertise on the six conventional elements.
 - Domain Receptivity and Aversion are retired. Resistance and Vulnerability
   remain, for both domains and elements.
+
+2026-10-08, generic vocabulary (every number unchanged):
+
+- Stats are the classic seven: Strength, Endurance and Agility (physical),
+  Intellect and Intuition (mental), Presence and Resolve (social). They were
+  Prowess, Toughness, Agility, Wit, Sensitivity, Charisma and Will. Intellect
+  takes cunning; Resolve keeps methodical work.
+- Fighting styles replace elements as the second tag kind (`style`): Blades,
+  Blunt, Polearms, Archery, Unarmed and Spellcraft. A move has a style the
+  way it would have an element, and a style is also a `+test` tag.
+- Domain Expertise is Proficiency: a general benefit in combat (once combat
+  exists) and a specific one on tests in its domain. Elemental Focus is
+  Combat Focus, on a style: a specific benefit in combat and a general one
+  on tests carrying the style. Resistance and Vulnerability exist for both
+  kinds; Domain Ineptitude is Ineptitude.
+- Edge pips are just pips, through the contrib's `+pips`; the loadout counts
+  in the contrib's default "points". Scholarship and Ritual descriptions lose
+  their setting-specific notes.
 """
 
 RULESET = {
-    "version": "sandbox-2",
+    "version": "sandbox-3",
     "scales": {
         "grade": {
             "name": "Grade",
@@ -103,46 +122,47 @@ RULESET = {
                 {"key": "a", "label": "A", "score": 60, "edge_factor": 0.7},
                 {"key": "s", "label": "S", "score": 80, "edge_factor": 0.6},
             ],
+            # The rules contrib calls + pips "edge" and - pips "weakness".
             "edge": [5, 4, 3, 2, 2],
             "weakness": [1, 2, 4, 5, 6],
         },
     },
     "stats": [
         {
-            "key": "prowess",
-            "name": "Prowess",
+            "key": "strength",
+            "name": "Strength",
             "category": "physical",
-            "description": "Force, strength, martial skill and finesse with a weapon.",
+            "description": "Force, power, martial skill and finesse with a weapon.",
         },
         {
-            "key": "toughness",
-            "name": "Toughness",
+            "key": "endurance",
+            "name": "Endurance",
             "category": "physical",
-            "description": "Endurance: weathering pain, poison, cold and hardship.",
+            "description": "Stamina: weathering pain, poison, cold and hardship.",
         },
         {
-            "key": "wit",
-            "name": "Wit",
+            "key": "intellect",
+            "name": "Intellect",
             "category": "mental",
-            "description": "Thinking fast, improvising, misdirection and cunning.",
+            "description": "Reasoning, knowledge, quick thinking and cunning.",
         },
         {
-            "key": "sensitivity",
-            "name": "Sensitivity",
+            "key": "intuition",
+            "name": "Intuition",
             "category": "mental",
-            "description": "Empathy, intuition, noticing and feeling the metaphysical.",
+            "description": "Empathy, instinct, noticing and sensing the unseen.",
         },
         {
-            "key": "charisma",
-            "name": "Charisma",
+            "key": "presence",
+            "name": "Presence",
             "category": "social",
-            "description": "Presence, allure, leadership and performance.",
+            "description": "Charm, allure, leadership and performance.",
         },
         {
-            "key": "will",
-            "name": "Will",
+            "key": "resolve",
+            "name": "Resolve",
             "category": "social",
-            "description": "Resolve, discipline, patience and methodical work.",
+            "description": "Discipline, patience, nerve and methodical work.",
         },
         {
             "key": "agility",
@@ -157,89 +177,120 @@ RULESET = {
         {
             "key": "acrobatics",
             "name": "Acrobatics",
-            "description": "Balance, tumbling, falls and aerial movement. Suggested: Agility, Prowess.",
+            "description": "Balance, tumbling, falls and aerial movement. Suggested: Agility, Strength.",
         },
         {
             "key": "alchemy",
             "name": "Alchemy",
-            "description": "Identifying and handling substances: potions, poisons and reagents. Suggested: Will, Wit.",
+            "description": "Identifying and handling substances: potions, poisons and reagents. Suggested: Resolve, Intellect.",
         },
         {
             "key": "athletics",
             "name": "Athletics",
-            "description": "Climbing, swimming, lifting, running and grappling. Suggested: Prowess, Toughness.",
+            "description": "Climbing, swimming, lifting, running and grappling. Suggested: Strength, Endurance.",
         },
         {
             "key": "deception",
             "name": "Deception",
-            "description": "Lies, disguise, bluffing and forgery. Suggested: Wit, Charisma.",
+            "description": "Lies, disguise, bluffing and forgery. Suggested: Intellect, Presence.",
         },
         {
             "key": "insight",
             "name": "Insight",
-            "description": "Reading motives, lies and moods. Suggested: Sensitivity, Wit.",
+            "description": "Reading motives, lies and moods. Suggested: Intuition, Intellect.",
         },
         {
             "key": "intimidation",
             "name": "Intimidation",
-            "description": "Threats, menace and interrogation. Suggested: Charisma, Prowess.",
+            "description": "Threats, menace and interrogation. Suggested: Presence, Strength.",
         },
         {
             "key": "medicine",
             "name": "Medicine",
-            "description": "Wounds, illness, diagnosis and surgery. Suggested: Sensitivity, Will.",
+            "description": "Wounds, illness, diagnosis and surgery. Suggested: Intuition, Resolve.",
         },
         {
             "key": "perception",
             "name": "Perception",
-            "description": "Noticing, searching and spotting danger. Suggested: Sensitivity, Wit.",
+            "description": "Noticing, searching and spotting danger. Suggested: Intuition, Intellect.",
         },
         {
             "key": "performance",
             "name": "Performance",
-            "description": "Music, oratory, dance and acting. Suggested: Charisma, Sensitivity.",
+            "description": "Music, oratory, dance and acting. Suggested: Presence, Intuition.",
         },
         {
             "key": "persuasion",
             "name": "Persuasion",
-            "description": "Argument, negotiation, diplomacy and rallying. Suggested: Charisma, Wit.",
+            "description": "Argument, negotiation, diplomacy and rallying. Suggested: Presence, Intellect.",
         },
         {
             "key": "ritual",
             "name": "Ritual",
-            "description": "Rites, wards, spirits, curses and sensing the metaphysical. Suggested: Will, Sensitivity.",
+            "description": "Rites, wards, spirits and curses. Suggested: Resolve, Intuition.",
         },
         {
             "key": "scholarship",
             "name": "Scholarship",
-            "description": "History, languages, law and natural philosophy, including magitech. Suggested: Will, Wit.",
+            "description": "History, languages, law and natural philosophy. Suggested: Resolve, Intellect.",
         },
         {
             "key": "seduction",
             "name": "Seduction",
-            "description": "Charm, allure and flirtation. Suggested: Charisma, Sensitivity.",
+            "description": "Charm, allure and flirtation. Suggested: Presence, Intuition.",
         },
         {
             "key": "stealth",
             "name": "Stealth",
-            "description": "Sneaking, hiding and shadowing someone. Suggested: Agility, Sensitivity.",
+            "description": "Sneaking, hiding and shadowing someone. Suggested: Agility, Intuition.",
         },
         {
             "key": "survival",
             "name": "Survival",
-            "description": "Wilderness, tracking, beasts, weather and hardship. Suggested: Toughness, Sensitivity.",
+            "description": "Wilderness, tracking, beasts, weather and hardship. Suggested: Endurance, Intuition.",
         },
         {
             "key": "thievery",
             "name": "Thievery",
-            "description": "Pickpocketing, locks, palming and sleight of hand. Suggested: Wit, Agility.",
+            "description": "Pickpocketing, locks, palming and sleight of hand. Suggested: Intellect, Agility.",
         },
-        {"key": "fire", "name": "Fire", "kind": "element"},
-        {"key": "water", "name": "Water", "kind": "element"},
-        {"key": "air", "name": "Air", "kind": "element"},
-        {"key": "earth", "name": "Earth", "kind": "element"},
-        {"key": "light", "name": "Light", "kind": "element"},
-        {"key": "darkness", "name": "Darkness", "kind": "element"},
+        # Fighting styles: a move has one, and any test may carry one too.
+        {
+            "key": "blades",
+            "name": "Blades",
+            "kind": "style",
+            "description": "Swords, daggers and axes.",
+        },
+        {
+            "key": "blunt",
+            "name": "Blunt",
+            "kind": "style",
+            "description": "Maces, hammers, staves and clubs.",
+        },
+        {
+            "key": "polearms",
+            "name": "Polearms",
+            "kind": "style",
+            "description": "Spears, glaives and halberds.",
+        },
+        {
+            "key": "archery",
+            "name": "Archery",
+            "kind": "style",
+            "description": "Bows, crossbows and slings.",
+        },
+        {
+            "key": "unarmed",
+            "name": "Unarmed",
+            "kind": "style",
+            "description": "Fists, kicks, grapples and holds.",
+        },
+        {
+            "key": "spellcraft",
+            "name": "Spellcraft",
+            "kind": "style",
+            "description": "Battle magic: bolts, blasts and barriers.",
+        },
     ],
     # Degrees mirror around zero: the sign says success or failure, the size
     # says by how much.
@@ -271,20 +322,20 @@ RULESET = {
 # The sandbox settings import these values. Keep numeric tuning in one place.
 # ---------------------------------------------------------------------------
 
-# P1/P3: Domain Expertise is a flat score bonus on tests tagged with its
-# domain. Upgrades are an XP dump: they do something, just not much.
-DOMAIN_EXPERTISE = {"score": 8, "per_level": 1, "max_level": 5, "memory": 10}
+# P1/P3: Proficiency is a flat score bonus on tests tagged with its domain.
+# Upgrades are an XP dump: they do something, just not much.
+PROFICIENCY = {"score": 8, "per_level": 1, "max_level": 5, "loadout_cost": 10}
 
 # P2: point-buy stat allocation during the draft stage. Escalating costs make
 # stacking expensive; the budget buys "all B" or a specialised spread such as
 # S B B B C D D, A A A B D D D, or even S S D D D D D (allowed on purpose).
 POINT_BUY = {"costs": {"d": 0, "c": 1, "b": 2, "a": 4, "s": 7}, "budget": 14}
 
-# P2: pip policy (from the design: 10 Edge total, 5 per stat; weakness free).
-PIPS = {"edge_budget": 10, "edge_cap": 5, "weakness_cap": 5}
+# P2: pip policy (from the design: 10 + pips total, 5 per stat; weakness free).
+PIPS = {"budget": 10, "cap": 5, "weakness_cap": 5}
 
-# P3: ability loadout budget.
-MEMORY_BUDGET = 100
+# P3: ability loadout budget, in points.
+LOADOUT_BUDGET = 100
 
 # P4: difficulty used when `+test` names no challenge, and whether a challenge
 # may carry pips (`+test/set A+=...`, `B--`) for finer storyteller control.
@@ -295,50 +346,50 @@ DIFFICULTY_ALLOWS_PIPS = True
 # The starting allowance is spent before earned XP and never counts toward XP
 # totals. Upgrade n (1-based) costs `base * factor ** (n - 1)`.
 STARTING_ALLOWANCE = 10
-ABILITY_XP_COST = {"domain_expertise": 3}
+ABILITY_XP_COST = {"proficiency": 3}
 UPGRADE_COST = {"base": 2, "factor": 2}
 
 # P3: the ability catalog seed (RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG").
 # Families are templates acquired once per tag. The combat-specific behavior
 # waits for a combat contrib; these effects apply only to the shared RP checks.
-FLAW_PENALTY = DOMAIN_EXPERTISE["score"]
+FLAW_PENALTY = PROFICIENCY["score"]
 
 CATALOG = [
     {
-        "key": "domain-expertise",
-        "name": "Domain Expertise",
+        "key": "proficiency",
+        "name": "Proficiency",
         "category": "domain",
         "tag_kind": "domain",
         "acquisition": "xp",
-        "xp_cost": ABILITY_XP_COST["domain_expertise"],
-        "max_level": DOMAIN_EXPERTISE["max_level"],
-        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "xp_cost": ABILITY_XP_COST["proficiency"],
+        "max_level": PROFICIENCY["max_level"],
+        "budget_cost": PROFICIENCY["loadout_cost"],
         "description": "A bonus on every test in the domain, growing a little with each level.",
         "effects": [
             {
                 "kind": "tag_bonus",
                 "tags": ["@tag"],
-                "score": DOMAIN_EXPERTISE["score"],
-                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "score": PROFICIENCY["score"],
+                "per_level": PROFICIENCY["per_level"],
             }
         ],
     },
     {
-        "key": "elemental-focus",
-        "name": "Elemental Focus",
-        "category": "element",
-        "tag_kind": "element",
+        "key": "combat-focus",
+        "name": "Combat Focus",
+        "category": "style",
+        "tag_kind": "style",
         "acquisition": "xp",
-        "xp_cost": ABILITY_XP_COST["domain_expertise"],
-        "max_level": DOMAIN_EXPERTISE["max_level"],
-        "budget_cost": DOMAIN_EXPERTISE["memory"],
-        "description": "A bonus on tests carrying the element, growing a little with each level.",
+        "xp_cost": ABILITY_XP_COST["proficiency"],
+        "max_level": PROFICIENCY["max_level"],
+        "budget_cost": PROFICIENCY["loadout_cost"],
+        "description": "A bonus on tests carrying the fighting style, growing a little with each level.",
         "effects": [
             {
                 "kind": "tag_bonus",
                 "tags": ["@tag"],
-                "score": DOMAIN_EXPERTISE["score"],
-                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "score": PROFICIENCY["score"],
+                "per_level": PROFICIENCY["per_level"],
             }
         ],
     },
@@ -348,48 +399,48 @@ CATALOG = [
         "category": "domain",
         "tag_kind": "domain",
         "acquisition": "xp",
-        "xp_cost": ABILITY_XP_COST["domain_expertise"],
-        "max_level": DOMAIN_EXPERTISE["max_level"],
-        "budget_cost": DOMAIN_EXPERTISE["memory"],
+        "xp_cost": ABILITY_XP_COST["proficiency"],
+        "max_level": PROFICIENCY["max_level"],
+        "budget_cost": PROFICIENCY["loadout_cost"],
         "description": "A bonus against someone else's opposed test carrying the domain.",
         "effects": [
             {
                 "kind": "tag_bonus",
                 "tags": ["@tag"],
-                "score": DOMAIN_EXPERTISE["score"],
-                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "score": PROFICIENCY["score"],
+                "per_level": PROFICIENCY["per_level"],
                 "match": "opposing",
             }
         ],
     },
     {
-        "key": "elemental-resistance",
-        "name": "Elemental Resistance",
-        "category": "element",
-        "tag_kind": "element",
+        "key": "style-resistance",
+        "name": "Style Resistance",
+        "category": "style",
+        "tag_kind": "style",
         "acquisition": "xp",
-        "xp_cost": ABILITY_XP_COST["domain_expertise"],
-        "max_level": DOMAIN_EXPERTISE["max_level"],
-        "budget_cost": DOMAIN_EXPERTISE["memory"],
-        "description": "A bonus against someone else's opposed test carrying the element.",
+        "xp_cost": ABILITY_XP_COST["proficiency"],
+        "max_level": PROFICIENCY["max_level"],
+        "budget_cost": PROFICIENCY["loadout_cost"],
+        "description": "A bonus against someone else's opposed test carrying the fighting style.",
         "effects": [
             {
                 "kind": "tag_bonus",
                 "tags": ["@tag"],
-                "score": DOMAIN_EXPERTISE["score"],
-                "per_level": DOMAIN_EXPERTISE["per_level"],
+                "score": PROFICIENCY["score"],
+                "per_level": PROFICIENCY["per_level"],
                 "match": "opposing",
             }
         ],
     },
     {
-        "key": "domain-ineptitude",
-        "name": "Domain Ineptitude",
+        "key": "ineptitude",
+        "name": "Ineptitude",
         "category": "domain",
         "tag_kind": "domain",
         "is_flaw": True,
         "acquisition": "free",
-        "description": "Expertise turned inside out: a penalty on your own tests in the domain.",
+        "description": "Proficiency turned inside out: a penalty on your own tests in the domain.",
         "effects": [{"kind": "tag_bonus", "tags": ["@tag"], "score": -FLAW_PENALTY}],
     },
     {
@@ -408,14 +459,14 @@ CATALOG = [
         ],
     },
     {
-        "key": "elemental-vulnerability",
-        "name": "Elemental Vulnerability",
-        "category": "element",
-        "tag_kind": "element",
+        "key": "style-vulnerability",
+        "name": "Style Vulnerability",
+        "category": "style",
+        "tag_kind": "style",
         "is_flaw": True,
         "acquisition": "free",
         "description": (
-            "A penalty when someone else's opposed test against you carries the element."
+            "A penalty when someone else's opposed test against you carries the fighting style."
         ),
         "effects": [
             {"kind": "tag_bonus", "tags": ["@tag"], "score": -FLAW_PENALTY, "match": "opposing"}

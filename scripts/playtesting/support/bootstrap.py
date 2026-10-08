@@ -55,8 +55,8 @@ def at_initial_setup():
                 services.set_stat(character, stat, "B")
             services.finalize(character)
             if role == "browser":
-                services.set_edge(character, "charisma", 2)
-                abilities.grant(character, "domain-expertise", "performance")
+                services.set_edge(character, "presence", 2)
+                abilities.grant(character, "proficiency", "performance")
         identities[role] = {"account": account.pk, "character": character.pk, "name": character.key}
     Path(settings.GAME_DIR, "fixtures.json").write_text(json.dumps(identities), encoding="utf-8")
 

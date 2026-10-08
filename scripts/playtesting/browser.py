@@ -95,12 +95,12 @@ def run_browser(session, timeout=30):
                 )
 
             command("look", "Playtest browser laboratory")
-            own, other = command("+sheet", "Charisma")
+            own, other = command("+sheet", "Presence")
             assert "B ++" in own and "B ++" not in other
             command("+scene/open Live browser laboratory", "opened|created|Scene #")
             command("+scene/privacy public", "Public")
-            command("+test/set A=Charisma/Performance~Browser audience", "Browser audience")
-            own, other = command("+test #1=Charisma/Performance", "Narrow Success")
+            command("+test/set A=Presence/Performance~Browser audience", "Browser audience")
+            own, other = command("+test #1=Presence/Performance", "Narrow Success")
             assert "Narrow Success" in other
             for private in ("B ++", "55.2", '"roll"', "actor_score"):
                 assert private not in other

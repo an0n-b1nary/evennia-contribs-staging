@@ -99,13 +99,12 @@ class TestCharacterCmdSet(EvenniaTest):
         from evennia.commands.cmdparser import cmdparser
         from evennia_rp_contest.commands import CmdTest
 
-        from commands.rp import CmdEdge
-
-        expected = {"+edge": CmdEdge, "+pips": CmdEdge, "+test": CmdTest}
+        expected = {"+test": CmdTest}
         chargen = importlib.import_module("evennia_rp_chargen.commands")
         for name in (
             "Sheet",
             "Stats",
+            "Pips",
             "Abilities",
             "Lock",
             "Unlock",

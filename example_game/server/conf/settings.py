@@ -100,14 +100,18 @@ RP_CHARGEN_ALLOCATION = {
     "path": "evennia_rp_chargen.allocation.PointBuyAllocation",
     "params": rp_values.POINT_BUY,
 }
-RP_CHARGEN_ALLOCATION_NOUN = "build points"
-RP_CHARGEN_PIP_BUDGET = rp_values.PIPS["edge_budget"]
-RP_CHARGEN_PIP_CAP = rp_values.PIPS["edge_cap"]
+RP_CHARGEN_PIP_BUDGET = rp_values.PIPS["budget"]
+RP_CHARGEN_PIP_CAP = rp_values.PIPS["cap"]
 RP_CHARGEN_WEAKNESS_CAP = rp_values.PIPS["weakness_cap"]
-RP_CHARGEN_PIP_NOUN = "Edge"
-RP_CHARGEN_LOADOUT_BUDGET = rp_values.MEMORY_BUDGET
+RP_CHARGEN_LOADOUT_BUDGET = rp_values.LOADOUT_BUDGET
+# Player-facing nouns, shown at the contrib defaults so they're easy to find:
+# change any word here. Stat, tag and ability names live in world/ruleset.py.
+RP_CHARGEN_ALLOCATION_NOUN = "build points"
+RP_CHARGEN_PIP_NOUN = "pips"
+RP_CHARGEN_WEAKNESS_NOUN = "weakness"
 RP_CHARGEN_LOADOUT_NOUN = "loadout"
-RP_CHARGEN_LOADOUT_UNIT = "Memory"
+RP_CHARGEN_LOADOUT_UNIT = "points"
+RP_CHARGEN_ALLOWANCE_NOUN = "starting allowance"
 RP_CHARGEN_LOCK_SCOPES = ("pips", "loadout")
 RP_CHARGEN_LOCK_TTL = 3 * 60 * 60
 RP_CHARGEN_REQUIRE_APPROVAL = False
@@ -125,7 +129,8 @@ RP_CHARGEN_XP_LEDGER = "evennia_rp_chargen.integrations.xp.EvenniaXPLedger"
 RP_CONTEST_STAFF_LOCK = "cmd:perm(Builder)"
 RP_CONTEST_CAN_SET_CHALLENGE = "cmd:all()"
 RP_CONTEST_DEFAULT_DIFFICULTY = rp_values.DEFAULT_DIFFICULTY
-RP_CONTEST_TAG_KIND = ["domain", "element"]
+# Tag kinds `+test` accepts: domains, and the fighting styles in world/ruleset.py.
+RP_CONTEST_TAG_KIND = ["domain", "style"]
 RP_CONTEST_SHOW_RATINGS_TO_ROOM = False
 RP_CONTEST_CHALLENGE_IDLE_TTL = 3 * 60 * 60
 RP_CONTEST_SCENES_APP_LABEL = "evennia_scenes"

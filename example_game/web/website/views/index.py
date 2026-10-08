@@ -51,7 +51,7 @@ IN_GAME_ONLY = (
     ("evennia_social", "Profiles, discovery, paging, filtering, teleport"),
     ("evennia_accessibility", "Screenreader mode and accessible form partials"),
     ("evennia_rp_rules", "Shared graded ratings and RP check resolution"),
-    ("evennia_rp_chargen", "Private character sheets, Edge and ability loadouts"),
+    ("evennia_rp_chargen", "Private character sheets, pips and ability loadouts"),
     ("evennia_rp_contest", "Player-led tests, room challenges and result history"),
 )
 

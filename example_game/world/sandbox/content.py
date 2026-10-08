@@ -200,10 +200,10 @@ OOC_ROOMS = (
         desc="[Placeholder] A workshop for character sheets, abilities and shared RP challenges.",
         plaque=(
             "[Placeholder] Start a sheet with +stats, choose a grade for every stat, "
-            "then +stats/finalize. +edge sets Edge and Weakness; +spend/ability "
+            "then +stats/finalize. +pips sets + and weakness pips; +spend/ability "
             "buys a specialization from your starting allowance. Anyone may set "
             "a challenge with +test/set. Choose an approach; suggestions are optional. "
-            "IC poses and tests lock Edge and loadout. +unlock announces a change. "
+            "IC poses and tests lock pips and loadout. +unlock announces a change. "
             "The two demonstration characters have finalized sheets; Builder mode "
             "lets you inspect them with +sheet <name> or puppet the stat-block dummy."
         ),
@@ -211,8 +211,8 @@ OOC_ROOMS = (
             "+sheet",
             "+stats",
             "+stats/finalize",
-            "+edge/set",
-            "+edge/weakness",
+            "+pips/set",
+            "+pips/weakness",
             "+abilities",
             "+spend/ability",
             "+upgrade",
@@ -670,25 +670,36 @@ SCENE_SPEAKERS = ("Sandbox Storyteller", "Sandbox Visitor")
 # RP fixtures belong only to the tagged demo characters, never player sheets.
 RP_SAMPLE_BUILDS = (
     {
-        "edge": {"charisma": 2, "agility": 3},
-        "weakness": {"toughness": 1},
-        "abilities": (("domain-expertise", "performance"), ("domain-ineptitude", "thievery")),
+        "edge": {"presence": 2, "agility": 3},
+        "weakness": {"endurance": 1},
+        "abilities": (("proficiency", "performance"), ("ineptitude", "thievery")),
     },
     {
-        "edge": {"sensitivity": 2, "wit": 3},
-        "weakness": {"prowess": 1},
-        "abilities": (("elemental-focus", "water"), ("elemental-vulnerability", "fire")),
+        "edge": {"intuition": 2, "intellect": 3},
+        "weakness": {"strength": 1},
+        "abilities": (("combat-focus", "blades"), ("style-vulnerability", "spellcraft")),
     },
 )
+# Keys an earlier seed created and later vocabulary renamed or retired. A
+# reseed archives them: off the public catalog, still readable on old sheets.
+RP_RETIRED_TAGS = ("tinkering", "fire", "water", "air", "earth", "light", "darkness")
+RP_RETIRED_ABILITIES = (
+    "domain-aversion",
+    "domain-expertise",
+    "elemental-focus",
+    "elemental-resistance",
+    "domain-ineptitude",
+    "elemental-vulnerability",
+)
 RP_CHALLENGES = (
-    "A=Charisma/Performance~Hold the audience's attention",
+    "A=Presence/Performance~Hold the audience's attention",
     "B~Cross the chasm",
 )
 RP_DUMMY_NAME = "Stat-block Dummy"
 RP_DUMMY_DESC = "[Placeholder] A demonstration character with a stat block and no chargen sheet."
 RP_DUMMY_STAT_BLOCK = {
     key: "C"
-    for key in ("prowess", "toughness", "wit", "sensitivity", "charisma", "will", "agility")
+    for key in ("strength", "endurance", "intellect", "intuition", "presence", "resolve", "agility")
 }
 
 BOARD_POSTS = (BOARD_FIRST_POST, BOARD_SECOND_POST)
