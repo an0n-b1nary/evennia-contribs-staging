@@ -9,6 +9,7 @@ Only the final evidence/ directory is suitable for sharing.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -27,8 +28,40 @@ from pathlib import Path
 REPOSITORY = "https://github.com/an0n-b1nary/evennia-contribs-staging.git"
 # Includes the spend ledger, but predates chargen's additive catalog migration.
 OLD_REVISION = "1939b8aa80d8e90c408715d68ca18a379d1699b4"
+# Public fixtures with the older reference vocabulary, for pre-driver snapshots.
+LEGACY_FIXTURE_REVISION = "0d5beef3fcf7ebdcb34eb57f07a4056de1d9a34f"
 ROOT = Path(__file__).resolve().parents[1]
 HIDDEN = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
+def driver_identity(root):
+    """Record driver code independently of the immutable package pins."""
+    files = [root / "scripts/downstream_gate.py", root / "scripts/downstream_runtime.py"]
+    files += sorted((root / "scripts/playtesting").rglob("*.py"))
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in files
+    }
+
+
+def prepare_fixtures(repository, directory, old_revision, new_revision):
+    """Pin fixtures separately when a consumer predates the live playtest driver."""
+    fixtures = {}
+    for name, revision in (("old", old_revision), ("new", new_revision)):
+        source = directory / name / "snapshot"
+        relative = f"{name}/snapshot"
+        if not (source / "scripts/playtesting/support/bootstrap.py").is_file():
+            relative = "legacy-fixtures"
+            source = directory / relative
+            revision = LEGACY_FIXTURE_REVISION
+            if not source.exists():
+                snapshot(repository, revision, source)
+        for required in ("support/bootstrap.py", "scenarios.py"):
+            if not (source / "scripts/playtesting" / required).is_file():
+                raise ValueError(f"Missing pinned playtest fixture: {required}")
+        fixtures[name] = {"revision": revision, "directory": relative}
+    (directory / "fixtures.json").write_text(json.dumps(fixtures, indent=2), encoding="utf-8")
+    return {name: fixture["revision"] for name, fixture in fixtures.items()}
 
 
 def run(command, *, cwd, log, timeout=1200, environment=None):
@@ -174,6 +207,7 @@ def main(argv=None):
             parser.error("Use full lowercase 40-character Git revisions")
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
     directory = args.resume.resolve() if args.resume else args.output_root.resolve() / stamp
+    driver = driver_identity(ROOT)
     if args.resume:
         previous = json.loads((directory / "evidence/result.json").read_text(encoding="utf-8"))
         if (previous["old_revision"], previous["new_revision"]) != (
@@ -181,11 +215,18 @@ def main(argv=None):
             args.new_revision,
         ):
             parser.error("Resume revisions must match the original run")
+        if previous.get("driver_files_sha256") != driver:
+            parser.error("Driver changed; start a fresh run instead of reusing phase results")
     else:
         directory.mkdir(parents=True)
     evidence = directory / "evidence"
     evidence.mkdir(exist_ok=True)
-    result = {"old_revision": args.old_revision, "new_revision": args.new_revision, "passed": False}
+    result = {
+        "old_revision": args.old_revision,
+        "new_revision": args.new_revision,
+        "passed": False,
+        "driver_files_sha256": driver,
+    }
     print(f"Downstream gate: {directory}", flush=True)
     started = time.monotonic()
     try:
@@ -203,6 +244,9 @@ def main(argv=None):
                 snapshot(repository, revision, phase / "snapshot")
         result["unchanged_migration_files"] = migration_history(
             directory / "old/snapshot", directory / "new/snapshot"
+        )
+        result["fixture_revisions"] = prepare_fixtures(
+            repository, directory, args.old_revision, args.new_revision
         )
         if args.resume:
             interpreters = {
