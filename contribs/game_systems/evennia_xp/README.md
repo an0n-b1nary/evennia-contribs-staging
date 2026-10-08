@@ -24,6 +24,8 @@ aggregation, scheduling, and the web/API surface.
   `XP_STAFF_LOCK` and optional `evennia-accessibility` screen-reader support.
 - **First-login summary** — `XPSummaryCharacterMixin` shows each character
   what the last weekly batch paid it, once, the next time it is puppeted.
+- **Projected XP** — `+xp` and (with evennia-rptracker) `+activity` show what
+  the collectors would pay a character so far, before the batch runs.
 - **Web + API** (`[web]` extra) — `XPSummaryView` (self-only balance + log)
   and `XPLogViewSet` (DRF read-only self-only).
 - **`run_xp_batch`** management command for backfills and debugging.
@@ -229,6 +231,41 @@ The summary compares `CharacterXP.last_payout_week` with the character's
 the character and nothing on a quiet week. With `evennia-accessibility`
 installed and `screenreader_mode` on, the bullets and colour codes are dropped.
 Errors are logged and never interrupt login.
+
+---
+
+## Projected XP
+
+Before the batch runs, a player can see what they have earned since the last one.
+`+xp` adds a block whenever `XP_COLLECTORS` is non-empty:
+
+```
+  Projected (not yet awarded):
+    RP Session           1.50
+    Lore Authored        0.00
+    Total                1.50 XP
+```
+
+To show the same in evennia-rptracker's `+activity`, set its hook:
+
+```python
+# settings.py
+RPTRACKER_XP_PROJECTION = "evennia_xp.projection.activity_lines"
+```
+
+Both come from `evennia_xp.projection.project_for_character(character_id,
+window_end=None)`. It runs every registered collector with `window_end` = now,
+keeps one character's awards, and drops any that an `XPLog` row already records
+(the batch's own `(source_type, source_ref_id)` key). It returns
+`XPProjection(by_source, total)`. It writes no XP and runs no anti-gaming sweeps,
+so a session a sweep would later flag can still appear. Collectors that
+`get_or_create` eligibility rows (the shipped lore and plots ones do) create them
+here too. Those rows are idempotent, so the batch still pays once.
+
+Each call runs every collector over the whole roster, then filters to one
+character. That's fine for one player's command, but don't loop it over all
+characters. Collector keys that aren't `XPLog` source types are labelled by
+title-casing the key (`tavern_tales` → "Tavern Tales").
 
 ---
 

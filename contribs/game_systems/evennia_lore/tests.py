@@ -1139,3 +1139,101 @@ class TestMapsOverlayWiring(EvenniaTest):
         )
         overlays = collect_overlays([self.room1.id], staff=False)
         self.assertTrue(overlays["has_lore"][self.room1.id])
+
+
+# ---------------------------------------------------------------------------
+# Shipped LORE_SESSION_CONTEXT_PROVIDER (integrations/session_context.py)
+# ---------------------------------------------------------------------------
+
+_SHIPPED_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
+_HAS_REGIONS_AND_PLOTS = apps.is_installed("evennia_regions") and apps.is_installed("evennia_plots")
+
+
+@unittest.skipUnless(apps.is_installed("evennia_rptracker"), "requires evennia_rptracker")
+class TestShippedSessionContextProvider(EvenniaTest):
+    """The provider reads real partner rows; absent partners drop their part."""
+
+    def setUp(self):
+        super().setUp()
+        from evennia_rptracker.models import RPSession, RPSessionSceneLink
+
+        self.rp_session = RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            room=self.room1,
+            room_name=self.room1.key,
+            status=RPSession.Status.COMPLETED,
+        )
+        RPSessionSceneLink.objects.create(session=self.rp_session, scene_id=41)
+        RPSessionSceneLink.objects.create(session=self.rp_session, scene_id=42)
+
+    def _context(self, session=None):
+        from evennia_lore.integrations.session_context import get_session_context
+
+        return get_session_context(session or self.rp_session)
+
+    @unittest.skipUnless(_HAS_REGIONS_AND_PLOTS, "requires evennia_regions and evennia_plots")
+    def test_room_primary_region_and_threads_of_overlapping_scenes(self):
+        Region = apps.get_model("evennia_regions", "Region")
+        coast = Region.objects.create(name="The Drowned Coast")
+        overlay = Region.objects.create(name="The Fog Overlay")
+        _membership_model().objects.create(region=overlay, room=self.room1)
+        _membership_model().objects.create(region=coast, room=self.room1, is_primary=True)
+
+        PlotThread = apps.get_model("evennia_plots", "PlotThread")
+        ScenePlotLink = apps.get_model("evennia_plots", "ScenePlotLink")
+        threads = [
+            PlotThread.create_thread(name=name, creator=None, description="", privacy="public")
+            for name in ("Tide", "Lantern", "Elsewhere")
+        ]
+        ScenePlotLink.objects.create(thread=threads[0], scene_id=41)
+        ScenePlotLink.objects.create(thread=threads[1], scene_id=42)
+        ScenePlotLink.objects.create(thread=threads[2], scene_id=99)
+
+        self.assertEqual(
+            self._context(),
+            {
+                "room_id": self.room1.pk,
+                "region_id": coast.pk,
+                "thread_ids": {threads[0].pk, threads[1].pk},
+            },
+        )
+
+    @override_settings(LORE_REGIONS_APP_LABEL="no_such_regions", LORE_PLOTS_APP_LABEL="no_plots")
+    def test_absent_partners_leave_only_the_room(self):
+        self.assertEqual(
+            self._context(), {"room_id": self.room1.pk, "region_id": None, "thread_ids": set()}
+        )
+
+    def test_session_with_no_room_or_scenes(self):
+        from evennia_rptracker.models import RPSession
+
+        bare = RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            status=RPSession.Status.COMPLETED,
+        )
+        self.assertEqual(
+            self._context(bare), {"room_id": None, "region_id": None, "thread_ids": set()}
+        )
+
+    def test_a_failing_part_is_logged_and_the_rest_survive(self):
+        with (
+            patch(
+                "evennia_lore.integrations.session_context._region_id",
+                side_effect=RuntimeError("regions broke"),
+            ),
+            self.assertLogs("evennia", level="ERROR") as logs,
+        ):
+            context = self._context()
+        self.assertEqual(context["room_id"], self.room1.pk)
+        self.assertIsNone(context["region_id"])
+        self.assertIsInstance(context["thread_ids"], set)
+        self.assertIn("region lookup failed", logs.output[0])
+
+    @override_settings(LORE_SESSION_CONTEXT_PROVIDER=_SHIPPED_PROVIDER)
+    def test_drives_the_trickle_through_the_setting(self):
+        entry = _make_entry("Room Lore", author=self.char2)
+        entry.rooms.add(self.room1)
+        pool = _build_pool(self.char1, self.rp_session)
+        self.assertEqual(pool, [(entry, 5)])

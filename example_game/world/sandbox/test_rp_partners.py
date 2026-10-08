@@ -212,6 +212,41 @@ class TestLoginXPSummary(EvenniaTest):
         self.assertIsNotNone(self.char1.attributes.get("sandbox_last_seen"))
 
 
+class TestActivityXPProjection(EvenniaTest):
+    """+activity through the game's cmdset, with evennia_xp's projection hook.
+
+    With xp installed, a lore entry published this week shows as pending XP;
+    with xp absent, the hook is unset and +activity still runs.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def run_activity(self):
+        from commands.default_cmdsets import CharacterCmdSet
+
+        command = next(c for c in CharacterCmdSet().commands if c.key == "+activity")
+        command.caller = self.char1
+        command.switches = []
+        command.args = ""
+        with mock.patch.object(self.char1, "msg") as replies:
+            command.func()
+        return " ".join(str(call.args[0]) for call in replies.call_args_list if call.args)
+
+    def test_projected_xp_or_plain_activity_without_xp(self):
+        if not apps.is_installed("evennia_rptracker"):
+            return
+        from evennia_lore.models import LoreEntry
+
+        LoreEntry.create_entry(title="Tide tables", author=self.char1)
+        output = self.run_activity()
+        self.assertIn("Your RP Activity", output)
+        if apps.is_installed("evennia_xp"):
+            self.assertIn("Lore Authored +1.00", output)
+        else:
+            self.assertNotIn("Projected XP", output)
+
+
 class TestRoomMoodSceneRights(EvenniaTest):
     """+mood through the game's own cmdset, Room typeclass and scenes partner.
 

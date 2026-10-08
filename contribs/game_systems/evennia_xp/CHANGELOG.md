@@ -7,6 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] - 2026-10-07
+
+- **Added:** projected XP. `evennia_xp.projection.project_for_character()`
+  runs the registered `XP_COLLECTORS` now and returns what they would pay one
+  character, per source and in total, leaving out anything the ledger already
+  records. It writes no XP and runs no anti-gaming sweep.
+- **Added:** `+xp` shows a "Projected (not yet awarded)" block, listing every
+  registered source and a total, whenever collectors are registered. A failed
+  projection is logged and the rest of `+xp` still shows.
+- **Added:** `evennia_xp.projection.activity_lines`, a ready-made
+  `RPTRACKER_XP_PROJECTION` for evennia-rptracker's `+activity`: the sources
+  with something pending and the total, or "nothing pending yet". Both
+  outputs are plain text under screen-reader mode.
+- Ported from the source project, whose `+xp` and `+activity` both showed a
+  projection built from its own hardcoded source names.
+
 ## [0.3.0] - 2026-10-07
 
 - **Added:** a first-login XP summary. The first time a character is puppeted

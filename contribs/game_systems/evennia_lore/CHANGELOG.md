@@ -7,6 +7,19 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] - 2026-10-07
+
+- **Added:** a shipped `LORE_SESSION_CONTEXT_PROVIDER`,
+  `evennia_lore.integrations.session_context.get_session_context`. It gives the
+  passive trickle the session's room, the room's primary region (evennia-regions)
+  and the plot threads linked to any scene the session overlapped
+  (evennia-rptracker's scene links, then evennia-plots' `ScenePlotLink`). Each
+  partner is found through its `LORE_*_APP_LABEL` and is optional; an absent one
+  drops only its part of the context, and a failing one is logged without losing
+  the rest. The setting still defaults to `None`, so existing games keep
+  tag-only weighting until they opt in. Ported from the source project's
+  provider, which every game wiring the trickle had to rewrite.
+
 ## [0.3.1] - 2026-10-02
 
 - Stack labelled table rows below 640px while retaining table semantics and desktop columns.

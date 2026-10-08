@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-jobs"
-version = "0.1.4"
+version = "0.2.0"
 description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -38,11 +38,12 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_jobs", "evennia_jobs.migrations", "evennia_jobs.api"]
+packages = ["evennia_jobs", "evennia_jobs.migrations", "evennia_jobs.integrations", "evennia_jobs.api"]
 
 [tool.setuptools.package-dir]
 "evennia_jobs" = "."
 "evennia_jobs.migrations" = "migrations"
+"evennia_jobs.integrations" = "integrations"
 "evennia_jobs.api" = "api"
 
 [tool.setuptools.package-data]

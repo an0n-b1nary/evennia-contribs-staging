@@ -126,6 +126,76 @@ class TestContribSettings(EvenniaTestCase):
                 trace.assert_not_called()
 
 
+class TestShippedIntegrationHooks(EvenniaTest):
+    """The staff-ticket and lore-context hooks, through this game's settings.
+
+    Each setting now names a function a contrib ships (no world.sandbox glue).
+    Driving the real caller proves the dotted path, the partner and the
+    callee agree.
+    """
+
+    def test_rptracker_pose_spam_sweep_files_a_staff_ticket(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from evennia_jobs.models import Job, JobType
+        from evennia_rptracker.antigaming import sweep_rp_sessions
+        from evennia_rptracker.models import RPSession
+
+        now = timezone.now()
+        session = RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            room=self.room1,
+            room_name=self.room1.key,
+            status=RPSession.Status.COMPLETED,
+            pose_count=25,
+            activated_at=now - timedelta(minutes=5),
+            ended_at=now - timedelta(minutes=1),
+        )
+        sweep_rp_sessions(now)
+        session.refresh_from_db()
+        self.assertEqual(session.status, RPSession.Status.FLAGGED)
+        job = Job.objects.get()
+        self.assertEqual(job.job_type, JobType.DISCUSS)
+        self.assertIsNone(job.author)
+        self.assertIn(f"RPSession #{session.pk}", job.description)
+
+    def test_boards_reporter_files_a_staff_ticket(self):
+        from evennia_boards.integrations.xp import _call_reporter
+        from evennia_jobs.models import Job, JobType
+
+        _call_reporter("Auto-flag: cutscene spam", "Three IC posts in an hour.")
+        job = Job.objects.get()
+        self.assertEqual((job.job_type, job.title), (JobType.DISCUSS, "Auto-flag: cutscene spam"))
+
+    def test_lore_trickle_gets_room_region_and_threads(self):
+        from evennia_lore.selection import _resolve_context
+        from evennia_plots.models import PlotThread, ScenePlotLink
+        from evennia_rptracker.models import RPSession, RPSessionSceneLink
+
+        from evennia_regions.models import Region, RegionMembership
+
+        region = Region.objects.create(name="The Proving Coast")
+        RegionMembership.objects.create(region=region, room=self.room1, is_primary=True)
+        thread = PlotThread.create_thread(
+            name="Tidewatch", creator=None, description="", privacy="public"
+        )
+        ScenePlotLink.objects.create(thread=thread, scene_id=7)
+        rp_session = RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            room=self.room1,
+            room_name=self.room1.key,
+            status=RPSession.Status.COMPLETED,
+        )
+        RPSessionSceneLink.objects.create(session=rp_session, scene_id=7)
+        self.assertEqual(
+            _resolve_context(rp_session),
+            {"room_id": self.room1.pk, "region_id": region.pk, "thread_ids": {thread.pk}},
+        )
+
+
 # ---------------------------------------------------------------------------
 # Regions + maps: the tile-overlay seam, end to end
 # ---------------------------------------------------------------------------

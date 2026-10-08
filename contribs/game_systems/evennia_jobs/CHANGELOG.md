@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] - 2026-10-07
+
+- **Added:** `evennia_jobs.integrations.staff_review.file_review_job(title,
+  description)`, a ready-made value for the flag hooks other contribs expose:
+  `RPTRACKER_FLAG_REVIEW_HOOK` (evennia-rptracker) and
+  `BOARDS_ANTIGAMING_REPORTER` (evennia-boards). It files an authorless
+  `DISCUSS` ticket, the staff-only type, and returns the `Job`. Games no longer
+  have to write this wrapper themselves; the source project kept two copies of
+  it.
+
 ## [0.1.4] - 2026-10-02
 
 - **Changed:** web templates use the self-contained namespaced stylesheet and
