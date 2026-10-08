@@ -22,7 +22,7 @@ BOARDS_ANTIGAMING_REPORTER — dotted path to a callable(title, description).
 
     Example (add to your settings.py)::
 
-        BOARDS_ANTIGAMING_REPORTER = "myapp.jobs.reporters.create_antigaming_job"
+        BOARDS_ANTIGAMING_REPORTER = "evennia_jobs.integrations.staff_review.file_review_job"
 
     The callable receives:
         title (str)       — short flag summary

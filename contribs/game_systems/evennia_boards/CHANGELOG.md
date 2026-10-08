@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.3] - 2026-10-07
+
+- **Docs:** `BOARDS_ANTIGAMING_REPORTER` examples (README and
+  `integrations/xp.py`) now use evennia-jobs' shipped reporter,
+  `evennia_jobs.integrations.staff_review.file_review_job`, instead of a
+  placeholder path. No code change.
+
 ## [0.3.2] - 2026-10-02
 
 - **Fixed:** command helpers import the public accessibility export so the installed

@@ -145,13 +145,14 @@ Posts on IC-type boards earn 1 XP each (scaled by the active arc multiplier).
 The sweep flags authors who post ≥ 3 IC posts within any 24-hour window. Flagged
 posts are excluded from awards until staff review and clear the flag.
 
-To forward flags to a staff ticket system (e.g. evennia-jobs):
+To forward flags to a staff ticket system, use evennia-jobs' shipped reporter (each
+flag becomes a staff-only `+discuss` ticket):
 
 ```python
-BOARDS_ANTIGAMING_REPORTER = "myapp.jobs.reporters.create_antigaming_job"
+BOARDS_ANTIGAMING_REPORTER = "evennia_jobs.integrations.staff_review.file_review_job"
 ```
 
-The callable receives `(title: str, description: str)`.
+Any other callable taking `(title: str, description: str)` works too.
 
 ---
 
