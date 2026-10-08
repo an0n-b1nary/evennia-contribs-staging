@@ -7,10 +7,10 @@ Every setting is read when needed, so `override_settings` works in tests.
     RP_CHARGEN_STAFF_LOCK        lockstring for staff commands and +sheet on others
     RP_CHARGEN_ALLOCATION        {"path": allocation class, "params": {...}}
     RP_CHARGEN_ALLOCATION_NOUN   what allocation points are called ("build points")
-    RP_CHARGEN_PIP_BUDGET        total edge a character may carry (None: no budget)
-    RP_CHARGEN_PIP_CAP           most edge on one stat (None: the scale's maximum)
+    RP_CHARGEN_PIP_BUDGET        total + pips a character may carry (None: no budget)
+    RP_CHARGEN_PIP_CAP           most + pips on one stat (None: the scale's maximum)
     RP_CHARGEN_WEAKNESS_CAP      most weakness on one stat (None: the scale's maximum)
-    RP_CHARGEN_PIP_NOUN          what edge pips are called ("edge")
+    RP_CHARGEN_PIP_NOUN          what + pips are called ("pips")
     RP_CHARGEN_WEAKNESS_NOUN     what weakness pips are called ("weakness")
     RP_CHARGEN_LOADOUT_NOUN      what the equipped-ability set is called ("loadout")
     RP_CHARGEN_LOCK_SCOPES       what a build lock freezes (("pips", "loadout"))
@@ -41,7 +41,7 @@ DEFAULTS = {
     "RP_CHARGEN_PIP_BUDGET": None,
     "RP_CHARGEN_PIP_CAP": None,
     "RP_CHARGEN_WEAKNESS_CAP": None,
-    "RP_CHARGEN_PIP_NOUN": "edge",
+    "RP_CHARGEN_PIP_NOUN": "pips",
     "RP_CHARGEN_WEAKNESS_NOUN": "weakness",
     "RP_CHARGEN_LOADOUT_NOUN": "loadout",
     "RP_CHARGEN_LOCK_SCOPES": ("pips", "loadout"),
@@ -79,7 +79,7 @@ def lock_ttl() -> timedelta | None:
 
 
 def scope_noun(scope: str) -> str:
-    """Player-facing name of a lock scope ("edge", "loadout")."""
+    """Player-facing name of a lock scope ("pips", "loadout")."""
     if scope == PIPS:
         return get("RP_CHARGEN_PIP_NOUN")
     if scope == LOADOUT:
@@ -88,7 +88,7 @@ def scope_noun(scope: str) -> str:
 
 
 def locked_things() -> str:
-    """`"edge and loadout"`: what a build lock freezes, in words."""
+    """`"pips and loadout"`: what a build lock freezes, in words."""
     nouns = [scope_noun(scope) for scope in lock_scopes()]
     if len(nouns) <= 1:
         return "".join(nouns) or "build"

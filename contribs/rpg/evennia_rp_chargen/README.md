@@ -1,6 +1,6 @@
 # evennia-rp-chargen
 
-> **Preview (0.2.0, Pre-Alpha).** This package was written directly as a
+> **Preview (0.2.1, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
 > while the rest of the rp- cluster is built on it. Pin an exact commit.
 
@@ -8,7 +8,8 @@ Character sheets for RP-focused [Evennia](https://www.evennia.com) games,
 built on [`evennia-rp-rules`](../evennia_rp_rules/README.md). It provides:
 
 - graded stats chosen within an **allocation** (point-buy, array, or free);
-- **edge** and **weakness** pips under a pip policy;
+- **pips** under a pip policy: `+` pips from a budget, free **weakness** (`-`)
+  pips by choice;
 - a draft → finalized (→ approved) life cycle, with no staff bottleneck by
   default;
 - an **ability catalog** of abilities and flaws, with effects stored as data,
@@ -60,13 +61,13 @@ A change that breaks the allocation, such as overspending, is refused.
 Finalizing is refused until nothing is left to do, such as unset stats or
 unused array slots.
 
-**Pips.** Edge (`+`) comes from a budget; weakness (`-`) is free, a
-roleplaying choice, and never buys more edge. Both may sit on one stat, and
+**Pips.** `+` pips (`edge` in the API) come from a budget; weakness (`-`) is
+free, a roleplaying choice, and never buys more `+` pips. Both may sit on one stat, and
 the resolver uses the net count, while the sheet shows both runs (`B +++ -`).
 Pips stay player-managed after finalizing, but not while the build is locked.
 
 **Build locks.** A lock freezes the scopes in `RP_CHARGEN_LOCK_SCOPES`, which
-are edge pips and the ability loadout by default.
+are `+` pips and the ability loadout by default.
 
 | From | Event | To |
 |---|---|---|
@@ -84,14 +85,14 @@ are edge pips and the ability loadout by default.
 are evennia-rp-rules effect specs stored as data:
 
 ```python
-{"key": "domain-expertise", "name": "Domain Expertise", "tag_kind": "domain",
+{"key": "proficiency", "name": "Proficiency", "tag_kind": "domain",
  "acquisition": "xp", "xp_cost": 3, "max_level": 5, "budget_cost": 10,
  "effects": [{"kind": "tag_bonus", "tags": ["@tag"], "score": 8, "per_level": 1}]}
 ```
 
 - **Templates.** An entry with `tag_kind` is a template, acquired once per
   tag of that kind. `@tag` in its effects stands for the chosen tag, so one
-  entry covers every domain ("Domain Expertise: Performance"), including
+  entry covers every domain ("Proficiency: Performance"), including
   domains staff add later.
 - **Equipping.** Equipped copies count against `RP_CHARGEN_LOADOUT_BUDGET`
   and reach checks as modifiers. The loadout is frozen while the build is
@@ -125,7 +126,7 @@ transaction; a failed purchase rolls them all back.
 **Per-tag loadout costs.** A template can set `budget_cost_overrides`, such as
 `{"ritual": 15, "performance": 12}`, falling back to `budget_cost` for other
 tags. Use tag keys of the template's kind and nonnegative integer costs.
-`+abilities/info Domain Expertise: Ritual` shows the resolved cost. Costs
+`+abilities/info Proficiency: Ritual` shows the resolved cost. Costs
 are read from the catalog each time, so rebalancing reaches existing copies.
 An over-budget loadout stays equipped and is flagged on the sheet; new equips
 are blocked until enough abilities are unequipped. Flaws always cost zero.
@@ -179,7 +180,44 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(ChargenCmdSet)
 ```
 
-Rename a command by subclassing it: `class CmdEdge(CmdPips): key = "+edge"`.
+### Renaming things for your game
+
+Everything a player reads comes from your ruleset or your settings, so you can
+rename any of it without editing this package.
+
+- **Stats, rungs, tags and outcomes** are the `name`/`label` fields in your
+  ruleset (`RP_RULES_RULESET`).
+- **Abilities and flaws** are the `name` fields in your catalog seed
+  (`RP_CHARGEN_CATALOG_SEED`). Run `evennia rp_chargen_seed --update` after
+  changing them. Keep each `key` stable once players own copies, because
+  that's what their sheets store.
+- **Nouns** come from settings. Copy any of these defaults into
+  `server/conf/settings.py` and change the words:
+
+  ```python
+  RP_CHARGEN_ALLOCATION_NOUN = "build points"
+  RP_CHARGEN_PIP_NOUN = "pips"              # the + pips, which come from a budget
+  RP_CHARGEN_WEAKNESS_NOUN = "weakness"     # the - pips, which are free
+  RP_CHARGEN_LOADOUT_NOUN = "loadout"
+  RP_CHARGEN_LOADOUT_UNIT = "points"
+  RP_CHARGEN_ALLOWANCE_NOUN = "starting allowance"
+  ```
+
+- **Commands** are renamed by subclassing. Give the subclass its own
+  docstring, because that's its `help` text, then add it in place of the
+  original:
+
+  ```python
+  from evennia_rp_chargen.commands import CmdPips
+
+  class CmdBoons(CmdPips):
+      """
+      Manage your boons. (Write your game's help text here.)
+      """
+
+      key = "+boons"
+      aliases = ["+pips"]
+  ```
 
 ### Wiring the lock triggers
 
@@ -209,10 +247,10 @@ The other triggers need no wiring:
 
 | Command | Who | Does |
 |---|---|---|
-| `+sheet [<character>]` | owner; staff for others | The sheet: ratings with both pip runs, edge used, lock state; allocation while drafting |
+| `+sheet [<character>]` | owner; staff for others | The sheet: ratings with both pip runs, `+` pips used, lock state; allocation while drafting |
 | `+stats`, `+stats <stat>=<rung>`, `/clear`, `/finalize` | owner | Choose rungs on a draft, then finalize |
-| `+pips <stat>=<n>`, `/set`, `/clear`, `/weakness` | owner | Edge and weakness; counts may be numbers or `+++` / `--` |
-| `+lock`, `+unlock` | owner | Lock or unlock edge and loadout, announced |
+| `+pips <stat>=<n>`, `/set`, `/clear`, `/weakness` | owner | `+` and weakness pips; counts may be numbers or `+++` / `--` |
+| `+lock`, `+unlock` | owner | Lock or unlock pips and loadout, announced |
 | `+abilities`, `/list`, `/info`, `/equip`, `/unequip`, `/flaw`, `/unflaw` | owner | Your abilities and flaws, the catalog, and the loadout |
 | `+spend`, `+spend/ability <ability>[: <tag>]` | owner | Your allowance and XP; buy an ability |
 | `+upgrade <ability>[: <tag>]` | owner | Raise an ability a level |
@@ -254,10 +292,10 @@ a `CheckError` that tells the player to finish it.
 | `RP_CHARGEN_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff commands and viewing others' sheets |
 | `RP_CHARGEN_ALLOCATION` | free | `{"path": ..., "params": {...}}` |
 | `RP_CHARGEN_ALLOCATION_NOUN` | `"build points"` | What allocation points are called |
-| `RP_CHARGEN_PIP_BUDGET` | `None` | Total edge per character (`None`: no budget) |
-| `RP_CHARGEN_PIP_CAP` | `None` | Most edge on one stat (`None`: the scale's maximum) |
+| `RP_CHARGEN_PIP_BUDGET` | `None` | Total `+` pips per character (`None`: no budget) |
+| `RP_CHARGEN_PIP_CAP` | `None` | Most `+` pips on one stat (`None`: the scale's maximum) |
 | `RP_CHARGEN_WEAKNESS_CAP` | `None` | Most weakness on one stat (`None`: the scale's maximum) |
-| `RP_CHARGEN_PIP_NOUN`, `RP_CHARGEN_WEAKNESS_NOUN`, `RP_CHARGEN_LOADOUT_NOUN` | `"edge"`, `"weakness"`, `"loadout"` | Player-facing nouns |
+| `RP_CHARGEN_PIP_NOUN`, `RP_CHARGEN_WEAKNESS_NOUN`, `RP_CHARGEN_LOADOUT_NOUN` | `"pips"`, `"weakness"`, `"loadout"` | Player-facing nouns (see [Renaming things](#renaming-things-for-your-game)) |
 | `RP_CHARGEN_LOCK_SCOPES` | `("pips", "loadout")` | What a lock freezes |
 | `RP_CHARGEN_LOCK_TTL` | `10800` (3 hours) | Seconds after the last IC action that a lock lapses; `None` to disable |
 | `RP_CHARGEN_REQUIRE_APPROVAL` | `False` | Make approval a gate |

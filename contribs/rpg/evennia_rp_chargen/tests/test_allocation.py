@@ -144,16 +144,16 @@ class PipPolicyTests(SimpleTestCase):
         self.assertEqual(
             errors,
             [
-                "Brawn may carry at most 2 edge, not 3.",
+                "Brawn may carry at most 2 pips, not 3.",
                 "Charm may carry at most 1 weakness, not 2.",
-                "That's 5 edge in all, and you have 4.",
+                "That's 5 pips in all, and you have 4.",
             ],
         )
 
     def test_weakness_never_buys_edge(self):
         policy = PipPolicy(edge_budget=2)
         heavy = ratings(brawn="Mid+++", brains="Mid---")
-        self.assertIn("That's 3 edge in all, and you have 2.", policy.errors(heavy, RULES))
+        self.assertIn("That's 3 pips in all, and you have 2.", policy.errors(heavy, RULES))
 
     def test_no_budget(self):
         self.assertIsNone(PipPolicy().edge_left(ratings(brawn="Mid+++")))

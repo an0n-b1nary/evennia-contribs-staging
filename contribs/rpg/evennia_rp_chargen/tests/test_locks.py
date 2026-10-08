@@ -44,8 +44,8 @@ class LockStateTests(ChargenTest):
             self.assertTrue(locks.unlock(self.char1))
             self.assertFalse(locks.unlock(self.char1))
         text = self.messages(other)
-        self.assertIn("Char locks their edge and loadout.", text)
-        self.assertIn("Char unlocks their edge and loadout.", text)
+        self.assertIn("Char locks their pips and loadout.", text)
+        self.assertIn("Char unlocks their pips and loadout.", text)
 
     def test_pose_while_unlocked_relocks(self):
         locks.note_ic_action(self.char1)

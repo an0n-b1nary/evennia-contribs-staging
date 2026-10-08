@@ -56,21 +56,21 @@ class PlayerCommandTests(ChargenCommandTest):
         self.make_sheet(self.char2, brawn="Mid", brains="Mid", charm="Mid")
         self.call(CmdPips(), "brawn=++", "Brawn is now Mid ++.", caller=self.char2)
         self.call(CmdPips(), "/set brains=1", "Brains is now Mid +.", caller=self.char2)
-        self.call(CmdPips(), "charm=1", "That's 4 edge in all, and you have 3.", caller=self.char2)
+        self.call(CmdPips(), "charm=1", "That's 4 pips in all, and you have 3.", caller=self.char2)
         self.call(CmdPips(), "/weakness brawn=-", "Brawn is now Mid ++ -.", caller=self.char2)
         self.call(CmdPips(), "brawn=lots", "Give a number", caller=self.char2)
-        self.call(CmdPips(), "/clear", "Cleared edge from 2 stat(s).", caller=self.char2)
+        self.call(CmdPips(), "/clear", "Cleared pips from 2 stat(s).", caller=self.char2)
         self.call(CmdPips(), "", "Char2", caller=self.char2)
 
     def test_locks_gate_pips_and_are_self_service(self):
         self.make_sheet(self.char2, brawn="Mid")
         locks.note_ic_action(self.char2)
-        self.call(CmdPips(), "brawn=1", "Your edge and loadout are locked", caller=self.char2)
-        self.call(CmdUnlock(), "", "You unlock your edge and loadout.", caller=self.char2)
-        self.call(CmdUnlock(), "", "Your edge and loadout aren't locked.", caller=self.char2)
+        self.call(CmdPips(), "brawn=1", "Your pips and loadout are locked", caller=self.char2)
+        self.call(CmdUnlock(), "", "You unlock your pips and loadout.", caller=self.char2)
+        self.call(CmdUnlock(), "", "Your pips and loadout aren't locked.", caller=self.char2)
         self.call(CmdPips(), "brawn=1", "Brawn is now Mid +.", caller=self.char2)
-        self.call(CmdLock(), "", "You lock your edge and loadout.", caller=self.char2)
-        self.call(CmdLock(), "", "Your edge and loadout are already locked.", caller=self.char2)
+        self.call(CmdLock(), "", "You lock your pips and loadout.", caller=self.char2)
+        self.call(CmdLock(), "", "Your pips and loadout are already locked.", caller=self.char2)
 
     def test_drafts_do_not_lock(self):
         self.call(CmdLock(), "", "Only a finalized sheet locks.", caller=self.char2)
@@ -81,6 +81,7 @@ class SheetCommandTests(ChargenCommandTest):
         self.make_sheet(self.char2, brawn="High+-")
         output = self.call(CmdSheet(), "", "Char2", caller=self.char2)
         self.assertIn("High + -", output)
+        self.assertIn("Pips: 1.  Weakness: 1.", output)
         self.assertIn("unlocked", output)
         for score in ("21", "19.5"):
             self.assertNotIn(score, output)
