@@ -22,6 +22,8 @@ aggregation, scheduling, and the web/API surface.
   00:00 UTC; idempotent across server restarts.
 - **`CmdXp`** — `+xp`, `+xp/log`, `+xp/sources`, `+xp/grant` with
   `XP_STAFF_LOCK` and optional `evennia-accessibility` screen-reader support.
+- **First-login summary** — `XPSummaryCharacterMixin` shows each character
+  what the last weekly batch paid it, once, the next time it is puppeted.
 - **Web + API** (`[web]` extra) — `XPSummaryView` (self-only balance + log)
   and `XPLogViewSet` (DRF read-only self-only).
 - **`run_xp_batch`** management command for backfills and debugging.
@@ -195,6 +197,38 @@ writes in `transaction.atomic()` to roll everything back together.
 
 `+spend` and `+upgrade` remain consumer commands; `evennia-rp-chargen[xp]`
 provides them and the `EvenniaXPLedger` adapter.
+
+---
+
+## First-login summary
+
+After each weekly batch, a character's next login shows what it earned:
+
+```
+XP awarded for week 2026-W18: 3.50 XP total
+  • Cutscene (+1.00)
+  • RP Session (+2.50)
+Use +xp to view your balance and history.
+```
+
+Add the mixin to your Character typeclass:
+
+```python
+from evennia_xp.typeclasses import XPSummaryCharacterMixin
+
+class Character(XPSummaryCharacterMixin, ObjectParent, DefaultCharacter):
+    ...
+```
+
+It calls `super().at_post_puppet()` first, so it composes with other mixins in
+any order. If you'd rather keep your own hook, call
+`evennia_xp.summary.notify_xp_summary(self)` from `at_post_puppet` instead.
+
+The summary compares `CharacterXP.last_payout_week` with the character's
+`last_xp_summary_week` Attribute, so it shows exactly once per batch that paid
+the character and nothing on a quiet week. With `evennia-accessibility`
+installed and `screenreader_mode` on, the bullets and colour codes are dropped.
+Errors are logged and never interrupt login.
 
 ---
 

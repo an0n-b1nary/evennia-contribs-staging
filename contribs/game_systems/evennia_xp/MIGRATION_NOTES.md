@@ -79,6 +79,16 @@ since landed in the indicated contrib package.
   `+spend`/`+upgrade` belong to the consuming ability system; rp-chargen ships
   those commands and an optional adapter for this ledger.
 
+- **First-login summary (0.3.0).** The source kept `_notify_xp_summary()` on
+  its Character typeclass, and the posing extraction left it behind as "the
+  consuming game's own". Nothing in it is game-specific, so it now ships as
+  `summary.notify_xp_summary()` plus `typeclasses.XPSummaryCharacterMixin`.
+  Same Attribute key (`last_xp_summary_week`, default category), so a game
+  adopting the contrib keeps its state. Changes: the aggregate lookup is a
+  single `values_list` read; errors go through Evennia's `logger.log_trace`;
+  the function returns whether it showed anything. The source's 13 tests are
+  ported (some merged), plus a failure-path test and a mixin MRO test.
+
 - **No `evennia-links` dependency.** The source XP app had no bridge models
   and no `AbstractLink`/`Archived` usage. The contrib correctly has zero
   `evennia-links` dependency.
