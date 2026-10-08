@@ -1,0 +1,49 @@
+name: Downstream snapshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      old_revision:
+        description: Full public SHA containing the starting database schema
+        required: true
+        default: "1939b8aa80d8e90c408715d68ca18a379d1699b4"
+      new_revision:
+        description: Full public target SHA with passing required CI
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  snapshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install driver dependencies and browser system libraries
+        run: |
+          pip install psutil==7.1.0 playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Data preservation and live driver fault tests
+        run: |
+          python scripts/test_downstream_gate.py < /dev/null
+          python scripts/test_playtest.py < /dev/null
+      - name: Public snapshots, populated upgrade and backup restore
+        env:
+          OLD_REVISION: ${{ inputs.old_revision }}
+          NEW_REVISION: ${{ inputs.new_revision }}
+        run: |
+          python scripts/downstream_gate.py \
+            --old-revision "$OLD_REVISION" --new-revision "$NEW_REVISION" < /dev/null
+      - name: Sanitized verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: downstream-snapshot-evidence
+          path: .downstream-runs/*/evidence/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

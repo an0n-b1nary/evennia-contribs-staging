@@ -69,9 +69,21 @@ def allocate_ports():
 
 
 class Host:
-    def __init__(self, profile="deterministic", startup=180, action=15, shutdown=30):
+    def __init__(
+        self,
+        profile="deterministic",
+        startup=180,
+        action=15,
+        shutdown=30,
+        *,
+        scaffold=None,
+        output_root=None,
+        restore=None,
+    ):
         self.run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
-        self.directory = ROOT / ".playtest-runs" / self.run_id
+        self.directory = (output_root or ROOT / ".playtest-runs") / self.run_id
+        self.scaffold = scaffold or ROOT / "example_game"
+        self.restore = restore
         self.game = (self.directory / "game").resolve()
         self.artifacts = self.directory / "evidence"
         self.artifacts.mkdir(parents=True)
@@ -80,6 +92,12 @@ class Host:
         self.credentials = {
             role: {"name": "pt-" + role, "password": secrets.token_urlsafe(24)} for role in ROLES
         }
+        if restore is not None:
+            # Only the downstream gate supplies this runner-created backup.
+            # The destination is always a new host, never an existing game.
+            saved = json.loads((restore / "host.json").read_text(encoding="utf-8"))
+            self.run_id = saved["run_id"]
+            self.credentials = saved["credentials"]
         self.owner_password = secrets.token_urlsafe(32)
         self.evidence = Evidence(
             self.artifacts,
@@ -123,7 +141,7 @@ class Host:
 
     def prepare(self):
         shutil.copytree(
-            ROOT / "example_game",
+            self.scaffold,
             self.game,
             ignore=shutil.ignore_patterns(
                 "*.db3*",
@@ -152,6 +170,9 @@ class Host:
         )
         (self.game / "credentials.json").write_text(json.dumps(self.credentials), encoding="utf-8")
         self.write_settings()
+        if self.restore is not None:
+            shutil.copy2(self.restore / "database.db3", self.game / "server/evennia.db3")
+            shutil.copy2(self.restore / "fixtures.json", self.game / "fixtures.json")
         self.command("migrate", "--noinput")
         database = self.game / "server/evennia.db3"
         if not database.is_file():

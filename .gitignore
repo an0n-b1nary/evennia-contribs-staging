@@ -109,3 +109,6 @@ ci_game/
 
 # Disposable live playtest hosts, credentials, databases and evidence.
 .playtest-runs/
+
+# Clean package environments, snapshot copies and upgrade/restore rehearsals.
+.downstream-runs/
