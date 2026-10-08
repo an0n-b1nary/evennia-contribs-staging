@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.5] - 2026-10-07
+
+- **Docs:** the README now names the shipped values for two hooks:
+  `RPTRACKER_FLAG_REVIEW_HOOK` → evennia-jobs'
+  `integrations.staff_review.file_review_job`, and `RPTRACKER_XP_PROJECTION` →
+  evennia-xp's `projection.activity_lines`. It also points the XP section at
+  this contrib's own `integrations.xp` collector instead of saying XP is
+  entirely the game's job. No code change.
+
 ## [0.1.4] - 2026-10-02
 
 - **Fixed:** exported `__version__` now matches the installed package metadata.

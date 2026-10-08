@@ -153,19 +153,25 @@ Add any of these to `server/conf/settings.py`. All have sensible defaults.
 | `RPTRACKER_POSE_SPAM_MIN_COUNT` | `20` | Pose count threshold for spam detection |
 | `RPTRACKER_POSE_SPAM_MAX_SECONDS` | `600` | Total duration threshold (10 min) |
 | `RPTRACKER_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock string for `CmdRPTrackerStaff` |
-| `RPTRACKER_XP_PROJECTION` | `None` | Dotted path: `(char_pk, window_end) → list[str] \| None` |
+| `RPTRACKER_XP_PROJECTION` | `None` | Dotted path: `(char_pk, window_end) → list[str] \| None`. evennia-xp ships `evennia_xp.projection.activity_lines` |
 | `RPTRACKER_SCENE_DISPLAY` | `None` | Dotted path: `(scene_id) → str` |
-| `RPTRACKER_FLAG_REVIEW_HOOK` | `None` | Dotted path: `(title, description) → None` |
+| `RPTRACKER_FLAG_REVIEW_HOOK` | `None` | Dotted path: `(title, description) → None`. evennia-jobs ships `evennia_jobs.integrations.staff_review.file_review_job` |
 | `RPTRACKER_SCENES_APP_LABEL` | `"scenes"` | App label for the optional scenes partner |
 
 ---
 
 ## XP integration
 
-XP is entirely the consuming game's responsibility. `is_xp_eligible()` on
-`RPSession` provides a sensible default (COMPLETED + ≥30 min + ≥1 partner +
-not yet awarded), but your XP collector queries and award logic live in your
-game code.
+With evennia-xp installed, register this contrib's collector and post-batch hook
+(see `evennia_rptracker/integrations/xp.py`):
+
+```python
+XP_COLLECTORS += [("rp_session", "evennia_rptracker.integrations.xp.collect_rp_sessions")]
+XP_POST_BATCH_HOOKS += ["evennia_rptracker.integrations.xp.flip_session_flags"]
+```
+
+Eligibility is `RPSession.is_xp_eligible()` (COMPLETED + ≥30 min + ≥1 partner +
+not yet awarded). With another XP system, write your own collector around it.
 
 Call `sweep_rp_sessions(window_end)` **before** your XP collectors so flagged
 sessions are excluded:
@@ -181,10 +187,17 @@ def run_weekly_batch(window_end):
 ```
 
 Wire `RPTRACKER_FLAG_REVIEW_HOOK` to route auto-flag notifications to your
-staff queue (e.g. a ticket system):
+staff queue. With evennia-jobs, use its shipped reporter (each flag becomes a
+staff-only `+discuss` ticket); otherwise any `(title, description)` callable works:
 
 ```python
-RPTRACKER_FLAG_REVIEW_HOOK = "myapp.jobs.create_review_ticket"
+RPTRACKER_FLAG_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
+```
+
+To show projected XP at the bottom of `+activity`, with evennia-xp:
+
+```python
+RPTRACKER_XP_PROJECTION = "evennia_xp.projection.activity_lines"
 ```
 
 ---
