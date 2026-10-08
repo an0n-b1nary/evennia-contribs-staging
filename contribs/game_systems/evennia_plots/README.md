@@ -232,3 +232,8 @@ in 0.2.0 are removed. Update any old dotted settings paths before upgrading:
 | `evennia_plots.gating.resolve_xp_multiplier` | `evennia_plots.integrations.gating.resolve_xp_multiplier` |
 
 The installation examples above already use these supported paths.
+
+Thread bonus collection uses `evennia_xp.gating.resolve_xp_multiplier`, so a
+host may compose its own XP policy with the plots resolver. Delegate to the
+plots resolver to preserve per-arc scaling. Existing arc pauses still suppress
+thread bonuses before collection.

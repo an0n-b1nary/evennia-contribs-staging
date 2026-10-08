@@ -63,9 +63,9 @@ def collect_thread_bonuses(window_end):
         Award per (thread, participant) credit.
     """
     # evennia_xp is an optional dep; import deferred so this module loads without it.
+    from evennia_xp.gating import resolve_xp_multiplier
     from evennia_xp.models import XPLog
 
-    from evennia_plots.integrations.gating import resolve_xp_multiplier
     from evennia_plots.models import PlotBonusCredit, PlotParticipant, PlotThread
 
     window_start = _window_start(window_end)
