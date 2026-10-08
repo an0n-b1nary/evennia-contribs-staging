@@ -19,6 +19,12 @@ as the ledger behind `RP_CHARGEN_XP_LEDGER` when retaining a native XP app;
 the ledger must participate in the same database transaction. Starting
 allowance is chargen-owned and must never inflate earned-XP totals.
 
+## 0.2.1
+
+No migration. The default `RP_CHARGEN_PIP_NOUN` is now `"pips"`; a game that
+relied on the old default and wants to keep its wording sets
+`RP_CHARGEN_PIP_NOUN = "edge"`.
+
 ## 0.2.0
 
 Run `evennia migrate` to add `AbilityDefinition.budget_cost_overrides`.

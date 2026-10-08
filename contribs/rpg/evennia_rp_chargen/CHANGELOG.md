@@ -9,8 +9,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-08
+
+### Changed
+
+- `RP_CHARGEN_PIP_NOUN` now defaults to `"pips"` instead of `"edge"`, and the
+  command help says "`+` pips" rather than "edge". Set
+  `RP_CHARGEN_PIP_NOUN = "edge"` to keep the old wording. The API, stored
+  sheets and ruleset keys are unchanged.
+
 ### Documentation
 
+- New README section, "Renaming things for your game": every player-facing
+  noun setting with its default, the catalog-name route, and the command
+  rename recipe (with its own help docstring).
 - Updated the preview version and documented the pilot origin, dependency
   boundaries and pose/session lock lifecycle.
 

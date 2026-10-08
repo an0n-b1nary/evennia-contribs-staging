@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-chargen"
-version = "0.2.0"
+version = "0.2.1"
 description = "Character sheets for Evennia RP games: graded stats, edge and weakness pips, point-buy or array allocation, and scene-aware build locks."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

@@ -313,9 +313,9 @@ class Command(BaseCommand):
             seed_catalog(update=True)
             # Retain old copies and references for players, but retire these
             # entries from the public catalog if an earlier seed created them.
-            for row in TagDefinition.objects.filter(key="tinkering"):
+            for row in TagDefinition.objects.filter(key__in=content.RP_RETIRED_TAGS):
                 row.archive()
-            for row in AbilityDefinition.objects.filter(key="domain-aversion"):
+            for row in AbilityDefinition.objects.filter(key__in=content.RP_RETIRED_ABILITIES):
                 row.archive()
             for author, spec in zip(authors, content.RP_SAMPLE_BUILDS, strict=True):
                 for stat in get_ruleset().stats:

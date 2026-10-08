@@ -120,9 +120,9 @@ class PipServiceTests(ChargenTest):
 
     def test_edge_within_policy(self):
         self.assertEqual(services.set_edge(self.char1, "brawn", 2).display(), "Mid ++")
-        with self.assertRaisesMessage(ChargenError, "at most 2 edge"):
+        with self.assertRaisesMessage(ChargenError, "at most 2 pips"):
             services.set_edge(self.char1, "brains", 3)
-        with self.assertRaisesMessage(ChargenError, "4 edge in all"):
+        with self.assertRaisesMessage(ChargenError, "4 pips in all"):
             services.set_edge(self.char1, "brains", 2)
         services.set_edge(self.char1, "brains", 1)
 

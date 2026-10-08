@@ -4,8 +4,8 @@
 
     +sheet      view your sheet (staff: anyone's)
     +stats      choose your stats' rungs on a draft sheet, then finalize it
-    +pips       manage edge and weakness pips (games often subclass it as +edge)
-    +lock       lock your edge and loadout (announced)
+    +pips       manage your stats' pips: + from a budget, - by choice
+    +lock       lock your pips and loadout (announced)
     +unlock     unlock them (announced)
     +abilities  your abilities and flaws, the catalog, equipping, flaws
     +spend      what you have to spend; +spend/ability buys an ability
@@ -13,7 +13,7 @@
     +chargen    staff: review sheets, set stats, grant and revoke, add tags
 
 Add `ChargenCmdSet` to the character cmdset, or pick the commands you want.
-Rename a command by subclassing it (`class CmdEdge(CmdPips): key = "+edge"`).
+Rename a command by subclassing it (`class CmdBoons(CmdPips): key = "+boons"`).
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ class CmdSheet(_ChargenCommand):
       +sheet
       +sheet <character>     (staff only)
 
-    Your sheet shows every stat with its edge (+) and weakness (-) pips.
+    Your sheet shows every stat with its + and weakness (-) pips.
     Nobody but you and staff can see it.
     """
 
@@ -108,7 +108,7 @@ class CmdStats(_ChargenCommand):
       +stats/finalize
 
     Pick each stat's rung (for example: +stats charisma=B), within your
-    allocation. Edge and weakness are set separately with +pips.
+    allocation. Pips (+ and -) are set separately with +pips.
     Finalizing locks the rungs in; after that only staff can change them.
     """
 
@@ -155,7 +155,7 @@ class CmdStats(_ChargenCommand):
 
 class CmdPips(_ChargenCommand):
     """
-    Manage edge and weakness pips.
+    Manage your stats' pips.
 
     Usage:
       +pips
@@ -164,10 +164,10 @@ class CmdPips(_ChargenCommand):
       +pips/clear [<stat>]
       +pips/weakness <stat>=<count>
 
-    Edge (+) nudges a stat up and comes from a limited budget. Weakness (-)
-    nudges it down; it's free, a roleplaying choice. A count can be a number
-    or the pips themselves: +pips charisma=+++ or +pips/weakness will=--.
-    While you're in a scene your edge is locked; +unlock first.
+    A + pip nudges a stat up and comes from a limited budget. A weakness
+    pip (-) nudges it down; it's free, a roleplaying choice. A count can be a
+    number or the pips themselves: +pips charisma=+++ or +pips/weakness will=--.
+    While you're in a scene your pips are locked; +unlock first.
     """
 
     key = "+pips"
@@ -200,7 +200,7 @@ class CmdPips(_ChargenCommand):
 
 class CmdLock(_ChargenCommand):
     """
-    Lock your edge and loadout.
+    Lock your pips and loadout.
 
     Usage:
       +lock
@@ -222,7 +222,7 @@ class CmdLock(_ChargenCommand):
 
 class CmdUnlock(_ChargenCommand):
     """
-    Unlock your edge and loadout to change them.
+    Unlock your pips and loadout to change them.
 
     Usage:
       +unlock

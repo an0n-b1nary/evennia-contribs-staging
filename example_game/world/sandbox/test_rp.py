@@ -39,7 +39,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
 
         self.assertEqual(
             set(get_ruleset().stats),
-            {"prowess", "toughness", "wit", "sensitivity", "charisma", "will", "agility"},
+            {"strength", "endurance", "intellect", "intuition", "presence", "resolve", "agility"},
         )
         domains = TagDefinition.objects.filter(kind="domain")
         self.assertEqual(domains.count(), 16)
@@ -65,13 +65,14 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
             },
         )
         self.assertTrue(all("Suggested:" in row.description for row in domains))
-        self.assertEqual(TagDefinition.objects.filter(kind="element").count(), 6)
+        self.assertEqual(TagDefinition.objects.filter(kind="style").count(), 6)
+        self.assertFalse(TagDefinition.objects.filter(kind="element").exists())
         self.assertFalse(AbilityDefinition.objects.filter(key="domain-aversion").exists())
-        focus = AbilityDefinition.objects.get(key="elemental-focus")
-        expertise = AbilityDefinition.objects.get(key="domain-expertise")
+        focus = AbilityDefinition.objects.get(key="combat-focus")
+        proficiency = AbilityDefinition.objects.get(key="proficiency")
         self.assertEqual((focus.budget_cost, focus.max_level), (10, 5))
-        self.assertEqual(focus.effects, expertise.effects)
-        for key in ("domain-ineptitude", "domain-vulnerability", "elemental-vulnerability"):
+        self.assertEqual(focus.effects, proficiency.effects)
+        for key in ("ineptitude", "domain-vulnerability", "style-vulnerability"):
             flaw = AbilityDefinition.objects.get(key=key)
             self.assertTrue(flaw.is_flaw)
             self.assertEqual(flaw.budget_cost, 0)
@@ -94,7 +95,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
                 self.assertTrue(abilities.find_owned(sample, ability, tag).equipped)
         challenges = list(Challenge.objects.filter(room=self.grounds))
         self.assertEqual([row.number for row in challenges], [1, 2])
-        self.assertEqual((challenges[0].stat_key, challenges[0].tag), ("charisma", "performance"))
+        self.assertEqual((challenges[0].stat_key, challenges[0].tag), ("presence", "performance"))
         self.assertIsNone(challenges[1].stat_key)
         self.assertIsNone(challenges[1].tag)
         self.assertEqual(challenges[1].description, "Cross the chasm")
@@ -109,9 +110,9 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         scene = Scene.objects.create(room=self.grounds, room_name=self.grounds.key)
         self.grounds.active_scene_id = scene.pk
         record = services.perform_test(
-            self.samples[0], parse_test("#1=Charisma/Performance"), roller=ScriptedRoller([10])
+            self.samples[0], parse_test("#1=Presence/Performance"), roller=ScriptedRoller([10])
         )
-        self.assertTrue(record.is_success)  # B++ + Expertise + 10 narrowly beats A.
+        self.assertTrue(record.is_success)  # B++ + Proficiency + 10 narrowly beats A.
         self.assertEqual(record.rating_display, "B ++")
         self.assertEqual(record.scene_id, scene.pk)
         self.assertTrue(locks.is_locked(self.samples[0]))
@@ -130,27 +131,26 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_contest.parsing import parse_test
 
         first = services.perform_test(
-            self.samples[1], parse_test("#1=Sensitivity/Water"), roller=ScriptedRoller([0])
+            self.samples[1], parse_test("#1=Agility/Blades"), roller=ScriptedRoller([0])
         )
         self.assertTrue(first.alternative)
-        self.assertEqual(first.tag, "water")
+        self.assertEqual(first.tag, "blades")
         second = services.perform_test(
-            self.samples[1], parse_test("#2=Wit/Ritual"), roller=ScriptedRoller([0])
+            self.samples[1], parse_test("#2=Intellect/Ritual"), roller=ScriptedRoller([0])
         )
         self.assertFalse(second.alternative)
         self.assertEqual(second.challenge.number, 2)
 
     def test_ic_pose_locks_ooc_does_not_and_unlock_is_announced(self):
-        from commands.rp import CmdEdge
         from evennia_rp_chargen import locks
-        from evennia_rp_chargen.commands import CmdUnlock
+        from evennia_rp_chargen.commands import CmdPips, CmdUnlock
 
         self.build_player()
         self.char2.record_pose("OOC: choosing an approach.", pose_type="ooc")
         self.assertFalse(locks.is_locked(self.char2))
         self.char2.record_pose("studies the gap.", pose_type="pose")
         self.assertTrue(locks.is_locked(self.char2))
-        self.assertIn("locked", self.call(CmdEdge(), "/set Wit=2", caller=self.char2))
+        self.assertIn("locked", self.call(CmdPips(), "/set Intellect=2", caller=self.char2))
         self.char1.location = self.grounds
         output = self.call(CmdUnlock(), "", caller=self.char2, receiver=self.char1)
         self.assertIn("unlocks", output)
@@ -197,7 +197,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_chargen.services import ChargenError
 
         self.build_player()
-        for name in ("Domain Expertise:Performance", "Elemental Focus:Water"):
+        for name in ("Proficiency:Performance", "Combat Focus:Blades"):
             self.assertIn("You learn", self.call(CmdSpend(), f"/ability {name}", caller=self.char2))
             self.assertIn("level 2", self.call(CmdUpgrade(), name, caller=self.char2))
         build = CharacterBuild.objects.get(character=self.char2)
@@ -206,9 +206,9 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         self.assertEqual(transactions.count(), 4)
         self.assertTrue(all(row.xp_amount == 0 for row in transactions))
         with self.assertRaises(ChargenError):
-            abilities.upgrade(self.char2, "elemental-focus", "water")
+            abilities.upgrade(self.char2, "combat-focus", "blades")
         self.assertEqual(transactions.count(), 4)
-        self.assertEqual(abilities.find_owned(self.char2, "elemental-focus", "water").level, 2)
+        self.assertEqual(abilities.find_owned(self.char2, "combat-focus", "blades").level, 2)
 
     def test_reseed_preserves_player_sheet_and_check_audit(self):
         from evennia_rp_chargen import abilities
@@ -218,12 +218,14 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_contest.parsing import parse_test
 
         self.build_player()
-        abilities.acquire(self.char2, "elemental-focus", "water")
-        record = services.perform_test(self.char2, parse_test("#2=Wit"), roller=ScriptedRoller([0]))
+        abilities.acquire(self.char2, "combat-focus", "blades")
+        record = services.perform_test(
+            self.char2, parse_test("#2=Intellect"), roller=ScriptedRoller([0])
+        )
         call_command("seed_sandbox", verbosity=0)
         self.assertEqual(CharacterBuild.objects.count(), 3)
         self.assertEqual(CharacterBuild.objects.get(character=self.char2).allowance_spent, 3)
-        self.assertTrue(abilities.find_owned(self.char2, "elemental-focus", "water").equipped)
+        self.assertTrue(abilities.find_owned(self.char2, "combat-focus", "blades").equipped)
         self.assertEqual(Challenge.all_objects.count(), 2)
         record.refresh_from_db()
         self.assertIsNone(record.challenge_id)

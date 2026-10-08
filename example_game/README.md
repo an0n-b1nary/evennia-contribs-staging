@@ -148,56 +148,64 @@ carries one command family and one brass plaque naming its commands:
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
 | Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
-| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-contest` | `+sheet`, `+stats`, `+edge`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen` |
+| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen` |
 
 ### RP checks in the Proving Grounds
 
 Take `proving` from the Arrival Hall and read the plaque. The seven stats are
-Prowess, Toughness, Wit, Sensitivity, Charisma, Will and Agility. A simple
+Strength, Endurance, Agility, Intellect, Intuition, Presence and Resolve. A simple
 starting sheet sets every stat to B (14 allocation points), then finalizes:
 
 ```text
-+stats Prowess=B
-+stats Toughness=B
-+stats Wit=B
-+stats Sensitivity=B
-+stats Charisma=B
-+stats Will=B
++stats Strength=B
++stats Endurance=B
 +stats Agility=B
++stats Intellect=B
++stats Intuition=B
++stats Presence=B
++stats Resolve=B
 +stats/finalize
-+edge/set Wit=3
-+edge/set Agility=2
-+spend/ability Domain Expertise:Athletics
-+upgrade Domain Expertise:Athletics
++pips/set Intellect=3
++pips/set Agility=2
++spend/ability Proficiency:Athletics
++upgrade Proficiency:Athletics
 +sheet
 +test/list
 +test #2=Agility/Athletics~I leap across.
 ```
 
 Domains suggest an approach in their descriptions; any stat/tag pairing is
-legal. Elements are Fire, Water, Air, Earth, Light and Darkness. The seeded
-Storyteller has Domain Expertise:Performance, the Visitor has Elemental
-Focus:Water, and both have finalized sheets and a flaw. Builder mode lets you
+legal. The second tag kind is fighting styles: Blades, Blunt, Polearms,
+Archery, Unarmed and Spellcraft. A move would have a style, and any test may
+carry one. The seeded Storyteller has Proficiency:Performance, the Visitor has
+Combat Focus:Blades, and both have finalized sheets and a flaw. Builder mode lets you
 inspect them with `+sheet <name>`. The Stat-block Dummy has C in every stat
 and no chargen sheet; puppet it to exercise the adapter fallback.
 
-Challenge #1 suggests Charisma/Performance at A; #2 is the prompt-only B
+Challenge #1 suggests Presence/Performance at A; #2 is the prompt-only B
 challenge “Cross the chasm.” Choose a different approach with
-`+test #1=Wit/Deception`; the result marks it as an alternative. Anyone can
+`+test #1=Intellect/Deception`; the result marks it as an alternative. Anyone can
 set a challenge, including `+test/set/once B~Cross the chasm`. Its setter or
 staff can edit, void attempts, and close it. Room messages and public scene
 logs show outcomes; grades stay private and only staff `+test/review` sees
 dice and the resolution ledger.
 
-IC poses and checks lock Edge and the ability loadout. `+unlock` announces
+IC poses and checks lock pips and the ability loadout. `+unlock` announces
 your change; the next IC pose locks again. An OOC message does not lock the
 build. Tracker session end or three idle hours releases it. Abilities use
-a 100 Memory loadout; Expertise and Focus cost 10 each, flaws cost none.
+a 100-point loadout; Proficiency and Combat Focus cost 10 each, flaws cost none.
 The starting allowance is 10, acquisitions cost 3, and upgrades cost 2, 4,
 8, then 16. Purchases use the allowance first, then earned XP. To top up for
 playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10:Playtest`.
 `+spend` shows both balances. Staff can revoke with an exact refund using
 `+chargen/revoke/refund <character>/<ability>:<tag>`.
+
+Every name above belongs to the game, not the contribs. Stats, domains, styles
+and abilities are named in `world/ruleset.py`. The sheet's nouns (pips,
+weakness, loadout, points) are set in the RP block of `server/conf/settings.py`,
+and their contrib defaults are listed there. To rename a command such as
+`+pips`, follow "Renaming things for your game" in the
+[rp-chargen README](../contribs/rpg/evennia_rp_chargen/README.md#renaming-things-for-your-game).
 
 The CI `rp-sandbox` job runs the full sandbox gate with all partners, then
 fresh environments with scenes, tracker, XP, chargen or contest physically
@@ -1101,11 +1109,11 @@ never reused. Password hashing and login throttling keep their normal settings.
 The owner account only bootstraps the database; gameplay uses ordinary players
 and a nonsuperuser Builder.
 
-The RP pass covers draft validation and finalization, Edge/Weakness policy,
+The RP pass covers draft validation and finalization, pip policy,
 allowance/XP transactions and refunds, loadouts, scene and tracker integration,
 private ratings, challenge binding/alternatives/retries, once/edit/void
 authorization, literal comments and reconnect persistence. A per-check
-`ScriptedRoller([10])` makes B++ Charisma with Performance Expertise against A
+`ScriptedRoller([10])` makes B++ Presence with Performance Proficiency against A
 resolve to Narrow Success. The normal profile checks real outcome records
 without assuming a particular roll. Chromium uses anonymous `/webclient/`
 pages in independent contexts, types real password logins into the input
