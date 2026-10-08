@@ -12,13 +12,15 @@ a change isn't allowed. The rules:
 - **Finalising** needs every stat set and nothing the allocation or pip
   policy objects to. The player does it; staff review is optional unless
   `RP_CHARGEN_REQUIRE_APPROVAL` is set.
+- **Guards** (`guards`) other apps connect may refuse any rating change, staff
+  edits included, after these rules pass and before anything is written.
 """
 
 from __future__ import annotations
 
 from django.utils import timezone
 
-from evennia_rp_chargen import conf, locks
+from evennia_rp_chargen import conf, guards, locks
 from evennia_rp_chargen.allocation import AllocationReport, get_allocation
 from evennia_rp_chargen.models import CharacterBuild
 from evennia_rp_chargen.pips import PipPolicy
@@ -98,6 +100,7 @@ def set_stat(character, stat_text: str, rung_text: str) -> tuple[Rating, Allocat
     report = get_allocation().check(ratings, ruleset)
     if report.errors:
         raise ChargenError(" ".join(report.errors))
+    guards.check(guards.BuildChange(character, guards.RATING, stat=stat, before=current, after=new))
     handler.set(stat, new)
     build.allocation_spent = report.spent
     build.save(update_fields=["allocation_spent", "updated_at"])
@@ -111,7 +114,9 @@ def clear_stat(character, stat_text: str) -> AllocationReport:
         raise ChargenError("Your stats are final. Ask staff if something needs changing.")
     ruleset = get_ruleset()
     handler = StatHandler(character, ruleset)
-    handler.clear(find_stat(stat_text, ruleset))
+    stat = find_stat(stat_text, ruleset)
+    guards.check(guards.BuildChange(character, guards.RATING, stat=stat, before=handler.get(stat)))
+    handler.clear(stat)
     report = get_allocation().check(handler.ratings(), ruleset)
     build.allocation_spent = report.spent
     build.save(update_fields=["allocation_spent", "updated_at"])
@@ -123,15 +128,16 @@ def clear_stat(character, stat_text: str) -> AllocationReport:
 # ---------------------------------------------------------------------------
 
 
-def _change_pips(character, stat_text: str, **pips) -> Rating:
+def _check_pips_changeable(character) -> None:
     build = get_build(character)
     if build is None:
         raise ChargenError("You don't have a character sheet yet. Start one with +stats.")
     if not build.is_draft and locks.scope_locked(character, conf.PIPS):
-        raise ChargenError(
-            f"Your {conf.locked_things()} are locked for the scene. "
-            "Use +unlock first; the room is told."
-        )
+        raise ChargenError(locks.locked_message())
+
+
+def _change_pips(character, stat_text: str, **pips) -> Rating:
+    _check_pips_changeable(character)
     ruleset = get_ruleset()
     stat = find_stat(stat_text, ruleset)
     handler = StatHandler(character, ruleset)
@@ -157,6 +163,7 @@ def _change_pips(character, stat_text: str, **pips) -> Rating:
     created = [e for e in policy.errors(ratings, ruleset) if e not in before]
     if created:
         raise ChargenError(" ".join(created))
+    guards.check(guards.BuildChange(character, guards.RATING, stat=stat, before=current, after=new))
     return handler.set(stat, new)
 
 
@@ -173,12 +180,27 @@ def clear_edge(character, stat_text: str | None = None) -> list[Rating]:
     ruleset = get_ruleset()
     if stat_text is not None:
         return [set_edge(character, stat_text, 0)]
+    _check_pips_changeable(character)
     handler = StatHandler(character, ruleset)
-    return [
-        set_edge(character, key, 0)
-        for key, rating in handler.ratings().items()
-        if rating is not None and rating.edge
+    keys = [key for key, rating in handler.ratings().items() if rating is not None and rating.edge]
+    # Ask the guards about every stat before clearing any, so a refusal leaves
+    # the whole sheet as it was rather than half cleared.
+    refused = [
+        message
+        for key in keys
+        for message in guards.refusals(
+            guards.BuildChange(
+                character,
+                guards.RATING,
+                stat=find_stat(key, ruleset),
+                before=handler.get(key),
+                after=handler.get(key).with_pips(edge=0),
+            )
+        )
     ]
+    if refused:
+        raise ChargenError(" ".join(dict.fromkeys(refused)))
+    return [set_edge(character, key, 0) for key in keys]
 
 
 # ---------------------------------------------------------------------------
@@ -238,10 +260,13 @@ def reopen(character, *, by=None, note: str = "") -> CharacterBuild:
     return build
 
 
-def staff_set_stat(character, stat_text: str, rating_text: str) -> tuple[Rating, list[str]]:
+def staff_set_stat(
+    character, stat_text: str, rating_text: str, *, by=None
+) -> tuple[Rating, list[str]]:
     """Staff: set a stat's full rating (rung and pips), bypassing policy.
 
-    Returns the rating and any policy problems it creates, as warnings.
+    Returns the rating and any policy problems it creates, as warnings. Guards
+    still apply: a change one refuses raises `ChargenError`.
     """
     ensure_build(character)
     ruleset = get_ruleset()
@@ -251,6 +276,11 @@ def staff_set_stat(character, stat_text: str, rating_text: str) -> tuple[Rating,
     except ValueError as exc:
         raise ChargenError(str(exc)) from None
     handler = StatHandler(character, ruleset)
+    guards.check(
+        guards.BuildChange(
+            character, guards.RATING, stat=stat, before=handler.get(stat), after=rating, by=by
+        )
+    )
     handler.set(stat, rating)
     ratings = handler.ratings()
     warnings = [

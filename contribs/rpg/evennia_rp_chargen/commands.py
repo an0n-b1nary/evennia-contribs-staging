@@ -335,7 +335,7 @@ class CmdChargen(_ChargenCommand):
         target = self.find_character(name)
         if target is None:
             return
-        result = self.run(services.staff_set_stat, target, stat_text, self.rhs)
+        result = self.run(services.staff_set_stat, target, stat_text, self.rhs, by=self.caller)
         if result is None:
             return
         rating, warnings = result

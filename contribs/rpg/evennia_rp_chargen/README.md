@@ -1,6 +1,6 @@
 # evennia-rp-chargen
 
-> **Preview (0.2.1, Pre-Alpha).** This package was written directly as a
+> **Preview (0.3.0, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
 > while the rest of the rp- cluster is built on it. Pin an exact commit.
 
@@ -16,7 +16,9 @@ built on [`evennia-rp-rules`](../evennia_rp_rules/README.md). It provides:
   per-tag templates, levels, and a budgeted loadout;
 - spending, from a starting allowance first and then from XP;
 - **build locks** triggered by IC poses, resolved checks or manual locking,
-  released by RP session end, manual unlocking or an idle TTL.
+  released by RP session end, manual unlocking or an idle TTL;
+- **change guards**, through which other apps can refuse a build change that
+  would break something of theirs, such as worn gear's requirements.
 
 Stat names, rungs and numbers all come from the game's ruleset; this package
 ships none of its own.
@@ -130,6 +132,14 @@ tags. Use tag keys of the template's kind and nonnegative integer costs.
 are read from the catalog each time, so rebalancing reaches existing copies.
 An over-budget loadout stays equipped and is flagged on the sheet; new equips
 are blocked until enough abilities are unequipped. Flaws always cost zero.
+
+**Change guards.** Other apps can hang state off a build: gear that needs
+three `+` pips in a stat, say. A change that would break it is refused
+before it's written, with a message naming what to undo first. There is no
+staff override, so the build and what depends on it never disagree; staff
+undo the dependent thing first, as a player would. Such apps also freeze when
+the build does, so gear can't change at any moment when pips or loadout can't.
+See [Change guards](#change-guards) for the API.
 
 **Tags.** The ruleset's tags seed the vocabulary. `TagDefinition` rows add
 to it, rename tags, or archive them (`+chargen/tag`, or the admin). Set
@@ -282,6 +292,46 @@ Every service raises `ChargenError` with a message fit to show the player.
 `StatHandler(char)` reads and writes ratings without policy. `ChargenSubject`
 and `subject_adapter` expose a playable sheet to checks. A draft sheet raises
 a `CheckError` that tells the player to finish it.
+
+### Change guards
+
+Every service that changes a build sends `guards.build_change_requested`
+with a `BuildChange`, after its own rules pass and before anything is written
+or paid. That covers ratings and pips, equipping and unequipping, buying and
+upgrading, flaws, and staff grants, revokes and `/setstat`. A receiver returns
+`None` to allow the change or a message to refuse it:
+
+```python
+# yourapp/apps.py, in ready()
+from evennia_rp_chargen.guards import RATING, build_change_requested
+
+def keep_gear_attuned(sender, change, **kwargs):
+    # gear_broken_by is your own lookup: worn items the new rating no longer satisfies.
+    if change.kind == RATING and (item := gear_broken_by(change.character, change.after)):
+        return f"Your {item} needs more pips in {change.stat.name}. Remove it first."
+    return None
+
+build_change_requested.connect(keep_gear_attuned, dispatch_uid="yourapp.gear_guard")
+```
+
+- **What a change says.** `kind` is one of `RATING`, `EQUIP`, `UNEQUIP`,
+  `ACQUIRE`, `UPGRADE`, `TAKE_FLAW`, `REMOVE_FLAW`, `GRANT` and `REVOKE`. A
+  rating change carries `stat`, `before` and `after` (`None` for unset). An
+  ability change carries `ability`, `tag`, `copy` (`None` when the change
+  creates it) and `level`, the level after the change (0 when it removes the
+  copy). `by` is who made the change, when the caller said; staff tools
+  always do.
+- **Staff are asked too.** There is no override.
+- **Fail closed.** A guard that raises, or answers with anything but a message
+  or a list of messages, refuses the change and is logged.
+- **Auto-equip.** A purchase or grant that would auto-equip skips the equip
+  quietly when a guard refuses it, as it does when the loadout is full.
+- **Don't write in a guard.** The change can still fail after the guards
+  answer.
+
+For state that freezes with the build, `locks.frozen(char)` is true whenever a
+lock freezes any scope on a non-draft sheet. `locks.locked_message()` is the
+refusal chargen itself uses.
 
 ---
 

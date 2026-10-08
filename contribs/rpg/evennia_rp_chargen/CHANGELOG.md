@@ -9,6 +9,28 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
+### Added
+
+- Change guards (`evennia_rp_chargen.guards`). Every service that changes a
+  build sends `build_change_requested` with a `BuildChange` after its own
+  rules pass and before anything is written or paid. Covered: ratings and
+  pips (including staff `/setstat`), equip and unequip, acquire and upgrade,
+  taking and removing flaws, and staff grants and revokes. A receiver returns
+  a message to refuse. Staff changes are asked too, with no override. A guard
+  that raises or answers with anything else refuses the change (fail closed).
+  Auto-equip skips quietly when a guard refuses the equip. Clearing pips from
+  every stat asks about each stat first, so a refusal clears none of them.
+- `locks.frozen(character)`: whether a lock freezes any scope on a non-draft
+  sheet, for partner state that must freeze with the build.
+- `locks.locked_message()`: the lock refusal, shared by chargen and partners.
+
+### Changed
+
+- `services.staff_set_stat` takes an optional `by`, which `+chargen/setstat`
+  passes, so guards can see who made the change.
+
 ## [0.2.1] - 2026-10-08
 
 ### Changed

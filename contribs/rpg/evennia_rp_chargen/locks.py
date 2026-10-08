@@ -24,6 +24,8 @@ Hooks for the game:
 - `RP_CHARGEN_LOCK_TTL` releases a lock that long after the last IC action,
   for solo posing that never makes a session and for games with no tracker.
   It's checked when the lock is read; no script runs.
+- `frozen(character)` and `locked_message()` are for partner apps whose own
+  state must freeze with the build (worn gear, for instance).
 """
 
 from __future__ import annotations
@@ -114,6 +116,24 @@ def scope_locked(character, scope: str) -> bool:
     return scope in conf.lock_scopes() and is_locked(character)
 
 
+def frozen(character) -> bool:
+    """Whether any part of the build is frozen right now.
+
+    For partner apps whose own state hangs off the build, such as worn gear:
+    they can't change at any moment when pips or loadout can't. Draft sheets
+    never freeze.
+    """
+    return bool(conf.lock_scopes()) and is_locked(character) and _has_lockable_build(character)
+
+
+def locked_message() -> str:
+    """The refusal for a change the lock forbids, naming what it freezes."""
+    return (
+        f"Your {conf.locked_things()} are locked for the scene. "
+        "Use +unlock first; the room is told."
+    )
+
+
 def _announce(character, room_text: str, self_text: str) -> None:
     character.msg(self_text)
     location = getattr(character, "location", None)
@@ -195,8 +215,10 @@ def on_check_resolved(sender, check=None, result=None, **kwargs) -> None:
 
 __all__ = [
     "LockState",
+    "frozen",
     "is_locked",
     "lock",
+    "locked_message",
     "note_ic_action",
     "on_check_resolved",
     "release",

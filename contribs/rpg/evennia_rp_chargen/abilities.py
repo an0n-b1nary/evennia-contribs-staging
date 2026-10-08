@@ -13,6 +13,9 @@ Every function raises `ChargenError` with a message fit to show the player.
   nothing. Staff-only flaws (acquisition `staff`) can't be shed by players.
 - **Staff** grant any ability at any level for free, revoke with an optional
   refund, and set a sheet's starting allowance.
+- **Guards** (`guards`) other apps connect may refuse any of these changes,
+  staff ones included, after the rules above pass and before anything is
+  written or paid. Auto-equipping skips quietly when a guard objects.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from evennia_rp_chargen import conf, locks
+from evennia_rp_chargen import conf, guards, locks
 from evennia_rp_chargen.catalog import find_ability
 from evennia_rp_chargen.ledger import InsufficientXP, LedgerUnavailable, get_ledger
 from evennia_rp_chargen.models import (
@@ -140,10 +143,14 @@ def loadout_budget() -> int | None:
 def _check_unlocked(character) -> None:
     build = ensure_build(character)
     if not build.is_draft and locks.scope_locked(character, conf.LOADOUT):
-        raise ChargenError(
-            f"Your {conf.locked_things()} are locked for the scene. "
-            "Use +unlock first; the room is told."
-        )
+        raise ChargenError(locks.locked_message())
+
+
+def _change(character, kind, copy=None, **fields) -> guards.BuildChange:
+    """A `BuildChange` for an ability change; `copy` fills in ability, tag and level."""
+    if copy is not None:
+        fields = {"ability": copy.ability, "tag": copy.tag, "level": copy.level, **fields}
+    return guards.BuildChange(character, kind, copy=copy, **fields)
 
 
 def _fits(character, extra: int) -> bool:
@@ -168,6 +175,7 @@ def equip(character, ability_text: str, tag_text: str | None = None) -> Characte
     _check_unlocked(character)
     if not _fits(character, copy.budget_cost):
         raise _budget_error(character, copy)
+    guards.check(_change(character, guards.EQUIP, copy))
     copy.equipped = True
     copy.save(update_fields=["equipped", "updated_at"])
     return copy
@@ -180,6 +188,7 @@ def unequip(character, ability_text: str, tag_text: str | None = None) -> Charac
     if not copy.equipped:
         raise ChargenError(f"{copy.display_name} isn't equipped.")
     _check_unlocked(character)
+    guards.check(_change(character, guards.UNEQUIP, copy))
     copy.equipped = False
     copy.save(update_fields=["equipped", "updated_at"])
     return copy
@@ -267,6 +276,7 @@ def acquire(character, ability_text: str, tag_text: str | None = None, *, by=Non
     ).exists():
         raise ChargenError(f"You already have {ability.display_name(tag)}.")
     build = ensure_build(character)
+    guards.check(_change(character, guards.ACQUIRE, ability=ability, tag=tag, level=1, by=by))
     with transaction.atomic():
         tx = _record(character, ability, tag, Kind.ACQUIRE, level_to=1, by=by)
         payment = _pay(character, build, ability.xp_cost, tx)
@@ -278,7 +288,11 @@ def acquire(character, ability_text: str, tag_text: str | None = None, *, by=Non
 def _auto_equip(character, copy: CharacterAbility) -> None:
     build = ensure_build(character)
     locked = not build.is_draft and locks.scope_locked(character, conf.LOADOUT)
-    if not locked and _fits(character, copy.budget_cost):
+    if (
+        not locked
+        and _fits(character, copy.budget_cost)
+        and not guards.refusals(_change(character, guards.EQUIP, copy))
+    ):
         copy.equipped = True
         copy.save(update_fields=["equipped", "updated_at"])
 
@@ -302,6 +316,7 @@ def upgrade(character, ability_text: str, tag_text: str | None = None, *, by=Non
             f"{copy.display_name} is already at its highest level ({ability.max_level})."
         )
     build = ensure_build(character)
+    guards.check(_change(character, guards.UPGRADE, copy, level=copy.level + 1, by=by))
     with transaction.atomic():
         tx = _record(
             character,
@@ -340,6 +355,7 @@ def take_flaw(character, flaw_text: str, tag_text: str | None = None) -> Charact
     ).exists():
         raise ChargenError(f"You already have {ability.display_name(tag)}.")
     _check_unlocked(character)
+    guards.check(_change(character, guards.TAKE_FLAW, ability=ability, tag=tag, level=1))
     with transaction.atomic():
         _record(character, ability, tag, Kind.FLAW_ADD, level_to=1)
         return CharacterAbility.objects.create(
@@ -354,6 +370,7 @@ def remove_flaw(character, flaw_text: str, tag_text: str | None = None) -> str:
     if copy.ability.acquisition != Acquisition.FREE:
         raise ChargenError(f"{copy.display_name} was given by staff; ask them about it.")
     _check_unlocked(character)
+    guards.check(_change(character, guards.REMOVE_FLAW, copy, level=0))
     name = copy.display_name
     with transaction.atomic():
         _record(character, copy.ability, copy.tag, Kind.FLAW_REMOVE, level_from=copy.level)
@@ -373,10 +390,13 @@ def grant(character, ability_text: str, tag_text: str | None = None, *, level: i
         raise ChargenError(f"{ability.name} goes from level 1 to {ability.max_level}.")
     tag = _tag(ability, tag_text)
     ensure_build(character)
+    copy = CharacterAbility.objects.filter(
+        character_id=character.id, ability=ability, tag=tag
+    ).first()
+    guards.check(
+        _change(character, guards.GRANT, copy, ability=ability, tag=tag, level=level, by=by)
+    )
     with transaction.atomic():
-        copy = CharacterAbility.objects.filter(
-            character_id=character.id, ability=ability, tag=tag
-        ).first()
         before = copy.level if copy else 0
         if copy is None:
             copy = CharacterAbility.objects.create(
@@ -403,6 +423,7 @@ def revoke(character, ability_text: str, tag_text: str | None = None, *, refund=
         a ledger; that amount is reported rather than lost silently.
     """
     copy = find_owned(character, ability_text, tag_text)
+    guards.check(_change(character, guards.REVOKE, copy, level=0, by=by))
     ability, tag = copy.ability, copy.tag
     history = AbilityTransaction.objects.filter(
         character_id=character.id, ability=ability, tag_key=tag.key if tag else ""

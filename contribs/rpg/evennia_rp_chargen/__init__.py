@@ -14,7 +14,8 @@ Modules:
     stats      — StatHandler: ratings stored on the character
     allocation — FreeAllocation, PointBuyAllocation, ArrayAllocation
     pips       — PipPolicy: edge budget and caps, weakness caps
-    locks      — note_ic_action, lock, unlock, release
+    locks      — note_ic_action, lock, unlock, release, frozen
+    guards     — build_change_requested: partners refuse build changes
     subject    — ChargenSubject and subject_adapter for checks
     sheet      — render_sheet
     commands   — +sheet, +stats, +pips, +lock, +unlock, +chargen
@@ -22,4 +23,4 @@ Modules:
 Importing the package imports no models; import the modules you need.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
