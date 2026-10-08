@@ -9,6 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Documentation
+
+- Recorded the contrib-native pilot's origin and adoption steps, and clarified
+  that future combat owns its numeric mapping while sharing kernel interfaces.
+
+## [0.1.0] - 2026-10-02
+
 ### Added
 
 - **Math core.**

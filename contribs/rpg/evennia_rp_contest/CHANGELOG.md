@@ -1,6 +1,13 @@
-# Changelog
+# Changelog — evennia-rp-contest
 
-## 0.1.0 — Preview
+## [Unreleased]
+
+### Documentation
+
+- Clarified preview pinning, the contrib-native origin and independence from
+  chargen and combat; linked the reference integration and adoption notes.
+
+## [0.1.0] - 2026-10-05
 
 - Player-led `+test`, optional domain/element tags and suggestions, room
   challenges, retries, `/once`, setter/staff edits and retained void records.

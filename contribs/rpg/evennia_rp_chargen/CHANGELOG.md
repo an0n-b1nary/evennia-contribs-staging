@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Documentation
+
+- Updated the preview version and documented the pilot origin, dependency
+  boundaries and pose/session lock lifecycle.
+
 ## [0.2.0] - 2026-10-07
 
 - Added the optional `EvenniaXPLedger` adapter (`[xp]` extra): allowance

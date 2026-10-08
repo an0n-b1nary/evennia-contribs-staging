@@ -1,8 +1,8 @@
 # evennia-rp-rules
 
-> **Preview (0.1.x, Pre-Alpha).** This package was written directly as a
+> **Preview (0.1.0, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
-> while the rest of the rp- cluster is built on it. Pin an exact version.
+> while the rest of the rp- cluster is built on it. Pin an exact commit.
 
 The value-neutral resolution kernel for RP-focused [Evennia](https://www.evennia.com)
 games: graded stats with **edge** and **weakness** pips, a shared **outcome
@@ -10,11 +10,15 @@ ladder**, pluggable **resolvers**, seedable **dice**, and an exact **odds
 tool** for tuning.
 
 It ships no models, no commands, and no stat names. A game describes its rules
-as a plain dict (a *ruleset*) and the kernel validates and runs it. The planned
-`evennia-rp-chargen` (character sheets), `evennia-rp-contest` (`+test`
-challenges) and, later, `evennia-rp-combat` all resolve through it, so
-non-combat checks and combat share one set of numbers without importing each
-other.
+as a plain dict (a *ruleset*) and the kernel validates and runs it.
+`evennia-rp-chargen` supplies character sheets and `evennia-rp-contest` supplies
+`+test` challenges. Future `evennia-rp-combat` will use the kernel directly,
+with its own resolver and rung-to-number mapping. Shared grades and pipeline
+interfaces do not require combat to reuse non-combat numbers or import contest.
+
+For the pilot's origin and adoption steps, see
+[MIGRATION_NOTES.md](MIGRATION_NOTES.md). A wired reference integration lives
+in [`example_game`](../../../example_game/README.md).
 
 ---
 

@@ -1,8 +1,13 @@
 # evennia-rp-contest
 
-**Preview — 0.1.0, Pre-Alpha.** Non-combat stat checks and room challenges.
-This contrib-native pilot has no game-specific stat names, grades or rewards.
-It requires `evennia-rp-rules` and `evennia-links`, but not chargen.
+> **Preview (0.1.0, Pre-Alpha).** Authored directly as a contrib-native pilot.
+> APIs and migrations may change; pin an exact commit.
+
+Non-combat stat checks and room challenges, with no game-specific stat names,
+grades or rewards. It requires `evennia-rp-rules` and `evennia-links`, but not
+chargen or combat. See [MIGRATION_NOTES.md](MIGRATION_NOTES.md) for origin and
+adoption steps, and [`example_game`](../../../example_game/README.md) for the
+wired reference integration.
 
 Install the dependencies before this package, add `evennia_rp_contest` after
 them in `INSTALLED_APPS`, run `evennia migrate --noinput`, and add

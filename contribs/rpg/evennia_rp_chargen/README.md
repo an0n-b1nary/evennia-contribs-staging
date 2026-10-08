@@ -1,8 +1,8 @@
 # evennia-rp-chargen
 
-> **Preview (0.1.x, Pre-Alpha).** This package was written directly as a
+> **Preview (0.2.0, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
-> while the rest of the rp- cluster is built on it. Pin an exact version.
+> while the rest of the rp- cluster is built on it. Pin an exact commit.
 
 Character sheets for RP-focused [Evennia](https://www.evennia.com) games,
 built on [`evennia-rp-rules`](../evennia_rp_rules/README.md). It provides:
@@ -14,10 +14,17 @@ built on [`evennia-rp-rules`](../evennia_rp_rules/README.md). It provides:
 - an **ability catalog** of abilities and flaws, with effects stored as data,
   per-tag templates, levels, and a budgeted loadout;
 - spending, from a starting allowance first and then from XP;
-- **build locks** that freeze edge and loadout while a character is in a scene.
+- **build locks** triggered by IC poses, resolved checks or manual locking,
+  released by RP session end, manual unlocking or an idle TTL.
 
 Stat names, rungs and numbers all come from the game's ruleset; this package
 ships none of its own.
+
+It requires `evennia-rp-rules` and `evennia-links`; contest is independent.
+Earned XP is optional through the ledger seam. See
+[MIGRATION_NOTES.md](MIGRATION_NOTES.md) for the contrib-native origin and
+upgrade steps, and [`example_game`](../../../example_game/README.md) for the
+wired reference integration.
 
 ---
 

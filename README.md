@@ -36,7 +36,7 @@ contribs/
 └── utils/           — small standalone utilities (e.g. evennia-accessibility)
 ```
 
-## Planned contribs
+## Contrib roadmap
 
 The repo is being populated incrementally. The full anticipated slate, grouped by role:
 
@@ -52,22 +52,30 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns
 - `evennia-lore` (game_systems) — wiki-style knowledge entries with approval queue, version history, region-weighted passive discovery
-- `evennia-xp` (game_systems) — pluggable XP collection with weekly payout
+- `evennia-xp` (game_systems) — pluggable XP collection with weekly payout and atomic spending/refunds (preview 0.2.0)
 - `evennia-boards` (game_systems) — flat bulletin boards with subscriptions and post versioning
 - `evennia-scenes` (game_systems) — scene logging with live entries, participants, web surface
 - `evennia-calendar` (game_systems) — events, RSVP, optional cluster-lottery seating
 - `evennia-plots` (game_systems) — plot threads and arcs with task checklists and bonuses
 
 **RP cluster** — mechanics for RP-focused games; named with the `rp-` prefix to distinguish from PvE-leveling-loot systems
-- `evennia-rp-chargen` (rpg) — stat allocation and ability selection; stats foundation for the rest of the cluster
-- `evennia-rp-combat` (rpg) — turn-based combat tuned for PvP parity and narrative integration; pairs with Evennia's `rpg/traits`, `rpg/dice`, `rpg/buffs`
-- `evennia-rp-contest` (rpg) — non-combat stat challenges using the same stat/roll system as rp-combat
+- [`evennia-rp-rules`](contribs/rpg/evennia_rp_rules/README.md) (rpg) — preview 0.1.0; value-neutral graded resolution, modifier pipeline, subjects, vocabulary and exact odds
+- [`evennia-rp-chargen`](contribs/rpg/evennia_rp_chargen/README.md) (rpg) — preview 0.2.0; sheets, allocation, Edge/weakness, catalog, loadouts, allowance/XP spending and build locks; depends on rules and links
+- [`evennia-rp-contest`](contribs/rpg/evennia_rp_contest/README.md) (rpg) — preview 0.1.0; playable `+test` checks and player-led room challenges with private audits; depends on rules and links, with optional chargen, scenes and session integration
+- `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
 - `evennia-rp-equipment` (rpg) — equipment slots with stat modifiers
 - `evennia-rp-party` (rpg) — party coordination for group combat
 - `evennia-rp-crafting` (game_systems) — IC crafting economy: resources, workshops, crafted items with cosmetic features, player-run storefronts
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
 
-Each contrib lands here only after it has run cleanly in its source project and at least one second downstream game for several weeks. APIs may change between extractions; pin to commits if you depend on one.
+The three shipped RP packages are a **contrib-native pilot**: their generic code
+was authored here, wired into [`example_game`](example_game/README.md), and then
+consumed by the source project through pinned dependencies and thin adapters.
+This is a scoped exception to the usual source-first extraction process; it
+does not establish production readiness or several weeks of downstream use.
+Other contribs continue through the extraction process in
+[CONTRIBUTING.md](CONTRIBUTING.md). APIs may change; pin exact commits if you
+depend on a preview package. Combat, equipment and party mechanics remain planned.
 
 ## License
 
