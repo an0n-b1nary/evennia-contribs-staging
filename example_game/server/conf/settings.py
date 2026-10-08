@@ -159,7 +159,9 @@ OPTIONS_ACCOUNT_DEFAULT["pose_header_format"] = (
 )
 OPTIONS_ACCOUNT_DEFAULT["pose_separator"] = (
     "Visual separator between poses.",
-    "Text",
+    # Text.deserialize rejects empty strings and logs a traceback on every
+    # pose. BaseOption keeps normal text input validation and permits blank.
+    "BaseOption",
     "",
 )
 OPTIONS_ACCOUNT_DEFAULT["highlight_enabled"] = (

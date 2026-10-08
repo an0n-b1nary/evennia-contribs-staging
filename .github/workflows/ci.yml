@@ -188,3 +188,38 @@ jobs:
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
       - name: Sandbox gate with verified partner absence
         run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}
+
+  live-playtest:
+    needs: [rp-sandbox]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install runtime and live driver
+        run: pip install evennia==6.0.0 psutil==7.1.0 playwright==1.62.0
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Install all contribs in dependency order
+        run: |
+          evennia --init ci_game < /dev/null
+          python scripts/ci_install_contribs.py ci_game
+      - name: Driver protocol and failure tests
+        run: python scripts/test_playtest.py < /dev/null
+      - name: Two fresh deterministic/browser and normal RNG passes
+        run: |
+          python scripts/playtest.py run --suite rp < /dev/null
+          python scripts/playtest.py run --suite rp < /dev/null
+      - name: Persistent exploratory JSONL session
+        run: python scripts/test_playtest_interactive.py < /dev/null
+      - name: Sanitized live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-playtest-evidence
+          path: .playtest-runs/*/evidence/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

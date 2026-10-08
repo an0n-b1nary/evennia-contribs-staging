@@ -106,3 +106,6 @@ ci_game/
 
 # UI/UX screenshot captures (scripts/ui_shots.py) — local review artifacts.
 .screenshots/
+
+# Disposable live playtest hosts, credentials, databases and evidence.
+.playtest-runs/

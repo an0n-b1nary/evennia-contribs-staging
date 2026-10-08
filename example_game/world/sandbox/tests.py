@@ -107,6 +107,24 @@ class TestContribSettings(EvenniaTestCase):
         ):
             self.assertIn(key, settings.OPTIONS_ACCOUNT_DEFAULT)
 
+    def test_empty_pose_separator_loads_and_round_trips_without_traceback(self):
+        from evennia.utils.optionhandler import InMemorySaveHandler, OptionHandler
+
+        storage = InMemorySaveHandler()
+        for value in (None, "---", ""):
+            if value is not None:
+                storage.add("pose_separator", value)
+            handler = OptionHandler(
+                None,
+                options_dict=settings.OPTIONS_ACCOUNT_DEFAULT,
+                savefunc=storage.add,
+                loadfunc=storage.get,
+            )
+            with mock.patch("evennia.utils.optionclasses.logger.log_trace") as trace:
+                self.assertEqual(handler.get("pose_separator"), value or "")
+                self.assertTrue(handler.get("pose_separator", return_obj=True).loaded)
+                trace.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Regions + maps: the tile-overlay seam, end to end

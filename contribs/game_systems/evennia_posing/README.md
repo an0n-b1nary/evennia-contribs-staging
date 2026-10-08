@@ -99,7 +99,7 @@ OPTIONS_ACCOUNT_DEFAULT["pose_header_format"] = (
     "Text", "--- {name} ---",
 )
 OPTIONS_ACCOUNT_DEFAULT["pose_separator"] = (
-    "Visual separator between poses.", "Text", "",
+    "Visual separator between poses.", "BaseOption", "",
 )
 OPTIONS_ACCOUNT_DEFAULT["highlight_enabled"] = (
     "Highlight character names in poses and room descriptions.",
@@ -118,6 +118,10 @@ not found!` the first time a player tries to change a setting (Evennia's
 `OptionHandler.set()` requires the key to be pre-registered; `.get()` with a
 default degrades gracefully, so *reading* current settings works even
 unregistered, but *writing* does not).
+
+The separator uses Evennia's `BaseOption`: it validates text input while
+accepting an intentionally empty stored value. `Text` rejects a blank default
+during deserialization and logs a traceback on every pose.
 
 ### 4. Wire the `pose_recorded` signal (optional, but the point of this contrib)
 

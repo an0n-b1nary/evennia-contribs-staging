@@ -1078,3 +1078,97 @@ warnings/errors. Check both populated and empty tables and the calendar's month
 navigation. Desktop tables keep their columns. After a reseed changes IDs, use
 `--routes-file <file.json>` with an explicit JSON list of `["slug", "/path/"]`
 pairs; this also allows extra routes such as history and staff pages.
+
+### Live RP playtests
+
+From the repository root, using the Python 3.12 environment with Evennia
+6.0.0 and all contribs installed editable in the dependency order above:
+
+```sh
+python -m pip install psutil==7.1.0 playwright==1.62.0
+python -m playwright install chromium
+python scripts/test_playtest.py
+python scripts/playtest.py run --suite rp
+python scripts/test_playtest_interactive.py
+```
+
+The default runs a fresh deterministic Telnet RP suite plus Chromium, then a
+separate fresh host with normal RNG. Each host copies the scaffold into
+`.playtest-runs/<run-id>/game/`, creates a new database, seeds inside Evennia's
+initial setup and waits for its first restart. Five distinct ports bind only
+to `127.0.0.1`. Existing sandbox accounts, database, secrets and processes are
+never reused. Password hashing and login throttling keep their normal settings.
+The owner account only bootstraps the database; gameplay uses ordinary players
+and a nonsuperuser Builder.
+
+The RP pass covers draft validation and finalization, Edge/Weakness policy,
+allowance/XP transactions and refunds, loadouts, scene and tracker integration,
+private ratings, challenge binding/alternatives/retries, once/edit/void
+authorization, literal comments and reconnect persistence. A per-check
+`ScriptedRoller([10])` makes B++ Charisma with Performance Expertise against A
+resolve to Narrow Success. The normal profile checks real outcome records
+without assuming a particular roll. Chromium uses anonymous `/webclient/`
+pages in independent contexts, types real password logins into the input
+widget, checks a sheet and RP result, verifies the public scene log and captures
+desktop/narrow screenshots. Browser traces and video are disabled.
+
+`--profile deterministic`, `--profile normal` and `--no-browser` are partial
+passes, recorded as such. Timeouts are configurable with `--startup-timeout`
+(180 seconds), `--action-timeout` (15), `--browser-timeout` (30) and
+`--shutdown-timeout` (30). Exit codes: 0 means the selected nonempty suite
+passed, 1 means a scenario or server-log assertion failed, 2 means setup,
+protocol or cleanup failed. Inspect `evidence/results.md` for case results.
+CI runs the complete pass twice on Ubuntu after the sandbox integration gate.
+
+For exploration, keep one runner process alive:
+
+```sh
+python scripts/playtest.py interactive
+```
+
+It defaults to normal RNG. Read the initial `{"event":"ready",...}` message,
+then write one JSON object per stdin line. The host, actors and sockets persist
+between requests. Responses echo the request `id`; unsolicited transcript
+events carry monotonically increasing `seq` values. Diagnostics go to stderr.
+These requests can be sent interactively or from an agent/process driver:
+
+```jsonl
+{"id":1,"op":"send","actor":"alice","command":"look"}
+{"id":2,"op":"send","actor":"bob","command":"ooc Ready to test."}
+{"id":3,"op":"read","actor":"alice","after":0}
+{"id":4,"op":"expect","actor":"alice","pattern":"Ready to test","after":0,"timeout":5}
+{"id":5,"op":"snapshot"}
+{"id":6,"op":"disconnect","actor":"bob"}
+{"id":7,"op":"send","actor":"bob","command":"+sheet"}
+{"id":8,"op":"quit"}
+```
+
+Actors are `alice`, `bob`, `staff`, `browser` and `browser-observer`. Each first
+use logs in normally; `send` accepts exactly one command line. `read` returns
+sanitized raw and ANSI-normalized receive/send records after a sequence cursor;
+`expect` matches normalized received text after that cursor. `snapshot` uses
+the Builder's fixed, read-only projection of enrolled characters, transactions,
+checks, challenges, scenes and tracker sessions. It accepts no arbitrary query
+or Python. JSONL errors are responses with `ok:false`; EOF and `quit` shut down
+the owned host. An interactive session is exploration, not a suite pass.
+
+Synchronization hooks exist only in the disposable copy. They require a matching
+run marker, localhost configuration and an enrolled account; state inspection
+also requires the designated staff role and Builder permission. Gameplay still
+passes through Evennia's normal authenticated command dispatcher. A nonce
+boundary means **dispatch returned**: progressive menus and delayed work may
+continue, so use `expect` for their visible prompts. Scripted RP commands are
+non-progressive. Do not install these hooks in a persistent game.
+
+Only `.playtest-runs/<run-id>/evidence/` is suitable for sharing. It contains a
+sanitized manifest, sequenced actor transcripts, snapshots, results, logs and
+browser diagnostics/screenshots. The sibling `game/` contains disposable
+passwords, settings and the full database; CI uploads only `evidence/`.
+Run directories are retained for diagnosis. Shutdown first requests Evennia's
+normal stop, then verifies the PID's creation identity and the exact run directory before
+terminating any remaining owned processes. No existing game can be targeted by
+the CLI. A source-project adapter is future work.
+
+On Linux, identity uses `/proc`'s boot-relative start counter so WSL/NTP clock
+adjustments cannot hide an owned process. `evidence/cleanup.json` records the
+verified shutdown.
