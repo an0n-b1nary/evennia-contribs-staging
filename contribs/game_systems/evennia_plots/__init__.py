@@ -1,23 +1,23 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-evennia_plots — narrative plot-thread and story-arc system for Evennia games.
+evennia_plots â€” narrative plot-thread and story-arc system for Evennia games.
 
 Public API (model classes loaded lazily to avoid AppRegistryNotReady):
 
-    PlotTag          — tag applied to plot threads and arcs
-    PlotThread       — named narrative container (active / concluded / archived)
-    PlotArc          — staff-only storyline grouping one or more plot threads
-    PlotParticipant  — per-character membership row on a PlotThread
-    PlotUpdate       — append-only journal block (thread or arc), version-tracked
-    ThreadLink       — directional sequel / related-story connection between threads
+    PlotTag          â€” tag applied to plot threads and arcs
+    PlotThread       â€” named narrative container (active / concluded / archived)
+    PlotArc          â€” staff-only storyline grouping one or more plot threads
+    PlotParticipant  â€” per-character membership row on a PlotThread
+    PlotUpdate       â€” append-only journal block (thread or arc), version-tracked
+    ThreadLink       â€” directional sequel / related-story connection between threads
 
-    ScenePlotLink    — bridge: Scene (integer soft-ref) ↔ PlotThread
-    PlotCalendarLink — bridge: PlotThread ↔ CalendarEvent (integer soft-ref)
-    PlotBoardLink    — bridge: PlotThread ↔ board Post (integer soft-ref + is_ic_post)
-    PlotBonusCredit  — XP-eligibility row: PlotThread ↔ character (integer soft-ref)
+    ScenePlotLink    â€” bridge: Scene (integer soft-ref) â†” PlotThread
+    PlotCalendarLink â€” bridge: PlotThread â†” CalendarEvent (integer soft-ref)
+    PlotBoardLink    â€” bridge: PlotThread â†” board Post (integer soft-ref + is_ic_post)
+    PlotBonusCredit  â€” XP-eligibility row: PlotThread â†” character (integer soft-ref)
 
-Signals (eagerly exported — plain Signal() objects, safe at app-load time):
+Signals (eagerly exported â€” plain Signal() objects, safe at app-load time):
 
     plot_thread_created, plot_thread_activated, plot_thread_concluded,
     plot_thread_archived, scene_linked_to_thread, post_linked_to_thread,
@@ -34,7 +34,7 @@ Web/API surface (requires [web] extra):
     from evennia_plots.api.views import PlotThreadViewSet
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from evennia_plots.signals import (
     arc_currency_changed,

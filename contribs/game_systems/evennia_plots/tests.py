@@ -944,8 +944,41 @@ class TestAntigaming(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
+def _collector_multiplier(source, **context):
+    from evennia_plots.integrations.gating import resolve_xp_multiplier
+
+    return Decimal("2") * resolve_xp_multiplier(source, **context)
+
+
+def _collector_paused(source, **context):
+    return Decimal("0")
+
+
 @unittest.skipUnless(apps.is_installed("evennia_xp"), "requires evennia_xp")
 class TestCollectors(EvenniaTest):
+    @override_settings(XP_MULTIPLIER_RESOLVER="evennia_plots.tests._collector_multiplier")
+    def test_collector_uses_configured_xp_resolver(self):
+        from evennia_plots.integrations.xp import collect_thread_bonuses
+
+        thread, now = self._make_concluded_thread_with_bonus(bonus=3)
+        PlotParticipant.objects.create(
+            thread=thread, character=self.char1, character_name=self.char1.key
+        )
+        awards = list(collect_thread_bonuses(now + timedelta(hours=1)))
+        self.assertEqual(len(awards), 1)
+        self.assertEqual(awards[0].amount, Decimal("6"))
+        self.assertEqual(awards[0].multiplier, Decimal("2"))
+
+    @override_settings(XP_MULTIPLIER_RESOLVER="evennia_plots.tests._collector_paused")
+    def test_configured_resolver_can_pause_thread_awards(self):
+        from evennia_plots.integrations.xp import collect_thread_bonuses
+
+        thread, now = self._make_concluded_thread_with_bonus(bonus=3)
+        PlotParticipant.objects.create(
+            thread=thread, character=self.char1, character_name=self.char1.key
+        )
+        self.assertEqual(list(collect_thread_bonuses(now + timedelta(hours=1))), [])
+
     def _make_concluded_thread_with_bonus(self, bonus=3):
         now = timezone.now()
         thread = _make_thread(creator=self.char1)

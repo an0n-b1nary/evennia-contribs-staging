@@ -5,7 +5,7 @@ from unittest import mock
 
 from django.apps import apps
 from django.core.management import call_command
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import Character
@@ -14,6 +14,42 @@ from typeclasses.rooms import Room
 from evennia_rp_rules.dice import ScriptedRoller
 from evennia_rp_rules.subjects import DictStatSource, get_subject
 from world.sandbox import content, glue
+
+
+def scaled_plot_xp(source, **context):
+    from decimal import Decimal
+
+    from evennia_plots.integrations.gating import resolve_xp_multiplier
+
+    return Decimal("2") * resolve_xp_multiplier(source, **context)
+
+
+class TestConfiguredPlotXP(EvenniaTest):
+    @override_settings(XP_MULTIPLIER_RESOLVER="world.sandbox.test_rp_partners.scaled_plot_xp")
+    def test_real_plot_collector_uses_host_policy_and_thread_arc(self):
+        if not apps.is_installed("evennia_xp"):
+            self.skipTest("requires XP partner")
+        from datetime import timedelta
+        from decimal import Decimal
+
+        from django.utils import timezone
+        from evennia_plots.integrations.xp import collect_thread_bonuses
+        from evennia_plots.models import PlotArc, PlotParticipant, PlotThread
+
+        arc = PlotArc.create_arc(name="Host policy", creator=self.char1)
+        arc.xp_mult_thread_bonus = Decimal("0.5")
+        arc.save(update_fields=["xp_mult_thread_bonus"])
+        thread = PlotThread.create_thread(name="Collector seam", creator=self.char1)
+        thread.arc = arc
+        thread.status = PlotThread.Status.CONCLUDED
+        thread.bonus_xp_computed = 3
+        thread.concluded_at = timezone.now()
+        thread.save()
+        PlotParticipant.objects.create(thread=thread, character=self.char1)
+        awards = list(collect_thread_bonuses(timezone.now() + timedelta(hours=1)))
+        self.assertEqual(len(awards), 1)
+        self.assertEqual(awards[0].amount, Decimal("3"))
+        self.assertEqual(awards[0].multiplier, Decimal("1"))
 
 
 class RPSeedMixin:
