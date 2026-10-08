@@ -43,6 +43,7 @@ from evennia_social.commands import (
     CmdHome,
     CmdIgnore,
     CmdJoin,
+    CmdMood,
     CmdOoc,
     CmdOocTeleport,
     CmdPage,
@@ -99,6 +100,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdOocTeleport)
         self.add(CmdHome)
         self.add(CmdRoomConfig)
+        self.add(CmdMood)
         self.add(CmdRoulette)
         self.add(CmdTel)
 

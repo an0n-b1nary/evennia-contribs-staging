@@ -210,3 +210,51 @@ class TestLoginXPSummary(EvenniaTest):
         else:
             self.assertEqual(summaries, [])
         self.assertIsNotNone(self.char1.attributes.get("sandbox_last_seen"))
+
+
+class TestRoomMoodSceneRights(EvenniaTest):
+    """+mood through the game's own cmdset, Room typeclass and scenes partner.
+
+    char2 is an ordinary player. With evennia_scenes installed, joining a
+    public scene in the room is what lets them set the mood; with it absent,
+    the same player is refused and the command still works for staff.
+    """
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def mood_command(self):
+        from commands.default_cmdsets import CharacterCmdSet
+
+        return next(c for c in CharacterCmdSet().commands if c.key == "+mood")
+
+    def run_mood(self, caller, args):
+        command = self.mood_command()
+        command.caller = caller
+        command.switches = []
+        command.args = args
+        with mock.patch.object(caller, "msg") as replies:
+            command.func()
+        return " ".join(str(call.args[0]) for call in replies.call_args_list if call.args)
+
+    def test_scene_participant_or_refused_without_scenes(self):
+        if apps.is_installed("evennia_scenes"):
+            from evennia_scenes.models import Scene, SceneParticipant
+
+            scene = Scene.objects.create(
+                title="Mood check",
+                room=self.room1,
+                room_name=self.room1.key,
+                creator=self.char1,
+                creator_name=self.char1.key,
+                privacy=Scene.Privacy.PUBLIC,
+            )
+            SceneParticipant.objects.create(
+                scene=scene, character=self.char2, character_name=self.char2.key
+            )
+            self.assertIn("Mood set", self.run_mood(self.char2, "Thunder rolls in."))
+            self.assertIn("Thunder rolls in.", self.room1.return_appearance(self.char1))
+        else:
+            self.assertIn("can't set the mood", self.run_mood(self.char2, "Thunder rolls in."))
+            self.assertIn("Mood set", self.run_mood(self.char1, "Thunder rolls in."))
+            self.assertIn("Thunder rolls in.", self.room1.return_appearance(self.char2))

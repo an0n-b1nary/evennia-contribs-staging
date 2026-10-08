@@ -143,7 +143,7 @@ carries one command family and one brass plaque naming its commands:
 | Arrival Hall | — | `+sandbox`, `+sandbox/builder` |
 | Posing Studio | `evennia_posing` | `+pot`, `emit`, `semipose`, `+poseheader`, `+highlight`, `+lastpose` |
 | Scene Room | `-scenes`, `-rptracker` | `+scene`, `+log`, `+rptracker`, `+activity` |
-| Social Commons | `-social` | `page`, `+finger`, `+where`, `+hangouts`, `+join`, `+summon`, `+home`, `+ooc`, `+ignore`, `+roomconfig`, `+roulette`, `@tel` |
+| Social Commons | `-social` | `page`, `+finger`, `+where`, `+hangouts`, `+join`, `+summon`, `+home`, `+ooc`, `+ignore`, `+roomconfig`, `+mood`, `+roulette`, `@tel` |
 | Story Office | `-plots`, `-calendar` | `+plot`, `+arc`, `+hook`, `+calendar`, `+rsvp` |
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
