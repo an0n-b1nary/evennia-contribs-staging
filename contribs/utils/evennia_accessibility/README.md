@@ -19,6 +19,7 @@ Screen-reader helpers, accessible Django form base classes, and MXP URL utilitie
   - `_form_errors.html` — non-field errors in an `aria-live="assertive"` summary
   - `_form_actions.html` — submit + optional cancel with sensible defaults
 - **An accessibility-focused stylesheet** (`accessibility.css`) with `.sr-only` utilities, focus-visible rings, `prefers-reduced-motion` + `prefers-color-scheme: dark` overrides, and the form rules that pair with the partials
+- **A `+screenreader` command** (alias `+sr`) so players can toggle the option without knowing `@option`
 - **Two MXP URL helpers**:
   - `absolute_web_url(path)` — promote site-relative paths to absolute URLs via `SITE_URL`
   - `mxp_link(url, label)` — build `|lu<url>|lt<label>|le` for clickable in-game links
@@ -53,11 +54,32 @@ OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = (
 SITE_URL = "https://your-game-domain.example"
 ```
 
-Players can then toggle the option with the standard `@option` command:
+Add the command to your cmdsets so players can toggle the option themselves:
+
+```python
+# commands/default_cmdsets.py
+from evennia_accessibility.commands import CmdScreenreader
+
+class CharacterCmdSet(default_cmds.CharacterCmdSet):
+    def at_cmdset_creation(self):
+        super().at_cmdset_creation()
+        self.add(CmdScreenreader)
+
+class AccountCmdSet(default_cmds.AccountCmdSet):  # optional: reachable out of character
+    def at_cmdset_creation(self):
+        super().at_cmdset_creation()
+        self.add(CmdScreenreader)
+```
 
 ```
-@option screenreader_mode = True
++screenreader          show the current setting
++screenreader/on       enable plain-text output
++screenreader/off      back to standard formatting
 ```
+
+The standard `@option screenreader_mode = True` works too. If the option isn't
+registered in `OPTIONS_ACCOUNT_DEFAULT`, `+screenreader/on` tells the player it isn't
+available and logs a warning naming this README, rather than raising.
 
 ## Compatibility
 

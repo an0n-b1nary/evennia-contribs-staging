@@ -63,3 +63,20 @@ git diff extracted/evennia-accessibility/v0.1..HEAD -- \
 Plus the accessibility-relevant blocks of whichever site stylesheet ships those rules.
 
 If the diff shows substantive changes, those changes need to be re-extracted into this contrib via a new sync commit.
+
+---
+
+# v0.2.0 — `+screenreader` (2026-10-07)
+
+| Source file | Lines taken | What we took |
+|---|---|---|
+| `commands/social/accessibility.py` | full | `CmdScreenreader` → `commands.py` |
+| `commands/social/tests_accessibility.py` | full | 8 test methods, folded into `tests.py` as `TestCmdScreenreader` |
+
+The social-commands extraction (`evennia_social`, `MIGRATION_NOTES.md` "Deliberately omitted") left this command behind and earmarked it for this contrib, which owns the `screenreader_mode` option it toggles.
+
+Changes from the source:
+
+- `help_category` `"Social"` → `"General"`; the docstring no longer names other games' commands.
+- `OptionHandler.set` raising `ValueError` for an unregistered option is caught, reported to the player and logged (`_store`). The source assumed the host game had registered the option.
+- Tests register the option with `override_settings(OPTIONS_ACCOUNT_DEFAULT=…)` rather than mocking `options.get`: the command's job *is* the `set` round-trip, so mocking it away would test nothing. The helper tests above keep their mocks. Three tests are new — `uses_screenreader` reads what the command writes, the account (OOC) caller, and the unregistered-option path.

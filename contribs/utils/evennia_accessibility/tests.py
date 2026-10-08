@@ -13,8 +13,10 @@ Objects available from EvenniaTest:
 from unittest import mock
 
 from django import forms
+from django.conf import settings
 from django.template.loader import render_to_string
-from evennia.utils.test_resources import EvenniaTest
+from django.test import override_settings
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_accessibility.accessibility import (
     describe_icon,
@@ -22,6 +24,7 @@ from evennia_accessibility.accessibility import (
     plain_list,
     uses_screenreader,
 )
+from evennia_accessibility.commands import CmdScreenreader
 from evennia_accessibility.forms import AccessibleForm, AccessibleModelForm
 
 
@@ -345,3 +348,80 @@ class TestFormPartialsRender(EvenniaTest):
         # which assigns "" rather than raising when the route is not mounted.
         html = render_to_string("evennia_accessibility/_form_actions.html", {"cancel_url": ""})
         self.assertNotIn("<a href", html)
+
+
+# The option registration the README asks adopting games to add. The command
+# tests need real ``options.set`` round-trips, so they register it for the
+# test's duration rather than mocking ``options.get`` as the helper tests do.
+_WITH_OPTION = {
+    **settings.OPTIONS_ACCOUNT_DEFAULT,
+    "screenreader_mode": ("Render plain-text output suited for screen readers.", "Boolean", False),
+}
+_WITHOUT_OPTION = {
+    key: value
+    for key, value in settings.OPTIONS_ACCOUNT_DEFAULT.items()
+    if key != "screenreader_mode"
+}
+
+
+@override_settings(OPTIONS_ACCOUNT_DEFAULT=_WITH_OPTION)
+class TestCmdScreenreader(EvenniaCommandTest):
+    """+screenreader against a game that registered the option."""
+
+    def test_bare_shows_status_disabled(self):
+        result = self.call(CmdScreenreader(), "", caller=self.char1)
+        self.assertIn("Screen-reader mode", result)
+        self.assertIn("Disabled", result)
+
+    def test_bare_shows_status_enabled(self):
+        self.account.options.set("screenreader_mode", "True")
+        result = self.call(CmdScreenreader(), "", caller=self.char1)
+        self.assertIn("Enabled", result)
+
+    def test_slash_on_enables_and_confirms(self):
+        result = self.call(CmdScreenreader(), "/on", caller=self.char1)
+        self.assertIn("enabled", result.lower())
+        self.assertTrue(self.account.options.get("screenreader_mode", False))
+
+    def test_slash_off_disables_and_confirms(self):
+        self.account.options.set("screenreader_mode", "True")
+        result = self.call(CmdScreenreader(), "/off", caller=self.char1)
+        self.assertIn("disabled", result.lower())
+        self.assertFalse(self.account.options.get("screenreader_mode", True))
+
+    def test_toggle_is_what_uses_screenreader_reads(self):
+        """The command and the helper agree on one option, end to end."""
+        self.call(CmdScreenreader(), "/on", caller=self.char1)
+        self.assertTrue(uses_screenreader(self.char1))
+        self.call(CmdScreenreader(), "/off", caller=self.char1)
+        self.assertFalse(uses_screenreader(self.char1))
+
+    def test_works_from_the_account_out_of_character(self):
+        self.call(CmdScreenreader(), "/on", caller=self.account)
+        self.assertTrue(self.account.options.get("screenreader_mode", False))
+
+    def test_unknown_switch_error(self):
+        result = self.call(CmdScreenreader(), "/foo", caller=self.char1)
+        self.assertIn("Unknown switch", result)
+        self.assertIn("/on", result)
+        self.assertIn("/off", result)
+
+    def test_sr_alias_registered(self):
+        self.assertIn("+sr", CmdScreenreader.aliases)
+
+
+@override_settings(OPTIONS_ACCOUNT_DEFAULT=_WITHOUT_OPTION)
+class TestCmdScreenreaderUnregisteredOption(EvenniaCommandTest):
+    """A game that skipped the README step gets a message, not a traceback."""
+
+    def test_slash_on_reports_instead_of_raising(self):
+        with mock.patch("evennia_accessibility.commands.logger.log_warn") as warn:
+            result = self.call(CmdScreenreader(), "/on", caller=self.char1)
+        self.assertIn("isn't available", result)
+        self.assertNotIn("enabled", result.lower())
+        warn.assert_called_once()
+        self.assertIn("OPTIONS_ACCOUNT_DEFAULT", warn.call_args[0][0])
+
+    def test_bare_status_still_reads_disabled(self):
+        result = self.call(CmdScreenreader(), "", caller=self.char1)
+        self.assertIn("Disabled", result)

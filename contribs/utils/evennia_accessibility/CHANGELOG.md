@@ -2,6 +2,19 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
+## [0.2.0] - 2026-10-07
+
+- **Added:** `+screenreader` (alias `+sr`) in `evennia_accessibility.commands` — a
+  shortcut for toggling the `screenreader_mode` option this contrib already reads.
+  Bare invocation reports the current state; `/on` and `/off` set it. Works from a
+  character or out of character from the account. Ported from the source project,
+  where it lived among the social commands even though the option it toggles is
+  owned here.
+- **Added:** a game that never registered `screenreader_mode` in
+  `OPTIONS_ACCOUNT_DEFAULT` now gets a plain message for the player and a warning in
+  the server log naming the fix, instead of the `ValueError("Option not found!")`
+  Evennia's `OptionHandler.set` raises. The source command raised.
+
 ## [0.1.1] - 2026-10-02
 
 - **Fixed:** the documentation comments at the top of `_form_actions.html`,

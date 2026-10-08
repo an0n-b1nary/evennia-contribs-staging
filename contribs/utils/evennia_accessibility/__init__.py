@@ -15,6 +15,11 @@ Public API:
         mxp_link,
     )
 
+Commands (import explicitly — not re-exported, so importing the package
+never pulls in Evennia's command machinery)::
+
+    from evennia_accessibility.commands import CmdScreenreader
+
 See `README.md` for installation, settings, and usage examples.
 """
 
@@ -22,7 +27,7 @@ from .accessibility import describe_icon, describe_priority, plain_list, uses_sc
 from .forms import AccessibleForm, AccessibleModelForm
 from .mxp import absolute_web_url, mxp_link
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "AccessibleForm",
