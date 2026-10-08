@@ -17,6 +17,14 @@ OUTCOMES = {
 }
 
 
+def shows_rating(text, display):
+    """True if a rating such as `B` or `B ++` appears as its own token in `text`.
+
+    A bare substring test would see the grade `B` inside words like "Blades".
+    """
+    return re.search(rf"(?<![\w+-]){re.escape(display)}(?![\w+-])", text) is not None
+
+
 class Suite:
     def __init__(self, session):
         self.session = session
@@ -273,7 +281,7 @@ class Suite:
             record = state["checks"][-1]
             assert record["outcome_key"] in OUTCOMES, record
             assert record["detail"]["outcome"]["label"] in self.observer(result)
-            assert record["rating_display"] not in self.observer(result)
+            assert not shows_rating(self.observer(result), record["rating_display"]), record
         assert len(self.state()["checks"]) == 2
 
 
