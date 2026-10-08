@@ -2,7 +2,7 @@
 
 A preview channel for [Evennia](https://www.evennia.com/) contribs in active development.
 
-> ⚠️ This repository is a **preview channel for Evennia contribs in active development**. APIs may change. Migrations may be rewritten. Each contrib here is intended to eventually submit to [`evennia/evennia`](https://github.com/evennia/evennia) upstream. Use at your own risk; pin to specific commits if you depend on one.
+> ⚠️ This repository is a **preview channel for Evennia contribs in active development**. APIs may change. Shipped migration history is preserved; upgrades still need verification against your data. Each contrib here is intended to eventually submit to [`evennia/evennia`](https://github.com/evennia/evennia) upstream. Pin specific commits if you depend on a package.
 
 ## What this is
 
@@ -21,7 +21,7 @@ Each contrib lives in its own subfolder with its own `README.md`, `CHANGELOG.md`
 Each contrib is installable as a pip subdirectory dependency:
 
 ```bash
-pip install -e "git+https://github.com/an0n-b1nary/evennia-contribs-staging.git#subdirectory=contribs/<category>/<contrib_name>&egg=<contrib_name>"
+pip install "evennia-<name> @ git+https://github.com/an0n-b1nary/evennia-contribs-staging.git@<full-sha>#subdirectory=contribs/<category>/<contrib_name>"
 ```
 
 See the per-contrib README for `INSTALLED_APPS`, settings hooks, and wiring details.
@@ -52,7 +52,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns
 - `evennia-lore` (game_systems) — wiki-style knowledge entries with approval queue, version history, region-weighted passive discovery
-- `evennia-xp` (game_systems) — pluggable XP collection with weekly payout and atomic spending/refunds (preview 0.2.0)
+- `evennia-xp` (game_systems) — pluggable XP collection, login summaries, projected earnings and atomic spending/refunds (preview 0.4.0)
 - `evennia-boards` (game_systems) — flat bulletin boards with subscriptions and post versioning
 - `evennia-scenes` (game_systems) — scene logging with live entries, participants, web surface
 - `evennia-calendar` (game_systems) — events, RSVP, optional cluster-lottery seating
@@ -71,11 +71,15 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 The three shipped RP packages are a **contrib-native pilot**: their generic code
 was authored here, wired into [`example_game`](example_game/README.md), and then
 consumed by the source project through pinned dependencies and thin adapters.
-This is a scoped exception to the usual source-first extraction process; it
-does not establish production readiness or several weeks of downstream use.
-Other contribs continue through the extraction process in
-[CONTRIBUTING.md](CONTRIBUTING.md). APIs may change; pin exact commits if you
-depend on a preview package. Combat, equipment and party mechanics remain planned.
+Shared behavior and reusable integrations across all contribs are developed
+here first; downstream games consume pinned public snapshots and own their
+content, ruleset values, theme and composition. See
+[CONTRIBUTING.md](CONTRIBUTING.md). The pilot does not establish production
+readiness or several weeks of downstream use. Combat, equipment and party
+mechanics remain planned.
+
+Clean package installation, populated upgrades and backup restores can be
+verified with the [downstream snapshot gate](scripts/DOWNSTREAM.md).
 
 ## License
 
