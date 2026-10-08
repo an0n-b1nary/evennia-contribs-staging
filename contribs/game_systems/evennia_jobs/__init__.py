@@ -16,6 +16,10 @@ Commands (import explicitly when needed):
 
     from evennia_jobs.commands import CmdRequest, CmdBug, CmdIssue, CmdDiscuss, CmdJobs
 
+Staff-review reporter for other contribs' flag hooks (see README):
+
+    evennia_jobs.integrations.staff_review.file_review_job
+
 Web/API surface (requires [web] extra):
 
     from evennia_jobs.views import JobListView, JobDetailView
@@ -23,7 +27,7 @@ Web/API surface (requires [web] extra):
     # wire URLs with: include("evennia_jobs.urls") / include("evennia_jobs.api.urls")
 """
 
-__version__ = "0.1.4"
+__version__ = "0.2.0"
 
 _LAZY = {
     "Job": "models",

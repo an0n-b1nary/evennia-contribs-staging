@@ -168,6 +168,37 @@ class TestJobModel(EvenniaTest):
         self.assertEqual(Job.objects.count(), 0)
 
 
+class TestStaffReviewReporter(EvenniaTest):
+    """integrations.staff_review: the shared flag-hook callable."""
+
+    def test_files_an_authorless_discuss_ticket(self):
+        from evennia_jobs.integrations.staff_review import file_review_job
+
+        job = file_review_job("Auto-flag: pose spam", "RPSession #42 was flagged.")
+        self.assertEqual(Job.objects.get(), job)
+        self.assertEqual(job.job_type, JobType.DISCUSS)
+        self.assertIsNone(job.author)
+        self.assertEqual(job.title, "Auto-flag: pose spam")
+        self.assertEqual(job.description, "RPSession #42 was flagged.")
+        self.assertEqual(job.status, JobStatus.OPEN)
+
+    def test_resolves_by_its_documented_dotted_path(self):
+        from django.utils.module_loading import import_string
+
+        reporter = import_string("evennia_jobs.integrations.staff_review.file_review_job")
+        reporter("t", "d")
+        self.assertEqual(Job.objects.filter(job_type=JobType.DISCUSS).count(), 1)
+
+    def test_errors_propagate_to_the_caller(self):
+        from evennia_jobs.integrations.staff_review import file_review_job
+
+        with (
+            patch.object(Job, "create_job", side_effect=IntegrityError("no number")),
+            self.assertRaises(IntegrityError),
+        ):
+            file_review_job("t", "d")
+
+
 class TestJobCommentModel(EvenniaTest):
     def setUp(self):
         super().setUp()

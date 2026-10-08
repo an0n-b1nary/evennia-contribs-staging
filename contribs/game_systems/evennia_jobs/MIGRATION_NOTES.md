@@ -27,11 +27,13 @@ Extracted from a private Evennia game project.
 
 ## Divergences from source game
 
-**`review.py` not shipped.** The source game has `world/jobs/review.py`, a thin
-wrapper around `Job.create_job` that implements the `RPTRACKER_FLAG_REVIEW_HOOK`
-contract. This is game-specific integration glue — consumers write their own hook
-wrapper to suit their notification system. The public API is `Job.create_job(job_type,
-author, title, description)` and `JobComment.create_comment(...)`.
+**`review.py` and `antigaming_reporter.py` → `integrations/staff_review.py` (0.2.0).**
+The source game had two identical wrappers around `Job.create_job`, one for
+`RPTRACKER_FLAG_REVIEW_HOOK` and one for `BOARDS_ANTIGAMING_REPORTER`. 0.1.x left
+them out as game glue. Every game wiring those hooks to this contrib rewrote the same
+few lines, so 0.2.0 ships one function, `file_review_job`, for both settings. One
+difference: the source wrappers swallowed errors. This one raises them. Both callers
+already catch and log, so swallowing here only hid the failure from the caller.
 
 **Staff perm now configurable.** `cmd:perm(Builder)` is the default but can be
 overridden via `JOBS_STAFF_LOCK`. The permission check is consistent across commands,

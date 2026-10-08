@@ -14,6 +14,7 @@ in-game commands and (optionally) a web interface + REST API.
 |---|---|
 | `Job` + `JobComment` models | Ticket + comment storage |
 | `Job.create_job()` | Public programmatic API for filing tickets from other systems |
+| `integrations.staff_review` | Ready-made `(title, description)` reporter for the rptracker and boards flag hooks |
 | 5 commands | `CmdRequest`, `CmdBug`, `CmdIssue` (players); `CmdDiscuss`, `CmdJobs` (staff) |
 | Website surface (`[web]`) | 5 views, accessible forms, Bootstrap 4 templates |
 | DRF API (`[web]`) | Read-only `JobViewSet` with privacy filtering |
@@ -156,8 +157,22 @@ JobComment.create_comment(
 )
 ```
 
-This replaces the un-shipped `review.py` adapter from the source game. Wire your own
-hook to call `Job.create_job` as needed.
+### Staff review of automated flags
+
+evennia-rptracker and evennia-boards flag suspicious activity and then call a
+dotted-path setting with `(title, description)` so a person can review it. Point both
+at the shipped reporter:
+
+```python
+# settings.py
+RPTRACKER_FLAG_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
+BOARDS_ANTIGAMING_REPORTER = "evennia_jobs.integrations.staff_review.file_review_job"
+```
+
+Each flag becomes an authorless `DISCUSS` ticket. `+discuss` is the staff-only type, so
+the flagged player can't see it on the web or through the API. Any other code with a
+`(title, description)` hook can use the same function. If filing fails, the error is
+raised to the caller; both shipped callers log it and still record the flag.
 
 ---
 
