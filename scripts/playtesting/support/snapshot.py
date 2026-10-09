@@ -6,6 +6,7 @@ from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
 from evennia_rp_contest.models import Challenge, CheckRecord
+from evennia_rp_resources.models import ResourceGrant, ResourceHolding
 from evennia_rptracker.models import RPSession
 from evennia_scenes.models import LogEntry, Scene
 from evennia_xp.models import CharacterXP, XPLog, XPSpend
@@ -48,6 +49,21 @@ def snapshot():
         }
     return {
         "actors": actors,
+        "resource_holdings": rows(
+            ResourceHolding.objects.filter(character_id__in=ids),
+            "character_id",
+            "resource__key",
+            "quantity",
+        ),
+        "resource_grants": rows(
+            ResourceGrant.objects.filter(character_id__in=ids),
+            "character_id",
+            "resource__key",
+            "quantity",
+            "source",
+            "week",
+            "by_id",
+        ),
         "transactions": rows(
             AbilityTransaction.objects.filter(character_id__in=ids),
             "id",

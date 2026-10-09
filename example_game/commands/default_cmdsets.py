@@ -26,6 +26,7 @@ from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
 
 from commands.sandbox import CmdSandbox
 from evennia_accessibility.commands import CmdScreenreader
+from evennia_links.commands import CmdRuntime
 from evennia_maps.commands import CmdMap
 from evennia_posing.commands import (
     CmdEmit,
@@ -81,6 +82,9 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # Pose pipeline (evennia_posing) — CmdPose replaces Evennia's stock
         # pose/emote command, the same way the old hand-rolled stopgap did.
         self.add(CmdPose)
+        self.add(CmdRuntime)
+        for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):
+            self.add(command)
         self.add(CmdEmit)
         self.add(CmdSemipose)
         self.add(CmdPot)

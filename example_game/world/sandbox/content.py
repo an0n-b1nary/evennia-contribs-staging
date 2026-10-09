@@ -233,6 +233,10 @@ OOC_ROOMS = (
             "+wear",
             "+remove",
             "+worn",
+            "+resources",
+            "+resources/catalog",
+            "+gather",
+            "+gather/clear",
         ),
     ),
     OocRoom(

@@ -56,6 +56,11 @@ def at_server_start():
 
     ensure_calendar_script_running()
 
+    if apps.is_installed("evennia_rp_resources"):
+        from evennia_rp_resources.scripts import ensure_resource_script_running
+
+        ensure_resource_script_running()
+
     # evennia_xp — start the weekly (Monday 00:00 UTC) batch Script.
     if apps.is_installed("evennia_xp"):
         from evennia_xp.scripts import ensure_xp_batch_script_running

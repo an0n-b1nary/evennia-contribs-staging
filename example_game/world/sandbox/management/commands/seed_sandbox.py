@@ -281,6 +281,15 @@ class Command(BaseCommand):
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
         counts.update(self._create_rp_playground(rooms, authors))
+        from django.apps import apps
+
+        if apps.is_installed("evennia_rp_resources"):
+            from evennia_rp_resources.catalog import seed_catalog
+            from evennia_rp_resources.services import grant
+
+            counts["resources"] = len(seed_catalog(update=True))
+            for author in authors:
+                grant(author, "timber", 3, "staff", note="Sandbox demonstration stores")
         return counts
 
     def _create_rp_playground(self, rooms, authors):

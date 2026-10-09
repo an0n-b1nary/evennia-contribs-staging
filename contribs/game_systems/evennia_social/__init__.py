@@ -51,7 +51,7 @@ apps.py is discovered during that phase, since evennia_social is itself
 listed in INSTALLED_APPS).
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 _LAZY = {
     "SocialCharacterMixin": "typeclasses",

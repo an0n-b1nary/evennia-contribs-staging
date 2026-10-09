@@ -268,3 +268,16 @@ in their own suites, without hard-coding release numbers.
 ## License
 
 By contributing, you agree your contributions are licensed under [BSD 3-Clause](LICENSE), matching Evennia upstream.
+
+### Resource partner profiles
+
+Use a fresh Python 3.12 environment for each profile, with Evennia 6.0.0. Create
+an empty game with `evennia --init ci_game < /dev/null`, then run
+`python scripts/ci_install_contribs.py ci_game --exclude evennia-maps` (or exclude
+`evennia-plots`, `evennia-social`, or `evennia-rptracker`). Migrate with
+`evennia migrate --noinput < /dev/null` from the game. Run
+`python scripts/ci_run_resources_tests.py ci_game --absent evennia_maps
+--absent evennia_economy` from the repo, substituting the excluded app label.
+The runner verifies physical absence and requires a positive test count. Omit
+installation exclusions for the present profile. Economy is intentionally
+absent in every current profile; adjust the matrix when it ships.

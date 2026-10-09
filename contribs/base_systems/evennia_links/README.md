@@ -356,3 +356,20 @@ present.
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+## Registered runtime controls and ownership caps
+
+`evennia_links.runtime.register(name, default, validator=callable)` registers a
+host setting as runtime-tunable, normally from `AppConfig.ready()`. `get(name)`
+reads a ServerConfig override before the host setting and default. `set(name,
+value, by=actor)` and `reset(name, by=actor)` validate, log the actor and send
+`runtime_setting_changed` after commit; there is no process-local value cache.
+Only registered names can be edited through `evennia_links.commands.CmdRuntime`
+(`+runtime NAME=<JSON value>`, `+runtime/reset NAME`). Its staff lock defaults to
+Builder and can be set with `LINKS_RUNTIME_STAFF_LOCK`.
+
+`cap_contributions` in the same module is a robust collector signal. Providers
+receive `character` and return disjoint provider keys, for example
+`{"workshop": {"resources": 12, "money": 50}}`. `cap_raise(character, kind)` sums
+nonnegative integer raises for that cap. Missing or broken providers contribute
+nothing. The cap owner adds this raise to its base; providers never import it.
