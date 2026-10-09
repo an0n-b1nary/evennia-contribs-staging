@@ -64,11 +64,13 @@ as it lands.
 ### Resource gathering
 
 `evennia-economy` 0.1 adds integer purses and passive weekly income with a
-five-UBI-week base cap, once-only starting/reveal stipends, and atomic exchanges
+five-UBI-week base cap, once-only starting stipends (plus a reveal stipend
+when a hidden economy is revealed), and atomic exchanges
 of money, carried items and resource counters. Demo authors start with 200 coins.
 Use `+balance`, `+offer character=5 coins for resource:grain:2`, and `+accept number`;
 `/secret` on either offer or acceptance suppresses the room announcement. Stock
-`give` is replaced so gifts enforce the same account and freeze rules too.
+`give` is replaced so gifts enforce the same-account rule too; it stays available
+while the economy is hidden (items only) and for item gifts while frozen.
 
 Staff use `+economy` for reconciliation and per-account accrual, `/run dry` for
 income previews, `/credit` and `/debit` for adjustments, and `/flags` for review.
