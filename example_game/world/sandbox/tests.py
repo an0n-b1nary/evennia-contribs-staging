@@ -28,6 +28,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
 
 # Keep the resources seam in the standard sandbox gate as well as the

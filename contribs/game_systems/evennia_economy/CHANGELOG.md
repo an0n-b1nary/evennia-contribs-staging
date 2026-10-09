@@ -13,6 +13,11 @@
   sandbox market stock, real partner seams and live offline-sale acceptance.
 - Upgrades retain the original migration and existing round-trip review flags.
 
+## 0.1.1 — 2026-10-09
+
+- Fixed: accept evennia-links 0.8 alongside 0.7 so the contrib installs with
+  the shared web character resolver and its consumers.
+
 ## 0.1.0 — 2026-10-09
 
 - Added: integer purses, atomic journaled currency writes, independent passive

@@ -197,6 +197,49 @@ class TestPlayableCharacters(EvenniaTest):
         self.assertFalse(characters.is_playable(self.obj1))
 
 
+class TestWebCharacter(EvenniaTest):
+    """EvenniaTest accounts have no sessions, so no live puppets unless patched."""
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char2)
+        self.account.characters.add(self.char1)
+
+    def _resolve(self, live=(), **kwargs):
+        from unittest.mock import patch
+
+        from evennia_links.characters import web_character
+
+        with patch.object(self.account, "get_all_puppets", return_value=list(live)):
+            return web_character(self.account, **kwargs)
+
+    def test_no_live_session_still_resolves_a_character(self):
+        # Regression: the website treated a visitor who was not connected
+        # in-game as having no character at all.
+        self.assertEqual(self._resolve(), self.char1)  # the last puppet
+        self.account.db._last_puppet = None
+        self.assertEqual(self._resolve(), self.char2)  # then roster order
+
+    def test_last_puppet_must_be_on_the_roster(self):
+        self.account.db._last_puppet = self.obj1
+        self.assertEqual(self._resolve(), self.char2)
+
+    def test_live_roster_puppet_wins(self):
+        self.assertEqual(self._resolve(live=[self.char2]), self.char2)
+        self.assertEqual(self._resolve(live=[self.obj1, self.char2]), self.char2)
+
+    def test_live_puppet_off_the_roster(self):
+        self.assertEqual(self._resolve(live=[self.obj1]), self.obj1)
+        self.assertEqual(self._resolve(live=[self.obj1], roster_only=True), self.char1)
+
+    def test_anonymous_and_empty_accounts_resolve_to_none(self):
+        from evennia_links.characters import web_character
+
+        self.assertIsNone(web_character(AnonymousUser()))
+        self.assertIsNone(web_character(None))
+        self.assertIsNone(web_character(self.account2))
+
+
 class TestPeriodicQueue(SimpleTestCase):
     def test_weekly_and_short_period_labels(self):
         from datetime import UTC, datetime

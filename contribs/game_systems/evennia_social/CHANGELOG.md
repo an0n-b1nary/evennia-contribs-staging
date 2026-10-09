@@ -2,6 +2,21 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.4.0 — 2026-10-09
+
+- **Added:** presence (`evennia_social.presence`). Each character is
+  `findable` (default), `unfindable` or, for staff only, `dark`. Unfindable
+  characters are left out of `+where`, `+where/count` and `+hangouts` counts,
+  but still appear in `who`; dark staff are also left out of `who`. Anyone in
+  the same room, and staff, see through both; staff see a `(unfindable)` /
+  `(dark)` marker in `+where`. A stored `dark` on a character that is no
+  longer staff reads as `unfindable`. Web code with no in-game viewer uses
+  `is_publicly_findable()` / `is_publicly_listed()`.
+- **Added:** `+unfindable [on|off|dark]`, and a `CmdWho` that replaces
+  Evennia's `who` (mount it in the AccountCmdSet) and leaves dark staff out
+  for unprivileged accounts. `SocialCharacterMixin.presence_visibility`
+  stores the setting.
+
 ## 0.3.0 — 2026-10-09
 
 - Added: Optional `SOCIAL_PROFILE_PROVIDERS` callbacks for visibility-aware profile fields.

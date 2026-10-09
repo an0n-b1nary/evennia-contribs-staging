@@ -157,9 +157,15 @@ class Command(BaseCommand):
 
     def _purge(self, dry_run):
         from django.apps import apps
+        from evennia.comms.models import ChannelDB
         from evennia.utils.search import search_tag
 
         counts = {}
+        for channel in ChannelDB.objects.filter(db_key="IC RP"):
+            if channel.tags.has(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY):
+                counts["ic_channel"] = 1
+                if not dry_run:
+                    channel.delete()
 
         objs = search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
         if apps.is_installed("evennia_economy"):
@@ -272,6 +278,21 @@ class Command(BaseCommand):
 
     def _rebuild(self):
         counts = {}
+        from django.apps import apps
+
+        if apps.is_installed("evennia_rptracker"):
+            from evennia.comms.models import ChannelDB
+            from evennia.utils.create import create_channel
+
+            if ChannelDB.objects.filter(db_key="IC RP").exists():
+                raise ValueError("Unowned channel already uses the demonstration IC RP name")
+            channel = create_channel(
+                "IC RP",
+                typeclass="evennia_rptracker.typeclasses.ICChannel",
+                desc="Generic in-character channel; active speakers earn channel-session XP.",
+            )
+            channel.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+            counts["ic_channel"] = 1
         authors = self._seed_characters()
         rooms = self._create_rooms()
         counts["rooms"] = len(rooms)

@@ -8,7 +8,7 @@ coupling economy to their packages.
 
 ## Install
 
-Install `evennia-links>=0.7,<0.8`, then `pip install -e .`. Add
+Install `evennia-links>=0.7,<0.9`, then `pip install -e .`. Add
 `"evennia_links"` followed by `"evennia_economy"` to `INSTALLED_APPS` and run
 `evennia migrate --noinput`. Links is the only hard contrib dependency.
 
@@ -103,7 +103,7 @@ offline. Purchase rechecks current account membership, stock, provider visibilit
 buyer funds and item hooks; payment, fees, delivery, listing completion and ledger
 entries commit together. A sold listing cannot sell twice. Seller sale fees come
 from the proceeds. Listed items cannot be moved or destroyed outside the service.
-Use rp-resources 0.1.2 or newer for returning archived resource stock.
+Use rp-resources 0.1.3 or newer for returning archived resource stock.
 
 Quiet stalls are flagged once per inactivity period after five weeks without an
 owner login, listing, unlisting or sale. They never close automatically. Call

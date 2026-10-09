@@ -37,14 +37,42 @@
   display: block;
 }
 
-.evennia-maps-fallback {
+/* A terrain colour arrives as the rect's fill attribute; CSS outranks a
+   presentation attribute, so the default grey applies only when it is absent. */
+.evennia-maps-fallback:not([fill]) {
   fill: #6c757d;
+}
+
+.evennia-maps-fallback {
   stroke: rgba(255, 255, 255, 0.25);
   stroke-width: 1;
 }
 
-.evennia-maps-tile:hover .evennia-maps-fallback {
-  fill: #4a90d9;
+/* A terrain colour arrives as a fill attribute, so hover brightens rather than
+   recolours: the cell keeps its terrain's hue. */
+.evennia-maps-tile:hover .evennia-maps-fallback,
+.evennia-maps-tile:hover image {
+  filter: brightness(1.25);
+  stroke: #ffffff;
+}
+
+.evennia-maps-terrain-legend-item {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 1rem 0.25rem 0;
+}
+
+/* One swatch style for both legends: a sprite thumbnail or a colour chip. */
+.evennia-maps-swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  background: #6c757d;
+  vertical-align: middle;
+  object-fit: cover;
 }
 
 .evennia-maps-legend-item {
@@ -76,6 +104,11 @@
   object-fit: cover;
 }
 
+.evennia-maps-tile:hover {
+  filter: brightness(1.2);
+  border-color: #ffffff;
+}
+
 .evennia-maps-tile.evennia-maps-tile-active {
   border-color: #ffce54;
   box-shadow: 0 0 4px 1px rgba(255, 206, 84, 0.8);
@@ -105,6 +138,59 @@
   height: 100%;
   font-size: 1.1em;
   color: #b39ddb;
+}
+
+.evennia-maps-tooltip .evennia-maps-badges {
+  margin-top: 0.2rem;
+}
+
+.evennia-maps-badge {
+  display: inline-block;
+  padding: 0 0.35rem;
+  border-radius: 2px;
+  background: #2d2d2d;
+  color: #f0f0f0;
+  font-size: 0.8em;
+}
+
+.evennia-maps-terrain-key {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 0.35rem 0.6rem;
+  background: rgba(27, 27, 27, 0.9);
+  color: #f0f0f0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  font-size: 0.85rem;
+}
+
+.evennia-maps-terrain-key summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.evennia-maps-terrain-key ul {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evennia-maps-terrain-key li {
+  display: flex;
+  align-items: center;
+  margin: 0.15rem 0;
+}
+
+.evennia-maps-list {
+  margin-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .evennia-maps-tile,
+  .evennia-maps-fallback,
+  .evennia-maps-svg image {
+    transition: filter 120ms ease-out;
+  }
 }
 
 .evennia-maps-error {

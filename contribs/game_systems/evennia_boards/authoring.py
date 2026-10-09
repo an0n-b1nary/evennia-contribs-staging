@@ -25,10 +25,10 @@ class BoardsAuthoringMixin(LoginRequiredMixin):
     login_url = "/accounts/login/"
 
     def get_character(self) -> int:
-        """Return the ObjectDB pk of the puppeted character (cached per request).
+        """Return the ObjectDB pk of the acting character (cached per request).
 
         Raises:
-            PermissionDenied: if logged in but no active puppet.
+            PermissionDenied: if logged in but has no character.
         """
         if not hasattr(self, "_character_id"):
             self._character_id = require_character(self.request)

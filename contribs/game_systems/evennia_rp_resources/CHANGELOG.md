@@ -1,11 +1,16 @@
 # Changelog
 
-## 0.1.2 — 2026-10-09
+## 0.1.3 — 2026-10-09
 
 - Fixed: returning reserved stall stock can restore archived resources, without
   reopening ordinary grants or unarchiving the catalogue entry. The optional
   economy provider exposes `refund`; `grant(..., allow_archived=True)` is the
   explicit host recovery API. Regression verified against the previous service.
+
+## 0.1.2 — 2026-10-09
+
+- Fixed: accept evennia-links 0.8 alongside 0.7 so resources install with
+  the shared web character resolver and its consumers.
 
 ## 0.1.1 — 2026-10-09
 

@@ -7,8 +7,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.6.0] - 2026-10-09
 
+- **Added:** `MAPS_TERRAINS`, `{key: {"label", "color", "sprite"}}`, and
+  `evennia_maps.terrain.terrain_style()` / `terrain_legend()`. Before, every tile
+  without a sprite was the same grey whatever its terrain; now it takes its
+  terrain's colour. `MAPS_TERRAIN_TILESET` still works as the sprite fallback.
+  Colours must be hex values.
+- **Added:** a terrain key on both maps; on the live map, a hover highlight that
+  keeps the terrain's hue, a tooltip (room, terrain, region, activity badges), and
+  a **Room list** of every visible room, grouped by region, whose buttons open the
+  tile's popup, for keyboard and screen-reader users.
+- **Added:** `terrain_label`, `terrain_color` and `primary_region_name` on the tile
+  API (additive; empty strings when unset). The static map's tile titles and room
+  list name each room's terrain.
 - **Tests:** isolate unconfigured off-map room types and unmounted partner
   links from host settings; CI exercises real partner startup, map rendering,
   and API seams with calendar present and absent.

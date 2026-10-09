@@ -385,6 +385,15 @@ without a sweep. `account_ids(character)` and `same_account(a, b)` back
 same-account rules. Characters on no account (NPCs, props) belong to nobody.
 The stored list is read directly, so sweeps don't load every account.
 
+`web_character(user, roster_only=False)` is the character a web request acts
+as. A website visitor need not be connected in-game, so a live puppet is a
+preference rather than a requirement: a live puppet on the account's playable
+list wins, then any other live puppet (a staffer playing an NPC) unless
+`roster_only`, then the account's last puppet if it is on the list, then the
+first character on the list. Anonymous users and accounts with nothing to play
+resolve to `None`. Web contribs use it for their `get_character_id(user)`;
+pass `roster_only=True` where the identity pays or records the character.
+
 `evennia_links.periodic` serves weekly (or staff-shortened) batch scripts.
 `period_key(seconds)` labels the most recently completed Monday-anchored
 period (ISO weeks for the weekly default). `advance(state, period, run,

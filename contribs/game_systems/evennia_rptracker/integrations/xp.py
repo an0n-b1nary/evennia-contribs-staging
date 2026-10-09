@@ -52,14 +52,23 @@ def collect_rp_sessions(window_end):
     Yields:
         Award for each eligible session.
     """
+    return _collect(window_end, "rp_session")
+
+
+def collect_rp_channel_sessions(window_end):
+    """Yield uncapped IC-channel awards through the host's multiplier policy."""
+    return _collect(window_end, "rp_channel_session")
+
+
+def _collect(window_end, source):
     from evennia_xp.batch import Award
     from evennia_xp.gating import resolve_xp_multiplier
-    from evennia_xp.models import XPLog
 
     from evennia_rptracker.models import RPSession
 
     window_start = _window_start(window_end)
     sessions = RPSession.objects.filter(
+        source_type=source,
         status=RPSession.Status.COMPLETED,
         xp_awarded=False,
         activated_at__isnull=False,
@@ -68,10 +77,10 @@ def collect_rp_sessions(window_end):
     ).select_related("character", "room")
 
     for session in sessions:
-        if not session.is_xp_eligible():
+        if session.character_id is None or not session.is_xp_eligible():
             continue
         mult = resolve_xp_multiplier(
-            "rp_session",
+            source,
             room=session.room,
             character=session.character,
         )
@@ -80,10 +89,10 @@ def collect_rp_sessions(window_end):
         yield Award(
             character_id=session.character_id,
             amount=Decimal("1.0") * mult,
-            source_type=XPLog.SourceType.RP_SESSION,
+            source_type=source,
             source_ref_id=session.pk,
             multiplier=mult,
-            reason=f"RP session #{session.pk}",
+            reason=f"{'IC-channel' if source == 'rp_channel_session' else 'RP'} session #{session.pk}",
         )
 
 
@@ -104,22 +113,35 @@ def flip_session_flags(window_end, awards, week_label):
         awards: sequence of Award namedtuples produced by the batch run.
         week_label: ISO week string (e.g. "2026-W28") written to xp_week.
     """
+    _flip_flags(awards, week_label, "rp_session")
+
+
+def flip_channel_session_flags(window_end, awards, week_label):
+    """Mark only channel sessions whose XP ledger writes actually committed."""
+    _flip_flags(awards, week_label, "rp_channel_session")
+
+
+def _flip_flags(awards, week_label, source):
     from evennia_xp.models import XPLog
 
     from evennia_rptracker.models import RPSession
 
-    session_pks = {a.source_ref_id for a in awards if a.source_type == XPLog.SourceType.RP_SESSION}
-    if not session_pks:
+    expected = {(a.character_id, a.source_ref_id) for a in awards if a.source_type == source}
+    if not expected:
         return
 
-    awarded = set(
-        XPLog.objects.filter(
-            source_type=XPLog.SourceType.RP_SESSION,
-            source_ref_id__in=session_pks,
-        ).values_list("source_ref_id", flat=True)
-    )
+    # A ledger row only confirms the award it was written for: same source,
+    # same session and same character.
+    awarded = {
+        ref
+        for character_id, ref in XPLog.objects.filter(
+            source_type=source,
+            source_ref_id__in={ref for _character_id, ref in expected},
+        ).values_list("character_id", "source_ref_id")
+        if (character_id, ref) in expected
+    }
     if awarded:
-        RPSession.objects.filter(pk__in=awarded).update(
+        RPSession.objects.filter(pk__in=awarded, source_type=source).update(
             xp_awarded=True,
             xp_week=week_label,
         )

@@ -1635,3 +1635,21 @@ class TestSceneApiDateFilters(EvenniaTest):
                 response = self.titles(query)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(query[1:].split("=")[0], response.data)
+
+
+class TestWebCharacterWithoutLiveSession(EvenniaTest):
+    """Regression: a website visitor need not be connected in-game.
+
+    The resolver returned the first live puppet, so an account browsing the
+    site without a game session had no character and every write was denied.
+    """
+
+    def test_roster_character_resolves_without_a_live_puppet(self):
+        from evennia_scenes.permissions import get_character_id, require_character
+
+        self.account2.characters.add(self.char2)
+        self.assertEqual(get_character_id(self.account2), self.char2.pk)
+        from types import SimpleNamespace
+
+        request = SimpleNamespace(user=self.account2)
+        self.assertEqual(require_character(request), self.char2.pk)

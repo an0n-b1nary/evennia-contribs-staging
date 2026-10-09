@@ -3,9 +3,10 @@
 
   Variables:
     svg — required — the dict built by evennia_maps.views.build_svg_context():
-      tiles      — [{x, y, room_id, room_name, terrain, sprite, region,
-                     region_url, latest_scene, latest_scene_url,
-                     svg_x, svg_y}]
+      tiles      — [{x, y, room_id, room_name, terrain, terrain_label, color,
+                     sprite, region, region_url, latest_scene,
+                     latest_scene_url, svg_x, svg_y}]
+      terrains   — legend rows, one terrain_style() per terrain present
       tile_size  — pixel size of one tile
       svg_width, svg_height — total SVG dimensions
 
@@ -28,7 +29,7 @@
        xmlns="http://www.w3.org/2000/svg">
     {% for tile in svg.tiles %}
     <g class="evennia-maps-tile" data-terrain="{{ tile.terrain|default:'plain' }}">
-      <title>{{ tile.room_name }}{% if tile.region %} &mdash; {{ tile.region.name }}{% endif %}</title>
+      <title>{{ tile.room_name }}{% if tile.terrain_label %} &mdash; {{ tile.terrain_label }}{% endif %}{% if tile.region %} &mdash; {{ tile.region.name }}{% endif %}</title>
       {% if tile.sprite %}
       <image href="{{ tile.sprite }}"
              x="{{ tile.svg_x }}" y="{{ tile.svg_y }}"
@@ -36,18 +37,30 @@
       {% else %}
       <rect x="{{ tile.svg_x }}" y="{{ tile.svg_y }}"
             width="{{ svg.tile_size }}" height="{{ svg.tile_size }}"
-            class="evennia-maps-fallback" />
+            class="evennia-maps-fallback"{% if tile.color %} fill="{{ tile.color }}"{% endif %} />
       {% endif %}
     </g>
     {% endfor %}
   </svg>
 </div>
 
+{% if svg.terrains %}
+<ul class="evennia-maps-terrain-legend list-unstyled small mt-2" aria-label="Terrain key">
+  {% for terrain in svg.terrains %}
+  <li class="evennia-maps-terrain-legend-item">
+    {% if terrain.sprite %}<img src="{{ terrain.sprite }}" alt="" class="evennia-maps-swatch">{% else %}<svg class="evennia-maps-swatch" viewBox="0 0 1 1" aria-hidden="true" focusable="false"><rect width="1" height="1" class="evennia-maps-fallback"{% if terrain.color %} fill="{{ terrain.color }}"{% endif %} /></svg>{% endif %}
+    {{ terrain.label }}
+  </li>
+  {% empty %}{% endfor %}
+</ul>
+{% endif %}
+
 <ul class="evennia-maps-legend list-unstyled small mt-2">
   {% for tile in svg.tiles %}
   <li class="evennia-maps-legend-item">
     <span class="text-muted">({{ tile.x }}, {{ tile.y }})</span>
     {% if tile.room_url %}<a href="{{ tile.room_url }}"><strong>{{ tile.room_name }}</strong></a>{% else %}<strong>{{ tile.room_name }}</strong>{% endif %}
+    {% if tile.terrain_label %}<span class="text-muted ml-1">{{ tile.terrain_label }}</span>{% endif %}
     {% if tile.region %}
       {% if tile.region_url %}
       <a href="{{ tile.region_url }}" class="ml-1">{{ tile.region.name }}</a>

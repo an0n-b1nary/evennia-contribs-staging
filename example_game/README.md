@@ -97,7 +97,7 @@ create review flags without blocking pickup. The room's `MarketRoomMixin` comes
 before the host room class and cooperatively adds the roster; the login hook
 calls `stalls.note_login`. These hooks are gated in absent-partner profiles.
 
-`evennia-rp-resources` 0.1.2 is wired with a generic Materials / Provisions /
+`evennia-rp-resources` 0.1.3 is wired with a generic Materials / Provisions /
 Essences catalogue. The IC rooms already carry forest, hills, urban and water
 terrains; these define the open trickle pool, while Grain is always common.
 The demonstration characters have Timber holdings and the Proving Grounds
@@ -708,6 +708,12 @@ cannot be left to the service — do it now, then hand the running game to syste
 ```bash
 evennia seed_sandbox   # rerunnable; idempotent
 ```
+
+The seeded `IC RP` channel uses `evennia_rptracker.typeclasses.ICChannel`.
+Puppet a character, subscribe with `channel/sub IC RP`, and send with
+`channel IC RP = <message>`. Channel activity has separate session and XP sources;
+it does not alter room pose timers or create scene links. Staff can inspect
+rolling region and channel totals with `+report activity [days]`.
 
 ### 6. Snapshot the golden DB
 

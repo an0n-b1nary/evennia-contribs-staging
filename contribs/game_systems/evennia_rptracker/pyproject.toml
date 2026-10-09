@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rptracker"
-version = "0.1.5"
+version = "0.2.0"
 description = "Passive RP session detection and tracking for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,7 +22,7 @@ classifiers = [
 # evennia-links provides AbstractLink (the base of RPSessionSceneLink, which
 # ships unconditionally), connect_soft_ref_cleanup (used by the scene bridge),
 # and resolve_dotted (used to resolve the optional settings hooks in commands.py).
-dependencies = ["evennia>=6.0", "evennia-links>=0.4"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.7"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

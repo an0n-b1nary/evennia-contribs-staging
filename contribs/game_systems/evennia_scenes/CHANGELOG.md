@@ -1,5 +1,14 @@
 # Changelog — evennia-scenes
 
+## [0.6.1] - 2026-10-09
+
+- **Fixed:** the website now resolves the acting character from the account's
+  playable characters through `evennia_links.characters.web_character`, so a
+  visitor who is not connected in-game still acts as their character. Before, only
+  a live puppet counted: pages and writes that need a character treated the
+  visitor as having none ("A puppeted character is required") unless the account
+  was also in the game. Requires evennia-links 0.8.
+
 ## [0.6.0] - 2026-10-07
 
 - **Added:** `?created_after=` and `?created_before=` on `/api/v1/scenes/`.
