@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Playable-character membership shared by every package that pays or restricts players.
+"""Playable-character membership shared by every package that pays or restricts players,
+and the character a web request acts as.
 
 Membership is the account's playable-character list (`account.characters`),
 including offline characters and characters listed on more than one account.
@@ -61,3 +62,43 @@ def playable_characters(predicate=None):
 def is_playable(character, predicate=None):
     """One character's membership and predicate, without sweeping the others."""
     return bool(account_ids(character)) and (predicate is None or bool(predicate(character)))
+
+
+def web_character(user, roster_only=False):
+    """
+    The character a web request acts as, or None.
+
+    A website visitor need not be connected in-game, so a live puppet is
+    a preference, not a requirement. In order: a live puppet on the
+    account's playable list, then any other live puppet (staff playing an
+    NPC) unless `roster_only`, then the last puppet if it is on the list,
+    then the first character on the list.
+
+    Args:
+        user: `request.user`; anonymous users and accounts with nothing to
+            play resolve to None.
+        roster_only: ignore live puppets that are not on the playable list,
+            for packages that pay or record the character.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+    account = getattr(user, "account", None) or user
+    try:
+        roster = [obj for obj in account.characters.all() if obj and obj.pk]
+    except AttributeError:
+        roster = []
+    try:
+        live = [obj for obj in account.get_all_puppets() if obj and obj.pk]
+    except AttributeError:
+        live = []
+    roster_ids = {obj.pk for obj in roster}
+    live_ids = {obj.pk for obj in live}
+    for character in roster:
+        if character.pk in live_ids:
+            return character
+    if live and not roster_only:
+        return live[0]
+    last = account.db._last_puppet if hasattr(account, "db") else None
+    if last and last.pk in roster_ids:
+        return next(obj for obj in roster if obj.pk == last.pk)
+    return roster[0] if roster else None

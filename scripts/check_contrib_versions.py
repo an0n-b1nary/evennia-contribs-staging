@@ -6,6 +6,8 @@ The exported version must match package metadata and the latest released
 changelog heading. A leading Unreleased section is allowed for future work,
 including a new contrib whose first release is still being prepared.
 Use --installed after editable installation to check distribution metadata too.
+Hard sibling dependencies must accept the versions declared in this checkout.
+Requires packaging; optional extras are outside the default CI installation.
 """
 
 from __future__ import annotations
@@ -17,6 +19,10 @@ import sys
 import tomllib
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 CONTRIBS_ROOT = Path(__file__).resolve().parent.parent / "contribs"
 HEADING = re.compile(r"^##\s+\[?(Unreleased|\d+\.\d+\.\d+)\]?(?=\s|$)", re.MULTILINE)
@@ -73,6 +79,40 @@ def check_contrib(path: Path, *, installed: bool = False) -> list[str]:
     return [f"{path.name}: {error}" for error in errors]
 
 
+def check_sibling_dependencies(paths: list[Path]) -> list[str]:
+    """Check hard sibling version constraints without importing contrib packages."""
+    errors = []
+    projects = {}
+    for path in paths:
+        try:
+            with (path / "pyproject.toml").open("rb") as stream:
+                project = tomllib.load(stream)["project"]
+            name = canonicalize_name(project["name"])
+            declared = Version(project["version"])
+            if name in projects:
+                errors.append(f"{path.name}: duplicate distribution name {name!r}")
+            projects[name] = (path, project, declared)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            errors.append(f"{path.name}: {exc}")
+    for path, project, _ in projects.values():
+        for raw in project.get("dependencies", []):
+            try:
+                requirement = Requirement(raw)
+                sibling = projects.get(canonicalize_name(requirement.name))
+                if sibling is None or (
+                    requirement.marker is not None and not requirement.marker.evaluate()
+                ):
+                    continue
+                declared = sibling[2]
+                if declared not in requirement.specifier:
+                    errors.append(
+                        f"{path.name}: dependency {raw!r} rejects sibling version {declared}"
+                    )
+            except InvalidRequirement as exc:
+                errors.append(f"{path.name}: {exc}")
+    return errors
+
+
 def main(argv: list[str] | None = None) -> int:
     """Check every discovered contrib and return a failing status on any drift."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -83,10 +123,11 @@ def main(argv: list[str] | None = None) -> int:
         print("No contribs found; refusing an empty version check.", file=sys.stderr)
         return 1
     errors = [error for path in paths for error in check_contrib(path, installed=args.installed)]
+    errors.extend(check_sibling_dependencies(paths))
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print(f"Version and changelog checks passed for {len(paths)} contribs.")
+    print(f"Version, changelog and sibling dependency checks passed for {len(paths)} contribs.")
     return 0
 
 

@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.1] - 2026-10-09
+
+- **Changed:** the XP identity resolver delegates to
+  `evennia_links.characters.web_character(user, roster_only=True)`, shared
+  with the other web contribs. With no live roster puppet it now prefers the
+  account's last puppet before roster order. Requires evennia-links 0.8.
+
 ## [0.4.0] - 2026-10-07
 
 - **Added:** projected XP. `evennia_xp.projection.project_for_character()`

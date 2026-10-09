@@ -6,7 +6,7 @@ AuthoringMixin — shared base for all evennia_jobs authoring (write) views.
 Every write-capable view (create, comment) should mix this in. It provides:
   - LoginRequiredMixin enforcement.
   - A cached ``get_character()`` that raises PermissionDenied when the
-    user has no active puppet.
+    user has no character.
   - ``get_permission_target()`` / ``check_permission()`` hooks so domain
     views can declare their own authoring rules in one place.
   - A ``form_valid()`` stub that intentionally raises NotImplementedError —
@@ -20,7 +20,7 @@ Usage::
         template_name = "evennia_jobs/my_form.html"
 
         def check_permission(self, character_id, target):
-            pass  # anyone with a puppet can create
+            pass  # anyone with a character can create
 
         def form_valid(self, form):
             character_id = self.get_character()
@@ -40,12 +40,12 @@ class AuthoringMixin(LoginRequiredMixin):
     login_url = "/accounts/login/"
 
     def get_character(self) -> int:
-        """Return the ObjectDB pk of the puppeted character.
+        """Return the ObjectDB pk of the acting character.
 
         Cached on the view instance for the request lifetime.
 
         Raises:
-            PermissionDenied: if the user is logged in but has no puppet.
+            PermissionDenied: if the user is logged in but has no character.
         """
         if not hasattr(self, "_character_id"):
             self._character_id = require_character(self.request)

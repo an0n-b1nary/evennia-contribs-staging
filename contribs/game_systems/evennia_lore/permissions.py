@@ -9,20 +9,24 @@ HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
 from django.core.exceptions import PermissionDenied
 
 from evennia_links import is_staff_user as is_staff_user
+from evennia_links.characters import web_character
 
 
 def get_character_id(user) -> int | None:
-    """Return the ObjectDB pk for the first puppeted character of *user*."""
-    if not user.is_authenticated:
-        return None
-    account = getattr(user, "account", None) or user
-    puppets = account.get_all_puppets() if hasattr(account, "get_all_puppets") else []
-    return puppets[0].pk if puppets else None
+    """Return the ObjectDB pk of the character *user* acts as on the web.
+
+    Resolved by ``evennia_links.characters.web_character``: a live puppet is
+    preferred but not required, so a visitor who is not connected in-game
+    still acts as a character from their account. Returns None if the user is
+    unauthenticated or has no character.
+    """
+    character = web_character(user)
+    return character.pk if character else None
 
 
 def require_character(request) -> int:
     """Return the character's ObjectDB pk or raise PermissionDenied."""
     character_id = get_character_id(request.user)
     if character_id is None:
-        raise PermissionDenied("A puppeted character is required for this action.")
+        raise PermissionDenied("A character is required for this action.")
     return character_id
