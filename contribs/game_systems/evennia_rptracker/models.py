@@ -44,6 +44,20 @@ class RPSession(models.Model):
         COMPLETED = "completed", "Completed"
         FLAGGED = "flagged", "Flagged"
 
+    class Source(models.TextChoices):
+        ROOM = "rp_session", "Room RP"
+        CHANNEL = "rp_channel_session", "Channel RP"
+
+    source_type = models.CharField(
+        max_length=24, choices=Source.choices, default=Source.ROOM, db_index=True
+    )
+    channel = models.ForeignKey(
+        "comms.ChannelDB", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    channel_name = models.CharField(max_length=255, blank=True)
+    last_activity_at = models.DateTimeField(null=True, blank=True)
+    account_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+
     character = models.ForeignKey(
         "objects.ObjectDB",
         on_delete=models.SET_NULL,
@@ -145,6 +159,8 @@ class RPSession(models.Model):
         """
         start = self.activated_at or self.started_at
         end = self.ended_at or timezone.now()
+        if self.source_type == self.Source.CHANNEL:
+            end = self.last_activity_at or start
         return max(0, int((end - start).total_seconds()))
 
     def duration_display(self):
@@ -187,7 +203,11 @@ class RPSession(models.Model):
         """Transition ACTIVE -> COMPLETED."""
         if self.status in (self.Status.PENDING, self.Status.ACTIVE):
             self.status = self.Status.COMPLETED
-            self.ended_at = timezone.now()
+            self.ended_at = (
+                self.last_activity_at or self.activated_at or self.started_at
+                if self.source_type == self.Source.CHANNEL
+                else timezone.now()
+            )
             self.ended_manually = manual
             self.save(update_fields=["status", "ended_at", "ended_manually"])
 
@@ -205,7 +225,11 @@ class RPSession(models.Model):
             self.flagged_by_name = flagged_by.key if flagged_by else "auto"
             self.flagged_at = timezone.now()
             if not self.ended_at:
-                self.ended_at = timezone.now()
+                self.ended_at = (
+                    self.last_activity_at or self.activated_at or self.started_at
+                    if self.source_type == self.Source.CHANNEL
+                    else timezone.now()
+                )
             self.save(
                 update_fields=[
                     "status",

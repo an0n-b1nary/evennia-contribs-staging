@@ -17,15 +17,17 @@ class RPSessionAdmin(admin.ModelAdmin):
         "pk",
         "character_name",
         "status",
+        "source_type",
         "room_name",
+        "channel_name",
         "pose_count",
         "started_at",
         "ended_at",
         "ended_manually",
         "xp_awarded",
     ]
-    list_filter = ["status", "ended_manually", "xp_awarded"]  # noqa: RUF012
-    search_fields = ["character_name", "room_name", "flag_reason"]  # noqa: RUF012
+    list_filter = ["status", "source_type", "ended_manually", "xp_awarded"]  # noqa: RUF012
+    search_fields = ["character_name", "room_name", "channel_name", "flag_reason"]  # noqa: RUF012
     readonly_fields = [  # noqa: RUF012
         "started_at",
         "activated_at",

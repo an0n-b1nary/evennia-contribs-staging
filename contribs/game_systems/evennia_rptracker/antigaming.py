@@ -122,7 +122,7 @@ def _flag_manual_end_abuse(window_end):
 
     by_char = {}
     for session in manually_ended:
-        by_char.setdefault(session.character_id, []).append(session)
+        by_char.setdefault((session.character_id, session.source_type), []).append(session)
 
     flagged_chars = 0
     for _char_id, sessions in by_char.items():

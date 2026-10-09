@@ -203,6 +203,7 @@ def _activate_session(char_id, character, room, state):
             character_name=character.key,
             room=room,
             room_name=room.key if room else "",
+            account_id_snapshot=getattr(getattr(character, "account", None), "pk", None),
             status=RPSession.Status.ACTIVE,
         )
         from django.utils import timezone
@@ -349,6 +350,7 @@ def _check_manual_end_flag(session):
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     manual_today = RPSession.objects.filter(
         character=session.character,
+        source_type=session.source_type,
         ended_manually=True,
         ended_at__gte=today_start,
     ).count()
@@ -399,6 +401,9 @@ def _check_idle_sessions():
             end_session(char_id, manual=False)
         else:
             _active_sessions.pop(char_id, None)
+    from evennia_rptracker.channel_tracker import check_idle_sessions
+
+    check_idle_sessions(now)
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +418,9 @@ def flush_all_sessions():
     """
     for char_id in list(_active_sessions.keys()):
         end_session(char_id, manual=False)
+    from evennia_rptracker.channel_tracker import flush_all_sessions as flush_channels
+
+    flush_channels()
 
 
 def recover_orphaned_sessions():
@@ -424,7 +432,9 @@ def recover_orphaned_sessions():
 
     from evennia_rptracker.models import RPSession
 
-    orphans = RPSession.objects.filter(status=RPSession.Status.ACTIVE)
+    orphans = RPSession.objects.filter(
+        status=RPSession.Status.ACTIVE, source_type=RPSession.Source.ROOM
+    )
     count = orphans.count()
     if count:
         logger.info(
@@ -432,29 +442,26 @@ def recover_orphaned_sessions():
             count,
         )
         orphans.update(status=RPSession.Status.COMPLETED, ended_at=timezone.now())
+    from django.db.models.functions import Coalesce
+
+    RPSession.objects.filter(
+        status=RPSession.Status.ACTIVE, source_type=RPSession.Source.CHANNEL
+    ).update(
+        status=RPSession.Status.COMPLETED,
+        ended_at=Coalesce("last_activity_at", "activated_at", "started_at"),
+    )
 
 
 # ---------------------------------------------------------------------------
-# IC-channel seam (inert — future extension point)
+# IC-channel collection (independent of room tracking)
 # ---------------------------------------------------------------------------
 
 
 def record_rp_channel_activity(character, channel):
-    """Entry point for IC-channel RP activity detection (inert seam).
+    """Record one accepted IC message; see channel_tracker for session rules."""
+    from evennia_rptracker.channel_tracker import record_rp_channel_activity as record
 
-    This is a no-op placeholder for a future IC-channel XP collector. When
-    a character sends an IC-channel message, the channel typeclass can call
-    this function. Today it logs a debug message and returns immediately.
-
-    Args:
-        character: The Character ObjectDB who sent the channel message.
-        channel: The Channel instance.
-    """
-    logger.debug(
-        "RPTracker: IC-channel activity from %s on channel %s (seam, no-op).",
-        getattr(character, "key", character),
-        getattr(channel, "key", channel),
-    )
+    return record(character, channel)
 
 
 # ---------------------------------------------------------------------------

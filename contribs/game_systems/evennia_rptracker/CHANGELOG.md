@@ -7,6 +7,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] - 2026-10-09
+
+- Added independent IC-channel sessions, character-attributed channel typeclass,
+  configurable eligibility, partner windows, lifecycle cleanup and XP collector.
+- Added read-only staff activity reports grouped by canonical region or room,
+  with separate channel totals and excluded flagged sessions. Deleted rooms keep
+  separate named buckets; deleted characters still count as participants.
+- Added an additive migration for session sources, channel history, persisted
+  activity timestamps and account snapshots. Existing rows remain room sessions.
+- **Fix:** the post-batch hooks now mark a session awarded only when its XP
+  ledger row matches the award's character as well as its source and session;
+  a ledger row written for another character no longer confirms it.
+- Requires evennia-links >=0.7 for shared playable-account partner exclusion.
+
 ## [0.1.5] - 2026-10-07
 
 - **Docs:** the README now names the shipped values for two hooks:
