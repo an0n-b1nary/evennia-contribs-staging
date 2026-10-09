@@ -113,7 +113,9 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdTel)
 
         # RP session tracking
-        for command in _optional_commands("evennia_rptracker", "CmdActivity", "CmdRPTrackerStaff"):
+        for command in _optional_commands(
+            "evennia_rptracker", "CmdActivity", "CmdRPTrackerStaff", "CmdRPActivityReport"
+        ):
             self.add(command)
 
         # Scenes
@@ -211,6 +213,10 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # read a character-select table to find it. The account cmdset merges
         # into the puppet's, so it works in character too.
         self.add(CmdScreenreader)
+        if apps.is_installed("evennia_rptracker"):
+            from evennia_rptracker.channel_commands import CmdICChannel
+
+            self.add(CmdICChannel)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

@@ -363,6 +363,7 @@ XP_MULTIPLIER_RESOLVER = "evennia_plots.integrations.gating.resolve_xp_multiplie
 
 XP_COLLECTORS = [
     ("rp_session", "evennia_rptracker.integrations.xp.collect_rp_sessions"),
+    ("rp_channel_session", "evennia_rptracker.integrations.xp.collect_rp_channel_sessions"),
     ("lore_authored", "evennia_lore.integrations.xp.collect_lore_authored"),
     ("lore_inspiration", "evennia_lore.integrations.xp.collect_lore_inspiration"),
     ("cutscene", "evennia_boards.integrations.xp.collect_cutscene_posts"),
@@ -381,6 +382,7 @@ XP_ANTIGAMING_SWEEPS = [
 # there is nothing to flip after the batch writes XPLog rows.
 XP_POST_BATCH_HOOKS = [
     "evennia_rptracker.integrations.xp.flip_session_flags",
+    "evennia_rptracker.integrations.xp.flip_channel_session_flags",
 ]
 
 # Removing a partner also removes its scheduled XP imports. The remaining
@@ -406,6 +408,11 @@ RPTRACKER_IDLE_CHECK_INTERVAL = 300
 RPTRACKER_MANUAL_END_ABUSE_COUNT = 3
 RPTRACKER_POSE_SPAM_MIN_COUNT = 20
 RPTRACKER_POSE_SPAM_MAX_SECONDS = 600
+RPTRACKER_CHANNEL_SESSION_IDLE_TIMEOUT = 1800
+RPTRACKER_CHANNEL_PARTNER_ACTIVE_WINDOW = 1800
+RPTRACKER_CHANNEL_ACTIVATION_MESSAGES = 2
+RPTRACKER_CHANNEL_ELIGIBLE = None
+RPTRACKER_REGIONS_APP_LABEL = "evennia_regions"
 
 # NOTE: RPTRACKER_SCENES_APP_LABEL is intentionally left unset. Its code
 # default is "evennia_scenes" (contribs/game_systems/evennia_rptracker/apps.py),
