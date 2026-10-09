@@ -16,7 +16,7 @@ part of this repo).
 
 ## What's wired up
 
-All 18 current contribs, in dependency order — `evennia_links` first, then
+All 19 current contribs, in dependency order — `evennia_links` first, then `evennia_rp_resources`, then
 the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
 `evennia_maps`), then the standalone apps (`evennia_calendar`,
@@ -60,6 +60,33 @@ room-receive signal; you must call this manually").
 
 Not yet extracted as contribs: crafting. This sandbox will grow to cover it
 as it lands.
+
+### Resource gathering
+
+`evennia-rp-resources` 0.1 is wired with a generic Materials / Provisions /
+Essences catalogue. The IC rooms already carry forest, hills, urban and water
+terrains; these define the open trickle pool, while Grain is always common.
+The demonstration characters have Timber holdings and the Proving Grounds
+plaque lists `+resources`, `+resources/catalog`, `+gather` and `+gather/clear`.
+Rare crystal is excluded from passive accrual and available to staff grants.
+
+Every playable character accrues six units per Monday batch, independently of
+RP. A 30-unit base cap tapers only passive income; stocks never decay. The
+server-start hook ensures the resources script is running and the character's
+cooperative login hook shows one summary after each batch. The summary mixin
+would go before DefaultCharacter with no special ordering; the sandbox calls
+the summary directly, using the same optional-app pattern as XP. Social's
+`SOCIAL_PROFILE_PROVIDERS` adds the gathering lean to `+finger` and respects the
+viewer's reveal access. This milestone has no web or API surface.
+
+Staff can preview with `+resources/run dry`, seed/update the configured catalogue,
+and grant/spend/audit stock. `+runtime` controls registered settings without a
+restart. `RP_RESOURCES_REVEALED=false` hides player access and summaries while
+background accrual continues. The live RP suite covers holdings, leans, staff
+grants and runtime reveal. `world/sandbox/test_resources.py` checks actual maps,
+social and login seams. Fresh CI profiles exclude maps, plots, social or tracker
+and verify the excluded package cannot be imported; economy is also asserted
+absent until its milestone ships.
 
 ### The map, and the web surface
 
@@ -421,6 +448,7 @@ python3.12 -m venv .venv_sandbox   # NOT the same venv as any other Evennia game
 source .venv_sandbox/bin/activate  # or .venv_sandbox\Scripts\activate on Windows
 pip install "evennia>=6.0"
 for d in contribs/base_systems/evennia_links \
+         contribs/game_systems/evennia_rp_resources \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \
          contribs/game_systems/evennia_boards \
@@ -583,6 +611,7 @@ if it lists a modified tracked file, that change is real and reset will destroy 
 
 ```bash
 for d in contribs/base_systems/evennia_links \
+         contribs/game_systems/evennia_rp_resources \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \
          contribs/game_systems/evennia_boards \

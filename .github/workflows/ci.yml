@@ -111,6 +111,45 @@ jobs:
       - name: Fresh-process partner seams and host-configured maps suite
         run: python scripts/ci_run_partner_tests.py ci_game --calendar ${{ matrix.calendar }}
 
+  resources-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: "--absent evennia_economy"
+          - profile: no-maps
+            excludes: "--exclude evennia-maps"
+            absent: "--absent evennia_maps --absent evennia_economy"
+          - profile: no-plots
+            excludes: "--exclude evennia-plots"
+            absent: "--absent evennia_plots --absent evennia_economy"
+          - profile: no-social
+            excludes: "--exclude evennia-social"
+            absent: "--absent evennia_social --absent evennia_economy"
+          - profile: no-tracker
+            excludes: "--exclude evennia-rptracker"
+            absent: "--absent evennia_rptracker --absent evennia_economy"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize disposable host
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected contribs in dependency order
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: Resources suite and real partner seams
+        run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
+
   rp-contest-partners:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -2,6 +2,10 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.3.0 — 2026-10-09
+
+- Added: Optional `SOCIAL_PROFILE_PROVIDERS` callbacks for visibility-aware profile fields.
+
 ## 0.2.0 — 2026-10-07
 
 - **Added:** room mood. `SocialRoomMixin` now owns `room_mood` and

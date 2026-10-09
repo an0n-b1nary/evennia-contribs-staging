@@ -10,6 +10,10 @@ Uses plain EvEditor callbacks (not a version-tracked editing framework) —
 bios are personal text, not collaborative content.
 """
 
+import logging
+from importlib import import_module
+
+from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
@@ -196,6 +200,16 @@ class CmdFinger(MuxCommand):
             lines.append(f"|w{'-' * width}|n")
             for key, value in target.profile_custom_fields.items():
                 lines.append(f" |w{key}:|n  {value}")
+
+        # Optional host-owned fields. Providers apply their own visibility policy.
+        for provider_path in getattr(settings, "SOCIAL_PROFILE_PROVIDERS", []):
+            try:
+                module, _, name = provider_path.rpartition(".")
+                fields = getattr(import_module(module), name)(viewer, target)
+                for key, value in fields.items():
+                    lines.append(f" |w{key}:|n  {value}")
+            except Exception:
+                logging.getLogger("evennia").exception("Profile provider failed: %s", provider_path)
 
         # Staff section (Builder+ only)
         if is_staff(viewer):

@@ -1,5 +1,9 @@
 # Changelog — evennia-links
 
+## [0.6.0] - 2026-10-09
+
+- Added: Registered runtime controls, staff `+runtime` and the cap-contribution collector.
+
 ## [0.5.1] - 2026-10-02
 
 - Validate complete web staff lock strings before evaluation, and deny access

@@ -49,6 +49,7 @@ EVENNIA_ADMIN = False
 # base models are imported at their app-load time).
 INSTALLED_APPS += [
     "evennia_links",
+    "evennia_rp_resources",
     "evennia_rptracker",
     "evennia_scenes",
     "evennia_boards",
@@ -82,6 +83,25 @@ INSTALLED_APPS += [
     # discovered and its ready() runs.
     "world.sandbox",
 ]
+
+######################################################################
+# RP resources (evennia-rp-resources) — passive accrual and gathering choices
+######################################################################
+RP_RESOURCES_REVEALED = True
+RP_RESOURCES_CATALOG = "world.sandbox.resources.catalog"
+RP_RESOURCES_CATEGORIES = [
+    ("materials", "Materials"),
+    ("provisions", "Provisions"),
+    ("essences", "Essences"),
+]
+RP_RESOURCES_WEEKLY_QUANTITY = 6
+RP_RESOURCES_BASE_CAP = 30
+RP_RESOURCES_TAPER_FRACTION = 0.8
+RP_RESOURCES_PERIOD_SECONDS = 604800
+RP_RESOURCES_LEAN_MULTIPLIER = 2
+RP_RESOURCES_STAFF_LOCK = "cmd:perm(Builder)"
+RP_ECONOMY_ELIGIBLE = None  # Every playable character; no RP/session requirement.
+SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
 
 ######################################################################
 # RP rules (evennia-rp-rules) — game values and optional sheet/stat-block seams

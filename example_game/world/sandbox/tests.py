@@ -28,6 +28,10 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+# Keep the resources seam in the standard sandbox gate as well as the
+# explicitly targeted fresh-environment partner profile.
+from world.sandbox.test_resources import ResourceSeams
+
 urlpatterns = [path("", include("web.urls"))]
 
 

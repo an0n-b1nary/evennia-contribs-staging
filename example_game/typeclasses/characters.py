@@ -68,6 +68,11 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
         super().at_post_puppet(**kwargs)
         self.attributes.add("sandbox_last_seen", timezone.now())
 
+        if apps.is_installed("evennia_rp_resources"):
+            from evennia_rp_resources.summary import notify_resource_summary
+
+            notify_resource_summary(self)
+
         if apps.is_installed("evennia_xp"):
             from evennia_xp.summary import notify_xp_summary
 

@@ -37,6 +37,114 @@ from evennia_links import (
 )
 
 
+def runtime_probe_validator(value):
+    return type(value) is int and value >= 0
+
+
+class TestRuntimeControls(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        from evennia_links import runtime
+
+        runtime.register("LINKS_TEST_CONTROL", 7, validator=runtime_probe_validator)
+
+    def tearDown(self):
+        from evennia_links import runtime
+
+        runtime._registry.pop("LINKS_TEST_CONTROL", None)
+        super().tearDown()
+
+    def test_override_host_default_precedence_and_reset(self):
+        from evennia_links import runtime
+
+        self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 7)
+        with self.settings(LINKS_TEST_CONTROL=9):
+            self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 9)
+            runtime.set("LINKS_TEST_CONTROL", 11, by=self.char1)
+            self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 11)
+            runtime.reset("LINKS_TEST_CONTROL", by=self.char1)
+            self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 9)
+
+    def test_invalid_and_unregistered_controls_fail_closed(self):
+        from evennia_links import runtime
+
+        for name, value in (
+            ("SECRET_KEY", 1),
+            ("LINKS_TEST_CONTROL", -1),
+            ("LINKS_TEST_CONTROL", True),
+        ):
+            with self.assertRaises(ValueError):
+                runtime.set(name, value)
+        with self.assertRaises(ValueError):
+            runtime.get("SECRET_KEY")
+
+    def test_reads_observe_external_writes_even_with_a_cached_config_instance(self):
+        from evennia.server.models import ServerConfig
+        from evennia.utils.dbserialize import to_pickle
+
+        from evennia_links import runtime
+
+        runtime.set("LINKS_TEST_CONTROL", 11)
+        cached = ServerConfig.objects.get(db_key="runtime:LINKS_TEST_CONTROL")
+        self.assertEqual(cached.value["value"], 11)
+        ServerConfig.objects.filter(pk=cached.pk).update(db_value=to_pickle({"value": 15}))
+        self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 15)
+
+    def test_change_signal_runs_after_commit(self):
+        from unittest.mock import Mock
+
+        from evennia_links import runtime
+
+        receiver = Mock(return_value=None)
+        runtime.runtime_setting_changed.connect(receiver, weak=False)
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("LINKS_TEST_CONTROL", 12, by=self.char1)
+                receiver.assert_not_called()
+            self.assertEqual(receiver.call_args.kwargs["value"], 12)
+            self.assertEqual(receiver.call_args.kwargs["by"], self.char1.pk)
+        finally:
+            runtime.runtime_setting_changed.disconnect(receiver)
+
+    def test_rollback_keeps_value_and_suppresses_signal(self):
+        from unittest.mock import Mock
+
+        from django.db import transaction
+
+        from evennia_links import runtime
+
+        receiver = Mock(return_value=None)
+        runtime.runtime_setting_changed.connect(receiver, weak=False)
+        try:
+            with (
+                self.captureOnCommitCallbacks(execute=True),
+                self.assertRaises(RuntimeError),
+                transaction.atomic(),
+            ):
+                runtime.set("LINKS_TEST_CONTROL", 12)
+                raise RuntimeError("Rollback")
+            self.assertEqual(runtime.get("LINKS_TEST_CONTROL"), 7)
+            receiver.assert_not_called()
+        finally:
+            runtime.runtime_setting_changed.disconnect(receiver)
+
+    def test_provider_failure_and_invalid_raise_degrade_to_base(self):
+        from evennia_links import runtime
+
+        def invalid(**kwargs):
+            return {
+                "invalid": {"resources": -4},
+                "fraction": {"resources": 1.5},
+                "good": {"resources": 3},
+            }
+
+        runtime.cap_contributions.connect(invalid, weak=False)
+        try:
+            self.assertEqual(runtime.cap_raise(self.char1, "resources"), 3)
+        finally:
+            runtime.cap_contributions.disconnect(invalid)
+
+
 class TestIsStaffUser(EvenniaTest):
     """The shared request-level staff policy fails closed and stays global."""
 

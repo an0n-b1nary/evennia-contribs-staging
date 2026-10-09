@@ -225,3 +225,12 @@ dependency, not a hard requirement.
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+## Optional profile providers
+
+`SOCIAL_PROFILE_PROVIDERS` is a list of dotted paths to `(viewer, target) -> dict`
+callbacks. Returned label/value fields are appended to `+finger`; each provider
+owns its visibility policy. Missing or failing providers are logged and skipped.
+For gathering leans, install resources and add
+`"evennia_rp_resources.profile.gathering_field"`. Leave the list empty when no
+extra fields are needed; social acquires no new dependencies.

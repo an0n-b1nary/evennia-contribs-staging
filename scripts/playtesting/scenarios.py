@@ -71,6 +71,38 @@ class Suite:
         assert identity["permissions"] == ["builder"] and not identity["superuser"]
         self.command("alice", "+playtest/state denied", "Only the playtest staff")
 
+    def resources(self):
+        before = self.state()
+        alice_id = before["actors"]["alice"]["id"]
+
+        def grain(state):
+            return sum(
+                row["quantity"]
+                for row in state["resource_holdings"]
+                if row["character_id"] == alice_id and row["resource__key"] == "grain"
+            )
+
+        self.command("alice", "+resources", "Resources:.*trickle cap")
+        self.command("alice", f"+resources/grant #{alice_id}=grain,3", "Only staff")
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=grain,3,Live playtest", "Resources updated"
+        )
+        assert grain(self.state()) >= grain(before) + 3
+        self.command("alice", "+gather grain", "Gathering lean: Grain")
+        self.command("alice", "+finger", "Gathering.*Grain")
+        self.command("staff", "+resources/run dry", "Preview")
+        self.command("staff", "+runtime RP_RESOURCES_REVEALED=false", "False")
+        try:
+            self.command(
+                "alice", "+resources", "not available|not found|Could not find|Unknown command"
+            )
+            self.command("staff", "+resources", "Resources:")
+            result = self.command("alice", "+finger")
+            assert "Gathering" not in result["output"]
+        finally:
+            self.command("staff", "+runtime/reset RP_RESOURCES_REVEALED", "True")
+        self.command("alice", "+gather/clear", "lean cleared")
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -289,6 +321,7 @@ def run_rp(session, smoke=False):
     suite = Suite(session)
     cases = [
         ("ordinary login, staff role and probe authorization", suite.prepare),
+        ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:
