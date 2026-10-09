@@ -33,7 +33,7 @@ XP integration (requires [xp] extra — register in your settings):
     XP_ANTIGAMING_SWEEPS += ["evennia_boards.integrations.xp.sweep_cutscene_spam"]
 """
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 
 from evennia_boards.signals import board_unread_notified, post_created
 

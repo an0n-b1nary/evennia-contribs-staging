@@ -897,6 +897,20 @@ class TestLoreCompendiumRenders(LoreWebRenderTestCase):
         self.assertIn("Tidebound", html)
         self.assertIn("Shared", html)
 
+    def test_compendium_works_without_connecting_in_game(self):
+        # Regression: a website visitor with no live session resolved to no
+        # character, so their compendium rendered empty.
+        entry = _make_entry(title="Tidebound", author=self.char1)
+        LoreAcquisition.objects.create(
+            entry=entry,
+            character=self.char2,
+            character_name=self.char2.key,
+            source=LoreAcquisition.Source.SHARED,
+        )
+        self.account2.characters.add(self.char2)
+        html = self._render(LoreCompendiumView, path_="/lore/mine/", user=self.account2)
+        self.assertIn("Tidebound", html)
+
     def test_empty_compendium_renders_its_empty_state(self):
         html = self._render(
             LoreCompendiumView, path_="/lore/mine/", user=self.account2, puppet=self.char2
@@ -1237,3 +1251,19 @@ class TestShippedSessionContextProvider(EvenniaTest):
         entry.rooms.add(self.room1)
         pool = _build_pool(self.char1, self.rp_session)
         self.assertEqual(pool, [(entry, 5)])
+
+
+class TestWebCharacterWithoutLiveSession(EvenniaTest):
+    """Regression: a website visitor need not be connected in-game.
+
+    The resolver returned the first live puppet, so an account browsing the
+    site without a game session had no character and every write was denied.
+    """
+
+    def test_roster_character_resolves_without_a_live_puppet(self):
+        from evennia_lore.permissions import get_character_id, require_character
+
+        self.account2.characters.add(self.char2)
+        self.assertEqual(get_character_id(self.account2), self.char2.pk)
+        request = SimpleNamespace(user=self.account2)
+        self.assertEqual(require_character(request), self.char2.pk)

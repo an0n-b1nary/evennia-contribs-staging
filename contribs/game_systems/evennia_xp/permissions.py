@@ -9,45 +9,24 @@ HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
 from django.core.exceptions import PermissionDenied
 
 from evennia_links import is_staff_user as is_staff_user
+from evennia_links.characters import web_character
 
 
 def get_character_id(user) -> int | None:
     """Return the read-only XP identity from the account's playable roster.
 
-    A live puppet is a preference only when several roster characters exist;
-    roster order is the deterministic fallback. Live puppets not present in
-    the roster are ignored.
+    Resolved by ``evennia_links.characters.web_character`` with
+    ``roster_only``: a live puppet on the roster is preferred, then the last
+    puppet, then roster order. Live puppets not present in the roster are
+    ignored.
     """
-    if user is None or not getattr(user, "is_authenticated", False):
-        return None
-    account = getattr(user, "account", None) or user
-    try:
-        roster = list(account.characters.all())
-    except Exception:
-        return None
-    roster = [character for character in roster if character and getattr(character, "pk", None)]
-    if not roster:
-        return None
-    if len(roster) == 1:
-        return roster[0].pk
-    try:
-        live = account.get_all_puppets()
-    except Exception:
-        live = []
-    live_ids = {
-        getattr(character, "pk", None)
-        for character in live or []
-        if character and getattr(character, "pk", None)
-    }
-    for character in roster:
-        if character.pk in live_ids:
-            return character.pk
-    return roster[0].pk
+    character = web_character(user, roster_only=True)
+    return character.pk if character else None
 
 
 def require_character(request) -> int:
     """Return the character's ObjectDB pk or raise PermissionDenied."""
     character_id = get_character_id(request.user)
     if character_id is None:
-        raise PermissionDenied("A puppeted character is required for this action.")
+        raise PermissionDenied("A character is required for this action.")
     return character_id

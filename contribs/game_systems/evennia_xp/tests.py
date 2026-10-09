@@ -744,9 +744,11 @@ class TestXPSummaryViewAuth(EvenniaTest):
         with patch.object(self.account, "get_all_puppets", return_value=[self.char1]):
             self.assertEqual(get_character_id(self.account), self.char1.pk)
         # A live puppet outside the account roster must not become the XP
-        # identity; roster order remains the deterministic fallback.
+        # identity; the last roster puppet, then roster order, is the fallback.
         outsider = MagicMock(pk=999999)
         with patch.object(self.account, "get_all_puppets", return_value=[outsider]):
+            self.assertEqual(get_character_id(self.account), self.char1.pk)
+            self.account.db._last_puppet = None
             self.assertEqual(get_character_id(self.account), self.char2.pk)
 
 

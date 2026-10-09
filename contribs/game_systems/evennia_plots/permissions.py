@@ -26,6 +26,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
 from evennia_links import is_staff_user as is_staff_user
+from evennia_links.characters import web_character
 
 # ---------------------------------------------------------------------------
 # In-game (character-level) helpers — used by models and commands
@@ -73,26 +74,26 @@ def can_manage_arc(character, arc=None) -> bool:
 
 
 def get_character_id(user) -> int | None:
-    """Return the ObjectDB pk for the first puppeted character of *user*.
+    """Return the ObjectDB pk of the character *user* acts as on the web.
 
-    Returns None if the user is unauthenticated or has no active puppet.
+    Resolved by ``evennia_links.characters.web_character``: a live puppet is
+    preferred but not required, so a visitor who is not connected in-game
+    still acts as a character from their account. Returns None if the user is
+    unauthenticated or has no character.
     """
-    if not user.is_authenticated:
-        return None
-    account = getattr(user, "account", None) or user
-    puppets = account.get_all_puppets() if hasattr(account, "get_all_puppets") else []
-    return puppets[0].pk if puppets else None
+    character = web_character(user)
+    return character.pk if character else None
 
 
 def require_character(request) -> int:
-    """Return the ObjectDB pk for the puppeted character, or raise PermissionDenied.
+    """Return the ObjectDB pk of the acting character, or raise PermissionDenied.
 
     Use for write actions (form submits, POSTs) that require a character identity.
 
     Raises:
-        PermissionDenied: if unauthenticated, or logged in but no puppet.
+        PermissionDenied: if unauthenticated, or logged in but has no character.
     """
     character_id = get_character_id(request.user)
     if character_id is None:
-        raise PermissionDenied("A puppeted character is required for this action.")
+        raise PermissionDenied("A character is required for this action.")
     return character_id

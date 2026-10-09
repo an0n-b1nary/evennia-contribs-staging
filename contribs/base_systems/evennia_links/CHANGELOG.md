@@ -1,5 +1,13 @@
 # Changelog — evennia-links
 
+## [0.8.0] - 2026-10-09
+
+- Added: `evennia_links.characters.web_character(user, roster_only=False)`, the
+  character a web request acts as. A live puppet is preferred but not required:
+  live roster puppet, then any live puppet (unless `roster_only`), then the last
+  puppet if it is on the roster, then roster order. Replaces seven per-contrib
+  copies, six of which saw no character for a visitor not connected in-game.
+
 ## [0.7.0] - 2026-10-09
 
 - Added: `evennia_links.characters`, the shared playable-character membership

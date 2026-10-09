@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-jobs"
-version = "0.2.0"
+version = "0.2.1"
 description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -25,7 +25,7 @@ dependencies = ["evennia>=6.0"]
 [project.optional-dependencies]
 # [web] enables website views, DRF API, and accessible forms/templates.
 web = [
-    "evennia-links>=0.5",
+    "evennia-links>=0.8",
     "evennia-accessibility>=0.1",
     "djangorestframework>=3.14",
     "django-filter>=23",
