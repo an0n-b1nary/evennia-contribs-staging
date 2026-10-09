@@ -24,6 +24,112 @@ class EconomyPartnerTests(EvenniaTest):
         self.account.characters.add(self.char1)
         self.account2.characters.add(self.char2)
 
+    def tearDown(self):
+        from .models import Storefront
+        from .stalls import close
+
+        for store in Storefront.objects.filter(status="open"):
+            with self.captureOnCommitCallbacks(execute=True):
+                close(self.char1, store.pk)
+        super().tearDown()
+
+    def test_real_resource_lot_escrow_sale_and_archived_return(self):
+        if not apps.is_installed("evennia_rp_resources"):
+            return
+        from evennia_rp_resources.models import ResourceDefinition, ResourceHolding
+        from evennia_rp_resources.services import grant
+
+        from .models import Listing
+        from .stalls import buy, claim, list_stock, unlist
+
+        self.room1.tags.add("market", category="rp_economy")
+        resource, _ = ResourceDefinition.objects.get_or_create(
+            key="grain", defaults={"name": "Grain", "category": "provisions"}
+        )
+        grant(self.char2, "grain", 6)
+        credit(self.char1, 20)
+        store = claim(self.char2)
+        spec = [{"kind": "resource", "key": "grain", "quantity": 3}]
+        listing = list_stock(self.char2, store.pk, spec, 10)
+        self.assertEqual(
+            ResourceHolding.objects.get(character=self.char2, resource=resource).quantity, 3
+        )
+        buy(self.char1, listing.pk)
+        self.assertEqual(
+            ResourceHolding.objects.get(character=self.char1, resource=resource).quantity, 3
+        )
+        listing = list_stock(self.char2, store.pk, spec, 5)
+        resource.archived = True
+        resource.save(update_fields=["archived"])
+        unlist(self.char2, listing.pk)
+        self.assertEqual(
+            ResourceHolding.objects.get(character=self.char2, resource=resource).quantity, 3
+        )
+        self.assertFalse(Listing.objects.filter(status="active").exists())
+
+    def test_stall_equipment_refusal_sealing_and_hidden_resources(self):
+        from .models import Listing
+        from .stalls import claim, list_stock, visible_listings
+
+        self.room1.tags.add("market", category="rp_economy")
+        store = claim(self.char2)
+        if apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_equipment.typeclasses import Equipment
+
+            gear = create_object(Equipment, key="Market cloak", location=self.char2)
+            gear.maker_id = self.char2.pk
+            gear.tags.add("worn", category="rp_equipment")
+            spec = [{"kind": "item", "key": str(gear.pk), "quantity": 1}]
+            with self.assertRaises(EconomyError):
+                list_stock(self.char2, store.pk, spec, 10)
+            gear.tags.remove("worn", category="rp_equipment")
+            with self.captureOnCommitCallbacks(execute=True):
+                list_stock(self.char2, store.pk, spec, 10)
+            self.assertTrue(gear.sealed)
+        # Persisted stock for a removed/hidden provider must not expose its details.
+        hidden = Listing.objects.create(
+            storefront=store, assets=[{"kind": "resource", "key": "grain", "quantity": 1}], price=10
+        )
+        with override_settings(RP_RESOURCES_REVEALED=False):
+            self.assertNotIn(hidden.pk, [r.pk for r in visible_listings(self.char2, store)])
+        if not apps.is_installed("evennia_rp_resources"):
+            from .stalls import unlist
+
+            with self.assertRaisesRegex(EconomyError, "missing asset provider"):
+                unlist(self.char2, hidden.pk)
+            hidden.refresh_from_db()
+            self.assertEqual(hidden.status, "active")
+        hidden.status = "returned"  # artificial fixture, not real escrow
+        hidden.save(update_fields=["status"])
+
+    def test_quiet_stall_real_review_job_or_hookless_queue(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .review import flag_quiet_stalls
+        from .stalls import claim
+
+        self.room1.tags.add("market", category="rp_economy")
+        store = claim(self.char2)
+        hook = (
+            "evennia_jobs.integrations.staff_review.file_review_job"
+            if apps.is_installed("evennia_jobs")
+            else None
+        )
+        with (
+            override_settings(RP_ECONOMY_FLAG_REVIEW_HOOK=hook),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            flag_quiet_stalls(timezone.now() + timedelta(weeks=6))
+        self.assertTrue(ReviewFlag.objects.filter(kind="quiet_stall").exists())
+        store.refresh_from_db()
+        self.assertEqual(store.status, "open")
+        if hook:
+            from evennia_jobs.models import Job
+
+            self.assertTrue(Job.objects.filter(title="Economy: quiet stall").exists())
+
     def test_absence_is_physical(self):
         for name in getattr(settings, "ECONOMY_ABSENT_PARTNERS", []):
             self.assertFalse(apps.is_installed(name))

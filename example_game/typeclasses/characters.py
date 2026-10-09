@@ -70,6 +70,7 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
 
         if apps.is_installed("evennia_economy"):
             from evennia_economy.batch import ensure_stipends
+            from evennia_economy.stalls import note_login
             from evennia_economy.summary import notify_economy_summary
 
             from evennia_links.runtime import get
@@ -77,6 +78,7 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
             if not get("RP_ECONOMY_FROZEN"):
                 ensure_stipends(self)
             notify_economy_summary(self)
+            note_login(self)
 
         if apps.is_installed("evennia_rp_resources"):
             from evennia_rp_resources.summary import notify_resource_summary

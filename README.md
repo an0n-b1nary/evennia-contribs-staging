@@ -64,10 +64,10 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - [`evennia-rp-contest`](contribs/rpg/evennia_rp_contest/README.md) (rpg) — preview 0.1.0; playable `+test` checks and player-led room challenges with private audits; depends on rules and links, with optional chargen, scenes and session integration
 - `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
 - [`evennia-rp-equipment`](contribs/rpg/evennia_rp_equipment/README.md) (rpg) — preview 0.1.0; wearable gear anyone can make, with worn lines and requirements on the wearer's build that grant nothing; worn gear holds the pips and abilities it needs through chargen's change guard; depends on rules and chargen
-- [`evennia-rp-resources`](contribs/game_systems/evennia_rp_resources/README.md) (game_systems) — preview 0.1.1; passive resource accrual, atomic holdings, gathering leans and optional economy exchanges; depends only on links
-- [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.1.0; integer purses, passive income, atomic trades, fee boundaries and staff reconciliation; depends only on links
+- [`evennia-rp-resources`](contribs/game_systems/evennia_rp_resources/README.md) (game_systems) — preview 0.1.2; passive resource accrual, atomic holdings, gathering leans, optional economy exchanges and reserved-stock refunds; depends only on links
+- [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.2.0; integer purses, passive income, atomic trades, reserved-stock stalls, fee boundaries and staff reconciliation; depends only on links
 - `evennia-rp-party` (rpg) — party coordination for group combat
-- `evennia-rp-crafting` (game_systems) — IC crafting economy: resources, workshops, crafted items with cosmetic features, player-run storefronts
+- `evennia-rp-crafting` (game_systems) — workshops and crafted items with cosmetic features, integrating resources and economy's storefronts
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
 
 The first three shipped RP packages (rules, chargen, contest) are a **contrib-native pilot**: their generic code

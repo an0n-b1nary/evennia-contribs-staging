@@ -84,7 +84,16 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdPose)
         self.add(CmdRuntime)
         for command in _optional_commands(
-            "evennia_economy", "CmdBalance", "CmdOffer", "CmdAccept", "CmdGive", "CmdEconomy"
+            "evennia_economy",
+            "CmdBalance",
+            "CmdOffer",
+            "CmdAccept",
+            "CmdGive",
+            "CmdEconomy",
+            "CmdStall",
+            "CmdBrowse",
+            "CmdBuy",
+            "CmdMarket",
         ):
             self.add(command)
         for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):

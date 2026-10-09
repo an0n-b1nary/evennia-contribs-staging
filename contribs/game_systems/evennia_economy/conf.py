@@ -49,6 +49,10 @@ def register_controls():
         ("REVEAL_STIPEND", 100, nonnegative),
         ("OFFER_TIMEOUT", 600, positive),
         ("MAX_OPEN_OFFERS", 5, positive),
+        ("MAX_STALLS", 1, positive),
+        ("STALL_SLOTS", 8, positive),
+        ("STALL_CAP_RAISE", 100, nonnegative),
+        ("QUIET_STALL_WEEKS", 5, weeks),
     ):
         register(f"RP_ECONOMY_{name}", default, validator=validator)
     for kind in FEE_KINDS:

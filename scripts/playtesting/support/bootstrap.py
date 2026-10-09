@@ -28,6 +28,8 @@ def at_initial_setup():
         room = create_object(settings.BASE_ROOM_TYPECLASS, key=f"Playtest {name} laboratory")
         room.room_type = "ic"
         room.db.desc = "[Placeholder] An isolated room for live command verification."
+        room.tags.add("market", category="rp_economy")
+        room.db.rp_economy_stall_slots = 8
         rooms[name] = room
     identities = {}
     for role, spec in credentials.items():
