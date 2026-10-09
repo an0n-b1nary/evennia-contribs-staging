@@ -23,6 +23,7 @@ when the package is imported during Django's app-loading phase.
 
 from evennia_rptracker import signals
 from evennia_rptracker.antigaming import sweep_rp_sessions
+from evennia_rptracker.channel_tracker import end_channel_session, end_character_channel_sessions
 from evennia_rptracker.tracker import (
     end_session,
     ensure_idle_check_running,
@@ -30,10 +31,11 @@ from evennia_rptracker.tracker import (
     get_active_session_id,
     get_session_state,
     record_rp_activity,
+    record_rp_channel_activity,
     recover_orphaned_sessions,
 )
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
 _LAZY = {
     "RPSession": "models",
@@ -45,12 +47,15 @@ __all__ = [
     "RPSession",
     "RPSessionPartner",
     "RPSessionSceneLink",
+    "end_channel_session",
+    "end_character_channel_sessions",
     "end_session",
     "ensure_idle_check_running",
     "flush_all_sessions",
     "get_active_session_id",
     "get_session_state",
     "record_rp_activity",
+    "record_rp_channel_activity",
     "recover_orphaned_sessions",
     "signals",
     "sweep_rp_sessions",

@@ -64,9 +64,12 @@ def _format_session_row(session, show_char=False):
     partners = session.partners.count()
     flag = " |r[FLAGGED]|n" if session.status == "flagged" else ""
     prefix = f"{session.character_name}: " if show_char else ""
+    channel = session.source_type == "rp_channel_session"
+    location = session.channel_name if channel else session.room_name
     return (
         f"  #{session.pk} {prefix}{status_tag} "
-        f"{duration} | {session.pose_count} poses | {partners} partner(s)"
+        f"{duration} | {session.pose_count} {'messages' if channel else 'poses'} | {partners} partner(s)"
+        f" | {'Channel' if channel else 'Room'}: {location or '(deleted)'}"
         f"{flag}"
     )
 
@@ -81,6 +84,7 @@ class CmdActivity(MuxCommand):
         +activity/history <N>  - View past N weeks
         +activity/detail <id>  - View details of a specific session
         +activity/end          - Manually end your current RP session
+        +activity/endchannel <channel> - Manually end your IC-channel session
 
     The RPTracker passively detects RP activity — you don't need to start
     or stop anything manually. Using /end explicitly closes your current
@@ -98,7 +102,9 @@ class CmdActivity(MuxCommand):
         switches = self.switches
         args = self.args.strip()
 
-        if "end" in switches:
+        if "endchannel" in switches:
+            self._do_endchannel(caller, args)
+        elif "end" in switches:
             self._do_end(caller)
         elif "detail" in switches:
             self._do_detail(caller, args)
@@ -135,7 +141,7 @@ class CmdActivity(MuxCommand):
             f"  Status   : {session.get_status_display()}",
             f"  Duration : {session.duration_display()}",
             f"  Poses    : {session.pose_count}",
-            f"  Room     : {session.room_name or '(unknown)'}",
+            f"  {'Channel' if session.source_type == 'rp_channel_session' else 'Room'} : {session.channel_name or session.room_name or '(unknown)'}",
             f"  Started  : {session.started_at.strftime('%Y-%m-%d %H:%M')} UTC",
         ]
         if session.ended_at:
@@ -167,6 +173,22 @@ class CmdActivity(MuxCommand):
             lines.append(f"  |r[FLAGGED]|n: {session.flag_reason}")
 
         caller.msg("\n".join(lines))
+
+    def _do_endchannel(self, caller, args):
+        from evennia.comms.models import ChannelDB
+
+        from evennia_rptracker import end_channel_session
+
+        channels = list(ChannelDB.objects.filter(db_key__iexact=args)) if args else []
+        if len(channels) != 1:
+            caller.msg("Usage: +activity/endchannel <channel name>")
+            return
+        session_id = end_channel_session(caller.pk, channels[0].pk, manual=True)
+        caller.msg(
+            "Your IC-channel session has been ended manually."
+            if session_id
+            else "You have no active session on that channel."
+        )
 
     def _do_history(self, caller, args):
         from datetime import timedelta
@@ -335,6 +357,7 @@ class CmdRPTrackerStaff(MuxCommand):
 
         from django.utils import timezone
 
+        from evennia_rptracker.channel_tracker import _active_channel_sessions
         from evennia_rptracker.models import RPSession
         from evennia_rptracker.tracker import _active_sessions
 
@@ -354,6 +377,9 @@ class CmdRPTrackerStaff(MuxCommand):
         active_count = sum(1 for s in _active_sessions.values() if s["status"] == "active")
         pending_count = sum(1 for s in _active_sessions.values() if s["status"] == "pending")
         lines.append(f"Live: |g{active_count} active|n, |y{pending_count} pending|n")
+        channel_active = sum(s["status"] == "active" for s in _active_channel_sessions.values())
+        channel_pending = sum(s["status"] == "pending" for s in _active_channel_sessions.values())
+        lines.append(f"Channels: {channel_active} active, {channel_pending} pending")
         lines.append("-" * 60)
 
         if flagged:
@@ -381,4 +407,39 @@ class CmdRPTrackerStaff(MuxCommand):
             "Use |w+rptracker/flag <id>=<reason>|n or |w+rptracker/unflag <id>|n to manage flags."
         )
 
+        self.caller.msg("\n".join(lines))
+
+
+class CmdRPActivityReport(MuxCommand):
+    """Staff aggregate activity. Usage: +report activity [days], default 7, range 1-90."""
+
+    key = "+report"
+    locks = getattr(settings, "RPTRACKER_STAFF_LOCK", "cmd:perm(Builder)")
+    help_category = "Staff"
+
+    def func(self):
+        from evennia_rptracker.reports import activity_report
+
+        args = self.args.split()
+        if not 1 <= len(args) <= 2 or args[0].lower() != "activity":
+            self.caller.msg("Usage: +report activity [days]")
+            return
+        try:
+            report = activity_report(int(args[1]) if len(args) == 2 else 7)
+        except ValueError as exc:
+            self.caller.msg(str(exc))
+            return
+        lines = [
+            f"RP activity: {report['start']:%Y-%m-%d %H:%M} to {report['end']:%Y-%m-%d %H:%M} UTC",
+            "Room geography uses current primary membership. Minutes are participant-minutes.",
+        ]
+        for row in report["rows"]:
+            lines.append(
+                f"{row['kind'].title()}: {row['name']} | {row['active']} active, {row['completed']} completed | "
+                f"{row['characters']} characters, {row['accounts']} known accounts, "
+                f"{row['unknown_accounts']} characters without account snapshots | "
+                f"{row['minutes']:.1f} minutes | {row['flagged']} flagged (excluded)"
+            )
+        if not report["rows"]:
+            lines.append("No activated RP sessions in this window.")
         self.caller.msg("\n".join(lines))

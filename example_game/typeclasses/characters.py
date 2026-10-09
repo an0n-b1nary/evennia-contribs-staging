@@ -120,9 +120,10 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
         from django.apps import apps
 
         if apps.is_installed("evennia_rptracker"):
-            from evennia_rptracker import end_session
+            from evennia_rptracker import end_character_channel_sessions, end_session
 
             end_session(self.id, manual=False)
+            end_character_channel_sessions(self.id)
 
         from django.utils import timezone
 

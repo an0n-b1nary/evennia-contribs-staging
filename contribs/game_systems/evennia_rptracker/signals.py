@@ -20,3 +20,9 @@ from django.dispatch import Signal
 rp_session_started = Signal()
 rp_session_ended = Signal()
 rp_activity_recorded = Signal()
+
+# Channel sessions deliberately never emit the room signals above: their
+# listeners may release build locks, expire challenges or acquire room lore.
+rp_channel_session_started = Signal()  # session
+rp_channel_session_ended = Signal()  # session
+rp_channel_activity_recorded = Signal()  # character, session_id, channel

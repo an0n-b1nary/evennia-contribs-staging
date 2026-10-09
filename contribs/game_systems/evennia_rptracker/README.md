@@ -25,7 +25,7 @@ available for downstream reward systems (XP, lore, etc.).
 
 ## Installation
 
-This contrib depends on [evennia-links](../../base_systems/evennia_links) `>= 0.2`
+This contrib depends on [evennia-links](../../base_systems/evennia_links) `>= 0.7`
 (it provides `AbstractLink`, the base of `RPSessionSceneLink`, plus the
 soft-reference cleanup helper). Install both:
 
@@ -86,8 +86,9 @@ In your `Character` typeclass:
 
 ```python
 def at_post_unpuppet(self, account, session=None, **kwargs):
-    from evennia_rptracker import end_session
+    from evennia_rptracker import end_session, end_character_channel_sessions
     end_session(self.id, manual=False)
+    end_character_channel_sessions(self.id)
     super().at_post_unpuppet(account, session=session, **kwargs)
 ```
 
@@ -233,6 +234,67 @@ RPTRACKER_SCENE_DISPLAY = "myscenes.display.render_scene_ref"
 ```
 
 ---
+
+## IC channels and activity reports (0.2)
+
+Create an opt-in channel with `evennia_rptracker.typeclasses.ICChannel`. Normal
+channel commands and history work; messages display the sending character.
+Replace `CmdChannel` in the account cmdset with
+`evennia_rptracker.channel_commands.CmdICChannel`. It searches across channel
+typeclasses (the stock Evennia 6 command searches only the configured base
+typeclass) and passes the caller's session to resolve its puppet.
+An account must have one active puppet, or a custom caller must supply the session
+to resolve its puppet. System messages and staff emits never count as RP.
+
+Channel sessions are independent of room sessions. Each speaker needs two messages
+and a recent eligible speaker from another account. Shared playable account
+memberships cannot supply partners. Subscribing or listening supplies no activity.
+The eligibility hook is applied to speakers and recent partners; its failures deny
+eligibility. Set `RPTRACKER_CHANNEL_ELIGIBLE` to a callable or dotted path taking a
+character to add your game's approval policy.
+
+| Setting | Default |
+|---|---|
+| `RPTRACKER_CHANNEL_SESSION_IDLE_TIMEOUT` | `1800` seconds |
+| `RPTRACKER_CHANNEL_PARTNER_ACTIVE_WINDOW` | `1800` seconds |
+| `RPTRACKER_CHANNEL_ACTIVATION_MESSAGES` | `2` |
+| `RPTRACKER_CHANNEL_ELIGIBLE` | `None` |
+| `RPTRACKER_REGIONS_APP_LABEL` | `"evennia_regions"` |
+
+Channel XP eligibility requires 30 minutes from activation to the last qualifying
+message. Idle waits never extend it. Leaving, disconnecting, deleting the channel,
+or shutdown closes sessions. Recovery uses the last persisted activity; batched
+writes can lose the final unflushed messages after a crash. Source and channel-name
+snapshots survive channel deletion. Room signals, scene bridges, pose timers,
+chargen locks and contest hooks remain specific to room activity.
+
+Register the channel XP collector alongside the room collector:
+
+```python
+XP_COLLECTORS += [
+    ("rp_channel_session", "evennia_rptracker.integrations.xp.collect_rp_channel_sessions"),
+]
+XP_POST_BATCH_HOOKS += ["evennia_rptracker.integrations.xp.flip_channel_session_flags"]
+```
+
+The host XP multiplier resolver receives `rp_channel_session` with `room=None`.
+Awards retain this distinct ledger source; post-batch flags require a matching
+committed ledger row. Channel XP is optional and requires evennia-xp.
+
+Add `CmdRPActivityReport` to the character cmdset for staff `+report activity [days]`
+(default seven days, range 1–90). It reports activated active/completed sessions,
+distinct characters, known account snapshots and participant-minutes, clipped to
+the rolling UTC window. Flagged sessions are shown separately and excluded from
+totals. Regions use current canonical primary memberships; unassigned rooms form
+their own bucket. Without the regions package, the report groups by room. Global
+channels always have separate buckets. A deleted room's sessions form a
+`<name> (deleted)` bucket of their own, and a deleted character still counts as
+a participant under its recorded name. Legacy unknown accounts are reported as
+unknown. Reading a report writes nothing. Scene/lore counts and effort scoring
+are outside this report.
+
+Players can use `+activity/endchannel <channel name>` to end one channel session;
+the normal `+activity/end` continues to end their room session.
 
 ## Version history
 
