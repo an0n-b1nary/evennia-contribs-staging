@@ -22,7 +22,7 @@ self.room1, used here as generic linkable/versionable objects.
 from django.contrib.auth.models import AnonymousUser
 from django.db import connection, models
 from django.db.models.signals import post_migrate
-from django.test import RequestFactory
+from django.test import RequestFactory, SimpleTestCase
 from evennia.utils.test_resources import EvenniaTest
 
 from evennia_links import (
@@ -143,6 +143,131 @@ class TestRuntimeControls(EvenniaTest):
             self.assertEqual(runtime.cap_raise(self.char1, "resources"), 3)
         finally:
             runtime.cap_contributions.disconnect(invalid)
+
+
+class TestPlayableCharacters(EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+
+    def test_membership_matches_the_characters_handler(self):
+        from evennia_links import characters
+
+        self.assertEqual(characters.account_ids(self.char1), [self.account.pk])
+        self.assertFalse(characters.same_account(self.char1, self.char2))
+        self.account.characters.add(self.char2)
+        self.assertTrue(characters.same_account(self.char1, self.char2))
+        self.assertEqual(characters.account_ids(self.obj1), [])
+        self.assertEqual(characters.account_ids(None), [])
+
+    def test_storage_attribute_is_evennias(self):
+        # Fails loudly if Evennia renames the handler's storage.
+        from evennia_links.characters import PLAYABLE_ATTRIBUTE
+
+        self.assertEqual(
+            [c.pk for c in self.account.attributes.get(PLAYABLE_ATTRIBUTE)],
+            [c.pk for c in self.account.characters.all()],
+        )
+
+    def test_reads_membership_changed_outside_identity_cache(self):
+        from evennia.typeclasses.attributes import Attribute
+        from evennia.utils.dbserialize import to_pickle
+
+        from evennia_links import characters
+
+        cached = self.account.attributes.get("_playable_characters", return_obj=True)
+        Attribute.objects.filter(pk=cached.pk).update(db_value=to_pickle([self.char1, self.char2]))
+        self.assertTrue(characters.same_account(self.char1, self.char2))
+
+    def test_sweep_and_single_check_share_the_predicate(self):
+        from evennia_links import characters
+
+        self.account2.characters.add(self.char1)  # listed twice, yielded once
+        self.assertEqual(
+            [c.pk for c in characters.playable_characters()], [self.char1.pk, self.char2.pk]
+        )
+
+        def only_two(character):
+            return character.pk == self.char2.pk
+
+        self.assertEqual([c.pk for c in characters.playable_characters(only_two)], [self.char2.pk])
+        self.assertTrue(characters.is_playable(self.char2, only_two))
+        self.assertFalse(characters.is_playable(self.char1, only_two))
+        self.assertFalse(characters.is_playable(self.obj1))
+
+
+class TestPeriodicQueue(SimpleTestCase):
+    def test_weekly_and_short_period_labels(self):
+        from datetime import UTC, datetime
+
+        from evennia_links.periodic import period_key
+
+        monday = datetime(2026, 10, 5, tzinfo=UTC)
+        self.assertEqual(period_key(604800, monday), "2026-W40")
+        self.assertEqual(period_key(86400, monday), "86400s:2026-10-05T00:00:00+00:00")
+
+    def test_new_period_runs_once_and_repeats_are_idle(self):
+        from evennia_links.periodic import advance
+
+        calls = []
+
+        def run(period, ids):
+            calls.append((period, ids))
+            return []
+
+        state = advance(None, "W1", run, now=0)
+        state = advance(state, "W1", run, now=60)
+        self.assertEqual(calls, [("W1", None)])
+        self.assertEqual(state, {"latest": "W1", "pending": []})
+
+    def test_only_failures_retry_with_backoff_then_give_up(self):
+        from evennia_links import periodic
+
+        calls = []
+
+        def run(period, ids):
+            calls.append(ids)
+            return [7]
+
+        state = periodic.advance({}, "W1", run, now=0)
+        self.assertEqual(state["pending"][0]["ids"], [7])
+        state = periodic.advance(state, "W1", run, now=periodic.RETRY_BASE - 1)
+        self.assertEqual(len(calls), 1)  # not yet due: no per-minute storm
+        now = 0
+        with self.assertLogs("evennia", level="ERROR"):
+            while state["pending"]:
+                now = state["pending"][0]["due"]
+                state = periodic.advance(state, "W1", run, now=now)
+        self.assertEqual(calls, [None] + [[7]] * (periodic.MAX_ATTEMPTS - 1))
+        self.assertLessEqual(now, periodic.MAX_ATTEMPTS * periodic.RETRY_MAX)
+
+    def test_whole_batch_exception_retries_everyone_later(self):
+        from evennia_links import periodic
+
+        def broken(period, ids):
+            raise RuntimeError("database away")
+
+        with self.assertLogs("evennia", level="ERROR"):
+            state = periodic.advance({}, "W1", broken, now=0)
+        self.assertEqual(state["pending"][0]["ids"], None)
+        self.assertEqual(state["pending"][0]["due"], periodic.RETRY_BASE)
+
+    def test_paused_periods_queue_and_run_oldest_first(self):
+        from evennia_links.periodic import advance
+
+        calls = []
+
+        def run(period, ids):
+            calls.append(period)
+            return []
+
+        state = advance({}, "W1", run, now=0, paused=True)
+        state = advance(state, "W2", run, now=60, paused=True)
+        self.assertEqual(calls, [])
+        state = advance(state, "W2", run, now=120)
+        self.assertEqual(calls, ["W1", "W2"])
+        self.assertEqual(state["pending"], [])
 
 
 class TestIsStaffUser(EvenniaTest):
