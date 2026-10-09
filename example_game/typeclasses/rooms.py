@@ -35,6 +35,8 @@ mixin):
   Evennia ships no room-receive signal, so this stays hand-wired.
 """
 
+# Economy is optional in partner profiles; the fallback keeps the host importable.
+from django.apps import apps
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
 
@@ -44,8 +46,17 @@ from evennia_social import SocialRoomMixin
 
 from .objects import ObjectParent
 
+if apps.is_installed("evennia_economy"):
+    from evennia_economy.typeclasses import MarketRoomMixin
+else:
 
-class Room(MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom):
+    class MarketRoomMixin:
+        pass
+
+
+class Room(
+    MarketRoomMixin, MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom
+):
     """
     Rooms are like any Object, except their location is None
     (which is default). They also use basetype_setup() to

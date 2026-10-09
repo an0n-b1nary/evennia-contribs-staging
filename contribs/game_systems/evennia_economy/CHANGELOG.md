@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — 2026-10-09
+
+- Added: market-room stalls, reserved item/resource listings, offline atomic
+  purchases, browsing and global discovery. Claim, listing and sale fees share
+  their feature transaction; returning stock is free.
+- Added: current stall ownership raises the passive money cap, with runtime
+  controls for slots, per-character limits, cap raises and quiet-stall weeks.
+- Added: quiet-stall and same-account drop/get review flags. Quiet stalls retain
+  stock until explicit closure; floor pickup is allowed without penalties.
+- Added: a cooperative market-room roster mixin, login-activity hook, generic
+  sandbox market stock, real partner seams and live offline-sale acceptance.
+- Upgrades retain the original migration and existing round-trip review flags.
+
 ## 0.1.1 — 2026-10-09
 
 - Fixed: accept evennia-links 0.8 alongside 0.7 so the contrib installs with

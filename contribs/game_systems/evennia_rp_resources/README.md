@@ -116,6 +116,12 @@ grant(character, "wood", 3, "exchange", exchange_id=42)
 spend(character, "wood", 2, "Workshop investment", source="craft")
 ```
 
+Reserved stock can be returned after its definition is archived with
+`grant(character, key, quantity, "exchange", allow_archived=True)`. Ordinary
+grants still reject archived keys. The optional economy provider's `refund`
+method uses this recovery path; refunds remain journaled without unarchiving
+the catalogue entry.
+
 Quantities must be positive integers. Shortfalls raise `ResourceError`.
 Counters update conditionally, and the counter plus signed ledger row share
 the caller's transaction. Multi-character exchanges should lock all involved

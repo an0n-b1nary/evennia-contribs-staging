@@ -63,7 +63,7 @@ as it lands.
 
 ### Resource gathering
 
-`evennia-economy` 0.1 adds integer purses and passive weekly income with a
+`evennia-economy` 0.2 adds market stalls as well as integer purses and passive weekly income with a
 five-UBI-week base cap, once-only starting stipends (plus a reveal stipend
 when a hidden economy is revealed), and atomic exchanges
 of money, carried items and resource counters. Demo authors start with 200 coins.
@@ -86,7 +86,18 @@ jobs and equipment in fresh environments; resources also runs without economy.
 The live suite trades resources and money between ordinary sessions, checks
 same-account refusal, secret acceptance, freeze/reveal and reconnect persistence.
 
-`evennia-rp-resources` 0.1.1 is wired with a generic Materials / Provisions /
+Market Row is tagged as a market with eight slots and a stocked demonstration
+stall. Try `look`, `+browse`, `+buy <listing number>` and `+market satchel`.
+`+stall/claim`, `/name`, `/desc`, `/list`, `/unlist` and `/close` manage your own
+counter. Items and resource lots are reserved, so a buyer can purchase while
+the seller is offline. A held stall raises the money cap by 100 coins; closure
+returns remaining stock and removes that raise. Five quiet weeks create a staff
+review job without closing the stall. Same-account `drop`/`get` handoffs also
+create review flags without blocking pickup. The room's `MarketRoomMixin` comes
+before the host room class and cooperatively adds the roster; the login hook
+calls `stalls.note_login`. These hooks are gated in absent-partner profiles.
+
+`evennia-rp-resources` 0.1.3 is wired with a generic Materials / Provisions /
 Essences catalogue. The IC rooms already carry forest, hills, urban and water
 terrains; these define the open trickle pool, while Grain is always common.
 The demonstration characters have Timber holdings and the Proving Grounds

@@ -7,7 +7,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from . import assets, conf
 from .batch import money_cap, run_stipends, run_weekly_batch
 from .exchange import accept_offer, cancel_offer, create_offer, expire_offers, give
-from .models import LedgerEntry, Offer, ReviewFlag
+from .models import LedgerEntry, Offer, ReviewFlag, Storefront
 from .reports import account_accrual, reconciliation
 from .services import EconomyError, balance, credit, debit
 
@@ -152,7 +152,7 @@ class CmdEconomy(EconomyCommand):
     +economy/credit character=amount[,note]
     +economy/debit character=amount[,note]
     +economy/audit [character]    (last 50 journal entries)
-    +economy/flags                (unreviewed round trips)
+    +economy/flags                (unreviewed round trips, floor transfers, quiet stalls)
     +economy/reviewed number
     Freeze and reveal: +runtime RP_ECONOMY_FROZEN=true, etc.
     """
@@ -227,9 +227,165 @@ class CmdEconomy(EconomyCommand):
             raise EconomyError("Unknown economy switch. See help +economy.")
 
 
+class CmdStall(EconomyCommand):
+    """Manage a stall in a market room.
+
+    +stall                       (your stalls)
+    +stall/claim [name]
+    +stall/name [stall number] = name
+    +stall/desc [stall number] = description
+    +stall/list [stall number/]item or lot = price
+    +stall/unlist listing number
+    +stall/close [stall number]
+
+    Listing reserves the stock. Buyers must visit, but you can be offline.
+    Staff can close any stall remotely to return its stock, even while frozen.
+    """
+
+    key = "+stall"
+
+    def run(self):
+        from . import stalls
+
+        if len(self.switches) > 1:
+            raise EconomyError("Use one stall switch at a time.")
+        switch = self.switches[0] if self.switches else ""
+        if not switch:
+            own = Storefront.objects.filter(owner=self.caller, status="open").order_by("pk")
+            self.msg(
+                "\n".join(f"#{s.pk} {s.name} in {s.room.key}" for s in own)
+                or "You hold no stalls. Use +stall/claim in a market room."
+            )
+            return
+        if switch == "claim":
+            store = stalls.claim(self.caller, name=self.args.strip() or None)
+            self.msg(f"Claimed stall #{store.pk}: {store.name}.")
+            return
+        if switch == "unlist":
+            listing = stalls.unlist(self.caller, int(self.args.strip().lstrip("#")))
+            self.msg(f"Listing #{listing.pk} returned to your inventory.")
+            return
+        if switch not in ("name", "desc", "list", "close"):
+            raise EconomyError("Unknown stall switch. See help +stall.")
+        if switch == "list":
+            if not self.rhs:
+                raise EconomyError("Usage: +stall/list item or lot = price")
+            stores = Storefront.objects.filter(
+                owner=self.caller, room_id=stalls.place(self.caller), status="open"
+            )
+            asset_text = self.lhs
+            number, separator, stock = self.lhs.partition("/")
+            if separator and number.strip().lstrip("#").isdecimal():
+                stores = stores.filter(pk=int(number.strip().lstrip("#")))
+                asset_text = stock
+        else:
+            target = self.args.strip() if switch == "close" else self.lhs.strip()
+            stores = Storefront.objects.filter(status="open")
+            if target:
+                stores = stores.filter(pk=int(target.lstrip("#")))
+            else:
+                stores = stores.filter(owner=self.caller, room_id=stalls.place(self.caller))
+        choices = list(stores[:2])
+        if len(choices) != 1:
+            raise EconomyError("Choose a stall by number, or visit your only stall in this room.")
+        store = choices[0]
+        if switch == "list":
+            listing = stalls.list_stock(
+                self.caller,
+                store.pk,
+                assets.parse_spec(self.caller, asset_text),
+                int(self.rhs.strip()),
+            )
+            self.msg(
+                f"Listing #{listing.pk}: {assets.describe(listing.assets)} for {conf.currency(listing.price)}."
+            )
+        elif switch == "close":
+            stalls.close(self.caller, store.pk)
+            self.msg(f"Stall #{store.pk} closed; reserved stock returned to its owner.")
+        else:
+            if self.rhs is None:
+                raise EconomyError(f"Usage: +stall/{switch} [number] = text")
+            stalls.edit(
+                self.caller, store.pk, **{"name" if switch == "name" else "description": self.rhs}
+            )
+            self.msg("Stall updated.")
+
+
+class CmdBrowse(EconomyCommand):
+    """Browse nearby stalls: +browse [stall number]. Discovery is also global via +market."""
+
+    key = "+browse"
+
+    def run(self):
+        from . import stalls
+
+        stores = stalls.directory(self.caller, room=stalls.place(self.caller))
+        if self.args.strip():
+            number = int(self.args.strip().lstrip("#"))
+            stores = [(s, rows) for s, rows in stores if s.pk == number]
+        lines = []
+        for store, listings in stores:
+            lines.append(f"Stall #{store.pk}: {store.name} ({store.owner.key})")
+            if store.description:
+                lines.append(store.description)
+            lines.extend(
+                f"  Listing #{r.pk}: {assets.describe(r.assets)} — {conf.currency(r.price)}"
+                for r in listings
+            )
+            if not listings:
+                lines.append("  No stock for sale.")
+        self.msg("\n".join(lines) or "No open stalls here.")
+
+
+class CmdBuy(EconomyCommand):
+    """Buy a reserved listing in this room: +buy listing number."""
+
+    key = "+buy"
+
+    def run(self):
+        from .stalls import buy
+
+        if self.switches:
+            raise EconomyError("Usage: +buy listing number")
+        listing = buy(self.caller, int(self.args.strip().lstrip("#")))
+        self.msg(
+            f"Bought listing #{listing.pk}: {assets.describe(listing.assets)} for {conf.currency(listing.price)}."
+        )
+
+
+class CmdMarket(EconomyCommand):
+    """Find open stalls by name, description or listed stock: +market [search text].
+
+    Discovery is global. Visit the stall's room to buy.
+    """
+
+    key = "+market"
+
+    def run(self):
+        from .stalls import directory
+
+        self.msg(
+            "\n".join(
+                f"#{s.pk} {s.name} — {s.room.key} ({len(rows)} listings)"
+                for s, rows in directory(self.caller, self.args.strip())
+            )
+            or "No matching open stalls."
+        )
+
+
 class EconomyCmdSet(CmdSet):
     key = "EconomyCmdSet"
 
     def at_cmdset_creation(self):
-        for command in (CmdBalance, CmdOffer, CmdAccept, CmdGive, CmdEconomy):
+        for command in (
+            CmdBalance,
+            CmdOffer,
+            CmdAccept,
+            CmdGive,
+            CmdEconomy,
+            CmdStall,
+            CmdBrowse,
+            CmdBuy,
+            CmdMarket,
+        ):
             self.add(command)

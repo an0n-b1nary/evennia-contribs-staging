@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-resources"
-version = "0.1.2"
+version = "0.1.3"
 description = "Passive resource accrual, atomic holdings and gathering choices for Evennia RP games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

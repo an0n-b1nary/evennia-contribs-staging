@@ -172,6 +172,48 @@ class Suite:
         self.session.connect("alice")
         assert self.state()["economy_purses"] == after["economy_purses"]
 
+    def stalls(self):
+        self.command("alice", "+stall/claim Live counter", "Claimed stall")
+        self.command("alice", "+gear/make live market cloak=body", "make|create")
+        self.command("alice", "+stall/list live market cloak=7", "Listing #")
+        state = self.state()
+        listing = state["economy_listings"][-1]
+        store = state["economy_stalls"][-1]
+        self.command("alice", f"+buy {listing['id']}", "same account")
+        self.command("bob", "+browse", "live market cloak")
+        self.command("bob", "+market cloak", "Live counter")
+        self.command("staff", "+runtime RP_ECONOMY_FROZEN=true", "True")
+        try:
+            self.command("bob", f"+buy {listing['id']}", "market is closed")
+        finally:
+            self.command("staff", "+runtime/reset RP_ECONOMY_FROZEN", "False")
+        self.session.disconnect("alice")
+        self.command("bob", f"+buy {listing['id']}", "Bought listing")
+        self.command("bob", f"+buy {listing['id']}", "no longer available")
+        self.session.connect("alice")
+        self.command("bob", "drop live market cloak", "drop")
+        self.command("bob", "get live market cloak", "pick up|get")
+        # Reserved resources return intact when the owner closes the stall.
+        self.command("alice", "+stall/list resource:grain:1=3", "Listing #")
+        reserved = self.state()["economy_listings"][-1]["id"]
+        self.session.host.reload()
+        self.command("bob", "+browse", "Grain")
+        assert (
+            next(row for row in self.state()["economy_listings"] if row["id"] == reserved)["status"]
+            == "active"
+        )
+        self.command("staff", f"+stall/close {store['id']}", "stock returned")
+        state = self.state()
+        assert all(
+            row["status"] != "active"
+            for row in state["economy_listings"]
+            if row["storefront_id"] == store["id"]
+        )
+        assert (
+            next(row for row in state["economy_stalls"] if row["id"] == store["id"])["status"]
+            == "closed"
+        )
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -392,6 +434,7 @@ def run_rp(session, smoke=False):
         ("ordinary login, staff role and probe authorization", suite.prepare),
         ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
         ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
+        ("reserved stall stock, offline purchase, freeze and stock recovery", suite.stalls),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:

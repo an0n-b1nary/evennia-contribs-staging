@@ -37,7 +37,7 @@ def total_held(character):
     )
 
 
-def _change(character, key, qty, source, **metadata):
+def _change(character, key, qty, source, *, allow_archived=False, **metadata):
     if source not in dict(ResourceGrant._meta.get_field("source").choices):
         raise ResourceError("Unknown grant source.")
     by = metadata.pop("by", None)
@@ -46,7 +46,7 @@ def _change(character, key, qty, source, **metadata):
     with transaction.atomic():
         # One lock order for all holdings and the batch: character, then holding.
         ObjectDB.objects.select_for_update().get(pk=character.pk)
-        resource = definition(key, active=qty > 0)
+        resource = definition(key, active=qty > 0 and not allow_archived)
         holding, _ = ResourceHolding.objects.get_or_create(character=character, resource=resource)
         query = ResourceHolding.objects.filter(pk=holding.pk)
         if qty < 0:
@@ -58,9 +58,9 @@ def _change(character, key, qty, source, **metadata):
         )
 
 
-def grant(character, key, qty, source="staff", **metadata):
+def grant(character, key, qty, source="staff", *, allow_archived=False, **metadata):
     _quantity(qty)
-    return _change(character, key, qty, source, **metadata)
+    return _change(character, key, qty, source, allow_archived=allow_archived, **metadata)
 
 
 def spend(character, key, qty, reason, *, source="craft", **metadata):
