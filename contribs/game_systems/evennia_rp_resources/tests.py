@@ -68,6 +68,17 @@ class ResourceTests(EvenniaTest):
         self.assertEqual(list(ResourceGrant.objects.values_list("quantity", flat=True)), [5, -2])
         self.assertEqual(ResourceGrant.objects.first().by_id, self.char1.pk)
 
+    def test_archived_reserved_stock_can_be_refunded_without_reopening_grants(self):
+        grant(self.char2, "wood", 3)
+        spend(self.char2, "wood", 3, "Reserved listing", source="exchange")
+        ResourceDefinition.objects.filter(key="wood").update(archived=True)
+        with self.assertRaises(ResourceError):
+            grant(self.char2, "wood", 3)
+        grant(self.char2, "wood", 3, "exchange", allow_archived=True, note="Listing returned")
+        self.assertEqual(total_held(self.char2), 3)
+        self.assertEqual(ResourceGrant.objects.last().source, "exchange")
+        self.assertTrue(ResourceDefinition.objects.get(key="wood").archived)
+
     def test_shortfall_does_not_change_balance_or_log(self):
         grant(self.char2, "wood", 2)
         with self.assertRaises(ResourceError):
