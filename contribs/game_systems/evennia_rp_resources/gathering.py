@@ -85,7 +85,7 @@ def set_lean(character, value):
     return choice
 
 
-def lean_description(character):
+def lean_description(character, *, check=True):
     choice = lean(character)
     if not choice:
         return "none"
@@ -98,8 +98,9 @@ def lean_description(character):
             .first()
             or choice["key"]
         )
-    available = any(matches_lean(resource, choice) for resource in pool())
-    return name + ("" if available else " (currently yields nothing)")
+    if not check or any(matches_lean(resource, choice) for resource in pool()):
+        return name
+    return name + " (currently yields nothing)"
 
 
 def matches_lean(resource, choice):

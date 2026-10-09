@@ -7,11 +7,16 @@ import re
 from django.db.models import Sum
 from evennia_economy.services import EconomyError
 
+from . import conf
 from .models import ResourceDefinition, ResourceGrant, ResourceHolding
 from .services import ResourceError, definition, grant, spend
 
 
 class ResourceAssetProvider:
+    def available(self, character):
+        """Resources stay out of trades with anyone they're hidden from (staff see them)."""
+        return conf.visible(character)
+
     def describe(self, key):
         try:
             return definition(key, active=False).name

@@ -6,13 +6,12 @@ import logging
 import math
 import random
 from collections import Counter
-from datetime import UTC, datetime, timedelta
 
 from django.db import transaction
-from django.utils import timezone
-from evennia.accounts.models import AccountDB
 from evennia.objects.models import ObjectDB
 
+from evennia_links import periodic
+from evennia_links.characters import playable_characters
 from evennia_links.runtime import cap_raise, get
 
 from . import conf
@@ -21,32 +20,16 @@ from .models import ResourceGrant
 from .services import grant, total_held
 
 logger = logging.getLogger("evennia")
-ANCHOR = datetime(1970, 1, 5, tzinfo=UTC)  # Monday 00:00 UTC
 
 
 def period_key(reference=None):
     """Label the completed period. Weekly defaults use the completed ISO week."""
-    seconds = get("RP_RESOURCES_PERIOD_SECONDS")
-    reference = (reference or timezone.now()).astimezone(UTC)
-    index = int((reference - ANCHOR).total_seconds() // seconds)
-    end = ANCHOR + timedelta(seconds=index * seconds)
-    if seconds == 604800:
-        previous = end - timedelta(seconds=1)
-        year, week, _ = previous.isocalendar()
-        return f"{year}-W{week:02d}"
-    return f"{seconds}s:{end.isoformat()}"
+    return periodic.period_key(get("RP_RESOURCES_PERIOD_SECONDS"), reference)
 
 
 def eligible_characters():
     """Playable characters, even while offline; host eligibility is authoritative."""
-    predicate = conf.hook("RP_ECONOMY_ELIGIBLE")
-    seen = set()
-    for account in AccountDB.objects.all().order_by("pk"):
-        for character in account.characters.all():
-            if character and character.pk not in seen:
-                seen.add(character.pk)
-                if predicate is None or predicate(character):
-                    yield character
+    return playable_characters(conf.hook("RP_ECONOMY_ELIGIBLE"))
 
 
 def holdings_cap(character):
@@ -97,7 +80,7 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
     if not isinstance(week, str) or not week or len(week) > 80:
         raise ValueError("Invalid batch period label.")
     resources = pool()
-    result = {"week": week, "characters": {}, "errors": []}
+    result = {"week": week, "characters": {}, "errors": [], "failed": []}
     for character in eligible_characters() if characters is None else characters:
         try:
             with transaction.atomic():
@@ -121,4 +104,14 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
         except Exception as exc:
             logger.exception("Resources batch failed for #%s, period %s", character.pk, week)
             result["errors"].append(f"#{character.pk}: {exc}")
+            result["failed"].append(character.pk)
     return result
+
+
+def run_due_period(week, ids=None):
+    """Scheduler entry point: pay everyone, or retry only `ids`; return failed ids."""
+    characters = None
+    if ids is not None:
+        wanted = set(ids)
+        characters = [c for c in eligible_characters() if c.pk in wanted]
+    return run_weekly_batch(week, characters=characters)["failed"]
