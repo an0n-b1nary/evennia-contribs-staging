@@ -526,6 +526,19 @@ MAPS_TERRAIN_TILESET = {
     "urban": "/static/sandbox/terrain/urban.png",
 }
 
+# Labels and colours for the same terrains (evennia_maps 0.6). The tileset
+# above still supplies the four sprites; "scrub" gets a colour and no sprite,
+# so the Causeway shows a swatch tinted to its terrain, not the bare grey a
+# terrain-less room keeps. Together they put every terrain-display path on
+# the seeded grid: sprite, tinted swatch, and no terrain at all.
+MAPS_TERRAINS = {
+    "water": {"label": "Open water", "color": "#2f6e9e"},
+    "forest": {"label": "Woodland", "color": "#2e5d34"},
+    "hills": {"label": "Hills", "color": "#7a6a4a"},
+    "scrub": {"label": "Dry scrub", "color": "#8a7a4a"},
+    "urban": {"label": "Town", "color": "#6b6b78"},
+}
+
 # The OOC wing is not part of the physical world, so its rooms must never
 # take a cell on the grid. Without this, `@dig north=<somewhere OOC>` from a
 # mapped room would annex one silently - the tile is a side effect of digging

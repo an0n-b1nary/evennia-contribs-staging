@@ -20,10 +20,10 @@ from evennia_maps.api.serializers import PlaneSerializer, RoomTileSerializer
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays
 from evennia_maps.permissions import is_room_web_visible, is_staff_user
+from evennia_maps.terrain import terrain_style
 from evennia_maps.views import (
     plane_tiles_queryset,
     tile_hangout_type,
-    tile_sprite,
     visible_tiles_for_plane,
 )
 
@@ -141,6 +141,7 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         recent_scenes_by_room = overlays.get("recent_scenes", {})
         has_lore = overlays.get("has_lore", {})
         upcoming_events_by_room = overlays.get("upcoming_events", {})
+        styles = {terrain: terrain_style(terrain) for terrain in {tile.terrain for tile in tiles}}
 
         data = [
             {
@@ -149,10 +150,13 @@ class PlaneViewSet(ReadOnlyModelViewSet):
                 "room_id": tile.room_id,
                 "room_name": tile.room_name or f"Room #{tile.room_id}",
                 "terrain": tile.terrain,
-                "sprite_url": tile_sprite(tile.terrain),
+                "terrain_label": styles[tile.terrain]["label"],
+                "terrain_color": styles[tile.terrain]["color"],
+                "sprite_url": styles[tile.terrain]["sprite"],
                 "portal_plane_id": portal_by_room.get(tile.room_id),
                 "hangout_type": tile_hangout_type(tile.room),
                 "primary_region_id": (primary_region.get(tile.room_id) or {}).get("id"),
+                "primary_region_name": (primary_region.get(tile.room_id) or {}).get("name", ""),
                 "has_active_scene": bool(has_active_scene.get(tile.room_id, False)),
                 "active_scenes": overlays.get("active_scenes", {}).get(tile.room_id, []),
                 "recent_scene_count": recent_scene_counts.get(tile.room_id, 0),

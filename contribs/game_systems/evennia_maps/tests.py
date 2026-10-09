@@ -1860,6 +1860,65 @@ def _attach(request, user):
     return request
 
 
+class TestTerrainStyle(MapsTestCase):
+    """Display data for a terrain key: MAPS_TERRAINS first, the tileset as fallback."""
+
+    def test_defaults_without_any_setting(self):
+        from evennia_maps.terrain import terrain_style
+
+        self.assertEqual(
+            terrain_style("salt_pan"),
+            {"key": "salt_pan", "label": "Salt pan", "color": "", "sprite": ""},
+        )
+        self.assertEqual(terrain_style("")["label"], "")
+
+    @override_settings(
+        MAPS_TERRAINS={"forest": {"label": "Old wood", "color": "#2e5d34"}},
+        MAPS_TERRAIN_TILESET={"forest": "/static/forest.png"},
+    )
+    def test_terrains_table_with_tileset_fallback_for_sprites(self):
+        from evennia_maps.terrain import terrain_style
+
+        self.assertEqual(
+            terrain_style("forest"),
+            {
+                "key": "forest",
+                "label": "Old wood",
+                "color": "#2e5d34",
+                "sprite": "/static/forest.png",
+            },
+        )
+
+    @override_settings(
+        MAPS_TERRAINS={"forest": {"sprite": "/static/new.svg"}},
+        MAPS_TERRAIN_TILESET={"forest": "/static/old.png"},
+    )
+    def test_terrains_sprite_beats_the_tileset(self):
+        from evennia_maps.terrain import terrain_style
+
+        self.assertEqual(terrain_style("forest")["sprite"], "/static/new.svg")
+
+    def test_only_hex_colours_pass(self):
+        from evennia_maps.terrain import terrain_style
+
+        for good in ("#abc", "#abcd", "#a1b2c3", "#a1b2c3d4"):
+            with self.subTest(colour=good), override_settings(MAPS_TERRAINS={"t": {"color": good}}):
+                self.assertEqual(terrain_style("t")["color"], good)
+        for bad in ("red", "#12", "#abcdeg", "url(x)", '#fff" onload="x', "#fff;fill:red"):
+            with self.subTest(colour=bad), override_settings(MAPS_TERRAINS={"t": {"color": bad}}):
+                self.assertEqual(terrain_style("t")["color"], "")
+
+    @override_settings(
+        MAPS_TERRAINS={"water": {}, "forest": {}},
+        MAPS_TERRAIN_PRECEDENCE=["hills", "forest"],
+    )
+    def test_legend_order_and_no_empty_terrain(self):
+        from evennia_maps.terrain import terrain_legend
+
+        keys = [row["key"] for row in terrain_legend(["zebra", "", "hills", "forest", "water"])]
+        self.assertEqual(keys, ["water", "forest", "hills", "zebra"])
+
+
 class MapsWebTestCase(MapsTestCase):
     """
     RequestFactory + direct view invocation.
@@ -2009,6 +2068,45 @@ class TestPlaneMapView(MapsWebTestCase):
         self.assertEqual(tile["sprite"], "/static/forest.png")
 
 
+@override_settings(ROOT_URLCONF=__name__)
+class TestPlaneMapTerrains(MapsWebTestCase):
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane("Terrains")
+
+    def _render(self):
+        request = _attach(self.factory.get("/map/"), AnonymousUser())
+        response = PlaneMapView.as_view()(request, pk=self.plane.pk)
+        response.render()
+        return response.content.decode()
+
+    @override_settings(
+        MAPS_TERRAINS={
+            "scrub": {"label": "Dry scrub", "color": "#8a7a4a"},
+            "forest": {"label": "Old wood", "sprite": "/static/forest.svg"},
+        },
+        MAPS_TERRAIN_PRECEDENCE=["forest", "scrub"],
+    )
+    def test_swatch_colour_sprite_and_terrain_key(self):
+        self.room1.set_terrain({"scrub"})
+        self.room2.set_terrain({"forest"})
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        placement.place_tile(self.room2, self.plane, 1, 0)
+        html = self._render()
+        self.assertIn('class="evennia-maps-fallback" fill="#8a7a4a"', html)
+        self.assertIn('<image href="/static/forest.svg"', html)
+        self.assertIn('aria-label="Terrain key"', html)
+        key = html[html.index('aria-label="Terrain key"') :]
+        self.assertLess(key.index("Dry scrub"), key.index("Old wood"))  # MAPS_TERRAINS order
+        self.assertIn(f"{self.room1.key} &mdash; Dry scrub", html)
+
+    def test_no_terrain_key_without_terrains(self):
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        html = self._render()
+        self.assertNotIn("Terrain key", html)
+        self.assertNotIn('class="evennia-maps-fallback" fill=', html)
+
+
 class TestSvgContextQueryCost(MapsWebTestCase):
     """The overlay pass must be one send for the grid, not one per tile."""
 
@@ -2128,6 +2226,8 @@ class TestWebPagesRender(MapsWebTestCase):
         self.assertIn('id="evennia-maps-live"', html)
         self.assertIn("/api/v1/planes/0/tiles/", html)
         self.assertIn("evennia_maps/js/evennia_maps.js", html)
+        self.assertIn('id="evennia-maps-list-toggle"', html)
+        self.assertIn('aria-controls="evennia-maps-list"', html)
         self.assertLess(html.index("leaflet.css"), html.index("evennia_maps/css/evennia_maps.css"))
 
     @override_settings(MAPS_TILES_URL_NAME="")
@@ -2235,10 +2335,13 @@ class TestPlaneTilesApi(MapsApiTestCase):
             "room_id",
             "room_name",
             "terrain",
+            "terrain_label",
+            "terrain_color",
             "sprite_url",
             "portal_plane_id",
             "hangout_type",
             "primary_region_id",
+            "primary_region_name",
             "has_active_scene",
             "recent_scene_count",
             "has_lore",
@@ -2254,6 +2357,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
         with _provider():
             tile = self._tiles(self.client)[0]
         self.assertIsNone(tile["primary_region_id"])
+        self.assertEqual(tile["primary_region_name"], "")
         self.assertFalse(tile["has_active_scene"])
         self.assertEqual(tile["active_scenes"], [])
         self.assertFalse(tile["has_lore"])
@@ -2265,6 +2369,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
         with _provider(_full_provider):
             tile = self._tiles(self.client)[0]
         self.assertEqual(tile["primary_region_id"], 7)
+        self.assertEqual(tile["primary_region_name"], "Testlands")
         self.assertTrue(tile["has_active_scene"])
         self.assertEqual(tile["active_scenes"], [{"id": 12, "title": "Live rehearsal"}])
         self.assertEqual(tile["recent_scene_count"], 3)
@@ -2283,6 +2388,21 @@ class TestPlaneTilesApi(MapsApiTestCase):
     def test_secret_room_visible_to_staff(self):
         self.room1.db.allow_teleport = "secret"
         self.assertEqual(len(self._tiles(self.client)), 1)
+
+    @override_settings(
+        MAPS_TERRAINS={"forest": {"label": "Old wood", "color": "#2e5d34"}},
+        MAPS_TERRAIN_PRECEDENCE=["forest"],
+    )
+    def test_terrain_display_reaches_the_payload(self):
+        self.room1.set_terrain({"forest"})
+        tile = self._tiles(self.client)[0]
+        self.assertEqual(tile["terrain_label"], "Old wood")
+        self.assertEqual(tile["terrain_color"], "#2e5d34")
+        self.assertEqual(tile["sprite_url"], "")
+
+    def test_terrain_display_is_empty_without_a_terrain(self):
+        tile = self._tiles(self.client)[0]
+        self.assertEqual((tile["terrain_label"], tile["terrain_color"]), ("", ""))
 
     def test_hangout_type_read_from_the_room(self):
         self.room1.db.hangout_type = "bar"

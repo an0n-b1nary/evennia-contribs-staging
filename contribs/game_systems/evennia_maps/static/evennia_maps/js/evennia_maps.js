@@ -25,6 +25,12 @@
  * map-wide pattern. Every overlay is privacy-filtered server-side exactly
  * like the base tile data; this file never re-derives visibility.
  *
+ * Terrain display (label, colour, sprite) comes from MAPS_TERRAINS on the
+ * server (terrain.terrain_style), so this file never needs the vocabulary.
+ * Tiles brighten on hover and carry a tooltip; a terrain legend sits in the
+ * corner, and a room list beneath the map gives keyboard and screen-reader
+ * users every tile, each with a button that opens the same popup.
+ *
  * Overlay data arrives only from whichever partner contribs the game has
  * installed (evennia_regions/scenes/lore/calendar). Absent ones simply
  * leave their field at its empty value, and an outbound URL template that
@@ -44,6 +50,9 @@
   // lands inside a single tile's footprint. Geometry in map units scales with
   // zoom, which a marker's iconSize (screen pixels) cannot.
   var TILE_PX = 32;
+
+  // Swatch for a tile whose terrain has neither a sprite nor a colour.
+  var FALLBACK_FILL = "#3a3a3a";
 
   function cellBounds(tile) {
     // Leaflet takes [lat, lng]; under CRS.Simple lat is y and increases upward,
@@ -132,9 +141,85 @@
       className: "evennia-maps-tile-blank",
       color: tile.has_active_scene ? "#ffce54" : "rgba(255, 255, 255, 0.25)",
       weight: 1,
-      fillColor: "#3a3a3a",
+      fillColor: tile.terrain_color || FALLBACK_FILL,
       fillOpacity: 1,
     });
+  }
+
+  function lighten(hex, amount) {
+    // terrain_color is validated server-side as #rgb, #rgba, #rrggbb or
+    // #rrggbbaa; alpha is dropped, which is fine for a hover fill.
+    var digits = hex.slice(1);
+    if (digits.length <= 4) {
+      digits = digits
+        .slice(0, 3)
+        .split("")
+        .map(function (d) {
+          return d + d;
+        })
+        .join("");
+    }
+    var channels = [0, 2, 4].map(function (i) {
+      var value = parseInt(digits.slice(i, i + 2), 16);
+      return Math.round(value + (255 - value) * amount);
+    });
+    return "rgb(" + channels.join(", ") + ")";
+  }
+
+  function addHover(layer, tile) {
+    // Sprite tiles are <img> elements and brighten through CSS (:hover); a
+    // swatch is an SVG path whose fill is an inline Leaflet attribute, so it
+    // is restyled here instead.
+    if (tile.sprite_url) {
+      return;
+    }
+    var base = layer.options.fillColor;
+    var stroke = layer.options.color;
+    layer.on("mouseover", function () {
+      layer.setStyle({ fillColor: lighten(base, 0.25), color: "#ffffff", weight: 2 });
+    });
+    layer.on("mouseout", function () {
+      layer.setStyle({ fillColor: base, color: stroke, weight: 1 });
+    });
+  }
+
+  function badges(tile) {
+    var items = [];
+    if (tile.has_active_scene) {
+      items.push("Scene now");
+    }
+    if (tile.upcoming_events && tile.upcoming_events.length) {
+      items.push("Event soon");
+    }
+    if (tile.has_lore) {
+      items.push("Lore here");
+    }
+    if (tile.hangout_type) {
+      items.push(hangoutLabel(tile.hangout_type));
+    }
+    return items;
+  }
+
+  function tooltipContent(tile) {
+    // Everything here is escaped: room and region names are player- or
+    // staff-authored, and bindTooltip renders HTML.
+    var html = "<strong>" + escapeHtml(tile.room_name) + "</strong>";
+    var detail = [tile.terrain_label, tile.primary_region_name].filter(Boolean);
+    if (detail.length) {
+      html += "<div>" + escapeHtml(detail.join(" · ")) + "</div>";
+    }
+    var flags = badges(tile);
+    if (flags.length) {
+      html +=
+        '<div class="evennia-maps-badges">' +
+        flags
+          .map(function (flag) {
+            return '<span class="evennia-maps-badge">' + escapeHtml(flag) + "</span>";
+          })
+          .join(" ") +
+        "</div>";
+    }
+    return html;
   }
 
   function portalLayers(tile) {
@@ -272,7 +357,18 @@
           groups.tiles.addLayer(layer);
         });
       } else {
-        groups.tiles.addLayer(tileLayer(tile).bindPopup(popupContent(tile, urls)));
+        var layer = tileLayer(tile)
+          .bindPopup(popupContent(tile, urls))
+          .bindTooltip(tooltipContent(tile), {
+            sticky: true,
+            direction: "top",
+            className: "evennia-maps-tooltip",
+          });
+        addHover(layer, tile);
+        if (groups.byRoom) {
+          groups.byRoom[tile.room_id] = layer;
+        }
+        groups.tiles.addLayer(layer);
       }
 
       var heatmap = heatmapMarker(tile);
@@ -308,6 +404,115 @@
       [Math.min.apply(null, ys) * TILE_PX, Math.min.apply(null, xs) * TILE_PX],
       [(Math.max.apply(null, ys) + 1) * TILE_PX, (Math.max.apply(null, xs) + 1) * TILE_PX]
     );
+  }
+
+  function swatch(tile) {
+    // Built as DOM nodes rather than HTML so sprite URLs and colours never
+    // pass through markup.
+    var node;
+    if (tile.sprite_url) {
+      node = document.createElement("img");
+      node.src = tile.sprite_url;
+      node.alt = "";
+    } else {
+      node = document.createElement("span");
+      node.style.background = tile.terrain_color || FALLBACK_FILL;
+    }
+    node.className = "evennia-maps-swatch";
+    return node;
+  }
+
+  function terrainRows(tiles) {
+    var seen = {};
+    var rows = [];
+    tiles.forEach(function (tile) {
+      var isPortal = tile.portal_plane_id !== null && tile.portal_plane_id !== undefined;
+      if (tile.terrain && !isPortal && !seen[tile.terrain]) {
+        seen[tile.terrain] = true;
+        rows.push(tile);
+      }
+    });
+    return rows.sort(function (a, b) {
+      return (a.terrain_label || a.terrain).localeCompare(b.terrain_label || b.terrain);
+    });
+  }
+
+  function renderLegend(box, tiles) {
+    box.textContent = "";
+    var rows = terrainRows(tiles);
+    box.hidden = !rows.length;
+    if (!rows.length) {
+      return;
+    }
+    var details = document.createElement("details");
+    details.open = true;
+    var summary = document.createElement("summary");
+    summary.textContent = "Terrain";
+    details.appendChild(summary);
+    var list = document.createElement("ul");
+    rows.forEach(function (tile) {
+      var item = document.createElement("li");
+      item.appendChild(swatch(tile));
+      item.appendChild(document.createTextNode(tile.terrain_label || tile.terrain));
+      list.appendChild(item);
+    });
+    details.appendChild(list);
+    box.appendChild(details);
+  }
+
+  function renderRoomList(listEl, tiles, byRoom, map, liveMapUrlTemplate) {
+    // The keyboard and screen-reader route to every tile: rooms grouped by
+    // region, each a button that opens the tile's popup on the map.
+    listEl.textContent = "";
+    var groups = {};
+    tiles.forEach(function (tile) {
+      var name = tile.primary_region_name || "No region";
+      (groups[name] = groups[name] || []).push(tile);
+    });
+    Object.keys(groups)
+      .sort()
+      .forEach(function (name) {
+        var heading = document.createElement("h2");
+        heading.className = "h6 mt-3";
+        heading.textContent = name;
+        listEl.appendChild(heading);
+        var list = document.createElement("ul");
+        list.className = "list-unstyled";
+        groups[name]
+          .sort(function (a, b) {
+            return a.room_name.localeCompare(b.room_name);
+          })
+          .forEach(function (tile) {
+            var item = document.createElement("li");
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-link btn-sm p-0";
+            var isPortal = tile.portal_plane_id !== null && tile.portal_plane_id !== undefined;
+            button.textContent = tile.room_name + (isPortal ? " (portal)" : "");
+            button.addEventListener("click", function () {
+              if (isPortal) {
+                window.location.href = urlFor(liveMapUrlTemplate, tile.portal_plane_id);
+                return;
+              }
+              var layer = byRoom[tile.room_id];
+              if (layer) {
+                var centre = cellCenter(tile);
+                map.setView(centre, Math.max(map.getZoom(), 1));
+                layer.openPopup(centre);
+              }
+            });
+            item.appendChild(button);
+            var detail = [tile.terrain_label].concat(badges(tile)).filter(Boolean);
+            if (detail.length) {
+              var note = document.createElement("span");
+              note.className = "text-muted small ml-2";
+              note.textContent = detail.join(" · ");
+              item.appendChild(note);
+            }
+            list.appendChild(item);
+          });
+        listEl.appendChild(list);
+      });
   }
 
   function showError(container, message) {
@@ -358,6 +563,27 @@
       lore: L.layerGroup(),
       hangouts: L.layerGroup(),
     };
+    var byRoomById = {};
+
+    var legend = L.control({ position: "bottomright" });
+    legend.onAdd = function () {
+      var box = L.DomUtil.create("div", "evennia-maps-terrain-key");
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.disableScrollPropagation(box);
+      box.hidden = true;
+      return box;
+    };
+    legend.addTo(map);
+
+    var listToggle = document.getElementById("evennia-maps-list-toggle");
+    var listEl = document.getElementById("evennia-maps-list");
+    if (listToggle && listEl) {
+      listToggle.addEventListener("click", function () {
+        var open = listToggle.getAttribute("aria-expanded") === "true";
+        listToggle.setAttribute("aria-expanded", open ? "false" : "true");
+        listEl.hidden = open;
+      });
+    }
 
     function load(planeId, fit) {
       if (!loading[planeId]) {
@@ -365,16 +591,29 @@
       }
       return loading[planeId]
         .then(function (tiles) {
+          byRoomById[planeId] = {};
           populateLayer(
             {
               tiles: groupsById[planeId],
               heatmap: overlayGroups.heatmap,
               lore: overlayGroups.lore,
               hangouts: overlayGroups.hangouts,
+              byRoom: byRoomById[planeId],
             },
             tiles,
             container
           );
+          renderLegend(legend.getContainer(), tiles);
+          if (listToggle && listEl) {
+            renderRoomList(
+              listEl,
+              tiles,
+              byRoomById[planeId],
+              map,
+              container.dataset.liveMapUrlTemplate
+            );
+            listToggle.hidden = !tiles.length;
+          }
           var bounds = fit ? boundsFor(tiles) : null;
           if (bounds) {
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 2 });

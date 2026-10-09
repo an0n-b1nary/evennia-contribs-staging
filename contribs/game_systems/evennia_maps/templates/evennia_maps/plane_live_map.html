@@ -40,6 +40,11 @@
      data-event-url-template="{{ event_url_template }}"
      data-layers='[{% for layer in layers %}{"id": {{ layer.id }}, "name": "{{ layer.name|escapejs }}", "elevation": {{ layer.elevation }}, "is_current": {{ layer.is_current|yesno:"true,false" }}}{% if not forloop.last %},{% endif %}{% endfor %}]'>
 </div>
+{% comment %} Filled and unhidden by evennia_maps.js once tiles load: every room
+   as a button that opens its popup, for keyboard and screen-reader users. {% endcomment %}
+<button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="evennia-maps-list-toggle"
+        aria-controls="evennia-maps-list" aria-expanded="false" hidden>Room list</button>
+<div id="evennia-maps-list" class="evennia-maps-list" hidden></div>
 {% else %}
 {% comment %} The tile feed is the whole page. Say why it is missing rather than
    rendering an empty canvas — see evennia_maps.views.tiles_url_template. {% endcomment %}
