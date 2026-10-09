@@ -109,7 +109,7 @@ class EconomyTests(EvenniaTest):
             self.assertEqual(batch.ensure_stipends(self.char2), {})
             self.assertEqual(batch.run_weekly_batch("test")["characters"], {})
         with override_settings(RP_ECONOMY_STARTING_STIPEND=20):
-            self.assertEqual(batch.ensure_stipends(self.char2), {"starting": 20, "reveal": 0})
+            self.assertEqual(batch.ensure_stipends(self.char2), {"starting": 20})
             self.assertEqual(batch.ensure_stipends(self.char2), {})
         self.assertEqual(balance(self.char2), 20)
 
@@ -127,6 +127,141 @@ class EconomyTests(EvenniaTest):
             with self.captureOnCommitCallbacks(execute=True):
                 runtime.set("RP_ECONOMY_REVEALED", True)
             self.assertEqual(balance(self.char2), 150)
+
+    def test_never_hidden_game_pays_no_reveal_stipend(self):
+        with override_settings(RP_ECONOMY_STARTING_STIPEND=20, RP_ECONOMY_REVEAL_STIPEND=30):
+            batch.run_weekly_batch("test")
+            batch.run_stipends()
+        self.assertEqual(balance(self.char2), 120)
+        self.assertFalse(StipendPayment.objects.filter(kind="reveal").exists())
+
+    def test_reveal_stipend_goes_to_those_eligible_at_the_reveal_only(self):
+        late = create_object(
+            "evennia.objects.objects.DefaultCharacter", key="Late", location=self.room1
+        )
+        with override_settings(RP_ECONOMY_STARTING_STIPEND=20, RP_ECONOMY_REVEAL_STIPEND=30):
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_REVEALED", False)
+            batch.ensure_stipends(self.char1)  # paid while hidden
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_REVEALED", True)
+            # char2 never logged in while hidden but was eligible at the reveal.
+            self.assertEqual((balance(self.char1), balance(self.char2)), (50, 50))
+            self.account2.characters.add(late)  # first eligible after the reveal
+            self.assertEqual(batch.ensure_stipends(late), {"starting": 20})
+            batch.run_weekly_batch("test")
+            batch.run_stipends()
+        self.assertEqual(balance(late), 120)
+        self.assertFalse(StipendPayment.objects.filter(character=late, kind="reveal").exists())
+
+    def test_reveal_sweep_failure_is_made_good_later(self):
+        with override_settings(RP_ECONOMY_STARTING_STIPEND=20, RP_ECONOMY_REVEAL_STIPEND=30):
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_REVEALED", False)
+            batch.ensure_stipends(self.char2)
+            with (
+                patch("evennia_economy.batch.credit", side_effect=RuntimeError),
+                self.assertLogs("evennia", level="ERROR"),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                runtime.set("RP_ECONOMY_REVEALED", True)
+            self.assertEqual(balance(self.char2), 20)
+            self.assertEqual(batch.ensure_stipends(self.char2), {"reveal": 30})
+        self.assertEqual(balance(self.char2), 50)
+
+    def test_reveal_sweep_waits_while_frozen(self):
+        with override_settings(RP_ECONOMY_STARTING_STIPEND=0, RP_ECONOMY_REVEAL_STIPEND=30):
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_REVEALED", False)
+            runtime.set("RP_ECONOMY_FROZEN", True)
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_REVEALED", True)
+            self.assertIsNone(batch.revealed_at())
+            with self.captureOnCommitCallbacks(execute=True):
+                runtime.set("RP_ECONOMY_FROZEN", False)
+        self.assertIsNotNone(batch.revealed_at())
+        self.assertEqual((balance(self.char1), balance(self.char2)), (30, 30))
+
+    def batch_script(self):
+        from evennia.utils.create import create_script
+
+        return create_script(
+            "evennia_economy.scripts.EconomyBatchScript", key="economy_batch", autostart=False
+        )
+
+    def test_scheduler_tick_runs_no_stipend_sweep(self):
+        calls = []
+
+        def eligible(character):
+            calls.append(character.pk)
+            return True
+
+        script = self.batch_script()
+        with override_settings(RP_ECONOMY_ELIGIBLE=eligible):
+            script.at_repeat()
+            self.assertEqual(sorted(calls), sorted([self.char1.pk, self.char2.pk]))
+            calls.clear()
+            for _ in range(3):
+                script.at_repeat()
+        self.assertEqual(calls, [])
+
+    def test_ensure_stipends_checks_one_character_only(self):
+        calls = []
+
+        def eligible(character):
+            calls.append(character.pk)
+            return True
+
+        with override_settings(RP_ECONOMY_ELIGIBLE=eligible, RP_ECONOMY_STARTING_STIPEND=5):
+            batch.ensure_stipends(self.char2)
+            batch.ensure_stipends(self.char2)  # already paid: no eligibility check at all
+        self.assertEqual(calls, [self.char2.pk])
+
+    def test_scheduler_retries_only_failures_with_backoff(self):
+        script = self.batch_script()
+        real_credit = batch.credit
+        attempts = []
+
+        def flaky(character, amount, **kwargs):
+            attempts.append(character.pk)
+            if character.pk == self.char2.pk:
+                raise RuntimeError("Credit failed")
+            return real_credit(character, amount, **kwargs)
+
+        with (
+            patch("evennia_economy.batch.credit", side_effect=flaky),
+            self.assertLogs("evennia", level="ERROR"),
+        ):
+            script.at_repeat()
+            script.at_repeat()  # within the backoff: nothing reruns
+        self.assertEqual(sorted(attempts), sorted([self.char1.pk, self.char2.pk]))
+        pending = script.db.batch_state["pending"]
+        self.assertEqual([entry["ids"] for entry in pending], [[self.char2.pk]])
+        with patch("evennia_links.periodic.time.time", return_value=pending[0]["due"]):
+            script.at_repeat()
+        self.assertEqual((balance(self.char1), balance(self.char2)), (100, 100))
+        self.assertEqual(script.db.batch_state["pending"], [])
+
+    def test_periods_missed_while_frozen_are_paid_when_unfrozen(self):
+        script = self.batch_script()
+        with override_settings(RP_ECONOMY_FROZEN=True):
+            for week in ("2026-W40", "2026-W41"):
+                with patch("evennia_economy.batch.period_key", return_value=week):
+                    script.at_repeat()
+        self.assertFalse(UBIPayment.objects.exists())
+        with patch("evennia_economy.batch.period_key", return_value="2026-W41"):
+            script.at_repeat()
+        self.assertEqual(
+            sorted(UBIPayment.objects.filter(character=self.char2).values_list("week", flat=True)),
+            ["2026-W40", "2026-W41"],
+        )
+
+    def test_scripts_from_before_the_queue_keep_their_last_period(self):
+        script = self.batch_script()
+        script.db.last_batch_week = "2026-W40"
+        with patch("evennia_economy.batch.period_key", return_value="2026-W40"):
+            script.at_repeat()
+        self.assertFalse(UBIPayment.objects.exists())
 
     def test_preview_matches_payment_without_writes(self):
         with override_settings(RP_ECONOMY_STARTING_STIPEND=50, RP_ECONOMY_REVEAL_STIPEND=30):
@@ -439,6 +574,37 @@ class EconomyTests(EvenniaTest):
         self.gift(self.char2, alt, money(1))
         self.assertFalse(ReviewFlag.objects.exists())
 
+    def test_deleting_a_character_burns_its_balance_in_the_journal(self):
+        credit(self.char2, 50)
+        name = self.char2.key
+        self.char2.delete()
+        row = LedgerEntry.objects.get(kind="deleted")
+        self.assertEqual((row.amount, row.from_name, row.to_id), (50, name, None))
+        self.assertEqual(reconciliation()["money"], {"minted": 50, "burned": 50, "held": 0})
+
+    def test_one_failing_post_commit_hook_does_not_skip_the_rest(self):
+        offer = create_offer(self.char1, self.char2, item(self.obj1))
+        with (
+            patch.object(self.char1, "at_object_leave", side_effect=RuntimeError),
+            patch.object(self.obj1, "at_post_move") as moved,
+            self.assertLogs("evennia", level="ERROR"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            accept_offer(self.char2, offer.pk)
+        moved.assert_called_once()
+        self.assertEqual(self.obj1.location, self.char2)
+
+    def test_income_cap_notice_is_given_once(self):
+        credit(self.char1, 500)
+        for week in ("W1", "W2", "W3"):
+            batch.run_weekly_batch(week)
+            with patch.object(self.char1, "msg") as msg:
+                notify_economy_summary(self.char1)
+            if week == "W1":
+                self.assertIn("at its income cap", msg.call_args.args[0])
+            else:
+                msg.assert_not_called()
+
     def test_staff_report_per_account_accrual_and_reconciliation(self):
         batch.run_weekly_batch("test")
         debit(self.char1, 10)
@@ -459,9 +625,12 @@ class EconomyTests(EvenniaTest):
 
     def test_reveal_hides_commands_and_help_for_players(self):
         with override_settings(RP_ECONOMY_REVEALED=False):
-            for command in (CmdBalance, CmdOffer, CmdAccept, CmdGive):
+            for command in (CmdBalance, CmdOffer, CmdAccept):
                 self.assertFalse(command().access(self.char2))
                 self.assertTrue(command().access(self.char1))
+            # give replaces Evennia's own, so it never disappears.
+            self.assertTrue(CmdGive().access(self.char2))
+            self.assertEqual(CmdGive().help_category, "general")
 
 
 @override_settings(RP_ECONOMY_REVEALED=True, RP_ECONOMY_FROZEN=False, RP_ECONOMY_FEE_POLICY=None)
@@ -491,8 +660,37 @@ class EconomyCommandTests(BaseEvenniaCommandTest):
 
     def test_give_uses_same_exchange_checks(self):
         credit(self.char1, 10)
-        self.call(CmdGive(), "2 coins to Char2", "Gift completed.")
+        self.call(CmdGive(), "2 coins to Char2", "You give 2 coins to Char2.")
         self.assertEqual(balance(self.char2), 2)
         self.account.characters.add(self.char2)
         self.assertIn("same account", self.call(CmdGive(), "1 coin=Char2"))
         self.assertFalse(Offer.objects.filter(status="open").exists())
+
+    def test_give_never_takes_an_offer_slot(self):
+        credit(self.char1, 10)
+        for _ in range(5):
+            create_offer(self.char1, self.char2, [{"kind": "money", "key": "", "quantity": 1}])
+        self.call(CmdGive(), "1 coin to Char2", "You give 1 coin to Char2.")
+
+    def test_hidden_give_hands_over_items_only(self):
+        self.obj1.location = self.char2
+        credit(self.char2, 10)
+        with override_settings(RP_ECONOMY_REVEALED=False):
+            refused = self.call(CmdGive(), "2 coins to Char", caller=self.char2)
+            self.assertIn("No unique carried item matches '2 coins'", refused)
+            with self.captureOnCommitCallbacks(execute=True):
+                self.call(CmdGive(), "Obj to Char", "You give Obj to Char.", caller=self.char2)
+        self.assertEqual(self.obj1.location, self.char1)
+        self.assertEqual(balance(self.char2), 10)
+
+    def test_frozen_give_moves_items_but_not_money_and_pays_no_fee(self):
+        self.obj1.location = self.char2
+        credit(self.char2, 10)
+        with override_settings(RP_ECONOMY_FROZEN=True, RP_ECONOMY_FEE_TRADE=3):
+            with self.captureOnCommitCallbacks(execute=True):
+                self.call(CmdGive(), "Obj to Char", "You give Obj to Char.", caller=self.char2)
+            frozen = self.call(CmdGive(), "1 coin to Char", caller=self.char2)
+            self.assertIn("market is closed", frozen)
+        self.assertEqual(self.obj1.location, self.char1)
+        self.assertEqual(balance(self.char2), 10)
+        self.assertTrue(LedgerEntry.objects.filter(kind="exchange").exists())

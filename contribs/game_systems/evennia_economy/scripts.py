@@ -16,18 +16,28 @@ def ensure_economy_script_running():
 class EconomyBatchScript(DefaultScript):
     def at_script_creation(self):
         self.key = "economy_batch"
-        self.desc = "Passive income, eligibility stipends and offer expiry."
+        self.desc = "Passive income, the reveal stipend sweep and offer expiry."
         self.interval = 60
         self.persistent = True
 
     def at_repeat(self):
-        from .batch import period_key, run_stipends, run_weekly_batch
+        from evennia_links.periodic import advance
+        from evennia_links.runtime import get
+
+        from .batch import note_visibility, period_key, run_due_period
         from .exchange import expire_offers
 
         expire_offers()
-        run_stipends()
-        week = period_key()
-        if self.db.last_batch_week != week:
-            result = run_weekly_batch(week)
-            if not result["errors"] and not result["frozen"]:
-                self.db.last_batch_week = week
+        note_visibility()
+        state = self.db.batch_state
+        if state is None and self.db.last_batch_week:
+            # Earlier scripts stored only the last fully paid period.
+            state = {"latest": self.db.last_batch_week, "pending": []}
+        # Periods completing while frozen queue up and are paid once unfrozen.
+        self.db.batch_state = advance(
+            state,
+            period_key(),
+            run_due_period,
+            paused=get("RP_ECONOMY_FROZEN"),
+            label="Economy batch",
+        )

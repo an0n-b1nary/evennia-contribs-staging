@@ -9,14 +9,17 @@ class EconomyConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from django.db.models.signals import post_save
+        from django.db.models.signals import post_save, pre_delete
 
         from evennia_links.runtime import runtime_setting_changed
 
         from .batch import on_runtime_change
         from .conf import register_controls
         from .exchange import on_location_saved
+        from .models import Purse
+        from .services import on_purse_deleted
 
         register_controls()
         post_save.connect(on_location_saved, dispatch_uid="economy_offer_departure")
         runtime_setting_changed.connect(on_runtime_change, dispatch_uid="economy_reveal")
+        pre_delete.connect(on_purse_deleted, sender=Purse, dispatch_uid="economy_purse_deleted")

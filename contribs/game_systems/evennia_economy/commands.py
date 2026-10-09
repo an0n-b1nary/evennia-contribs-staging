@@ -6,7 +6,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 
 from . import assets, conf
 from .batch import money_cap, run_stipends, run_weekly_batch
-from .exchange import accept_offer, cancel_offer, create_offer, expire_offers
+from .exchange import accept_offer, cancel_offer, create_offer, expire_offers, give
 from .models import LedgerEntry, Offer, ReviewFlag
 from .reports import account_accrual, reconciliation
 from .services import EconomyError, balance, credit, debit
@@ -104,30 +104,43 @@ class CmdAccept(EconomyCommand):
 
 
 class CmdGive(EconomyCommand):
-    """Give a carried item or other asset under the same exchange safeguards.
+    """Give something you carry to someone here.
 
-    give <assets> = <character>
-    Uses the same account, freeze, item-hook and fee checks as +offer.
+    give <things> = <character>
+    give <things> to <character>
+
+    Separate several things with commas. Giving to your own other characters
+    isn't allowed.
     """
 
+    # Replaces Evennia's give, so it stays available while the economy is hidden:
+    # then (for non-staff) it hands over carried items only, and says nothing of
+    # money or other assets. Coins and resources follow the market's freeze and fees.
     key = "give"
     rhs_split = ("=", " to ")
     arg_regex = r"\s|$"
+    help_category = "General"
+
+    def access(self, srcobj, access_type="cmd", default=False, **kwargs):
+        return super(EconomyCommand, self).access(srcobj, access_type, default, **kwargs)
+
+    def func(self):
+        try:
+            self.run()
+        except (EconomyError, ValueError) as exc:
+            self.msg(str(exc))
 
     def run(self):
-        if not self.rhs or self.switches:
-            raise EconomyError("Usage: give <assets> = <character>")
+        if not self.lhs or not self.rhs or self.switches:
+            raise EconomyError("Usage: give <things> = <character>")
         target = self.caller.search(self.rhs)
         if not target:
             return
-        # Creation and immediate acceptance are one outer transaction. A failed
-        # gift leaves no spurious open offer.
-        from django.db import transaction
-
-        with transaction.atomic():
-            offer = create_offer(self.caller, target, assets.parse_spec(self.caller, self.lhs))
-            accept_offer(target, offer.pk)
-        self.msg("Gift completed.")
+        spec = assets.parse_spec(self.caller, self.lhs, items_only=not conf.visible(self.caller))
+        offer = give(self.caller, target, spec)
+        described = assets.describe(offer.give)
+        self.msg(f"You give {described} to {target.key}.")
+        target.msg(f"{self.caller.key} gives you {described}.")
 
 
 class CmdEconomy(EconomyCommand):

@@ -3,10 +3,10 @@
 from django.db.models import Sum
 from evennia.accounts.models import AccountDB
 
+from evennia_links.characters import playable_accounts
 from evennia_links.collect import collect_dicts
 
 from .models import LedgerEntry, Purse, StipendPayment, UBIPayment
-from .services import playable_accounts
 from .signals import economy_figures
 
 

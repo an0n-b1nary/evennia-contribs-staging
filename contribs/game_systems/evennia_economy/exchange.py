@@ -61,7 +61,7 @@ def create_offer(giver, recipient, give, want=None, *, secret=False):
         assets.check(giver, recipient, give)
         # Requested stock need not be available until acceptance, but unknown
         # kinds must never be persisted as a valid offer.
-        known = {"money", "item", *assets.providers()}
+        known = {"money", "item", *assets.providers(giver, recipient)}
         if any(asset["kind"] not in known for asset in want):
             raise EconomyError("Unknown requested asset provider.")
         if {a["key"] for a in give if a["kind"] == "item"} & {
@@ -90,6 +90,39 @@ def _announce(offer, giver, recipient, secret):
             )
 
 
+def _swap(offer, giver, recipient, *, market=True):
+    """Recheck and move both legs of `offer`; the caller holds both character locks.
+
+    A non-market swap (an item-only `give`) pays no trade fee and ignores the
+    freeze, like Evennia's own give, but keeps every other check and the ledger.
+    """
+    # Lock all item rows in one order before calling pre-give hooks.
+    item_ids = sorted({int(a["key"]) for a in offer.give + offer.want if a["kind"] == "item"})
+    list(ObjectDB.objects.select_for_update().filter(pk__in=item_ids).order_by("pk"))
+    assets.check(giver, recipient, offer.give)
+    assets.check(recipient, giver, offer.want)
+    if market:
+        for actor, spec in ((giver, offer.give), (recipient, offer.want)):
+            if spec:
+                charge_fee(
+                    "trade", actor, {"offer_id": offer.pk, "assets": spec}, exchange_id=offer.pk
+                )
+    assets.move(giver, recipient, offer.give, offer.pk)
+    assets.move(recipient, giver, offer.want, offer.pk)
+    for first, second, spec in ((giver, recipient, offer.give), (recipient, giver, offer.want)):
+        if spec:
+            entry = journal(
+                "exchange",
+                giver=first,
+                recipient=second,
+                amount=sum(a["quantity"] for a in spec if a["kind"] == "money"),
+                assets=spec,
+                exchange_id=offer.pk,
+                by=recipient,
+            )
+            flag_round_trips(entry)
+
+
 def accept_offer(recipient, offer_id, *, secret=False):
     expire_offers()
     initial = Offer.objects.filter(pk=offer_id).first()
@@ -105,33 +138,42 @@ def accept_offer(recipient, offer_id, *, secret=False):
         giver = offer.giver
         if _parties(giver, recipient) != offer.room_id:
             raise EconomyError("The offer's room has changed.")
-        # Lock all item rows in one order before calling pre-give hooks.
-        item_ids = sorted({int(a["key"]) for a in offer.give + offer.want if a["kind"] == "item"})
-        list(ObjectDB.objects.select_for_update().filter(pk__in=item_ids).order_by("pk"))
-        assets.check(giver, recipient, offer.give)
-        assets.check(recipient, giver, offer.want)
-        for actor, spec in ((giver, offer.give), (recipient, offer.want)):
-            if spec:
-                charge_fee(
-                    "trade", actor, {"offer_id": offer.pk, "assets": spec}, exchange_id=offer.pk
-                )
-        assets.move(giver, recipient, offer.give, offer.pk)
-        assets.move(recipient, giver, offer.want, offer.pk)
-        for first, second, spec in ((giver, recipient, offer.give), (recipient, giver, offer.want)):
-            if spec:
-                entry = journal(
-                    "exchange",
-                    giver=first,
-                    recipient=second,
-                    amount=sum(a["quantity"] for a in spec if a["kind"] == "money"),
-                    assets=spec,
-                    exchange_id=offer.pk,
-                    by=recipient,
-                )
-                flag_round_trips(entry)
+        _swap(offer, giver, recipient)
         offer.status = "accepted"
         offer.save(update_fields=["status"])
         transaction.on_commit(lambda: _announce(offer, giver, recipient, secret))
+        return offer
+
+
+def give(giver, recipient, spec):
+    """Hand assets over at once, as one exchange that never occupies an offer slot.
+
+    Item-only gifts are ordinary handoffs: they work while the economy is hidden
+    or frozen and pay no trade fee. They still keep the same-room and same-account
+    rules, item hooks and the ledger, so round trips are still flagged for review.
+    Anything else is a market movement, refused while frozen.
+    """
+    spec = assets.normalize(spec)
+    if not spec:
+        raise EconomyError("Give at least one thing.")
+    market = any(asset["kind"] != "item" for asset in spec)
+    with transaction.atomic():
+        if market:
+            require_open()
+        lock_characters(giver, recipient)
+        room_id = _parties(giver, recipient)
+        now = timezone.now()
+        offer = Offer.objects.create(
+            giver=giver,
+            recipient=recipient,
+            room_id=room_id,
+            give=spec,
+            want=[],
+            secret=True,
+            status="accepted",
+            expires=now,
+        )
+        _swap(offer, giver, recipient, market=market)
         return offer
 
 

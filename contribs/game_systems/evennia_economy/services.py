@@ -4,9 +4,9 @@
 
 from django.db import transaction
 from django.db.models import F
-from evennia.accounts.models import AccountDB
 from evennia.objects.models import ObjectDB
 
+from evennia_links.characters import account_ids, playable_accounts, same_account  # noqa: F401
 from evennia_links.runtime import get
 
 from . import conf
@@ -26,36 +26,6 @@ def quantity(amount):
     if type(amount) is not int or amount <= 0 or amount > 2**63 - 1:
         raise EconomyError("Amount must be a positive whole number within the supported range.")
     return amount
-
-
-def playable_accounts():
-    """Read the playable handler's storage without its model/Attribute caches."""
-    from evennia.utils.dbserialize import from_pickle
-
-    rows = (
-        AccountDB.objects.filter(
-            db_attributes__db_key="_playable_characters", db_attributes__db_category__isnull=True
-        )
-        .order_by("pk")
-        .values_list("pk", "db_attributes__db_value")
-    )
-    for account_id, raw in rows:
-        yield account_id, [obj for obj in from_pickle(raw) if obj]
-
-
-def account_ids(character):
-    """Playable-character membership, including offline alts and multiple accounts."""
-    if character is None:
-        return []
-    return [
-        account_id
-        for account_id, characters in playable_accounts()
-        if character.pk in {obj.pk for obj in characters}
-    ]
-
-
-def same_account(first, second):
-    return bool(set(account_ids(first)) & set(account_ids(second)))
 
 
 def lock_characters(*characters):
@@ -143,3 +113,18 @@ def charge_fee(kind, actor, context=None, *, exchange_id=None):
                 exchange_id=exchange_id,
             )
         return amount
+
+
+def on_purse_deleted(sender, instance, **kwargs):
+    """Burn a deleted character's balance in the journal, so reconciliation still balances.
+
+    Purses only go away with their character (the foreign key cascades). The
+    row records the character's name and accounts while they can still be read.
+    """
+    if instance.balance:
+        journal(
+            "deleted",
+            giver=instance.character,
+            amount=instance.balance,
+            note="Balance removed with its character.",
+        )

@@ -68,6 +68,25 @@ class EconomyPartnerTests(EvenniaTest):
         with self.assertRaisesRegex(EconomyError, "same account"):
             create_offer(self.char2, self.char1, spec)
 
+    def test_hidden_resources_stay_out_of_player_trades(self):
+        if not apps.is_installed("evennia_rp_resources"):
+            return
+        from evennia_rp_resources.models import ResourceDefinition
+        from evennia_rp_resources.services import grant
+
+        ResourceDefinition.objects.get_or_create(
+            key="grain", defaults={"name": "Grain", "category": "provisions"}
+        )
+        grant(self.char2, "grain", 3)
+        spec = [{"kind": "resource", "key": "grain", "quantity": 1}]
+        with override_settings(RP_RESOURCES_REVEALED=False):
+            self.assertNotIn("resource", assets.providers(self.char2))
+            self.assertIn("resource", assets.providers(self.char1))  # staff still see it
+            with self.assertRaises(EconomyError):
+                assets.parse_spec(self.char2, "1 grain")
+            with self.assertRaises(EconomyError):
+                create_offer(self.char2, self.char1, spec)
+
     def test_resource_to_money_roundtrip_is_reviewed(self):
         if not apps.is_installed("evennia_rp_resources"):
             return

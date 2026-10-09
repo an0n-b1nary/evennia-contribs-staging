@@ -6,7 +6,10 @@ Collector receivers return {kind: provider}. A provider implements describe(key)
 check(giver, recipient, key, quantity), debit(character, key, quantity, exchange_id)
 and credit(character, key, quantity, exchange_id). All methods run inside the
 exchange transaction; check must raise on refusal and writes must be transactional.
-Money and items are reserved native kinds. Unknown providers fail closed.
+An optional available(character) -> bool hides the kind from that character (for
+example while its package is unrevealed): it won't parse, and offers involving
+them refuse it. Money and items are reserved native kinds. Unknown providers
+fail closed.
 """
 
 import logging
@@ -25,11 +28,16 @@ from .signals import asset_providers
 logger = logging.getLogger("evennia")
 
 
-def providers():
+def providers(*characters):
+    """Provider kinds, limited to those available to every given character."""
     return {
         key: value
         for key, value in collect_dicts(asset_providers, sender=OfferAssets).items()
         if key not in ("money", "item")
+        and all(
+            not hasattr(value, "available") or value.available(character)
+            for character in characters
+        )
     }
 
 
@@ -61,18 +69,23 @@ def normalize(spec):
     ]
 
 
-def parse_spec(character, text):
+def parse_spec(character, text, *, items_only=False):
     """Explicit prefixes avoid guessing: money:40, resource:grain:3, item:#12.
 
     Ordinary `40 coins` and inventory names are also accepted. A host provider
     may implement parse(text) -> (key, quantity) for its natural-language form.
+    With `items_only` (the economy is hidden from `character`), every piece is
+    a carried item, so nothing hints at money or other asset kinds.
     """
     result = []
-    available = providers()
+    available = {} if items_only else providers(character)
     for piece in text.split(","):
         piece = piece.strip()
         if not piece:
             raise EconomyError("Empty asset. Separate assets with commas.")
+        if items_only:
+            result.append(_carried_item(character, piece))
+            continue
         if piece.startswith("money:"):
             try:
                 result.append({"kind": "money", "key": "", "quantity": int(piece[6:])})
@@ -106,12 +119,16 @@ def parse_spec(character, text):
                 kind, (key, count) = matches[0]
                 result.append({"kind": kind, "key": key, "quantity": count})
                 continue
-        name = piece[5:] if piece.startswith("item:") else piece
-        objects = character.search(name, candidates=character.contents, quiet=True)
-        if len(objects) != 1:
-            raise EconomyError(f"No unique carried item matches {name!r}.")
-        result.append({"kind": "item", "key": str(objects[0].pk), "quantity": 1})
+        result.append(_carried_item(character, piece))
     return normalize(result)
+
+
+def _carried_item(character, piece):
+    name = piece[5:] if piece.startswith("item:") else piece
+    objects = character.search(name, candidates=character.contents, quiet=True)
+    if len(objects) != 1:
+        raise EconomyError(f"No unique carried item matches {name!r}.")
+    return {"kind": "item", "key": str(objects[0].pk), "quantity": 1}
 
 
 def describe(spec):
@@ -134,7 +151,7 @@ def describe(spec):
 
 
 def check(giver, recipient, spec):
-    available = providers()
+    available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]
         if kind == "money":
@@ -165,8 +182,13 @@ def check(giver, recipient, spec):
 
 
 def _finish_item(item, giver, recipient):
-    """Publish cache and hook changes only after the exchange commits."""
-    try:
+    """Publish cache and hook changes only after the exchange commits.
+
+    Each step runs on its own, so one failing hook can't skip the others (an
+    item's at_post_move is where equipment seals a handed-over item).
+    """
+
+    def relocate():
         # refresh_from_db() reuses Evennia's identity-mapped ObjectDB instance,
         # which can still carry the old FK. Read the scalar directly instead.
         location_id = (
@@ -175,16 +197,22 @@ def _finish_item(item, giver, recipient):
         item.db_location = ObjectDB.objects.get(pk=location_id) if location_id else None
         giver.contents_cache.remove(item)
         recipient.contents_cache.add(item)
-        giver.at_object_leave(item, recipient, move_type="give")
-        recipient.at_object_receive(item, giver, move_type="give")
-        item.at_post_move(giver, move_type="give")
-        item.at_give(giver, recipient)
-    except Exception:
-        logger.exception("Economy item post-transfer hook failed for #%s", item.pk)
+
+    for step in (
+        relocate,
+        lambda: giver.at_object_leave(item, recipient, move_type="give"),
+        lambda: recipient.at_object_receive(item, giver, move_type="give"),
+        lambda: item.at_post_move(giver, move_type="give"),
+        lambda: item.at_give(giver, recipient),
+    ):
+        try:
+            step()
+        except Exception:
+            logger.exception("Economy item post-transfer hook failed for #%s", item.pk)
 
 
 def move(giver, recipient, spec, exchange_id):
-    available = providers()
+    available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]
         if kind == "money":
