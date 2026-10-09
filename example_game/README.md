@@ -16,7 +16,7 @@ part of this repo).
 
 ## What's wired up
 
-All 19 current contribs, in dependency order — `evennia_links` first, then `evennia_rp_resources`, then
+All 20 current contribs, in dependency order — `evennia_links` first, then `evennia_economy` and `evennia_rp_resources`, then
 the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
 `evennia_maps`), then the standalone apps (`evennia_calendar`,
@@ -63,7 +63,28 @@ as it lands.
 
 ### Resource gathering
 
-`evennia-rp-resources` 0.1 is wired with a generic Materials / Provisions /
+`evennia-economy` 0.1 adds integer purses and passive weekly income with a
+five-UBI-week base cap, once-only starting/reveal stipends, and atomic exchanges
+of money, carried items and resource counters. Demo authors start with 200 coins.
+Use `+balance`, `+offer character=5 coins for resource:grain:2`, and `+accept number`;
+`/secret` on either offer or acceptance suppresses the room announcement. Stock
+`give` is replaced so gifts enforce the same account and freeze rules too.
+
+Staff use `+economy` for reconciliation and per-account accrual, `/run dry` for
+income previews, `/credit` and `/debit` for adjustments, and `/flags` for review.
+The generic jobs reporter files cross-asset round-trip flags as staff discussions.
+Runtime settings control reveal, freeze, stipend amounts, income, taper, cap weeks,
+offer limits and zero-default fees. The server-start hook ensures the scheduler
+runs; the character login hook quietly summarizes income once. No economy mixin,
+MRO change or web/API mount is needed. Stalls are a later milestone.
+
+`world/sandbox/test_economy.py` exercises actual resources, worn equipment,
+review jobs, commands and login/start hooks. CI verifies truly absent resources,
+jobs and equipment in fresh environments; resources also runs without economy.
+The live suite trades resources and money between ordinary sessions, checks
+same-account refusal, secret acceptance, freeze/reveal and reconnect persistence.
+
+`evennia-rp-resources` 0.1.1 is wired with a generic Materials / Provisions /
 Essences catalogue. The IC rooms already carry forest, hills, urban and water
 terrains; these define the open trickle pool, while Grain is always common.
 The demonstration characters have Timber holdings and the Proving Grounds
@@ -84,9 +105,8 @@ and grant/spend/audit stock. `+runtime` controls registered settings without a
 restart. `RP_RESOURCES_REVEALED=false` hides player access and summaries while
 background accrual continues. The live RP suite covers holdings, leans, staff
 grants and runtime reveal. `world/sandbox/test_resources.py` checks actual maps,
-social and login seams. Fresh CI profiles exclude maps, plots, social or tracker
-and verify the excluded package cannot be imported; economy is also asserted
-absent until its milestone ships.
+social and login seams. Fresh CI profiles exclude maps, plots, social, tracker
+or economy and verify the excluded package cannot be imported.
 
 ### The map, and the web surface
 
@@ -448,6 +468,7 @@ python3.12 -m venv .venv_sandbox   # NOT the same venv as any other Evennia game
 source .venv_sandbox/bin/activate  # or .venv_sandbox\Scripts\activate on Windows
 pip install "evennia>=6.0"
 for d in contribs/base_systems/evennia_links \
+         contribs/game_systems/evennia_economy \
          contribs/game_systems/evennia_rp_resources \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \
@@ -611,6 +632,7 @@ if it lists a modified tracked file, that change is real and reset will destroy 
 
 ```bash
 for d in contribs/base_systems/evennia_links \
+         contribs/game_systems/evennia_economy \
          contribs/game_systems/evennia_rp_resources \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \

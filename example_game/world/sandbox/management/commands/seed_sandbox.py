@@ -290,6 +290,12 @@ class Command(BaseCommand):
             counts["resources"] = len(seed_catalog(update=True))
             for author in authors:
                 grant(author, "timber", 3, "staff", note="Sandbox demonstration stores")
+        if apps.is_installed("evennia_economy"):
+            from evennia_economy.services import credit
+
+            for author in authors:
+                credit(author, 200, note="Sandbox demonstration purse")
+            counts["purses"] = len(authors)
         return counts
 
     def _create_rp_playground(self, rooms, authors):

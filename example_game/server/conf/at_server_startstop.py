@@ -61,6 +61,11 @@ def at_server_start():
 
         ensure_resource_script_running()
 
+    if apps.is_installed("evennia_economy"):
+        from evennia_economy.scripts import ensure_economy_script_running
+
+        ensure_economy_script_running()
+
     # evennia_xp — start the weekly (Monday 00:00 UTC) batch Script.
     if apps.is_installed("evennia_xp"):
         from evennia_xp.scripts import ensure_xp_batch_script_running

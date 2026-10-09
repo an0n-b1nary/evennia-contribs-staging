@@ -58,6 +58,13 @@ def at_initial_setup():
                 services.set_edge(character, "presence", 2)
                 abilities.grant(character, "proficiency", "performance")
         identities[role] = {"account": account.pk, "character": character.pk, "name": character.key}
+        if role == "alice":
+            alt, errors = account.create_character(
+                key="Playtest alternate", location=room, home=room
+            )
+            if errors or alt is None:
+                raise RuntimeError(f"Alternate fixture creation failed: {errors}")
+            identities["alternate"] = {"account": account.pk, "character": alt.pk, "name": alt.key}
     Path(settings.GAME_DIR, "fixtures.json").write_text(json.dumps(identities), encoding="utf-8")
 
 

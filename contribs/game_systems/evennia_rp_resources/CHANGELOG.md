@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-10-09
+
+- Added: gated economy asset provider for atomic resource exchanges, natural
+  quantity/name parsing and staff reconciliation figures. Economy remains optional.
+
 ## 0.1.0 — 2026-10-09
 
 - Added: stable resource catalogue, atomic holdings and signed grant/spend ledger.

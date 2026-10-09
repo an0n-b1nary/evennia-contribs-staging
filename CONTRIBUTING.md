@@ -274,10 +274,23 @@ By contributing, you agree your contributions are licensed under [BSD 3-Clause](
 Use a fresh Python 3.12 environment for each profile, with Evennia 6.0.0. Create
 an empty game with `evennia --init ci_game < /dev/null`, then run
 `python scripts/ci_install_contribs.py ci_game --exclude evennia-maps` (or exclude
-`evennia-plots`, `evennia-social`, or `evennia-rptracker`). Migrate with
+`evennia-plots`, `evennia-social`, `evennia-rptracker`, or `evennia-economy`). Migrate with
 `evennia migrate --noinput < /dev/null` from the game. Run
-`python scripts/ci_run_resources_tests.py ci_game --absent evennia_maps
---absent evennia_economy` from the repo, substituting the excluded app label.
+`python scripts/ci_run_resources_tests.py ci_game --absent evennia_maps`
+from the repo, substituting the excluded app label.
 The runner verifies physical absence and requires a positive test count. Omit
-installation exclusions for the present profile. Economy is intentionally
-absent in every current profile; adjust the matrix when it ships.
+installation exclusions for the present profile.
+
+### Economy partner profiles
+
+Repeat the fresh-environment procedure above, excluding `evennia-rp-resources`,
+`evennia-jobs`, or `evennia-rp-equipment`, then run
+`python scripts/ci_run_economy_tests.py ci_game --absent evennia_rp_resources`
+(substitute the excluded app label). Omit exclusions and `--absent` for the
+present profile. This runs the economy suite plus real resource exchange,
+equipment refusal/sealing and staff-review job seams. The resources matrix
+also checks an environment with economy genuinely unimportable.
+
+The full contrib matrix has a 45-minute job limit; partner jobs have 30 minutes.
+These bounds include installation/migration and allow the suite to grow across
+the supported Python versions without cancelling normal progress.

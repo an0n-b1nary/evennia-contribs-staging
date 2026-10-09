@@ -83,6 +83,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # pose/emote command, the same way the old hand-rolled stopgap did.
         self.add(CmdPose)
         self.add(CmdRuntime)
+        for command in _optional_commands(
+            "evennia_economy", "CmdBalance", "CmdOffer", "CmdAccept", "CmdGive", "CmdEconomy"
+        ):
+            self.add(command)
         for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):
             self.add(command)
         self.add(CmdEmit)

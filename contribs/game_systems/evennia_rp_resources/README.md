@@ -12,6 +12,12 @@ Install `evennia-links>=0.6` first, then `pip install -e .`. Add
 Links is the only hard contrib dependency. Maps, social, plots and economy
 are optional; resources imports none of their models.
 
+With economy 0.1 installed, resources 0.1.1 registers the `resource` exchange
+asset and reconciliation figures during app startup. `+offer` accepts
+`resource:grain:3` or `3 Grain`. Both resource ledger rows carry the exchange id,
+and failed swaps roll both holdings and currency back. With economy absent,
+resource commands, passive accrual and gathering work independently.
+
 Add `ResourcesCmdSet` to your character cmdset and `evennia_links.commands.CmdRuntime`
 for staff. Call `ensure_resource_script_running()` from
 `evennia_rp_resources.scripts` in your `at_server_start()` hook. Add

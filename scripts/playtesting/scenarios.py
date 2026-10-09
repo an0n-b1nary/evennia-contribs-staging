@@ -103,6 +103,75 @@ class Suite:
             self.command("staff", "+runtime/reset RP_RESOURCES_REVEALED", "True")
         self.command("alice", "+gather/clear", "lean cleared")
 
+    def economy(self):
+        state = self.state()
+        alice_id = state["actors"]["alice"]["id"]
+        bob_id = state["actors"]["bob"]["id"]
+        bob_name = self.session.host.credentials["bob"]["name"]
+
+        def purse(snapshot, character_id):
+            return next(
+                (
+                    r["balance"]
+                    for r in snapshot["economy_purses"]
+                    if r["character_id"] == character_id
+                ),
+                0,
+            )
+
+        def grain(snapshot, character_id):
+            return sum(
+                r["quantity"]
+                for r in snapshot["resource_holdings"]
+                if r["character_id"] == character_id and r["resource__key"] == "grain"
+            )
+
+        self.command("alice", "+balance", "Purse:")
+        self.command("alice", "+economy", "Only staff")
+        self.command("staff", f"+economy/credit #{alice_id}=20,Live trade", "Purse updated")
+        self.command("staff", f"+resources/grant #{bob_id}=grain,3,Live trade", "Resources updated")
+        before = self.state()
+        self.command("alice", f"+offer {bob_name}=5 coins for resource:grain:2", "Offer #")
+        offer_id = self.state()["economy_offers"][-1]["id"]
+        result = self.command("bob", f"+accept {offer_id}", "accepted")
+        assert "complete a trade" in self.observer(result, "staff")
+        after = self.state()
+        assert purse(after, alice_id) == purse(before, alice_id) - 5
+        assert purse(after, bob_id) == purse(before, bob_id) + 5
+        assert grain(after, alice_id) == grain(before, alice_id) + 2
+        assert grain(after, bob_id) == grain(before, bob_id) - 2
+        self.command("bob", f"+accept {offer_id}", "no longer open")
+        self.command("alice", "+offer Playtest alternate=1 coin", "same account")
+
+        self.command("alice", f"+offer {bob_name}=1 coin", "Offer #")
+        offer_id = self.state()["economy_offers"][-1]["id"]
+        result = self.command("bob", f"+accept/secret {offer_id}", "accepted")
+        assert "complete a trade" not in self.observer(result, "staff")
+        self.command("staff", "+runtime RP_ECONOMY_FROZEN=true", "True")
+        try:
+            self.command("alice", f"+offer {bob_name}=1 coin", "market is closed")
+            self.command("alice", "+balance", "Purse:")
+        finally:
+            self.command("staff", "+runtime/reset RP_ECONOMY_FROZEN", "False")
+        self.command("staff", "+runtime RP_ECONOMY_REVEALED=false", "False")
+        try:
+            self.command(
+                "alice", "+balance", "not available|not found|Could not find|Unknown command"
+            )
+            self.command("staff", "+economy/run dry", "Preview")
+        finally:
+            self.command("staff", "+runtime/reset RP_ECONOMY_REVEALED", "True")
+        before = self.state()
+        self.command("staff", "+economy/run", "Batch")
+        self.command("staff", "+economy/run", "Batch")
+        after = self.state()
+        assert len({(r["character_id"], r["week"]) for r in after["economy_ubi"]}) == len(
+            after["economy_ubi"]
+        )
+        self.session.disconnect("alice")
+        self.session.connect("alice")
+        assert self.state()["economy_purses"] == after["economy_purses"]
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -322,6 +391,7 @@ def run_rp(session, smoke=False):
     cases = [
         ("ordinary login, staff role and probe authorization", suite.prepare),
         ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
+        ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:

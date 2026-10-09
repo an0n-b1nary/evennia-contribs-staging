@@ -189,6 +189,7 @@ class Host:
     def write_settings(self):
         p = self.ports
         overrides = {
+            "MAX_NR_CHARACTERS": 2,  # Ordinary-account alt for exchange policy checks.
             "PLAYTEST_RUN_ID": self.run_id,
             "PLAYTEST_CREDENTIALS_FILE": str(self.game / "credentials.json"),
             "TELNET_PORTS": [p["telnet"]],

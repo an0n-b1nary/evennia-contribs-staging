@@ -68,6 +68,16 @@ class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, Defaul
         super().at_post_puppet(**kwargs)
         self.attributes.add("sandbox_last_seen", timezone.now())
 
+        if apps.is_installed("evennia_economy"):
+            from evennia_economy.batch import ensure_stipends
+            from evennia_economy.summary import notify_economy_summary
+
+            from evennia_links.runtime import get
+
+            if not get("RP_ECONOMY_FROZEN"):
+                ensure_stipends(self)
+            notify_economy_summary(self)
+
         if apps.is_installed("evennia_rp_resources"):
             from evennia_rp_resources.summary import notify_resource_summary
 

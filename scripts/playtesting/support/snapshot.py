@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from evennia.accounts.models import AccountDB
+from evennia_economy.models import LedgerEntry, Offer, Purse, UBIPayment
 from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
@@ -49,6 +50,32 @@ def snapshot():
         }
     return {
         "actors": actors,
+        "economy_purses": rows(
+            Purse.objects.filter(character_id__in=ids), "character_id", "balance"
+        ),
+        "economy_offers": rows(
+            Offer.objects.filter(giver_id__in=ids),
+            "id",
+            "giver_id",
+            "recipient_id",
+            "status",
+            "give",
+            "want",
+        ),
+        "economy_ledger": rows(
+            LedgerEntry.objects.filter(from_id__in=ids) | LedgerEntry.objects.filter(to_id__in=ids),
+            "id",
+            "kind",
+            "from_id",
+            "to_id",
+            "amount",
+            "fee",
+            "assets",
+            "exchange_id",
+        ),
+        "economy_ubi": rows(
+            UBIPayment.objects.filter(character_id__in=ids), "character_id", "week", "amount"
+        ),
         "resource_holdings": rows(
             ResourceHolding.objects.filter(character_id__in=ids),
             "character_id",

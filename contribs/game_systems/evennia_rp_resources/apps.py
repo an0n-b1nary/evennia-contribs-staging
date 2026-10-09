@@ -12,3 +12,10 @@ class ResourcesConfig(AppConfig):
         from .conf import register_controls
 
         register_controls()
+        if self.apps.is_installed("evennia_economy"):
+            from evennia_economy.signals import asset_providers, economy_figures
+
+            from .economy import provide_assets, provide_figures
+
+            asset_providers.connect(provide_assets, dispatch_uid="resources_economy_assets")
+            economy_figures.connect(provide_figures, dispatch_uid="resources_economy_figures")

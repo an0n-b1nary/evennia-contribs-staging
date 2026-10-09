@@ -31,6 +31,7 @@ def main() -> int:
     # launcher exits 0 having run ZERO tests (a silently-green CI job).
     result = subprocess.run(
         ["evennia", "test", "--settings=settings.py", *labels],
+        stdin=subprocess.DEVNULL,
         check=False,
     )
     return result.returncode
