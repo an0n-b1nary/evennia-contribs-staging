@@ -61,6 +61,9 @@ class RoomTileSerializer(serializers.Serializer):
     room_id = serializers.IntegerField()
     room_name = serializers.CharField()
     terrain = serializers.CharField()
+    # Display data from MAPS_TERRAINS (terrain.terrain_style): "" when unset.
+    terrain_label = serializers.CharField(allow_blank=True)
+    terrain_color = serializers.CharField(allow_blank=True)
     sprite_url = serializers.CharField()
     # Geometry-inferred portal: set when this room has an exit onto a
     # different, standalone (zstack="") plane. There is no in-game portal
@@ -72,6 +75,7 @@ class RoomTileSerializer(serializers.Serializer):
     # contrib that owns it, under that contrib's own privacy rule. See
     # evennia_maps/overlays.py.
     primary_region_id = serializers.IntegerField(allow_null=True)
+    primary_region_name = serializers.CharField(allow_blank=True)
     has_active_scene = serializers.BooleanField()
     active_scenes = MapPopupLinkSerializer(many=True)
     recent_scene_count = serializers.IntegerField()

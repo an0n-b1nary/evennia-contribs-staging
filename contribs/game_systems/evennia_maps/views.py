@@ -51,6 +51,7 @@ from django.views.generic import DetailView, ListView
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays, overlay_url_templates
 from evennia_maps.permissions import is_room_web_visible, is_staff_user, read_room_attr
+from evennia_maps.terrain import terrain_legend, terrain_style
 
 TILE_SIZE = 32
 
@@ -113,9 +114,7 @@ def tile_hangout_type(room):
 
 def tile_sprite(terrain):
     """Sprite URL for a resolved terrain key, or an empty string for the fallback swatch."""
-    # getattr, not settings.MAPS_TERRAIN_TILESET: a host game need not
-    # define it, matching terrain.py's handling of MAPS_TERRAIN_PRECEDENCE.
-    return getattr(settings, "MAPS_TERRAIN_TILESET", {}).get(terrain, "")
+    return terrain_style(terrain)["sprite"]
 
 
 def tiles_url_template():
@@ -142,6 +141,7 @@ def _build_tile_context(tile, overlays, urls):
     # The SVG legend links one recent log per tile; the Leaflet popup lists
     # the whole set. Both come from the same single overlay query.
     latest_scene = recent_scenes[0] if recent_scenes else None
+    style = terrain_style(tile.terrain)
     return {
         "x": tile.x,
         "y": tile.y,
@@ -149,7 +149,9 @@ def _build_tile_context(tile, overlays, urls):
         "room_name": tile.room_name or (room.key if room else f"Room #{tile.room_id}"),
         "room_url": _url_for(urls.get("room", ""), tile.room_id),
         "terrain": tile.terrain,
-        "sprite": tile_sprite(tile.terrain),
+        "terrain_label": style["label"],
+        "color": style["color"],
+        "sprite": style["sprite"],
         "region": region,
         "region_url": _url_for(urls.get("region", ""), region["id"]) if region else "",
         "active_scenes": [
@@ -189,6 +191,7 @@ def build_svg_context(tiles, *, staff=False, tile_size=TILE_SIZE, padding=1):
         t["svg_y"] = (max_y - t["y"]) * tile_size
     return {
         "tiles": rendered,
+        "terrains": terrain_legend(t["terrain"] for t in rendered),
         "tile_size": tile_size,
         "svg_width": (max_x - min_x + 1) * tile_size,
         "svg_height": (max_y - min_y + 1) * tile_size,

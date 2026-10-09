@@ -88,7 +88,8 @@ doesn't matter — `MapsRoomMixin` doesn't override `msg()` or any hook they tou
 | `MAPS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Staff lock for place/move/unplace/pin/reflow/check |
 | `MAPS_DIRECTION_OFFSETS` | `{}` | Merged over `direction.DEFAULT_DIRECTION_OFFSETS` — add or override individual directions without redeclaring the whole table |
 | `MAPS_TERRAIN_PRECEDENCE` | `[]` | Ordered list of terrain tag names; the first one present on a room's `terrain_tags` wins as `RoomTile.terrain` |
-| `MAPS_TERRAIN_TILESET` | `{}` | `{terrain_key: sprite_url}` for the web map. A terrain with no sprite renders as a plain swatch |
+| `MAPS_TERRAINS` | `{}` | `{terrain_key: {"label", "color", "sprite"}}`, each field optional: how a terrain looks on the web map. See [Terrain display](#terrain-display) |
+| `MAPS_TERRAIN_TILESET` | `{}` | `{terrain_key: sprite_url}`, the older sprite-only table; used when `MAPS_TERRAINS` gives a terrain no sprite |
 | `MAPS_UNMAPPABLE_ROOM_TYPES` | `()` | `room_type` values the auto-placer must never map — an OOC lounge, a chargen suite. Digging a directional exit into one places nothing; `+map/place` still honours an explicit request, and `/check` reports the result. **Not a privacy setting** — see below |
 | `MAPS_ROOM_VISIBILITY` | unset | Dotted path to a `callable(room) -> bool` replacing the default room-hiding rule. **Fails closed** — see below |
 | `MAPS_OVERLAY_URL_NAMES` | see below | Route names the map links out to, merged over the defaults |
@@ -171,6 +172,32 @@ Tiles require an authenticated account; the SVG page does not.
 `plane_live_map.html`. Nothing is vendored into this package. If your site runs
 without third-party CDN access, override that template and serve Leaflet yourself —
 the static SVG map has no JavaScript dependency at all.
+
+### Terrain display
+
+`MAPS_TERRAINS` sets how each resolved terrain key looks:
+
+```python
+MAPS_TERRAINS = {
+    "salt_pan": {"label": "Salt pan", "color": "#ece7dc", "sprite": "/static/terrain/salt_pan.svg"},
+    "scrub": {"label": "Dry scrub", "color": "#8a7a4a"},  # colour only: a tinted swatch
+}
+```
+
+- **sprite** draws over the cell, at any size; the map scales it. It falls back to
+  `MAPS_TERRAIN_TILESET`, then to a swatch.
+- **color** fills a cell with no sprite and colours its legend chip. Only hex
+  values (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) are used; anything else falls back
+  to the default swatch, since the value reaches SVG attributes.
+- **label** names the terrain in tooltips and legends. It defaults to the key in
+  sentence case (`salt_pan` → "Salt pan"). Keys are data; labels can change freely.
+
+Both maps show a terrain key for the terrains present on the plane. The live map adds
+a hover highlight that keeps the terrain's hue, a tooltip with the room, terrain,
+region and activity badges ("Scene now", "Event soon", "Lore here", hangout type),
+and a **Room list** button beneath the map. The list shows every visible room grouped
+by region, each a button that opens the tile's popup, which is the keyboard and
+screen-reader route to everything the map shows.
 
 ### Browsable API with Evennia's API disabled
 
