@@ -295,6 +295,19 @@ def _systems():
     return rows
 
 
+def _without_dark(accounts):
+    """Recently connected accounts, minus staff whose characters have gone dark."""
+    if not apps.is_installed("evennia_social"):
+        return accounts
+    from evennia_social.presence import is_publicly_listed
+
+    return [
+        account
+        for account in accounts
+        if all(is_publicly_listed(character) for character in account.characters.all())
+    ]
+
+
 class SandboxIndexView(EvenniaIndexView):
     """Evennia's index view, with this sandbox's widgets added to the context.
 
@@ -308,6 +321,9 @@ class SandboxIndexView(EvenniaIndexView):
         context = super().get_context_data(**kwargs)
         context.update(
             {
+                "accounts_connected_recent": _without_dark(
+                    context.get("accounts_connected_recent") or []
+                ),
                 "live_scenes": _live_scenes(),
                 "scene_archive_url": _url("evennia_scenes:scene-list"),
                 "upcoming_events": _upcoming_events(),

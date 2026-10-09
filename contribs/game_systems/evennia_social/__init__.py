@@ -21,13 +21,15 @@ Public API:
     HANGOUT_TYPES                          — valid +hangouts categories
     find_room(caller, query), find_room_for_player(caller, query, character)
     is_staff(character), get_connected_characters(), find_character(name)
+    evennia_social.presence — per-character findable / unfindable / (staff)
+        dark, and is_findable / is_listed for every presence surface
 
 Commands (import explicitly when needed):
 
     from evennia_social.commands import (
         CmdFinger, CmdWhere, CmdHangouts, CmdIgnore, CmdPage,
         CmdSummon, CmdJoin, CmdOoc, CmdOocTeleport, CmdHome,
-        CmdRoomConfig, CmdRoulette, CmdTel, CmdMood,
+        CmdRoomConfig, CmdRoulette, CmdTel, CmdMood, CmdUnfindable, CmdWho,
     )
 
 Screen-reader support (requires the [accessibility] extra):
@@ -51,7 +53,7 @@ apps.py is discovered during that phase, since evennia_social is itself
 listed in INSTALLED_APPS).
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 _LAZY = {
     "SocialCharacterMixin": "typeclasses",

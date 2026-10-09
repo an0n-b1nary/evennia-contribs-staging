@@ -6,6 +6,10 @@ Player discovery commands — +where and +hangouts.
 Provides location-based player discovery: who's where, which hangout
 venues are active, and room population counts.
 
+Every listing and count here leaves out characters who aren't findable by
+the viewer (``evennia_social.presence``): unfindable or dark characters,
+unless the viewer shares their room or is staff. Staff see a marker instead.
+
 Requires the caller's Room typeclass to mix in
 ``evennia_social.SocialRoomMixin`` (for ``hangout_type``) and
 ``evennia_posing.PosingCharacterMixin`` on Character (for
@@ -18,6 +22,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.objects.models import ObjectDB
 
 from evennia_posing.highlighting import format_pose_time
+from evennia_social import presence
 from evennia_social.social import get_connected_characters, is_staff
 from evennia_social.typeclasses import HANGOUT_TYPES
 
@@ -43,7 +48,8 @@ class CmdWhere(MuxCommand):
         +where/count        - Show room population counts only
 
     Respects IC/OOC visibility rules. Staff rooms are only visible
-    to staff members.
+    to staff members. Characters who chose |w+unfindable|n are left out
+    unless they're in your room.
     """
 
     key = "+where"
@@ -95,6 +101,9 @@ class CmdWhere(MuxCommand):
             if room_type == "staff" and not is_viewer_staff:
                 continue
 
+            if not presence.is_findable(char, viewer):
+                continue
+
             # Apply filter if requested.
             if filter_type and room_type != filter_type:
                 continue
@@ -113,6 +122,8 @@ class CmdWhere(MuxCommand):
                 char_descs = []
                 for char in sorted(chars, key=lambda c: c.last_pose_time or 0):
                     name = char.get_display_name(looker=viewer)
+                    if is_viewer_staff:
+                        name += presence.staff_marker(char)
                     idle = format_pose_time(char.last_pose_time)
                     if char.pose_status == "afk":
                         idle = "--"
@@ -148,6 +159,8 @@ class CmdWhere(MuxCommand):
                 chars.sort(key=lambda c: c.last_pose_time or 0)
                 for char in chars:
                     name = char.get_display_name(looker=viewer)
+                    if is_viewer_staff:
+                        name += presence.staff_marker(char)
                     if len(name) > 34:
                         name = name[:31] + "..."
                     idle = format_pose_time(char.last_pose_time)
@@ -183,6 +196,8 @@ class CmdWhere(MuxCommand):
             room = char.location
             room_type = getattr(room, "room_type", "ic") or "ic"
             if room_type == "staff" and not is_viewer_staff:
+                continue
+            if not presence.is_findable(char, viewer):
                 continue
             rooms[room] += 1
             total += 1
@@ -292,6 +307,9 @@ class CmdHangouts(MuxCommand):
 
             # Staff rooms hidden from non-staff.
             if room_type == "staff" and not is_viewer_staff:
+                continue
+
+            if not presence.is_findable(char, viewer):
                 continue
 
             # Only include designated hangout rooms.
