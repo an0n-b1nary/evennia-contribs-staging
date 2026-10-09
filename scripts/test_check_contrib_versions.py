@@ -85,6 +85,53 @@ class VersionChecks(unittest.TestCase):
         with patch.object(checker, "CONTRIBS_ROOT", self.root / "missing"):
             self.assertEqual(checker.main([]), 1)
 
+    def sibling(self, requirement, *, optional=False):
+        """Create a consumer of the probe's declared 0.2.0 release."""
+        consumer = self.root / "utils" / "evennia_consumer"
+        consumer.mkdir()
+        dependencies = (
+            f"[project.optional-dependencies]\nweb = [{requirement!r}]\n"
+            if optional
+            else f"dependencies = [{requirement!r}]\n"
+        )
+        (consumer / "pyproject.toml").write_text(
+            '[project]\nname = "evennia-consumer"\nversion = "0.1.0"\n' + dependencies,
+            encoding="utf-8",
+        )
+        return consumer
+
+    def test_incompatible_hard_sibling_is_rejected(self):
+        consumer = self.sibling("evennia-probe>=0.1,<0.2")
+        errors = checker.check_sibling_dependencies([self.package, consumer])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("evennia_consumer", errors[0])
+        self.assertIn("evennia-probe>=0.1,<0.2", errors[0])
+        self.assertIn("rejects sibling version 0.2.0", errors[0])
+
+    def test_compatible_normalized_sibling_with_extras_is_accepted(self):
+        consumer = self.sibling("Evennia_Probe[web]>=0.2,<0.3")
+        self.assertEqual(checker.check_sibling_dependencies([self.package, consumer]), [])
+
+    def test_external_dependency_is_left_to_pip(self):
+        consumer = self.sibling("unrelated-dependency>=1")
+        self.assertEqual(checker.check_sibling_dependencies([self.package, consumer]), [])
+
+    def test_inactive_marker_is_ignored(self):
+        consumer = self.sibling('evennia-probe<0.2; python_version < "3.0"')
+        self.assertEqual(checker.check_sibling_dependencies([self.package, consumer]), [])
+
+    def test_active_marker_is_checked(self):
+        consumer = self.sibling('evennia-probe<0.2; python_version >= "3.0"')
+        self.assertTrue(checker.check_sibling_dependencies([self.package, consumer]))
+
+    def test_optional_dependency_is_outside_default_install(self):
+        consumer = self.sibling("evennia-probe<0.2", optional=True)
+        self.assertEqual(checker.check_sibling_dependencies([self.package, consumer]), [])
+
+    def test_invalid_requirement_fails_closed(self):
+        consumer = self.sibling(">=0.2")
+        self.assertTrue(checker.check_sibling_dependencies([self.package, consumer]))
+
     def test_repository_release_metadata(self):
         self.assertEqual(checker.main([]), 0)
 
