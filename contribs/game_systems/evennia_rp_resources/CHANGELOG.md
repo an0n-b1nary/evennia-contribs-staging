@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 — 2026-10-09
+
+- Fixed: accept evennia-links 0.8 alongside 0.7 so resources install with
+  the shared web character resolver and its consumers.
+
 ## 0.1.1 — 2026-10-09
 
 - Added: gated economy asset provider for atomic resource exchanges, natural
