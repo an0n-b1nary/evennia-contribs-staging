@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Social commands package — profiles, discovery, messaging, filtering,
-teleportation, OOC, navigation, room mood, and enhanced @tel.
+teleportation, OOC, navigation, room mood, presence, and enhanced @tel.
 """
 
 from evennia_social.commands.discovery import CmdHangouts as CmdHangouts
@@ -13,6 +13,8 @@ from evennia_social.commands.mood import CmdMood as CmdMood
 from evennia_social.commands.navigation import CmdHome as CmdHome
 from evennia_social.commands.navigation import CmdOocTeleport as CmdOocTeleport
 from evennia_social.commands.ooc import CmdOoc as CmdOoc
+from evennia_social.commands.presence import CmdUnfindable as CmdUnfindable
+from evennia_social.commands.presence import CmdWho as CmdWho
 from evennia_social.commands.roomconfig import CmdRoomConfig as CmdRoomConfig
 from evennia_social.commands.roulette import CmdRoulette as CmdRoulette
 from evennia_social.commands.tel import CmdTel as CmdTel

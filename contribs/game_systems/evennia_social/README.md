@@ -22,6 +22,7 @@ place.
 | `HANGOUT_TYPES` | Tuple of valid `+hangouts` categories |
 | `commands/finger.py` | `CmdFinger` — profile view/edit, bio (`EvEditor`), followed themes |
 | `commands/discovery.py` | `CmdWhere`, `CmdHangouts` — player/venue discovery |
+| `commands/presence.py` | `CmdUnfindable`, `CmdWho` — per-character presence and a `who` that honours staff `dark` |
 | `commands/filtering.py` | `CmdIgnore` — account-level ignore list |
 | `commands/messaging.py` | `CmdPage` — private OOC messaging |
 | `commands/teleportation.py` | `CmdSummon`, `CmdJoin` — consensual teleport requests |
@@ -87,7 +88,7 @@ they touch disjoint state.
 from evennia_social.commands import (
     CmdFinger, CmdWhere, CmdHangouts, CmdIgnore, CmdPage,
     CmdSummon, CmdJoin, CmdOoc, CmdOocTeleport, CmdHome,
-    CmdRoomConfig, CmdRoulette, CmdTel, CmdMood,
+    CmdRoomConfig, CmdRoulette, CmdTel, CmdMood, CmdUnfindable,
 )
 
 class CharacterCmdSet(CmdSet):
@@ -187,6 +188,39 @@ behaves sensibly and needs to do nothing here.
 | `combat_state` | Character | `"idle"` | `@tel` refuses to teleport a character whose `combat_state == "in_combat"`, with a clearer message than a generic failure. Purely a nicety: if your game blocks combat movement in `at_pre_move` (the usual place), the move is rejected anyway. |
 
 ---
+
+## Presence: unfindable and dark
+
+Each character chooses whether it can be found from afar, with `+unfindable`:
+
+| Setting | `+where`, venue counts, web maps | `who` | Who can set it |
+|---|---|---|---|
+| `findable` (default) | shown | shown | anyone |
+| `unfindable` | hidden | shown | anyone |
+| `dark` | hidden | hidden | staff (`perm(Builder)`) |
+
+Being in the same room always reveals a character, and staff see through both
+settings (with a marker in `+where`). Unfindable is privacy from people who
+aren't there, not invisibility.
+
+Every presence surface asks `evennia_social.presence`, so they can't disagree.
+In-game code calls `is_findable(character, viewer)` (location) or
+`is_listed(character, viewer)` (online at all); web code with no in-game viewer
+calls `is_publicly_findable(character)` / `is_publicly_listed(character)`.
+
+`who` lives in the AccountCmdSet. To leave dark staff out of it, add this
+contrib's `CmdWho` there; it replaces Evennia's command of the same key:
+
+```python
+from evennia_social.commands import CmdWho
+
+class AccountCmdSet(default_cmds.AccountCmdSet):
+    def at_cmdset_creation(self):
+        super().at_cmdset_creation()
+        self.add(CmdWho)
+```
+
+Add `CmdUnfindable` to the CharacterCmdSet with the other social commands.
 
 ## The severed `+ooc` scene-log coupling
 

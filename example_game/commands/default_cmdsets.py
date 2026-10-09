@@ -52,7 +52,9 @@ from evennia_social.commands import (
     CmdRoulette,
     CmdSummon,
     CmdTel,
+    CmdUnfindable,
     CmdWhere,
+    CmdWho,
 )
 
 
@@ -111,6 +113,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdMood)
         self.add(CmdRoulette)
         self.add(CmdTel)
+        self.add(CmdUnfindable)
 
         # RP session tracking
         for command in _optional_commands("evennia_rptracker", "CmdActivity", "CmdRPTrackerStaff"):
@@ -211,6 +214,10 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # read a character-select table to find it. The account cmdset merges
         # into the puppet's, so it works in character too.
         self.add(CmdScreenreader)
+
+        # Presence (evennia_social): replaces Evennia's who, leaving staff who
+        # have gone dark out of it for players. +unfindable is in-character.
+        self.add(CmdWho)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):
