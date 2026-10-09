@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-09
+
+### Fixed
+
+- An item now seals before later `at_post_move` hooks run, so a failing host
+  hook (or an exchange's post-commit hook chain) can't leave an item that
+  changed hands editable by its maker.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

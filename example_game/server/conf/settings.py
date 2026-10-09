@@ -49,6 +49,7 @@ EVENNIA_ADMIN = False
 # base models are imported at their app-load time).
 INSTALLED_APPS += [
     "evennia_links",
+    "evennia_economy",
     "evennia_rp_resources",
     "evennia_rptracker",
     "evennia_scenes",
@@ -83,6 +84,23 @@ INSTALLED_APPS += [
     # discovered and its ready() runs.
     "world.sandbox",
 ]
+
+######################################################################
+# Economy (evennia-economy) — integer purses, passive income and atomic trades
+######################################################################
+RP_ECONOMY_REVEALED = True
+RP_ECONOMY_FROZEN = False
+RP_ECONOMY_CURRENCY = ("coin", "coins")
+RP_ECONOMY_WEEKLY_AMOUNT = 100
+RP_ECONOMY_BASE_CAP_WEEKS = 5
+RP_ECONOMY_TAPER_FRACTION = 0.8
+RP_ECONOMY_STARTING_STIPEND = 100
+RP_ECONOMY_REVEAL_STIPEND = 100
+RP_ECONOMY_PERIOD_SECONDS = 604800
+RP_ECONOMY_OFFER_TIMEOUT = 600
+RP_ECONOMY_MAX_OPEN_OFFERS = 5
+RP_ECONOMY_STAFF_LOCK = "cmd:perm(Builder)"
+RP_ECONOMY_FLAG_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
 
 ######################################################################
 # RP resources (evennia-rp-resources) — passive accrual and gathering choices

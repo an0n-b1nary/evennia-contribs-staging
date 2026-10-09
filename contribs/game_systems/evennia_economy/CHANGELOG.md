@@ -1,0 +1,20 @@
+# Changelog
+
+## 0.1.0 — 2026-10-09
+
+- Added: integer purses, atomic journaled currency writes, independent passive
+  income with ownership-raised caps, taper and once-only eligibility/reveal stipends.
+- Added: same-room atomic exchanges of money, items and optional provider assets,
+  unreserved offers, secret acceptance, expiry and same-account protection.
+- Added: fee boundaries, freeze/reveal controls, login summaries, reconciliation,
+  account accrual reports and cross-asset round-trip review flags.
+- `give` stays available while hidden (carried items only) and for item-only
+  gifts while frozen, without a trade fee or an open-offer slot.
+- The reveal stipend is paid once, to characters eligible when a game that ran
+  hidden is revealed; never-hidden games and later characters don't receive it.
+- The scheduler no longer sweeps stipends every minute, retries only failed
+  characters with backoff, and pays periods missed while frozen on unfreeze.
+- Deleting a character journals its balance as burned; post-commit item hooks
+  run independently; the income-cap notice is given once, not weekly.
+- Eligibility and same-account membership come from `evennia_links.characters`
+  (links 0.7).

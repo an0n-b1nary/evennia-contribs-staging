@@ -7,10 +7,18 @@ does not require RP, sessions, login time or partner counts.
 
 ## Install and wire
 
-Install `evennia-links>=0.6` first, then `pip install -e .`. Add
+Install `evennia-links>=0.7` first, then `pip install -e .`. Add
 `"evennia_links"` and `"evennia_rp_resources"` to `INSTALLED_APPS` in that order.
 Links is the only hard contrib dependency. Maps, social, plots and economy
 are optional; resources imports none of their models.
+
+With economy 0.1 installed, resources 0.1.1 registers the `resource` exchange
+asset and reconciliation figures during app startup. `+offer` accepts
+`resource:grain:3` or `3 Grain`. Both resource ledger rows carry the exchange id,
+and failed swaps roll both holdings and currency back. With economy absent,
+resource commands, passive accrual and gathering work independently. While
+resources are hidden, the asset provider's `available()` keeps them out of
+non-staff trades and parsing, so nothing hints at them.
 
 Add `ResourcesCmdSet` to your character cmdset and `evennia_links.commands.CmdRuntime`
 for staff. Call `ensure_resource_script_running()` from
@@ -65,12 +73,16 @@ can return `{"workshop": {"resources": 12, "money": 50}}` for the supplied
 Without providers the base cap applies.
 
 `RP_ECONOMY_ELIGIBLE` is an optional callable or dotted path `(character) -> bool`,
-shared with future economy code. By default all characters in accounts'
-playable-character lists qualify, including offline characters.
+shared with economy. By default all characters in accounts' playable-character
+lists qualify, including offline characters; membership comes from
+`evennia_links.characters`, so every package agrees on who is eligible.
 `RP_RESOURCES_STAFF_LOCK` defaults to `"cmd:perm(Builder)"`.
 
 `RP_RESOURCES_OPEN_TERRAINS` accepts a collection, callable, or dotted path
-returning a collection. `None` (default) scans the game's room typeclass family.
+returning a collection. `None` (default) scans the game's room typeclass family
+each time the pool is needed (`+gather`, `+resources/catalog`, the batch), so
+games with large grids should list their open terrains explicitly. Profile
+fields never scan.
 `RP_RESOURCES_TERRAIN_PROVIDER` accepts `(room) -> terrain key`; otherwise maps'
 resolver is used when installed, falling back to the room's `terrain` tag
 category. No regions dependency is needed. Empty terrain lists form an always
@@ -79,8 +91,11 @@ excluded from the trickle and new lean choices. Existing leans persist and
 report when they currently yield nothing.
 
 The scheduler checks every minute, so shortened periods need no restart.
-Each run pays the most recently completed period; there is no retroactive
-backfill. Default labels are ISO weeks. Changing duration creates a new
+Each completed period runs once. Characters whose accrual fails are retried
+alone, from five minutes doubling to six hours, for up to twelve attempts (see
+`evennia_links.periodic`); `+resources/run` reruns a period by hand. Periods
+that complete while the server is down are not backfilled. Default labels are
+ISO weeks. Changing duration creates a new
 period namespace; staff should account for the transition when tuning it.
 Hidden accrual continues normally and stops at the stock cap. A reveal
 does not itself broadcast a message: announce it through your game's normal
@@ -115,15 +130,18 @@ retries failed batches. Random draws are seeded by character and period and
 receipt metadata records the pool, weights, lean, prior stock and cap for audit.
 Dry runs neither change counters nor consume receipts.
 
+The login line names the week's gains. "Your stores are full" is said once
+when stores fill; while they stay full and nothing is gained, no line is sent.
+
 With social 0.3+, configure:
 
 ```python
 SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
 ```
 
-No economy asset-provider or plot signal is connected in 0.1; those adapters
-arrive with the corresponding milestones. Without maps, the tag fallback and
-common pool work without imports of any optional partner.
+Plot Thread payouts arrive in a later release; no plots signal is connected
+yet. Without maps, the tag fallback and common pool work without imports of any
+optional partner.
 
 ## Tests
 

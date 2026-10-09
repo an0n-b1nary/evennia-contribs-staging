@@ -95,13 +95,15 @@ class EquipmentMixin:
         return super().at_pre_move(destination, move_type=move_type, **kwargs)
 
     def at_post_move(self, source_location, move_type="move", **kwargs):
-        super().at_post_move(source_location, move_type=move_type, **kwargs)
+        # Our own state first, so a failing hook further along the MRO can't
+        # leave a handed-over item editable by its maker.
         # Staff can still teleport a worn item away; it isn't worn any more.
         if self.is_worn and self.location is not source_location:
             self.tags.remove(WORN_TAG, category=TAG_CATEGORY)
         holder = self.location
         if isinstance(holder, DefaultCharacter) and holder.id != self.maker_id:
             self.sealed = True
+        super().at_post_move(source_location, move_type=move_type, **kwargs)
 
 
 class Equipment(EquipmentMixin, DefaultObject):

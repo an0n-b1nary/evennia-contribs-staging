@@ -286,6 +286,78 @@ class ResourceTests(EvenniaTest):
             notify_resource_summary(self.char2)
         self.assertIn("Your stores are full", msg.call_args.args[0])
 
+    def test_full_stores_are_mentioned_once_not_weekly(self):
+        grant(self.char2, "wood", 30)
+        sent = []
+        for week in ("2026-W40", "2026-W41", "2026-W42"):
+            self.run_batch(week)
+            with patch.object(self.char2, "msg") as msg:
+                notify_resource_summary(self.char2)
+            sent.append([call.args[0] for call in msg.call_args_list])
+        self.assertEqual(len(sent[0]), 1)
+        self.assertIn("Your stores are full", sent[0][0])
+        self.assertEqual(sent[1:], [[], []])
+        spend(self.char2, "wood", 20, "Room again")
+        self.run_batch("2026-W43")
+        with patch.object(self.char2, "msg") as msg:
+            notify_resource_summary(self.char2)
+        self.assertNotIn("full", msg.call_args.args[0])
+
+    def batch_script(self):
+        from evennia.utils.create import create_script
+
+        return create_script(
+            "evennia_rp_resources.scripts.ResourceBatchScript",
+            key="rp_resources_batch",
+            autostart=False,
+        )
+
+    def test_scheduler_retries_only_failures_with_backoff(self):
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        script = self.batch_script()
+        real_grant = batch.grant
+        attempts = []
+
+        def flaky(character, *args, **kwargs):
+            attempts.append(character.pk)
+            if character.pk == self.char2.pk:
+                raise RuntimeError("Grant failed")
+            return real_grant(character, *args, **kwargs)
+
+        with (
+            patch("evennia_rp_resources.batch.period_key", return_value="2026-W40"),
+            patch("evennia_rp_resources.batch.grant", side_effect=flaky),
+            self.assertLogs("evennia", level="ERROR"),
+        ):
+            script.at_repeat()
+            before = len(attempts)
+            script.at_repeat()  # within the backoff: no per-minute rerun
+        self.assertEqual(len(attempts), before)
+        pending = script.db.batch_state["pending"]
+        self.assertEqual([entry["ids"] for entry in pending], [[self.char2.pk]])
+        with (
+            patch("evennia_rp_resources.batch.period_key", return_value="2026-W40"),
+            patch("evennia_links.periodic.time.time", return_value=pending[0]["due"]),
+        ):
+            script.at_repeat()
+        self.assertEqual((total_held(self.char1), total_held(self.char2)), (6, 6))
+        self.assertEqual(script.db.batch_state["pending"], [])
+
+    def test_scripts_from_before_the_queue_keep_their_last_period(self):
+        self.account2.characters.add(self.char2)
+        script = self.batch_script()
+        script.db.last_batch_week = "2026-W40"
+        with patch("evennia_rp_resources.batch.period_key", return_value="2026-W40"):
+            script.at_repeat()
+        self.assertEqual(total_held(self.char2), 0)
+
+    def test_profile_field_skips_the_open_terrain_scan(self):
+        gathering.set_lean(self.char2, "wood")
+        with patch("evennia_rp_resources.gathering.pool") as scan:
+            self.assertEqual(gathering_field(self.char1, self.char2), {"Gathering": "Wood"})
+        scan.assert_not_called()
+
     def test_hidden_notifications_are_suppressed_for_staff_too(self):
         batch.run_weekly_batch("2026-W40", characters=[self.char1])
         with override_settings(RP_RESOURCES_REVEALED=False), patch.object(self.char1, "msg") as msg:

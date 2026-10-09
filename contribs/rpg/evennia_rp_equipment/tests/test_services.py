@@ -93,6 +93,16 @@ class EditingTests(GearTest):
         with self.assertRaisesMessage(GearError, "changed hands"):
             services.add_requirement(self.char1, self.item, "Brawn +1")
 
+    def test_a_failing_later_move_hook_still_seals(self):
+        # Exchanges run move hooks after commit; a host hook further along the
+        # MRO must not leave a handed-over item editable by its maker.
+        from evennia.objects.objects import DefaultObject
+
+        with patch.object(DefaultObject, "at_post_move", side_effect=RuntimeError("host hook")):
+            self.item.move_to(self.char2, quiet=True, move_type="give")
+        self.assertEqual(self.item.location, self.char2)
+        self.assertTrue(self.item.sealed)
+
     def test_dropping_and_picking_it_back_up_doesnt_seal(self):
         self.item.move_to(self.room1, quiet=True, move_type="drop")
         self.item.move_to(self.char1, quiet=True, move_type="get")

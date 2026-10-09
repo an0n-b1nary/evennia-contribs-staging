@@ -1,5 +1,14 @@
 # Changelog — evennia-links
 
+## [0.7.0] - 2026-10-09
+
+- Added: `evennia_links.characters`, the shared playable-character membership
+  (`account_ids`, `same_account`, `playable_characters`, `is_playable`), so every
+  package that pays or restricts players agrees on who counts.
+- Added: `evennia_links.periodic`, Monday-anchored period labels and a retrying
+  queue for idempotent period batches: only failed characters retry, with
+  backoff, and periods missed while paused run once unpaused.
+
 ## [0.6.0] - 2026-10-09
 
 - Added: Registered runtime controls, staff `+runtime` and the cap-contribution collector.

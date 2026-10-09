@@ -373,3 +373,23 @@ receive `character` and return disjoint provider keys, for example
 `{"workshop": {"resources": 12, "money": 50}}`. `cap_raise(character, kind)` sums
 nonnegative integer raises for that cap. Missing or broken providers contribute
 nothing. The cap owner adds this raise to its base; providers never import it.
+
+## Playable characters and period batches
+
+`evennia_links.characters` is the one definition of "a player's characters"
+for packages that pay or restrict players. `playable_characters(predicate=None)`
+yields every character on any account's playable list once (offline ones
+included), filtered by an optional `(character) -> bool` such as a host's
+eligibility rule; `is_playable(character, predicate=None)` checks one character
+without a sweep. `account_ids(character)` and `same_account(a, b)` back
+same-account rules. Characters on no account (NPCs, props) belong to nobody.
+The stored list is read directly, so sweeps don't load every account.
+
+`evennia_links.periodic` serves weekly (or staff-shortened) batch scripts.
+`period_key(seconds)` labels the most recently completed Monday-anchored
+period (ISO weeks for the weekly default). `advance(state, period, run,
+paused=False)` queues each new period once and calls `run(period, ids)`, which
+pays everyone when `ids` is None and returns the ids that failed. Only those
+retry, with exponential backoff (5 minutes doubling to 6 hours, 12 attempts);
+a paused queue runs its periods oldest first once unpaused. Persist the
+returned dict on the script. Batches must be idempotent per period.

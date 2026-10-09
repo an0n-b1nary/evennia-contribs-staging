@@ -7,4 +7,5 @@ from .gathering import lean_description
 
 
 def gathering_field(viewer, target):
-    return {"Gathering": lean_description(target)} if conf.visible(viewer) else {}
+    # Profiles are viewed often; skip the open-terrain scan behind "(currently yields nothing)".
+    return {"Gathering": lean_description(target, check=False)} if conf.visible(viewer) else {}

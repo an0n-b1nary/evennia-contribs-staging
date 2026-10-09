@@ -48,7 +48,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -70,14 +70,14 @@ jobs:
         run: python scripts/test_check_templates.py
 
       - name: Initialize throwaway game directory
-        run: evennia --init ci_game
+        run: evennia --init ci_game < /dev/null
       - name: Install all contribs and register their apps
         run: python scripts/ci_install_contribs.py ci_game
       - name: Installed contrib version parity
         run: python scripts/check_contrib_versions.py --installed
       - name: Migrate
         working-directory: ci_game
-        run: evennia migrate --noinput
+        run: evennia migrate --noinput < /dev/null
       - name: Run tests
         working-directory: ci_game
         run: python ../scripts/ci_run_tests.py
@@ -85,7 +85,7 @@ jobs:
 
   partners:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -113,26 +113,29 @@ jobs:
 
   resources-partners:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - profile: all-present
             excludes: ""
-            absent: "--absent evennia_economy"
+            absent: ""
           - profile: no-maps
             excludes: "--exclude evennia-maps"
-            absent: "--absent evennia_maps --absent evennia_economy"
+            absent: "--absent evennia_maps"
           - profile: no-plots
             excludes: "--exclude evennia-plots"
-            absent: "--absent evennia_plots --absent evennia_economy"
+            absent: "--absent evennia_plots"
           - profile: no-social
             excludes: "--exclude evennia-social"
-            absent: "--absent evennia_social --absent evennia_economy"
+            absent: "--absent evennia_social"
           - profile: no-tracker
             excludes: "--exclude evennia-rptracker"
-            absent: "--absent evennia_rptracker --absent evennia_economy"
+            absent: "--absent evennia_rptracker"
+          - profile: no-economy
+            excludes: "--exclude evennia-economy"
+            absent: "--absent evennia_economy"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -150,9 +153,45 @@ jobs:
       - name: Resources suite and real partner seams
         run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
 
+  economy-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-resources
+            excludes: "--exclude evennia-rp-resources"
+            absent: "--absent evennia_rp_resources"
+          - profile: no-jobs
+            excludes: "--exclude evennia-jobs"
+            absent: "--absent evennia_jobs"
+          - profile: no-equipment
+            excludes: "--exclude evennia-rp-equipment"
+            absent: "--absent evennia_rp_equipment"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize disposable host
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected contribs in dependency order
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: Economy suite and real partner seams
+        run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
+
   rp-contest-partners:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
