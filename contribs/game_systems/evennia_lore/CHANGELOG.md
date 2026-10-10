@@ -28,6 +28,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `lore` and `ic-may-mislead`.
 - **Migrations:** 0003 adds the fields and `LoreNotice`; 0004 marks entries staff
   approved through `LORE_REQUIRE_APPROVAL` as affirmed.
+- **Fixed:** filtering the API for `affirmation=none` includes declines hidden
+  from the caller, so comparing listings cannot reveal another author's decline.
+- **Fixed:** staff can read restricted entries and their sealed notes with
+  `+lore/read` without acquiring them first, matching the website and API.
+- **Fixed:** the new-entry web form selects `LORE_DEFAULT_KIND` instead of always
+  choosing the first configured kind.
 
 ## [0.4.1] - 2026-10-09
 

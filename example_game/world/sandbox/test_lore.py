@@ -7,8 +7,8 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.test import RequestFactory
-from evennia.utils.test_resources import EvenniaTest
+from django.test import RequestFactory, override_settings
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia_lore.models import LoreEntry, LoreNotice, PlotLoreLink
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
@@ -32,6 +32,73 @@ class LoreReviewSeams(EvenniaTest):
         self.assertEqual(job.job_type, JobType.DISCUSS)
         self.assertIn(f"#{entry.entry_number} Camp Gossip", job.title)
         self.assertIn("+lore/affirm", job.description)
+
+
+class LoreLayerSeams(EvenniaCommandTest):
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_staff_can_review_restricted_sealed_notes_in_game(self):
+        from evennia_lore.commands import CmdLore
+
+        entry = LoreEntry.create_entry(
+            title="A hidden legend", author=self.char2, kind="legend", privacy="restricted"
+        )
+        entry.seal("The archivist knows the truth.")
+        player = self.call(CmdLore(), f"/read #{entry.entry_number}", caller=self.char2)
+        self.assertNotIn(entry.sealed_notes, player)
+        staff = self.call(CmdLore(), f"/read #{entry.entry_number}", caller=self.char1)
+        self.assertIn(entry.sealed_notes, staff)
+        self.assertFalse(entry.acquisitions.exists())
+
+    def test_api_filter_preserves_private_declines(self):
+        from evennia_lore.api.views import LoreEntryViewSet
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        declined = LoreEntry.create_entry(title="Declined legend", author=self.char1)
+        declined.decline(declined_by=self.char1, note="For the author only.")
+        plain = LoreEntry.create_entry(title="Unreviewed legend", author=self.char1)
+        self.account2.characters.add(self.char2)
+        request = APIRequestFactory().get("/api/lore/entries/", {"affirmation": "none"})
+        force_authenticate(request, user=self.account2)
+        response = LoreEntryViewSet.as_view({"get": "list"})(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            [row["id"] for row in response.data["results"]], [declined.pk, plain.pk]
+        )
+        self.assertTrue(all(row["affirmation"] == "none" for row in response.data["results"]))
+
+    @override_settings(LORE_DEFAULT_KIND="legend")
+    def test_web_submission_uses_the_configured_default_kind(self):
+        from django.urls import resolve, reverse
+        from evennia_lore.views import LoreCreateView
+
+        self.account2.characters.add(self.char2)
+        path_ = reverse("lore-create")
+        factory = RequestFactory()
+        request = factory.get(path_, HTTP_ACCEPT="text/html")
+        request.user = self.account2
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        request.resolver_match = resolve(path_)
+        response = LoreCreateView.as_view()(request)
+        response.render()
+        self.assertIn('<option value="legend" selected>', response.content.decode())
+        form = response.context_data["form"]
+        request = factory.post(
+            path_,
+            {
+                "title": "A legend from the web",
+                "body": "The river has turned gold.",
+                "kind": form["kind"].value(),
+                "accuracy": form["accuracy"].value() or "",
+                "privacy": "public",
+            },
+        )
+        request.user = self.account2
+        response = LoreCreateView.as_view()(request)
+        self.assertEqual(response.status_code, 302)
+        entry = LoreEntry.objects.get(title="A legend from the web")
+        self.assertEqual((entry.kind, entry.accuracy), ("legend", "open"))
 
 
 class SeededLoreSeams(SeededSandboxMixin, EvenniaTest):

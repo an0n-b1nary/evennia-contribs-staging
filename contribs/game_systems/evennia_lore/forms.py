@@ -94,6 +94,10 @@ class LoreEntryCreateForm(_LayerFieldsMixin, AccessibleModelForm):
             ),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial.setdefault("kind", layers.default_kind())
+
     def clean_title(self):
         title = self.cleaned_data.get("title", "").strip()
         if not title:

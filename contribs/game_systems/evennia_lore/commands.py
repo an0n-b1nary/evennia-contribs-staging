@@ -513,7 +513,11 @@ class CmdLore(EditingMixin, MuxCommand):
         staff = is_staff(caller)
         badges = _badges(entry, show_decline=staff or _is_author(entry, caller))
 
-        if entry.privacy == LoreEntry.Privacy.RESTRICTED and not entry.is_accessible_to(caller):
+        if (
+            entry.privacy == LoreEntry.Privacy.RESTRICTED
+            and not staff
+            and not entry.is_accessible_to(caller)
+        ):
             # The OOC layer follows the IC content: hidden until acquired.
             tags_str = ", ".join(t.name for t in entry.tags.all()) or "none"
             caller.msg(

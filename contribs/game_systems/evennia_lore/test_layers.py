@@ -471,6 +471,14 @@ class TestLayerCommands(LayerTestMixin, EvenniaCommandTest):
         self.assertNotIn("Secret truth.", result)
         self.assertNotIn("Accuracy", result)
 
+    def test_staff_can_read_restricted_sealed_lore_without_acquiring_it(self):
+        entry = _entry(author=self.char2, kind="legend", privacy=LoreEntry.Privacy.RESTRICTED)
+        entry.seal("A truth for staff to review.")
+        result = self.call(CmdLore(), f"/read #{entry.entry_number}", caller=self.char1)
+        self.assertIn(entry.body, result)
+        self.assertIn(entry.sealed_notes, result)
+        self.assertFalse(entry.acquisitions.exists())
+
     def test_author_requests_staff_affirm_or_decline(self):
         entry = _entry(author=self.char2, kind="rumor")
         n = entry.entry_number
@@ -651,6 +659,13 @@ class TestAffirmationViews(LayerTestMixin, EvenniaTest):
 
 
 class TestLayerForms(EvenniaTest):
+    @override_settings(LORE_DEFAULT_KIND="legend")
+    def test_new_form_uses_the_configured_default_kind(self):
+        from evennia_lore.forms import LoreEntryCreateForm
+
+        form = LoreEntryCreateForm()
+        self.assertEqual(form["kind"].value(), "legend")
+
     def test_create_form_enforces_the_rules(self):
         from evennia_lore.forms import LoreEntryCreateForm
 
@@ -745,6 +760,22 @@ class TestLayerAPI(EvenniaTest):
         self.assertFalse(player.exists())
         staff = LoreEntryFilter({"affirmation": "declined"}, qs, request=self._request(staff=True))
         self.assertEqual(list(staff.qs), [entry])
+
+    def test_none_filter_does_not_identify_other_authors_declines(self):
+        from evennia_lore.api.filters import LoreEntryFilter
+
+        declined = _entry("Other author's decline", author=self.char1)
+        declined.decline(declined_by=self.char1, note="Private.")
+        own_decline = _entry("Own decline", author=self.char2)
+        own_decline.decline(declined_by=self.char1, note="Private too.")
+        plain = _entry("No request", author=self.char1)
+        qs = LoreEntry.objects.all()
+        player = LoreEntryFilter(
+            {"affirmation": "none"}, qs, request=self._request(character=self.char2)
+        )
+        self.assertCountEqual(player.qs, [declined, plain])
+        staff = LoreEntryFilter({"affirmation": "none"}, qs, request=self._request(staff=True))
+        self.assertEqual(list(staff.qs), [plain])
 
 
 @unittest.skipUnless(apps.is_installed("evennia_guides"), "evennia-guides not installed")
