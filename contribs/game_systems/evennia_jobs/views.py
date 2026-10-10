@@ -10,6 +10,7 @@ Read-only views (login required):
 
 Authoring views (login + active puppet required):
     /jobs/new/<job_type>/  JobCreateView         — submit request / bug / issue
+                           (?title=&description= prefill the form)
     /jobs/<pk>/comment/    JobCommentCreateView   — append a comment
 
 Visibility rules:
@@ -41,6 +42,8 @@ from evennia_jobs.models import Job, JobComment, JobStatus, JobType
 from evennia_jobs.permissions import get_character_id, is_staff_user
 
 _VALID_JOB_TYPES = frozenset({JobType.REQUEST.value, JobType.BUG.value, JobType.ISSUE.value})
+# Query-string prefill is a starting point the submitter edits, never trusted input.
+_PREFILL_LIMITS = {"title": 255, "description": 2000}
 
 
 class JobListView(LoginRequiredMixin, ListView):
@@ -172,6 +175,15 @@ class JobCreateView(AuthoringMixin, FormView):
 
     def check_permission(self, character_id, target):
         pass  # any puppet holder can submit
+
+    def get_initial(self):
+        """Prefill from ``?title=`` and ``?description=``, as a guide's "Ask" link does."""
+        initial = super().get_initial()
+        for name, limit in _PREFILL_LIMITS.items():
+            value = self.request.GET.get(name, "").strip()
+            if value:
+                initial[name] = value[:limit]
+        return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

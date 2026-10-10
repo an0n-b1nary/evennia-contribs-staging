@@ -435,8 +435,8 @@ class TestWebPagesRender(EvenniaTest):
         self.job = _make_job(self.char2, title="Door is stuck", desc="It will not open.")
         self.issue = _make_job(self.char2, job_type=JobType.ISSUE, title="Player conduct")
 
-    def _render(self, view, user=None, puppet=None, method="get", **kwargs):
-        request = getattr(self.factory, method)("/jobs/")
+    def _render(self, view, user=None, puppet=None, method="get", path="/jobs/", **kwargs):
+        request = getattr(self.factory, method)(path)
         request.user = AnonymousUser() if user is None else user
         # Evennia's general_context processor reads request.session["puppet"]
         # for any authenticated user, and RequestFactory attaches no session.
@@ -518,6 +518,23 @@ class TestWebPagesRender(EvenniaTest):
         # once the route actually reverses.
         self.assertIn('href="/jobs/"', html)
         self.assertIn('name="csrfmiddlewaretoken"', html)
+
+    def test_request_form_prefills_from_the_query_string(self):
+        html = self._render(
+            JobCreateView,
+            user=self.account2,
+            puppet=self.char2,
+            path="/jobs/new/request/?title=Guide+question%3A+Trading&description=About+%3Cb%3Ethe%3C%2Fb%3E+page",
+            job_type="request",
+        )
+        self.assertIn('value="Guide question: Trading"', html)
+        self.assertIn("About &lt;b&gt;the&lt;/b&gt; page", html)
+
+    def test_prefill_is_capped(self):
+        request = self.factory.get("/jobs/new/request/", {"title": "x" * 400})
+        view = JobCreateView()
+        view.setup(request, job_type="request")
+        self.assertEqual(len(view.get_initial()["title"]), 255)
 
     def test_issue_form_warns_that_the_submission_is_anonymous(self):
         html = self._render(JobCreateView, user=self.account2, puppet=self.char2, job_type="issue")
