@@ -7,7 +7,7 @@
   screen readers, so a player with several characters can't post as the wrong
   one unnoticed. Authoring views put `acting_character` in the template context;
   the label is `evennia_accessibility/_acting_as.html`. Requires
-  evennia-accessibility 0.3 for the `[web]` extra.
+  evennia-accessibility 0.3.1 for the `[web]` extra.
 - A character picked on the website (Evennia's own puppet link) now applies to
   every page and write here when the game installs evennia-links 0.8.1's
   `WebCharacterMiddleware`. No change is needed in this package.

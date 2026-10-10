@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 — 2026-10-10
+
+- Fixed: market directory discovery (`+market`, `+browse`) skips stalls in rooms
+  the viewer can't `view`, so a stall no longer reveals an undiscovered room's
+  name. Staff still see every open stall.
+
 ## 0.2.2 — 2026-10-09
 
 - Added: market directory search includes an optional item's

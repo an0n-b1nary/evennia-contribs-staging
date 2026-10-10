@@ -98,7 +98,8 @@ contains one item or one resource lot, at a positive whole-number price.
 +stall/close [stall number]
 ```
 
-Discovery is global; purchases require the storefront's room. Sellers can be
+Discovery is global, except for stalls in rooms the viewer can't `view` (staff see
+every stall); purchases require the storefront's room. Sellers can be
 offline. Purchase rechecks current account membership, stock, provider visibility,
 buyer funds and item hooks; payment, fees, delivery, listing completion and ledger
 entries commit together. A sold listing cannot sell twice. Seller sale fees come

@@ -279,6 +279,60 @@ class Suite:
         self.command("alice", "+stall/close", "stock returned")
         assert len(self.state()["crafts"]) == len(before["crafts"]) + 2
 
+    def events(self):
+        alice_id = self.state()["actors"]["alice"]["id"]
+        for resource in ("grain", "ember"):
+            self.command(
+                "staff",
+                f"+resources/grant #{alice_id}={resource},20,Live EVENT",
+                "Resources updated",
+            )
+        self.command("staff", f"+economy/credit #{alice_id}=1000,Live EVENT", "Purse updated")
+        self.command("alice", "+workshop/unlock cooking=grain:6", "Unlocked Cook")
+        self.command("alice", "+workshop/unlock illusions=ember:9", "Unlocked Illusionist")
+        for niche, kind, resource, name, beat in (
+            (
+                "cooking",
+                "consumable",
+                "grain",
+                "live spice cake",
+                "Warm spice fills the laboratory.",
+            ),
+            ("illusions", "broadcast", "ember", "live muted globe", "Muted golden sparks bloom."),
+            (
+                "illusions",
+                "broadcast",
+                "ember",
+                "live bright globe",
+                "Visible golden sparks bloom.",
+            ),
+        ):
+            self.command("alice", f"+craft/new {niche}/{kind}={name}", "draft saved")
+            self.command("alice", "+craft/desc = A small live demonstration.", "draft saved")
+            self.command("alice", f"+craft/beat = {beat}", "draft saved")
+            self.command("alice", f"+craft/resources = {resource}:1", "draft saved")
+            self.command("alice", "+craft/finish", "You craft")
+        self.command("bob", "+ambient/mute", "muted")
+        result = self.command("alice", "use live spice cake", "You use")
+        assert "<EVENT> Warm spice" in self.observer(result)
+        self.command("bob", "gallery", "ambient gallery")
+        self.command("staff", "+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN=1", "1")
+        self.session.host.reload()
+        result = self.command("alice", "use live muted globe", "You use")
+        assert "Muted golden sparks" not in self.observer(result)
+        self.command("staff", "+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN=300", "300")
+        self.session.host.reload()
+        self.command("alice", "use live bright globe", "Wait a moment")
+        assert len(self.state()["event_uses"]) == 2
+        self.command("bob", "+ambient/unmute", "enabled")
+        self.command("staff", "+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN=1", "1")
+        result = self.command("alice", "use live bright globe", "You use")
+        assert "<EVENT> Visible golden sparks" in self.observer(result)
+        self.command("alice", "use live bright globe", "Could not find|not find")
+        assert len(self.state()["event_uses"]) == 3
+        self.command("bob", "laboratory", "laboratory")
+        self.command("staff", "+runtime/reset RP_CRAFTING_EVENT_ROOM_COOLDOWN", "30")
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -501,6 +555,7 @@ def run_rp(session, smoke=False):
         ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
         ("reserved stall stock, offline purchase, freeze and stock recovery", suite.stalls),
         ("invested niches, persistent crafts, hallmarks and offline crafted sale", suite.crafting),
+        ("consumed EVENTs, adjacent Broadcast mute and durable audience limits", suite.events),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:

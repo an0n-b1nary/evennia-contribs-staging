@@ -2,13 +2,19 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
-## [0.3.0] - 2026-10-10
+## [0.3.1] - 2026-10-10
 
 - **Added:** `_acting_as.html`, which names the character a form writes as
   ("Posting as **Name**", id `form-acting-as`) when the context has
   `acting_character`. `_form_actions.html` includes it and points the submit
   button's `aria-describedby` at it, so a screen reader names the character when
   focus reaches the button. Without `acting_character` both render as before.
+
+## [0.3.0] - 2026-10-10
+
+- Added: per-account ambient mute helper and `+ambient` command, shared across
+  characters and logins. Remote effects fail closed when the option is missing;
+  in-room scene effects are unaffected. Hosts explicitly register the option.
 
 ## [0.2.0] - 2026-10-07
 

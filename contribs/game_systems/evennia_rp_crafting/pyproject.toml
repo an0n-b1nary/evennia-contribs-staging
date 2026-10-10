@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-crafting"
-version = "0.1.0"
+version = "0.2.0"
 description = "Invested Workshops, cosmetic item behaviours and verified maker hallmarks for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -24,6 +24,7 @@ dependencies = ["evennia>=6.0", "evennia-links>=0.7,<0.9", "evennia-rp-resources
 [project.optional-dependencies]
 wearable = ["evennia-rp-equipment>=0.1.2,<0.2"]
 money = ["evennia-economy>=0.2,<0.3"]
+ambient = ["evennia-accessibility>=0.3,<0.4"]
 test = ["pytest>=8.0"]
 
 [project.urls]
