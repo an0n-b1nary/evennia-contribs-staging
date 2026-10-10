@@ -14,10 +14,11 @@ Screen-reader helpers, accessible Django form base classes, and MXP URL utilitie
 - **Two accessible Django form base classes** that auto-apply Bootstrap widget classes and `aria-describedby` wiring:
   - `AccessibleForm` — for non-model forms
   - `AccessibleModelForm` — for ModelForms
-- **Three form template partials** for accessible rendering:
+- **Four form template partials** for accessible rendering:
   - `_form_field.html` — label + widget + always-present error region + help text
   - `_form_errors.html` — non-field errors in an `aria-live="assertive"` summary
-  - `_form_actions.html` — submit + optional cancel with sensible defaults
+  - `_form_actions.html` — submit + optional cancel with sensible defaults; names the `acting_character` when one is given
+  - `_acting_as.html` — "Posting as **Name**" for the character a form writes as, which the submit button's `aria-describedby` points at
 - **An accessibility-focused stylesheet** (`accessibility.css`) with `.sr-only` utilities, focus-visible rings, `prefers-reduced-motion` + `prefers-color-scheme: dark` overrides, and the form rules that pair with the partials
 - **A `+screenreader` command** (alias `+sr`) so players can toggle the option without knowing `@option`
 - **Two MXP URL helpers**:

@@ -9,12 +9,16 @@
     submit_label  — text for the submit button  (default: "Submit")
     cancel_url    — href for the Cancel link     (default: none — cancel link hidden)
     cancel_label  — text for the cancel link     (default: "Cancel")
+    acting_character — the character the form writes as; named above the
+                       buttons ("Posting as …") and described to screen
+                       readers on the submit button (default: none)
 
   Tab order: submit first, cancel second — so Enter submits, Tab+Enter cancels.
 {% endcomment %}
-<div class="form-actions mt-4 d-flex align-items-center">
+{% include "evennia_accessibility/_acting_as.html" %}
+<div class="form-actions {% if acting_character %}mt-2{% else %}mt-4{% endif %} d-flex align-items-center">
 
-  <button type="submit" class="btn btn-primary mr-3">
+  <button type="submit" class="btn btn-primary mr-3"{% if acting_character %} aria-describedby="form-acting-as"{% endif %}>
     {{ submit_label|default:"Submit" }}
   </button>
 
