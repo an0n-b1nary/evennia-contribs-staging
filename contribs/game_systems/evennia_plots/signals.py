@@ -8,7 +8,8 @@ Thread lifecycle signals:
     plot_thread_created   — new PlotThread created (proposed status).
     plot_thread_activated — PlotThread transitioned proposed → active.
     plot_thread_concluded — PlotThread concluded; bonus_xp computed.
-                            kwargs: thread, bonus_xp
+                            kwargs: thread, bonus_xp, concluded_by (the
+                            character who concluded it, or None)
     plot_thread_archived  — PlotThread archived (stale, no bonus).
 
 Content-linking signals:

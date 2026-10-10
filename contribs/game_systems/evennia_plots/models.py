@@ -482,7 +482,9 @@ class PlotThread(models.Model):
         self.status = self.Status.CONCLUDED
         self.concluded_at = timezone.now()
         self.save(update_fields=["status", "concluded_at", "bonus_xp_computed"])
-        plot_signals.plot_thread_concluded.send(sender=type(self), thread=self, bonus_xp=bonus)
+        plot_signals.plot_thread_concluded.send(
+            sender=type(self), thread=self, bonus_xp=bonus, concluded_by=concluded_by
+        )
         return bonus
 
     def archive(self):
