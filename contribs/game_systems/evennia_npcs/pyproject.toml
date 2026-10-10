@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-npcs"
+version = "0.1.0"
+description = "Player-authored NPC blueprints, sharing, attributed portrayal and durable appearances for Evennia."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+dependencies = ["evennia>=6.0", "evennia-links>=0.6", "evennia-rp-rules>=0.1,<0.2"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Django",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+
+[project.optional-dependencies]
+scenes = ["evennia-scenes>=0.3"]
+plots = ["evennia-plots>=0.3.3"]
+posing = ["evennia-posing>=0.1"]
+contest = ["evennia-rp-contest>=0.1.1,<0.2"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+[tool.setuptools]
+packages = ["evennia_npcs", "evennia_npcs.migrations"]
+
+[tool.setuptools.package-dir]
+"evennia_npcs" = "."
+"evennia_npcs.migrations" = "migrations"
+
+[tool.setuptools.package-data]
+evennia_npcs = ["guides/*.md"]

@@ -65,3 +65,7 @@ plot_thread_edited = Signal()
 # Arc typology (XP-batch seam)
 arc_type_changed = Signal()
 arc_currency_changed = Signal()
+
+# kwargs: thread; providers return {provider_key: bool}. A True contributes
+# creative content to the existing one-point checklist item, never extra XP.
+collect_thread_content = Signal()

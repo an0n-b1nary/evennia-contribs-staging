@@ -59,6 +59,29 @@ can't auto-wire is `Room.at_object_receive` → `evennia_scenes`'
 `register_room_entry`, per that contrib's README ("Evennia ships no
 room-receive signal; you must call this manually").
 
+### NPCs
+
+`evennia-npcs` 0.1 is installed after links and rp-rules, independently of combat.
+`typeclasses/npcs.py` puts `NPCCharacterMixin` before the sandbox `Character`;
+its safeguards and NPC-only command set take precedence over PC login rewards
+and build/economy commands. `NPCCmdSet` is registered last on player characters
+so virtual portrayal overrides pose/say/emit/semipose and `+test` coherently.
+NPCs use their own scene-capture signal and are excluded from RPTracker rewards.
+
+`seed_sandbox` adds a Market Porter template and a Visiting Envoy unique NPC in
+the market. Try `+npc`, `+npc/spawn Market Porter`, then `+npc/puppet #object-id`,
+`pose offers directions.`, `+test presence`, `+npc/unpuppet` and
+`+npc/despawn #object-id`. Sharing and requests use `+npc/permit` and `/request`.
+Scene appearances survive despawn and history rechecks current scene privacy.
+Optional plot links share the creative-content checklist point with IC posts.
+
+The sandbox enables NPCs and opt-in full puppeting for demonstration. Production
+hosts default to dark rollout and virtual portrayal. `NPCS_REVEALED`,
+`NPCS_FROZEN` and `NPCS_COMBAT_PROFILES_REVEALED` are runtime switches. Combat
+profiles ship dark; no combat action engine is present. The server startup hook
+ensures one cleanup Script is running. See the
+[NPC install guide](../contribs/game_systems/evennia_npcs/README.md) for host policy.
+
 ### Economy, stalls and resource gathering
 
 `evennia-economy` 0.2 adds market stalls as well as integer purses and passive weekly income with a

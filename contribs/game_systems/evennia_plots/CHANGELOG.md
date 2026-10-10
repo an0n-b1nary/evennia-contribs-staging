@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.3] - 2026-10-10
+
+- Add `collect_thread_content`, an optional collector for creative-content
+  providers such as NPCs. Its boolean contributions share the IC-post checklist
+  item; linking both never awards the point twice. No NPC dependency is added.
+
 ## [0.3.2] - 2026-10-09
 
 - **Fixed:** the website now resolves the acting character from the account's
