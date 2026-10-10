@@ -795,12 +795,12 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
 
 
 class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
-    """All six overlay layers light up, from four different contribs.
+    """Every overlay layer lights up, from five different contribs.
 
     This is the end-to-end proof the extraction plan asks for: evennia_maps
     sends collect_tile_overlays once, and evennia_regions, evennia_scenes,
-    evennia_lore and evennia_calendar each answer with their own keys, with no
-    overlay configuration in settings.py at all.
+    evennia_lore, evennia_calendar and evennia_social each answer with their
+    own keys, with no overlay configuration in settings.py at all.
     """
 
     character_typeclass = Character
@@ -828,12 +828,26 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
 
         return collect_overlays(self.room_ids, staff=staff)
 
-    def test_all_seven_overlay_keys_are_answered(self):
+    def _connected(self, *characters):
+        """Stand in for the live sessions social's who's-here provider reads."""
+        return mock.patch(
+            "evennia_social.social.get_connected_characters", return_value=list(characters)
+        )
+
+    def _room(self, name):
+        from evennia.objects.models import ObjectDB
+
+        return ObjectDB.objects.get(pk=self.tile_by_name[name].room_id)
+
+    def test_all_eight_overlay_keys_are_answered(self):
         # The keys evennia_maps/overlays.py documents. A provider that failed
         # to connect degrades to an absent key rather than an error, which is
         # exactly why this has to be asserted somewhere.
+        self.char2.location = self._room("Market Row")
+        with self._connected(self.char2):
+            keys = set(self._overlays())
         self.assertEqual(
-            set(self._overlays()),
+            keys,
             {
                 "primary_region",
                 "has_active_scene",
@@ -842,8 +856,38 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
                 "recent_scenes",
                 "has_lore",
                 "upcoming_events",
+                "present",
             },
         )
+
+    def test_social_names_who_is_here_and_honors_unfindable(self):
+        from evennia_social import presence
+
+        market = self._room("Market Row")
+        self.char2.location = market
+        self.char1.location = market
+        presence.set_visibility(self.char1, presence.UNFINDABLE)
+        with self._connected(self.char1, self.char2):
+            as_player = self._overlays()["present"]
+            as_staff = self._overlays(staff=True)["present"]
+        self.assertEqual(as_player, {market.pk: [self.char2.key]})
+        self.assertEqual(
+            as_staff[market.pk], sorted([f"{self.char1.key} (unfindable)", self.char2.key])
+        )
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_the_live_tile_feed_carries_who_is_here(self):
+        from django.urls import reverse
+
+        market = self._room("Market Row")
+        self.char2.location = market
+        self.client.force_login(self.account2)
+        with self._connected(self.char2):
+            response = self.client.get(reverse("api-plane-tiles", args=[self.plane.pk]))
+        self.assertEqual(response.status_code, 200)
+        present = {tile["room_id"]: tile["present"] for tile in response.json()["results"]}
+        self.assertEqual(present[market.pk], [self.char2.key])
+        self.assertEqual(present[self.tile_by_name["The Archive"].room_id], [])
 
     def test_regions_names_every_tile(self):
         from world.sandbox import content

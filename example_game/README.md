@@ -192,16 +192,27 @@ Scenes and calendar would earn their mounts even if nothing else did:
 and silently drops whichever does not resolve, so without those two includes
 the tile popups would list recent logs and upcoming events as plain text.
 
-**Six tile overlays, zero overlay settings.** `evennia_maps` knows where rooms
-are and nothing else. Once per map render it sends `collect_tile_overlays`,
-and `evennia_regions` (`primary_region`), `evennia_scenes`
-(`has_active_scene`, `recent_scene_count`, `recent_scenes`), `evennia_lore`
-(`has_lore`) and `evennia_calendar` (`upcoming_events`) each answer for the
-rooms they know about, from providers they connect themselves in their own
-`AppConfig.ready()`. Nothing in `settings.py` configures this — uninstall a
-partner and its layer is simply absent. `world/sandbox/tests.py`
-(`TestMapOverlaySeam`) is the end-to-end proof, and it can only live here: no
-contrib's own suite installs the other three.
+**Eight tile overlays, zero overlay settings.** `evennia_maps` knows where
+rooms are and nothing else. Once per map render it sends `collect_tile_overlays`.
+Five contribs each answer for the rooms they know about, from providers they
+connect themselves in their own `AppConfig.ready()`:
+- `evennia_regions`: `primary_region`;
+- `evennia_scenes`: `has_active_scene`, `active_scenes`, `recent_scene_count`
+  and `recent_scenes`;
+- `evennia_lore`: `has_lore`;
+- `evennia_calendar`: `upcoming_events`;
+- `evennia_social`: `present`, who's here.
+
+Nothing in `settings.py` configures this. Uninstall a partner and its layer is
+simply absent. `world/sandbox/tests.py` (`TestMapOverlaySeam`) is the
+end-to-end proof, and it can only live here: no contrib's own suite installs
+the others.
+
+Who's here shows only on the live map, which requires a login: "N here" in the
+tooltip and room list, and the names in the popup. It honors `+unfindable`.
+Players never see unfindable or dark characters there; staff see them with a
+marker. Browser check: connect two characters to one room, set one
+`+unfindable`, and compare the live map as a player and as staff.
 
 ### Native website pages and client shell
 
