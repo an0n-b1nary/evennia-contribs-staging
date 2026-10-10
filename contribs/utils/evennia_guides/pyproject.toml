@@ -3,15 +3,15 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "evennia-jobs"
-version = "0.3.0"
-description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
+name = "evennia-guides"
+version = "0.1.0"
+description = "Player guides for Evennia games: Markdown pages with design-insight sidebars, gated on reveal switches, on the web."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]
 requires-python = ">=3.12"
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 2 - Pre-Alpha",
     "Framework :: Django",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3.12",
@@ -19,17 +19,11 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-# Core: models + commands only. No web/API deps.
-dependencies = ["evennia>=6.0"]
+# markdown-it-py: strict CommonMark, raw HTML off. pyyaml (front matter) comes
+# with Evennia.
+dependencies = ["evennia>=6.0", "markdown-it-py>=3.0,<5"]
 
 [project.optional-dependencies]
-# [web] enables website views, DRF API, and accessible forms/templates.
-web = [
-    "evennia-links>=0.8",
-    "evennia-accessibility>=0.1",
-    "djangorestframework>=3.14",
-    "django-filter>=23",
-]
 test = ["pytest>=8.0"]
 
 [project.urls]
@@ -38,16 +32,20 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 # Flat layout: package contents live at the same level as pyproject.toml.
 [tool.setuptools]
-packages = ["evennia_jobs", "evennia_jobs.migrations", "evennia_jobs.integrations", "evennia_jobs.api"]
+packages = [
+    "evennia_guides",
+    "evennia_guides.management",
+    "evennia_guides.management.commands",
+]
 
 [tool.setuptools.package-dir]
-"evennia_jobs" = "."
-"evennia_jobs.migrations" = "migrations"
-"evennia_jobs.integrations" = "integrations"
-"evennia_jobs.api" = "api"
+"evennia_guides" = "."
+"evennia_guides.management" = "management"
+"evennia_guides.management.commands" = "management/commands"
 
 [tool.setuptools.package-data]
-evennia_jobs = [
-    "templates/evennia_jobs/*.html",
-    "static/evennia_jobs/css/*.css",
+evennia_guides = [
+    "guides/*.md",
+    "templates/evennia_guides/*.html",
+    "static/evennia_guides/css/*.css",
 ]

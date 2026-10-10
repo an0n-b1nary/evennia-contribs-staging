@@ -43,6 +43,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 **Foundation**
 - `evennia-accessibility` (utils) — screen-reader helpers, accessible Django forms, MXP link conventions
 - `evennia-links` (base_systems) — shared bridge-model base classes, edit-history & soft-delete mixins, optional notification dispatcher
+- [`evennia-guides`](contribs/utils/evennia_guides/README.md) (utils) — preview 0.1.0; player guides written in Markdown and served as web pages, with design-insight asides, links between pages, and pages hidden until a reveal check passes
 
 **RP infrastructure** (all but the posing/social layer depend on `evennia-links`; posing and social are model-free and depend only on each other)
 - `evennia-posing` (game_systems) — the pose pipeline: pose/emit/semipose capture, pose-order tracker, pose headers, name highlighting; foundation other RP systems build on

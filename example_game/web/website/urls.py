@@ -11,7 +11,8 @@ the two halves of the demo agree with each other.
 Namespacing is not a style choice here - each contrib has one correct form, and
 the wrong one breaks its pages rather than failing quietly:
 
-- `evennia_maps`, `evennia_regions`, `evennia_calendar` and `evennia_plots`
+- `evennia_maps`, `evennia_regions`, `evennia_calendar`, `evennia_plots` and
+  `evennia_guides`
   declare `app_name` in their own urls.py and reverse their routes through that
   namespace (`{% url 'evennia_maps:...' %}`), so a bare `include()` is right:
   Django picks the namespace up from `app_name`. Mounting them un-namespaced
@@ -79,6 +80,8 @@ urlpatterns = [
     path("", include(("evennia_boards.urls", "evennia_boards"))),
     path("lore/", include("evennia_lore.urls")),
     path("jobs/", include("evennia_jobs.urls")),
+    # app_name "evennia_guides", so a bare include, like maps and regions.
+    path("guide/", include("evennia_guides.urls")),
 ]
 
 if apps.is_installed("evennia_scenes"):

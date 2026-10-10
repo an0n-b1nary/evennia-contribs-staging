@@ -1,0 +1,29 @@
+/* Self-contained styles for evennia_guides. */
+.evennia-guides-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1rem; }
+.evennia-guides-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-guides-table-scroll table { margin-bottom: 0; }
+
+.evennia-guides-body { overflow-wrap: anywhere; }
+.evennia-guides-body h2 { clear: both; margin-top: 1.5rem; }
+
+/* Design insight: inline on narrow screens, beside the text on wide ones.
+   It stays after its paragraph in the markup, so reading order is unchanged. */
+.evennia-guides-insight {
+  border-left: 4px solid #6c757d;
+  background: rgba(108, 117, 125, .08);
+  padding: .75rem 1rem;
+  margin: 0 0 1rem;
+}
+.evennia-guides-insight p:last-child { margin-bottom: 0; }
+.evennia-guides-insight-label { font-size: .75rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-bottom: .25rem; }
+.evennia-guides-insight-title { font-weight: 600; margin-bottom: .5rem; }
+.evennia-guides-insight-tags { font-size: .85rem; margin-top: .5rem; }
+@media (min-width: 992px) {
+  .evennia-guides-insight { float: right; clear: right; width: 38%; margin-left: 1.5rem; }
+  .evennia-guides-body .evennia-guides-table-scroll,
+  .evennia-guides-body pre { clear: both; }
+}
+
+.evennia-guides-link-hidden { text-decoration: underline dashed; }
+.evennia-guides-toc { border: 1px solid #dee2e6; padding: .5rem .75rem; display: inline-block; }
+.evennia-guides-footer { clear: both; border-top: 1px solid #dee2e6; }

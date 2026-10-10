@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] - 2026-10-09
+
+- **Added:** the request, bug and issue forms prefill their title and
+  description from `?title=` and `?description=` (capped at 255 and 2,000
+  characters). A guide page's "Ask about this page" link uses this. The
+  submitter still edits and submits the form; nothing is created from the
+  link alone.
+
 ## [0.2.1] - 2026-10-09
 
 - **Fixed:** the website now resolves the acting character from the account's

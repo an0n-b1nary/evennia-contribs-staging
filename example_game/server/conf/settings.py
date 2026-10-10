@@ -69,6 +69,8 @@ INSTALLED_APPS += [
     "evennia_jobs",
     "evennia_xp",
     "evennia_accessibility",
+    # Guides: Markdown pages from every app's guides/ and GUIDES_DIRS below.
+    "evennia_guides",
     "evennia_posing",
     "evennia_social",
     # RP kernel first; both character builds and contests depend on it.
@@ -139,6 +141,15 @@ RP_CRAFTING_UNLOCK_STEP = 1
 RP_CRAFTING_MONEY_CAP_RAISE = 100
 RP_CRAFTING_RESOURCE_CAP_RAISE = 6
 RP_CRAFTING_STAFF_LOCK = "cmd:perm(Builder)"
+
+######################################################################
+# Guides (evennia-guides) — Markdown guide pages on the web, at /guide/
+######################################################################
+# Read after each contrib's own guides/, so a page here replaces a contrib page
+# with the same key. "Ask about this page" opens the jobs request form
+# (GUIDES_ASK_URL's default, "job-create"), prefilled.
+GUIDES_DIRS = [os.path.join(GAME_DIR, "world", "guides")]
+GUIDES_STAFF_LOCK = "perm(Admin)"
 
 ######################################################################
 # RP rules (evennia-rp-rules) — game values and optional sheet/stat-block seams

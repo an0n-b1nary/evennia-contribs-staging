@@ -59,6 +59,7 @@ COMMENT_OPEN = re.compile(r"\{#")
 WEB_CONTRIBS = {
     "evennia_boards",
     "evennia_calendar",
+    "evennia_guides",
     "evennia_jobs",
     "evennia_lore",
     "evennia_maps",
