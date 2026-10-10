@@ -23,6 +23,7 @@ place.
 | `commands/finger.py` | `CmdFinger` — profile view/edit, bio (`EvEditor`), followed themes |
 | `commands/discovery.py` | `CmdWhere`, `CmdHangouts` — player/venue discovery |
 | `commands/presence.py` | `CmdUnfindable`, `CmdWho` — per-character presence and a `who` that honours staff `dark` |
+| `integrations/maps.py` | Who's here on the live map (`present`), wired only when `evennia-maps` is installed |
 | `commands/filtering.py` | `CmdIgnore` — account-level ignore list |
 | `commands/messaging.py` | `CmdPage` — private OOC messaging |
 | `commands/teleportation.py` | `CmdSummon`, `CmdJoin` — consensual teleport requests |
@@ -221,6 +222,22 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
 ```
 
 Add `CmdUnfindable` to the CharacterCmdSet with the other social commands.
+
+### Who's here on the live map
+
+With [`evennia-maps`](../evennia_maps/README.md) 0.7 or later installed, this
+contrib answers the map's `collect_tile_overlays` seam with `present`: the
+names of connected characters in each room. There's nothing to configure. When
+both apps are installed, `ready()` connects the provider
+(`integrations/maps.py`). Set `SOCIAL_MAPS_APP_LABEL` if your map app has a
+different label.
+
+The map follows the table above. Players see only findable characters, in
+both the names and the "N here" count. Staff see everyone, with the
+`(unfindable)` / `(dark)` marker. The map has no in-game viewer, so standing in
+the same room doesn't reveal anyone there. Names appear only on the live map,
+which requires a login, never on the public SVG map. The provider makes one
+pass over live sessions per render, with no query per tile.
 
 ## The severed `+ooc` scene-log coupling
 

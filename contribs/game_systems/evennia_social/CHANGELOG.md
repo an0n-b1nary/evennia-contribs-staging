@@ -2,6 +2,18 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.5.0 — 2026-10-10
+
+- **Added:** who's here on the live map. With evennia-maps installed,
+  `ready()` connects `integrations/maps.py` to its `collect_tile_overlays`
+  seam, which answers `present`: the names of connected characters in each
+  room. The map is a remote presence surface, so it follows `+where`:
+  players see only findable characters (`is_publicly_findable`), and
+  unfindable or dark characters are left out of both the names and the
+  count. Staff see everyone, with the `(unfindable)` / `(dark)` marker. One
+  pass over live sessions per map render, with no query per tile. Shows on
+  evennia-maps 0.7 or later; older maps ignore the key.
+
 ## 0.4.0 — 2026-10-09
 
 - **Added:** presence (`evennia_social.presence`). Each character is
