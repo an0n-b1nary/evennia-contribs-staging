@@ -56,8 +56,9 @@
     {% endif %}
   </div>
   {% endfor %}
+  {% include "evennia_accessibility/_acting_as.html" %}
   <div class="d-flex evennia-boards-gap">
-    <button type="submit" class="btn btn-primary">Post</button>
+    <button type="submit" class="btn btn-primary"{% if acting_character %} aria-describedby="form-acting-as"{% endif %}>Post</button>
     {% if cancel_url %}
     <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Cancel</a>
     {% endif %}

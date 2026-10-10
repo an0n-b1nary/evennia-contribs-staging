@@ -9,6 +9,7 @@ get_permission_target() / check_permission() hooks. Requires [web] extra.
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
+from evennia.objects.models import ObjectDB
 
 from evennia_boards.permissions import require_character
 
@@ -63,3 +64,9 @@ class BoardsAuthoringMixin(LoginRequiredMixin):
         character_id = self.get_character()
         self.check_permission(character_id, self.get_permission_target())
         return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        """Add ``acting_character``, which the form names beside its submit button."""
+        context = super().get_context_data(**kwargs)
+        context["acting_character"] = ObjectDB.objects.filter(pk=self.get_character()).first()
+        return context
