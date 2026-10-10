@@ -1,0 +1,16 @@
+{% comment %}
+  Empty state partial, shown when a list has no items.
+
+  Variables (pass via "with"):
+    message - required - what belongs here, e.g. "There are no guide pages yet."
+    action  - optional - where the items come from.
+
+  Usage:
+    {% include "evennia_guides/_empty_state.html" with message="There are no guide pages yet." %}
+{% endcomment %}
+<div class="text-center py-5">
+  <p class="text-muted mb-1">{{ message }}</p>
+  {% if action %}
+  <p class="text-muted"><code>{{ action }}</code></p>
+  {% endif %}
+</div>

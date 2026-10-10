@@ -1,0 +1,49 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_guides/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}Guide{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item active" aria-current="page">Guide</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Guide</h1>
+{% include "evennia_guides/_nav.html" %}
+
+{% for category, entries in categories %}
+<section class="mb-4" aria-labelledby="guide-category-{{ forloop.counter }}">
+  <h2 class="h4" id="guide-category-{{ forloop.counter }}">{{ category }}</h2>
+  <ul class="list-unstyled">
+    {% for entry in entries %}
+    <li class="mb-2">{% include "evennia_guides/_page_entry.html" %}</li>
+    {% empty %}
+    <li class="text-muted">No pages in this category.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% empty %}
+{% include "evennia_guides/_empty_state.html" with message="There are no guide pages yet." action="Pages are Markdown files in a guides/ directory." %}
+{% endfor %}
+
+{% if guide_staff %}
+<section class="mb-4" aria-labelledby="guide-staff-heading">
+  <h2 class="h4" id="guide-staff-heading">For staff</h2>
+  <ul class="list-unstyled">
+    {% for entry in staff_pages %}
+    <li class="mb-2">{% include "evennia_guides/_page_entry.html" %}</li>
+    {% empty %}
+    <li class="text-muted">No staff pages yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

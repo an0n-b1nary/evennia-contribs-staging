@@ -1,0 +1,35 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_guides/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}Glossary{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_guides:guide-index' %}">Guide</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Glossary</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Glossary</h1>
+{% include "evennia_guides/_nav.html" %}
+
+{% if terms %}
+<dl>
+  {% for term in terms %}
+  <dt id="{{ term.page.key }}"><a href="{{ term.url }}">{{ term.page.title }}</a>
+    {% if term.hidden %}<span class="badge badge-warning ml-1">{{ term.hidden }}</span>{% endif %}
+  </dt>
+  <dd class="evennia-guides-body mb-3">{{ term.body }}</dd>
+  {% endfor %}
+</dl>
+{% else %}
+{% include "evennia_guides/_empty_state.html" with message="The glossary is empty." action="A term is a page with kind: term." %}
+{% endif %}
+{% endblock %}

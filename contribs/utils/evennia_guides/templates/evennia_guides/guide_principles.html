@@ -1,0 +1,48 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_guides/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}Design principles{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_guides:guide-index' %}">Guide</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Design principles</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Design principles</h1>
+{% include "evennia_guides/_nav.html" %}
+
+{% for principle in principles %}
+<section class="mb-4" id="{{ principle.page.key }}" aria-labelledby="principle-{{ principle.page.key }}">
+  <h2 class="h4" id="principle-{{ principle.page.key }}"><a href="{{ principle.url }}">{{ principle.page.title }}</a>
+    {% if principle.hidden %}<span class="badge badge-warning ml-1">{{ principle.hidden }}</span>{% endif %}
+  </h2>
+  <div class="evennia-guides-body">{{ principle.body }}</div>
+  {% if principle.insights %}
+  <h3 class="h6 mt-3">Where it shows</h3>
+  <ul>
+    {% for item in principle.insights %}
+    <li><a href="{{ item.page.url }}#{{ item.insight.anchor }}">{{ item.insight.title }}</a> <span class="text-muted">in {{ item.page.page.title }}</span></li>
+    {% empty %}
+    <li class="text-muted">No insights are tagged with this principle yet.</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if principle.pages %}
+  <p class="small mb-0">Pages that illustrate it:
+    {% for entry in principle.pages %}<a href="{{ entry.url }}">{{ entry.page.title }}</a>{% if not forloop.last %}, {% endif %}{% empty %}none{% endfor %}
+  </p>
+  {% endif %}
+</section>
+{% empty %}
+{% include "evennia_guides/_empty_state.html" with message="No design principles are written up yet." action="A principle is a page with kind: principle." %}
+{% endfor %}
+{% endblock %}

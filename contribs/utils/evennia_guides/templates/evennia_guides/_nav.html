@@ -1,0 +1,15 @@
+{% comment %}
+  Links between the guide's index pages. Expects guide_has_principles and
+  guide_has_glossary from GuideMixin.
+{% endcomment %}
+<nav aria-label="Guide sections" class="mb-3">
+  <ul class="list-inline mb-0">
+    <li class="list-inline-item"><a href="{% url 'evennia_guides:guide-index' %}">All guide pages</a></li>
+    {% if guide_has_principles %}
+    <li class="list-inline-item"><a href="{% url 'evennia_guides:guide-principles' %}">Design principles</a></li>
+    {% endif %}
+    {% if guide_has_glossary %}
+    <li class="list-inline-item"><a href="{% url 'evennia_guides:guide-glossary' %}">Glossary</a></li>
+    {% endif %}
+  </ul>
+</nav>

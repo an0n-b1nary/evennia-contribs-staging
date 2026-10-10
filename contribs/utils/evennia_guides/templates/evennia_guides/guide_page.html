@@ -1,0 +1,63 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_guides/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}{{ page.title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_guides:guide-index' %}">Guide</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ page.title }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<article class="evennia-guides-page" aria-labelledby="guide-page-heading">
+  <h1 id="guide-page-heading" class="mb-3">{{ page.title }}</h1>
+  {% if hidden %}
+  <p class="alert alert-warning">{{ hidden }}. You can see this page because you're staff.</p>
+  {% endif %}
+
+  {% if toc %}
+  <nav aria-label="On this page" class="evennia-guides-toc mb-3">
+    <p class="font-weight-bold mb-1">On this page</p>
+    <ul class="mb-0">
+      {% for anchor, heading in toc %}
+      <li><a href="#{{ anchor }}">{{ heading }}</a></li>
+      {% empty %}
+      <li>This page has no sections.</li>
+      {% endfor %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  <div class="evennia-guides-body">
+    {{ body }}
+  </div>
+
+  <footer class="evennia-guides-footer mt-4 pt-2">
+    {% if principles %}
+    <p class="mb-1">Design principles:
+      {% for entry in principles %}<a href="{{ entry.url }}">{{ entry.page.title }}</a>{% if not forloop.last %}, {% endif %}{% empty %}none{% endfor %}
+    </p>
+    {% endif %}
+    {% if footer_pages %}
+    <ul class="list-inline mb-1">
+      {% for entry in footer_pages %}
+      <li class="list-inline-item"><a href="{{ entry.url }}">{{ entry.page.title }}</a></li>
+      {% empty %}
+      <li class="list-inline-item">No footer links.</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if ask_url %}
+    <p class="mb-0"><a class="btn btn-sm btn-outline-secondary" href="{{ ask_url }}">Ask about this page</a></p>
+    {% endif %}
+  </footer>
+</article>
+{% endblock %}
