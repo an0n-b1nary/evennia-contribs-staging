@@ -8,7 +8,8 @@ real characters with ruleset-validated stat blocks. No combat package is require
 
 ## Install
 
-Install `evennia-links` and `evennia-rp-rules` first, then this package. Add
+Install `evennia-links` (0.6 or later, for runtime controls) and
+`evennia-rp-rules` first, then this package. Add
 `evennia_npcs` to `INSTALLED_APPS` after them and run `evennia migrate --noinput`.
 Add `evennia_npcs.commands.NPCCmdSet` **after** your pose/say/emit/semipose and
 contest commands so its replacements win. They preserve ordinary PC commands

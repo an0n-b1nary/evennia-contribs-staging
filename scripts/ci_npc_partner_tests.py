@@ -62,7 +62,7 @@ class NPCPartnerSeams(BaseEvenniaCommandTest):
         thread = PlotThread.objects.create(
             plot_number=1, name="Cameo", creator=self.char1, status="active"
         )
-        svc.link_plot(self.char1, self.blueprint, thread.pk)
+        svc.link_plot(self.char1, self.blueprint, thread.plot_number)
         self.assertEqual(thread._compute_bonus_xp(), 1)
         thread.delete()
         self.assertFalse(PlotNPCLink.objects.exists())
