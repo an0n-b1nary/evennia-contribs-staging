@@ -60,6 +60,21 @@ class ResourceAssetProvider:
         except ResourceError as exc:
             raise EconomyError(str(exc)) from exc
 
+    def refund(self, character, key, quantity, exchange_id):
+        """Return reserved stock even if its catalogue entry was since archived."""
+        try:
+            grant(
+                character,
+                key,
+                quantity,
+                "exchange",
+                allow_archived=True,
+                exchange_id=exchange_id,
+                note="Reserved listing returned",
+            )
+        except ResourceError as exc:
+            raise EconomyError(str(exc)) from exc
+
 
 def provide_assets(sender, **kwargs):
     return {"resource": ResourceAssetProvider()}

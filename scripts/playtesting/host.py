@@ -186,6 +186,25 @@ class Host:
                 raise HostError("Migration did not create account tables; see launcher.log")
         self.command("collectstatic", "--noinput")
 
+    def reload(self):
+        """Reload only this disposable Server; verify the new owned process is ready."""
+        marker = self.game / "ready.json"
+        previous = json.loads(marker.read_text(encoding="utf-8"))["server_pid"]
+        marker.unlink()
+        self.command("reload")
+        deadline = time.monotonic() + self.startup_timeout
+        while time.monotonic() < deadline:
+            self.discover()
+            if marker.is_file():
+                ready = json.loads(marker.read_text(encoding="utf-8"))
+                if ready.get("run_id") != self.run_id:
+                    raise HostError("Reloaded Server fixture identity mismatch")
+                if ready.get("server_pid") != previous and ready.get("server_pid") in self.owned:
+                    self.manifest()
+                    return
+            time.sleep(0.2)
+        raise HostError("Reloaded Server did not become ready; see server.log")
+
     def write_settings(self):
         p = self.ports
         overrides = {

@@ -2,11 +2,20 @@
 
 from django.conf import settings
 from evennia.accounts.models import AccountDB
-from evennia_economy.models import LedgerEntry, Offer, Purse, UBIPayment
+from evennia_economy.models import (
+    LedgerEntry,
+    Listing,
+    Offer,
+    Purse,
+    ReviewFlag,
+    Storefront,
+    UBIPayment,
+)
 from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
 from evennia_rp_contest.models import Challenge, CheckRecord
+from evennia_rp_crafting.models import CraftRecord, NicheUnlock, Workshop
 from evennia_rp_resources.models import ResourceGrant, ResourceHolding
 from evennia_rptracker.models import RPSession
 from evennia_scenes.models import LogEntry, Scene
@@ -52,6 +61,51 @@ def snapshot():
         "actors": actors,
         "economy_purses": rows(
             Purse.objects.filter(character_id__in=ids), "character_id", "balance"
+        ),
+        "economy_stalls": rows(
+            Storefront.objects.filter(owner_id__in=ids),
+            "id",
+            "owner_id",
+            "room_id",
+            "status",
+            "last_active",
+        ),
+        "economy_listings": rows(
+            Listing.objects.filter(storefront__owner_id__in=ids),
+            "id",
+            "storefront_id",
+            "assets",
+            "price",
+            "status",
+            "buyer_id",
+        ),
+        "economy_flags": rows(ReviewFlag.objects.all(), "id", "kind", "reviewed"),
+        "crafting_workshops": rows(
+            Workshop.objects.filter(character_id__in=ids),
+            "id",
+            "character_id",
+            "invested_money",
+            "last_craft",
+        ),
+        "crafting_niches": rows(
+            NicheUnlock.objects.filter(workshop__character_id__in=ids),
+            "id",
+            "workshop__character_id",
+            "niche__key",
+            "position",
+            "abandoned_at",
+        ),
+        "crafts": rows(
+            CraftRecord.objects.filter(crafter_id__in=ids),
+            "id",
+            "crafter_id",
+            "niche__key",
+            "behaviour",
+            "item_id",
+            "resources_spent",
+            "money_spent",
+            "hallmark",
+            "prose",
         ),
         "economy_offers": rows(
             Offer.objects.filter(giver_id__in=ids),

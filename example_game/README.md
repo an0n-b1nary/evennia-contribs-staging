@@ -6,8 +6,8 @@ together every contrib in this repo. It exists for two reasons:
 1. **Reference integration.** It's the "how do these contribs actually get
    wired into a real game" example this repo otherwise lacks — settings,
    cmdsets, server hooks, and the typeclass seams that can't auto-wire.
-2. **A living sandbox to hand-test against**, as new contribs (crafting) get
-   extracted and land here.
+2. **A living sandbox to hand-test against**, as contribs and their integrations
+   grow.
 
 Full design background is tracked separately (local-only planning docs, not
 part of this repo).
@@ -16,12 +16,13 @@ part of this repo).
 
 ## What's wired up
 
-All 21 current contribs, in dependency order — `evennia_links` first, then `evennia_economy` and `evennia_rp_resources`, then
-the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
+All 22 current contribs, in dependency order — `evennia_links` first, then
+`evennia_economy` and `evennia_rp_resources`, followed by `evennia_rp_crafting`.
+Other apps that depend on links include `evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
-`evennia_maps`), then the standalone apps (`evennia_calendar`,
-`evennia_jobs`, `evennia_xp`, `evennia_accessibility`, `evennia_guides`), then the pose/social
-layer (`evennia_posing` before `evennia_social` — social hard-depends on
+`evennia_maps`; then come the standalone apps (`evennia_calendar`,
+`evennia_jobs`, `evennia_xp`, `evennia_accessibility`, `evennia_guides`), then
+the pose/social layer (`evennia_posing` before `evennia_social` — social hard-depends on
 posing), and the RP cluster (`evennia_rp_rules` before `evennia_rp_chargen`,
 `evennia_rp_equipment` and `evennia_rp_contest`; equipment requires chargen). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
 every XP/rptracker/lore/boards/plots/regions/maps/posing/social setting.
@@ -58,12 +59,9 @@ can't auto-wire is `Room.at_object_receive` → `evennia_scenes`'
 `register_room_entry`, per that contrib's README ("Evennia ships no
 room-receive signal; you must call this manually").
 
-Not yet extracted as contribs: crafting. This sandbox will grow to cover it
-as it lands.
+### Economy, stalls and resource gathering
 
-### Resource gathering
-
-`evennia-economy` 0.1 adds integer purses and passive weekly income with a
+`evennia-economy` 0.2 adds market stalls as well as integer purses and passive weekly income with a
 five-UBI-week base cap, once-only starting stipends (plus a reveal stipend
 when a hidden economy is revealed), and atomic exchanges
 of money, carried items and resource counters. Demo authors start with 200 coins.
@@ -86,7 +84,18 @@ jobs and equipment in fresh environments; resources also runs without economy.
 The live suite trades resources and money between ordinary sessions, checks
 same-account refusal, secret acceptance, freeze/reveal and reconnect persistence.
 
-`evennia-rp-resources` 0.1.1 is wired with a generic Materials / Provisions /
+Market Row is tagged as a market with eight slots and a stocked demonstration
+stall. Try `look`, `+browse`, `+buy <listing number>` and `+market satchel`.
+`+stall/claim`, `/name`, `/desc`, `/list`, `/unlist` and `/close` manage your own
+counter. Items and resource lots are reserved, so a buyer can purchase while
+the seller is offline. A held stall raises the money cap by 100 coins; closure
+returns remaining stock and removes that raise. Five quiet weeks create a staff
+review job without closing the stall. Same-account `drop`/`get` handoffs also
+create review flags without blocking pickup. The room's `MarketRoomMixin` comes
+before the host room class and cooperatively adds the roster; the login hook
+calls `stalls.note_login`. These hooks are gated in absent-partner profiles.
+
+`evennia-rp-resources` 0.1.3 is wired with a generic Materials / Provisions /
 Essences catalogue. The IC rooms already carry forest, hills, urban and water
 terrains; these define the open trickle pool, while Grain is always common.
 The demonstration characters have Timber holdings and the Proving Grounds
@@ -109,6 +118,34 @@ background accrual continues. The live RP suite covers holdings, leans, staff
 grants and runtime reveal. `world/sandbox/test_resources.py` checks actual maps,
 social and login seams. Fresh CI profiles exclude maps, plots, social, tracker
 or economy and verify the excluded package cannot be imported.
+
+### Workshops and crafting
+
+`evennia-rp-crafting` 0.1.0 seeds Weaver, Jeweller, Smith and Scribe niches.
+At Market Row, a sample field book can be read and a woven cloak shows a
+verified maker hallmark. The demonstration crafter owns a Workshop; resetting
+rebuilds demo stock while preserving player Workshops and craft history.
+
+Use `+workshop/catalog` for current unlock costs, then
+`+workshop/unlock writing = timber:3`. A second active niche costs twice its
+base inputs, then three times for a third. The five-niche cap is mandatory
+and runtime-tunable. `+workshop/abandon writing` frees the slot without a
+refund and lowers the money/resource cap raise.
+
+Compose with `+craft/new writing/readable = a field book`, `/desc`,
+`/text`, `/resources = timber:1`, preview with `+craft`, then `/finish`.
+Wearable drafts use `/line`, optional `/aura`, `/slot` and `/require`.
+Crafted wearables reuse equipment's requirements and sealing and do not use
+the plain-gear cap. Staff `+crafting/review` sees the original prose and costs.
+
+The host's `CraftedBook` and `CraftedWearable` typeclasses put `ObjectParent`
+first, so economy's early stock-deletion guard runs before item cleanup.
+Crafting's hallmark mixin precedes equipment/DefaultObject through the contrib
+base classes. No crafting character mixin, startup script, URL or API is needed.
+Without equipment, existing crafted objects retain their hallmark and new
+Wearable crafts are unavailable; Readable continues to work. Without economy,
+unlock costs use resources only. CI tests actual physically absent partners
+through `scripts/ci_run_crafting_tests.py`.
 
 ### The map, and the web surface
 
@@ -484,6 +521,7 @@ pip install "evennia>=6.0"
 for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_economy \
          contribs/game_systems/evennia_rp_resources \
+         contribs/game_systems/evennia_rp_crafting \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \
          contribs/game_systems/evennia_boards \
@@ -649,6 +687,7 @@ if it lists a modified tracked file, that change is real and reset will destroy 
 for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_economy \
          contribs/game_systems/evennia_rp_resources \
+         contribs/game_systems/evennia_rp_crafting \
          contribs/game_systems/evennia_rptracker \
          contribs/game_systems/evennia_scenes \
          contribs/game_systems/evennia_boards \

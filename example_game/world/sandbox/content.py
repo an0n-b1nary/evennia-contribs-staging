@@ -711,6 +711,10 @@ RP_CHALLENGES = (
     "A=Presence/Performance~Hold the audience's attention",
     "B~Cross the chasm",
 )
+MARKET_STALL_NAME = "The Sample Counter"
+MARKET_STALL_DESC = "[Placeholder] Try +browse, +buy, +market and +stall. Stock stays reserved while the seller is away."
+MARKET_STOCK_NAME = "sample market satchel"
+
 # Practice gear in the Proving Grounds (evennia-rp-equipment). `worn_by` is an
 # index into the demonstration characters (SCENE_SPEAKERS order) or None for the
 # floor; each worn item's requirements fit that character's RP_SAMPLE_BUILDS row.

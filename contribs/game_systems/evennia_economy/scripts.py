@@ -26,8 +26,12 @@ class EconomyBatchScript(DefaultScript):
 
         from .batch import note_visibility, period_key, run_due_period
         from .exchange import expire_offers
+        from .review import flag_quiet_stalls
+        from .stalls import run_upkeep
 
         expire_offers()
+        flag_quiet_stalls()
+        run_upkeep()
         note_visibility()
         state = self.db.batch_state
         if state is None and self.db.last_batch_week:

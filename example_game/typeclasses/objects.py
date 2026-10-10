@@ -8,10 +8,18 @@ with a location in the game world (like Characters, Rooms, Exits).
 
 """
 
+from django.apps import apps
 from evennia.objects.objects import DefaultObject
 
+if apps.is_installed("evennia_economy"):
+    from evennia_economy.typeclasses import EconomyObjectMixin
+else:
 
-class ObjectParent:
+    class EconomyObjectMixin:
+        pass
+
+
+class ObjectParent(EconomyObjectMixin):
     """
     This is a mixin that can be used to override *all* entities inheriting at
     some distance from DefaultObject (Objects, Exits, Characters and Rooms).

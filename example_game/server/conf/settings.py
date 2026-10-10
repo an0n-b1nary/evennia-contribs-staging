@@ -51,6 +51,7 @@ INSTALLED_APPS += [
     "evennia_links",
     "evennia_economy",
     "evennia_rp_resources",
+    "evennia_rp_crafting",
     "evennia_rptracker",
     "evennia_scenes",
     "evennia_boards",
@@ -101,6 +102,10 @@ RP_ECONOMY_REVEAL_STIPEND = 100
 RP_ECONOMY_PERIOD_SECONDS = 604800
 RP_ECONOMY_OFFER_TIMEOUT = 600
 RP_ECONOMY_MAX_OPEN_OFFERS = 5
+RP_ECONOMY_MAX_STALLS = 1
+RP_ECONOMY_STALL_SLOTS = 8
+RP_ECONOMY_STALL_CAP_RAISE = 100
+RP_ECONOMY_QUIET_STALL_WEEKS = 5
 RP_ECONOMY_STAFF_LOCK = "cmd:perm(Builder)"
 RP_ECONOMY_FLAG_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
 
@@ -122,6 +127,20 @@ RP_RESOURCES_LEAN_MULTIPLIER = 2
 RP_RESOURCES_STAFF_LOCK = "cmd:perm(Builder)"
 RP_ECONOMY_ELIGIBLE = None  # Every playable character; no RP/session requirement.
 SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
+
+######################################################################
+# RP crafting (evennia-rp-crafting) — invested niches and cosmetic items
+######################################################################
+RP_CRAFTING_REVEALED = True
+RP_CRAFTING_FROZEN = False
+RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
+RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
+RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
+RP_CRAFTING_NICHE_CAP = 5
+RP_CRAFTING_UNLOCK_STEP = 1
+RP_CRAFTING_MONEY_CAP_RAISE = 100
+RP_CRAFTING_RESOURCE_CAP_RAISE = 6
+RP_CRAFTING_STAFF_LOCK = "cmd:perm(Builder)"
 
 ######################################################################
 # Guides (evennia-guides) — Markdown guide pages on the web, at /guide/

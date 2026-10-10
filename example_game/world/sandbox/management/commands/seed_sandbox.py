@@ -168,6 +168,20 @@ class Command(BaseCommand):
                     channel.delete()
 
         objs = search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+        if apps.is_installed("evennia_economy"):
+            # Close demo-owned stalls before rebuilding their owners or market.
+            # Player-owned stalls in rooms being rebuilt need explicit staff recovery.
+            from django.db.models import Q
+            from evennia_economy.models import Storefront
+            from evennia_economy.stalls import recover
+
+            stores = Storefront.objects.filter(status="open").filter(
+                Q(owner_id__in=[o.pk for o in objs]) | Q(room_id__in=[o.pk for o in objs])
+            )
+            counts["stalls"] = stores.count()
+            if not dry_run:
+                for store in stores:
+                    recover(store.pk)
         if apps.is_installed("evennia_rp_contest"):
             from evennia_rp_contest.models import Challenge
 
@@ -312,11 +326,81 @@ class Command(BaseCommand):
             for author in authors:
                 grant(author, "timber", 3, "staff", note="Sandbox demonstration stores")
         if apps.is_installed("evennia_economy"):
+            from evennia.utils.create import create_object
             from evennia_economy.services import credit
+            from evennia_economy.stalls import claim, list_stock
 
             for author in authors:
                 credit(author, 200, note="Sandbox demonstration purse")
             counts["purses"] = len(authors)
+            market = rooms["market"]
+            market.tags.add("market", category="rp_economy")
+            market.db.rp_economy_stall_slots = 8
+            owner = authors[0]
+            original_room = owner.location
+            owner.location = market
+            store = claim(owner, name=content.MARKET_STALL_NAME)
+            store.description = content.MARKET_STALL_DESC
+            store.save(update_fields=["description"])
+            stock = create_object(
+                "typeclasses.objects.Object",
+                key=content.MARKET_STOCK_NAME,
+                location=owner,
+                tags=[(SANDBOX_TAG, SANDBOX_TAG_CATEGORY)],
+            )
+            list_stock(owner, store.pk, [{"kind": "item", "key": str(stock.pk), "quantity": 1}], 10)
+            if apps.is_installed("evennia_rp_resources"):
+                list_stock(
+                    owner, store.pk, [{"kind": "resource", "key": "timber", "quantity": 1}], 5
+                )
+            owner.location = original_room
+            counts["stalls"] = 1
+        if apps.is_installed("evennia_rp_crafting"):
+            counts.update(self._create_crafting(authors, rooms))
+        return counts
+
+    def _create_crafting(self, authors, rooms):
+        from django.apps import apps
+        from evennia_rp_crafting.catalog import seed_catalog
+        from evennia_rp_crafting.services import craft, unlock
+        from evennia_rp_resources.services import grant
+
+        from world.sandbox import crafting
+
+        owner = authors[-1]
+        counts = {"crafting_niches": len(seed_catalog(update=True))}
+        grant(owner, "timber", 12, "staff", note="Sandbox Workshop inputs")
+        if apps.is_installed("evennia_economy"):
+            from evennia_economy.services import credit
+
+            credit(owner, 200, note="Sandbox Workshop investment")
+        unlock(owner, "writing", {"timber": 3})
+        book = craft(
+            owner,
+            "writing",
+            "readable",
+            crafting.BOOK_NAME,
+            crafting.BOOK_DESC,
+            {"text": crafting.BOOK_TEXT},
+            {"timber": 1},
+        )
+        items = [book]
+        if apps.is_installed("evennia_rp_equipment"):
+            unlock(owner, "weaving", {"timber": 6})
+            cloak = craft(
+                owner,
+                "weaving",
+                "wearable",
+                crafting.CLOAK_NAME,
+                crafting.CLOAK_DESC,
+                {"worn_line": crafting.CLOAK_LINE, "slot": "body"},
+                {"timber": 1},
+            )
+            items.append(cloak)
+        for item in items:
+            item.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+            item.move_to(rooms["market"], quiet=True)
+        counts["crafted_items"] = len(items)
         return counts
 
     def _create_rp_playground(self, rooms, authors):

@@ -150,7 +150,7 @@ def describe(spec):
     return ", ".join(labels) or "nothing"
 
 
-def check(giver, recipient, spec):
+def check(giver, recipient, spec, *, item_giver=None):
     available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]
@@ -168,7 +168,7 @@ def check(giver, recipient, spec):
                 raise EconomyError("That item is no longer carried by its giver.")
             if item.destination or item.has_account or item.pk in (giver.pk, recipient.pk):
                 raise EconomyError("That object cannot be traded.")
-            if not item.at_pre_give(giver, recipient):
+            if not item.at_pre_give(item_giver or giver, recipient):
                 raise EconomyError("That item cannot be given. Remove worn gear first.")
             if not item.at_pre_move(
                 recipient, move_type="give"
@@ -181,12 +181,16 @@ def check(giver, recipient, spec):
             provider.check(giver, recipient, key, count)
 
 
-def _finish_item(item, giver, recipient):
+def _finish_item(item, giver, recipient, *, item_giver=None):
     """Publish cache and hook changes only after the exchange commits.
 
     Each step runs on its own, so one failing hook can't skip the others (an
     item's at_post_move is where equipment seals a handed-over item).
     """
+    # A host reset may return and then delete stock in the same outer transaction.
+    # There is no surviving object to publish after that transaction commits.
+    if not item.pk or not ObjectDB.objects.filter(pk=item.pk).exists():
+        return
 
     def relocate():
         # refresh_from_db() reuses Evennia's identity-mapped ObjectDB instance,
@@ -203,7 +207,7 @@ def _finish_item(item, giver, recipient):
         lambda: giver.at_object_leave(item, recipient, move_type="give"),
         lambda: recipient.at_object_receive(item, giver, move_type="give"),
         lambda: item.at_post_move(giver, move_type="give"),
-        lambda: item.at_give(giver, recipient),
+        lambda: item.at_give(item_giver or giver, recipient),
     ):
         try:
             step()
@@ -211,7 +215,7 @@ def _finish_item(item, giver, recipient):
             logger.exception("Economy item post-transfer hook failed for #%s", item.pk)
 
 
-def move(giver, recipient, spec, exchange_id):
+def move(giver, recipient, spec, exchange_id, *, item_giver=None):
     available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]
@@ -224,7 +228,9 @@ def move(giver, recipient, spec, exchange_id):
                 db_location_id=recipient.pk
             ):
                 raise EconomyError("Item ownership changed during the exchange.")
-            transaction.on_commit(lambda obj=item: _finish_item(obj, giver, recipient))
+            transaction.on_commit(
+                lambda obj=item: _finish_item(obj, giver, recipient, item_giver=item_giver)
+            )
         else:
             provider = available.get(kind)
             if provider is None:

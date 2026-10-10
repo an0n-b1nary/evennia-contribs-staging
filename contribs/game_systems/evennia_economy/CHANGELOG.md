@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.2 — 2026-10-09
+
+- Added: market directory search includes an optional item's
+  `get_market_keywords(viewer)` hook, allowing niche discovery without
+  importing crafting or requiring it to be installed.
+
+## 0.2.1 — 2026-10-09
+
+- Fixed: `evennia_economy.typeclasses` imports `DefaultObject` from its module,
+  not the flat API, which is still unset when a management command such as
+  `evennia check` loads host typeclasses through the URLconf. 0.2.0 crashed
+  those commands in any game whose object typeclass uses `EconomyObjectMixin`.
+
+## 0.2.0 — 2026-10-09
+
+- Added: market-room stalls, reserved item/resource listings, offline atomic
+  purchases, browsing and global discovery. Claim, listing and sale fees share
+  their feature transaction; returning stock is free.
+- Added: current stall ownership raises the passive money cap, with runtime
+  controls for slots, per-character limits, cap raises and quiet-stall weeks.
+- Added: quiet-stall and same-account drop/get review flags. Quiet stalls retain
+  stock until explicit closure; floor pickup is allowed without penalties.
+- Added: a cooperative market-room roster mixin, login-activity hook, generic
+  sandbox market stock, real partner seams and live offline-sale acceptance.
+- Upgrades retain the original migration and existing round-trip review flags.
+
 ## 0.1.1 — 2026-10-09
 
 - Fixed: accept evennia-links 0.8 alongside 0.7 so the contrib installs with

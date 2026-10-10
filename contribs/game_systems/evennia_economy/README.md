@@ -8,7 +8,7 @@ coupling economy to their packages.
 
 ## Install
 
-Install `evennia-links>=0.7,<0.8`, then `pip install -e .`. Add
+Install `evennia-links>=0.7,<0.9`, then `pip install -e .`. Add
 `"evennia_links"` followed by `"evennia_economy"` to `INSTALLED_APPS` and run
 `evennia migrate --noinput`. Links is the only hard contrib dependency.
 
@@ -71,10 +71,77 @@ any asset, including gifts. Unaccounted NPCs are allowed. Hosts should route
 other transfer commands through this API too; administrative object edits
 remain outside this player-exchange policy.
 
-Known gap: one character can `drop` an item and another character on the same
-account can `get` it later. Money and provider assets can't be dropped, so this
-only affects items. In keeping with detection over restriction, a later release
-plans a review flag for it alongside stalls, rather than blocking `get`.
+An item dropped in a room and picked up by a different character on the same
+playable account within seven days creates a staff review flag. Pickup is allowed.
+Money and provider assets cannot be dropped. This observation covers ordinary
+Evennia object location saves without a required item mixin; direct SQL edits
+remain host administration.
+
+## Stalls
+
+Tag a room `market` in category `rp_economy`. Its `rp_economy_stall_slots`
+Attribute overrides the runtime slot default. Characters may claim one stall
+by default. Stock is reserved at listing: items move to a stall-owned container
+with no location; provider counters are debited into the listing. A listing
+contains one item or one resource lot, at a positive whole-number price.
+
+```
++stall/claim My counter
++stall/name = A new name
++stall/desc = A description
++stall/list item name = 10
++stall/list resource:grain:3 = 5
++stall/unlist <listing number>
++browse [stall number]
++buy <listing number>
++market [name, description or stock search]
++stall/close [stall number]
+```
+
+Discovery is global; purchases require the storefront's room. Sellers can be
+offline. Purchase rechecks current account membership, stock, provider visibility,
+buyer funds and item hooks; payment, fees, delivery, listing completion and ledger
+entries commit together. A sold listing cannot sell twice. Seller sale fees come
+from the proceeds. Listed items cannot be moved or destroyed outside the service.
+Use rp-resources 0.1.3 or newer for returning archived resource stock.
+
+Listed item typeclasses may expose `get_market_keywords(looker)`, returning
+search terms in addition to their name. Crafting uses this optional hook for
+niche names and behaviour keys, so `+market weaver` finds active woven stock.
+Economy does not import or require crafting.
+
+Quiet stalls are flagged once per inactivity period after five weeks without an
+owner login, listing, unlisting or sale. They never close automatically. Call
+`evennia_economy.stalls.note_login(character)` from the character login hook.
+`EconomyBatchScript` checks inactivity. Flags use the existing staff-review hook
+and `+economy/flags`; hook failures leave the local queue intact.
+
+Owners close their stall locally. Staff may use `+stall/close <number>` remotely,
+including during a freeze. Closure returns all active stock without fees and frees
+the slot and cap raise. Restore a missing provider before returning its stock.
+Close stalls before deleting an owner or market room; deletion otherwise refuses
+to orphan reserved stock. Closed storefronts and their hidden stock containers
+retain listing history.
+
+For an early refusal before Evennia clears an object's attributes, put
+`EconomyObjectMixin` before the host's base object/character/room class (or in
+its shared object-parent mixin). The reference game wires it through
+`ObjectParent`, gated when economy is absent. Database deletion guards also
+protect reserved stock. Trusted reset code may call `stalls.recover(store_id)`
+before rebuilding owners or rooms; that recovery API is not a player command.
+
+Claim, listing, sale and upkeep boundaries default to zero fees. Upkeep runs
+once per current income period after the claim period, pauses while frozen,
+and retries shortfalls with one review flag per stall/period. It never closes
+a stall or marks a shortfall paid. It does not back-charge every missed period.
+If a host allows several stalls in one room, select one with
+`+stall/list <stall number>/<item or lot> = price`.
+
+For the one-line roster on `look`, put `evennia_economy.typeclasses.MarketRoomMixin`
+before the host room class. It cooperatively extends `get_display_footer` and
+does not constrain the order of other cooperative mixins. No web/API surface is
+shipped by this release. Future crafting can extend catalogue discovery with its
+niche vocabulary; this release searches names, descriptions and visible stock.
 
 ## Settings
 
@@ -93,6 +160,10 @@ Database overrides take precedence over host settings and defaults.
 | `PERIOD_SECONDS` | `604800` | Monday-anchored batch period |
 | `OFFER_TIMEOUT` | `600` | Seconds an unaccepted offer remains open |
 | `MAX_OPEN_OFFERS` | `5` | Sent open offers per character |
+| `MAX_STALLS` | `1` | Open stalls per character |
+| `STALL_SLOTS` | `8` | Market slots unless the room overrides it |
+| `STALL_CAP_RAISE` | `100` | Money-cap raise per currently held stall |
+| `QUIET_STALL_WEEKS` | `5` | Inactivity before staff review, never automatic closure |
 | `FEE_<KIND>` | `0` | Flat whole-number fee at each named boundary |
 
 The cap is `ceil(WEEKLY_AMOUNT * BASE_CAP_WEEKS)` plus links'

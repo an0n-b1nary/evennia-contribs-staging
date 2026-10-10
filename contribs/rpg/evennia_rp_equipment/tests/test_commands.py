@@ -8,6 +8,7 @@ char1 is a Developer (staff); char2 is an ordinary player.
 from __future__ import annotations
 
 from io import StringIO
+from unittest.mock import patch
 
 from django.core.management import call_command
 from evennia.commands.default.general import CmdDrop, CmdGive
@@ -21,6 +22,18 @@ from .base import GearCommandTest
 
 
 class GearCommandTests(GearCommandTest):
+    def test_info_includes_optional_verified_provenance_without_crafting_installed(self):
+        from evennia_rp_equipment.commands import render_info
+
+        item = self.make_item(self.char2, "cloak")
+        with patch.object(
+            type(item),
+            "get_display_provenance",
+            return_value="Made by Morgan (Weaver)",
+            create=True,
+        ):
+            self.assertIn("Craft hallmark: Made by Morgan (Weaver)", render_info(item, self.char1))
+
     def test_make_describe_require_and_inspect(self):
         self.call(CmdGear(), "/make Cursed Axe=weapon", "You make Cursed Axe.", caller=self.char2)
         self.call(

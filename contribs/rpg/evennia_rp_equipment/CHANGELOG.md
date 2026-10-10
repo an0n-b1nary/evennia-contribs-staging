@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-09
+
+### Added
+
+- `+gear/info` displays an optional item's `get_display_provenance(looker)`
+  line, allowing independently installed crafting packages to show verified
+  hallmarks without importing them into equipment.
+
 ## [0.1.1] - 2026-10-09
 
 ### Fixed
