@@ -96,3 +96,37 @@ class CmdScreenreader(MuxCommand):
             )
             return False
         return True
+
+
+class CmdAmbient(MuxCommand):
+    """Mute effects arriving from other rooms or through ambient channels.
+
+    Usage: +ambient, +ambient/mute, +ambient/unmute
+
+    Stored per account, across characters and logins. Effects used in your
+    current room remain visible as scene content.
+    """
+
+    key = "+ambient"
+    help_category = "General"
+    locks = "cmd:all()"
+
+    def func(self):
+        from .accessibility import mutes_ambient
+
+        account = getattr(self.caller, "account", self.caller)
+        if account is None or not hasattr(account, "options"):
+            self.msg("You must be logged in to use this command.")
+            return
+        if not self.switches:
+            self.msg(f"Ambient effects: {'muted' if mutes_ambient(account) else 'enabled'}.")
+            return
+        if len(self.switches) != 1 or self.switches[0] not in ("mute", "unmute"):
+            self.msg("Use +ambient, +ambient/mute or +ambient/unmute.")
+            return
+        try:
+            account.options.set("mute_ambient_effects", str(self.switches[0] == "mute"))
+        except ValueError:
+            self.msg("Ambient preferences aren't available on this game yet. Please tell staff.")
+            return
+        self.msg(f"Ambient effects: {'muted' if mutes_ambient(account) else 'enabled'}.")

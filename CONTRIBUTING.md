@@ -303,6 +303,9 @@ Run `python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox`, with
 `--absent evennia_economy` (or the matching excluded app label). The destination
 must be new. The runner copies reference-game code without databases or secrets,
 checks physical absence, and runs the crafting suite and actual reference seams.
+This includes Consumable deletion and retained provenance, Broadcast audience
+limits, channel permissions and both mute controls. With accessibility absent,
+Broadcast must remain in its user's room.
 The accessibility-absent profile uses an empty URLconf because unrelated web
 extras require accessibility; crafting's commands and items have no web surface.
 
