@@ -3,12 +3,13 @@
 Why the route names live here in Python rather than as ``{% url %}`` calls in
 ``_menu.html``: the menu is included from ``base.html``, so a name that does not
 reverse is a ``NoReverseMatch`` on *every page of the site*, not just the page
-with the bad link. And the names are easy to get wrong, because the nine contrib
+with the bad link. And the names are easy to get wrong, because the ten contrib
 web surfaces this game mounts use three different reverse forms for real reasons
 (see ``web/website/urls.py``):
 
 - ``app_name`` declared in the contrib, bare include -> ``evennia_maps:``,
-  ``evennia_regions:``, ``evennia_calendar:``, ``evennia_plots:``
+  ``evennia_regions:``, ``evennia_calendar:``, ``evennia_plots:``,
+  ``evennia_guides:``
 - no ``app_name``, namespace supplied at include time -> ``evennia_scenes:``,
   ``evennia_boards:``
 - bare names that must *not* be namespaced -> ``lore-list``, ``job-list``,
@@ -72,6 +73,7 @@ NAV_GROUPS = (
             ("Boards", "evennia_boards:board-list", PUBLIC),
             ("Characters", "characters", PUBLIC),
             ("Channels", "channels", PUBLIC),
+            ("Guide", "evennia_guides:guide-index", PUBLIC),
         ),
     ),
 )

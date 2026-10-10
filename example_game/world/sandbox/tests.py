@@ -1203,6 +1203,7 @@ class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
         ("lore-list", "/lore/"),
         ("job-list", "/jobs/"),
         ("xp-summary", "/xp/"),
+        ("evennia_guides:guide-index", "/guide/"),
     )
 
     def test_every_landing_route_reverses_under_its_prefix(self):

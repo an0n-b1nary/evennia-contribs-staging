@@ -16,11 +16,11 @@ part of this repo).
 
 ## What's wired up
 
-All 20 current contribs, in dependency order — `evennia_links` first, then `evennia_economy` and `evennia_rp_resources`, then
+All 21 current contribs, in dependency order — `evennia_links` first, then `evennia_economy` and `evennia_rp_resources`, then
 the apps that depend on it (`evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
 `evennia_maps`), then the standalone apps (`evennia_calendar`,
-`evennia_jobs`, `evennia_xp`, `evennia_accessibility`), then the pose/social
+`evennia_jobs`, `evennia_xp`, `evennia_accessibility`, `evennia_guides`), then the pose/social
 layer (`evennia_posing` before `evennia_social` — social hard-depends on
 posing), and the RP cluster (`evennia_rp_rules` before `evennia_rp_chargen`,
 `evennia_rp_equipment` and `evennia_rp_contest`; equipment requires chargen). See `server/conf/settings.py` for the full `INSTALLED_APPS` list and
@@ -178,6 +178,18 @@ not installed. The webclient keeps Evennia's normal client
 scripts and layout, with a reserved link back to the site, an 80-character
 reading measure, and a smaller default input pane. Existing browser-local
 layout preferences are not rewritten.
+
+### The guide
+
+`/guide/` serves the Markdown pages in `world/guides/`, along with any pages
+the installed contribs ship (`evennia_guides` itself ships a staff page,
+`writing-guides`). A page here with the same key as a contrib's page replaces
+it. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
+turn it off with `+runtime RP_ECONOMY_REVEALED=false` and the page, and the
+links to it, disappear without a reload. Every page's "Ask about this page"
+opens the jobs request form, prefilled. The guide is web-only and separate from in-game `help`. Run
+`evennia guides_check` after editing pages. `world/sandbox/test_guides.py` is
+the seam test.
 
 ### The seeded world: an OOC wing and an IC grid
 
@@ -483,6 +495,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
          contribs/utils/evennia_accessibility \
+         contribs/utils/evennia_guides \
          contribs/game_systems/evennia_posing \
          contribs/game_systems/evennia_social \
          contribs/rpg/evennia_rp_rules \
@@ -647,6 +660,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_jobs \
          contribs/game_systems/evennia_xp \
          contribs/utils/evennia_accessibility \
+         contribs/utils/evennia_guides \
          contribs/game_systems/evennia_posing \
          contribs/game_systems/evennia_social \
          contribs/rpg/evennia_rp_rules \
