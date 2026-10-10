@@ -240,6 +240,95 @@ class TestWebCharacter(EvenniaTest):
         self.assertIsNone(web_character(self.account2))
 
 
+class TestWebCharacterChoice(EvenniaTest):
+    """The website's own character choice (Evennia's session "puppet") reaches web_character."""
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account.characters.add(self.char2)
+
+    def _request(self, session, user=None, live=()):
+        """Run one request through the middleware; return what the resolver saw inside it."""
+        from unittest.mock import patch
+
+        from evennia_links.characters import web_character
+        from evennia_links.web import WebCharacterMiddleware
+
+        request = RequestFactory().get("/")
+        request.user = user or self.account
+        request.session = session
+        seen = {}
+
+        def view(request):
+            seen["character"] = web_character(request.user)
+            seen["roster_only"] = web_character(request.user, roster_only=True)
+            return "response"
+
+        with patch.object(self.account, "get_all_puppets", return_value=list(live)):
+            self.assertEqual(WebCharacterMiddleware(view)(request), "response")
+        return seen
+
+    def test_choice_wins_over_last_and_live_puppets(self):
+        # Regression: the site said "Welcome, Char2!" after the player chose
+        # Char2, while every contrib still posted as the last puppet, Char.
+        self.account.db._last_puppet = self.char1
+        seen = self._request({"puppet": self.char2.pk}, live=[self.char1])
+        self.assertEqual(seen["character"], self.char2)
+        self.assertEqual(seen["roster_only"], self.char2)
+
+    def test_choice_off_the_roster_is_ignored(self):
+        self.account.db._last_puppet = self.char1
+        self.assertEqual(self._request({"puppet": self.obj1.pk})["character"], self.char1)
+        self.account.characters.remove(self.char2)
+        self.assertEqual(self._request({"puppet": self.char2.pk})["character"], self.char1)
+
+    def test_malformed_or_missing_choice_is_ignored(self):
+        self.account.db._last_puppet = self.char1
+        for session in ({}, {"puppet": None}, {"puppet": "Char2"}):
+            with self.subTest(session=session):
+                self.assertEqual(self._request(session)["character"], self.char1)
+
+    def test_choice_belongs_to_the_requesting_account(self):
+        from evennia_links.characters import _web_choice, web_character
+
+        self.account2.characters.add(self.obj1)
+        self.account2.characters.add(self.char2)
+        self.account2.db._last_puppet = None
+        token = _web_choice.set((self.account.pk, self.char2.pk))
+        try:
+            # Another account's choice never applies, even to a shared character.
+            self.assertEqual(web_character(self.account2), self.obj1)
+        finally:
+            _web_choice.reset(token)
+
+    def test_choice_lasts_one_request(self):
+        from evennia_links.characters import _web_choice
+
+        self._request({"puppet": self.char2.pk})
+        self.assertIsNone(_web_choice.get())
+
+    def test_anonymous_request_has_no_choice(self):
+        seen = self._request({"puppet": self.char2.pk}, user=AnonymousUser())
+        self.assertIsNone(seen["character"])
+
+    def test_context_processor(self):
+        from unittest.mock import patch
+
+        from evennia_links.web import web_character_context
+
+        request = RequestFactory().get("/")
+        request.user = self.account
+        self.account.db._last_puppet = self.char2
+        with patch.object(self.account, "get_all_puppets", return_value=[]):
+            context = web_character_context(request)
+        self.assertEqual(context["web_character"], self.char2)
+        self.assertEqual(context["web_roster"], [self.char1, self.char2])
+
+        request.user = AnonymousUser()
+        self.assertEqual(web_character_context(request), {"web_character": None, "web_roster": []})
+
+
 class TestPeriodicQueue(SimpleTestCase):
     def test_weekly_and_short_period_labels(self):
         from datetime import UTC, datetime

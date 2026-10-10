@@ -393,6 +393,34 @@ list wins, then any other live puppet (a staffer playing an NPC) unless
 first character on the list. Anonymous users and accounts with nothing to play
 resolve to `None`. Web contribs use it for their `get_character_id(user)`;
 pass `roster_only=True` where the identity pays or records the character.
+`web_roster(user)` is the list it chooses from.
+
+### The website's chosen character
+
+Evennia's website already lets an account pick a character: the account menu's
+character links (`character-puppet`) store the choice in the Django session as
+`"puppet"`. Web contribs resolve their character from `request.user` alone, so
+on their own they can't see that choice, and the menu could name one character
+while a post went out as another. Install the middleware so the choice reaches
+`web_character`:
+
+```python
+# server/conf/settings.py
+MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]  # after session + auth
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "evennia_links.web.web_character_context",
+]
+```
+
+A chosen character wins over live and last puppets for as long as it stays on
+the account's playable list. Otherwise the order above applies. The choice
+lasts for one request and only applies to the account that made it. The
+context processor gives every template `web_character`, the character the
+contribs' pages act as (use it in your menu rather than Evennia's `puppet`,
+which is empty until a character is picked), and `web_roster`. Without the
+middleware, nothing changes.
+
+### Period batches
 
 `evennia_links.periodic` serves weekly (or staff-shortened) batch scripts.
 `period_key(seconds)` labels the most recently completed Monday-anchored
