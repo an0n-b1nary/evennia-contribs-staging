@@ -16,7 +16,7 @@ from .behaviours import behaviour
 from .commands import CmdCraft, CmdUse
 from .errors import CraftingError
 from .events import use
-from .models import CraftRecord, EventChannelLimit, EventRoomLimit, EventUse, NicheDefinition
+from .models import CraftRecord, EventRoomLimit, EventUse, NicheDefinition
 from .tests import CraftingFixture
 
 HAS_ACCESSIBILITY = apps.is_installed("evennia_accessibility")
@@ -28,7 +28,6 @@ class EventFixture(CraftingFixture):
         override = override_settings(
             RP_CRAFTING_EVENT_ROOM_COOLDOWN=30,
             RP_CRAFTING_EVENT_FRAME="<EVENT> {text}",
-            RP_CRAFTING_CHANNELS=("Effects",),
         )
         override.enable()
         self.addCleanup(override.disable)
@@ -60,7 +59,6 @@ class EventFixture(CraftingFixture):
 
     def expire(self):
         EventRoomLimit.objects.update(last_used=timezone.now() - timedelta(seconds=31))
-        EventChannelLimit.objects.update(last_used=timezone.now() - timedelta(seconds=31))
 
     def unmute(self, account):
         # Host-independent tests still exercise the actual OptionHandler.
@@ -222,40 +220,6 @@ class EventTests(EventFixture, EvenniaTest):
             use(self.char1, self.item("broadcast"))
         msg.assert_not_called()
 
-    def test_channel_effect_is_muted_and_not_duplicated_in_source_room(self):
-        if not HAS_ACCESSIBILITY:
-            self.skipTest("accessibility absent; own-room only")
-        channel = create_channel("Effects", locks="send:all();listen:all()")
-        channel.connect(self.account2)
-        self.unmute(self.account2)
-        self.account2.options.set("mute_ambient_effects", "True")
-        with (
-            patch.object(self.char2, "msg") as local,
-            patch.object(self.account2, "msg") as remote,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            use(self.char1, self.item("broadcast", reach="channel", channel="Effects"))
-        self.assertEqual(local.call_count, 1)
-        remote.assert_not_called()
-        self.expire()
-        self.char2.move_to(self.room2, quiet=True)
-        with (
-            patch.object(self.account2, "msg") as remote,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            use(self.char1, self.item("broadcast", reach="channel", channel="Effects"))
-        remote.assert_not_called()
-
-        self.expire()
-        self.account2.options.set("mute_ambient_effects", "False")
-        channel.mute(self.account2)
-        with (
-            patch.object(self.account2, "msg") as remote,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            use(self.char1, self.item("broadcast", reach="channel", channel="Effects"))
-        remote.assert_not_called()
-
     def test_outside_room_is_not_reached_recursively(self):
         third = create_object("evennia.objects.objects.DefaultRoom", key="Third room")
         create_object("evennia.objects.objects.DefaultExit", location=self.room2, destination=third)
@@ -276,29 +240,16 @@ class EventTests(EventFixture, EvenniaTest):
         with self.assertRaises(CraftingError):
             use(self.char1, second)
 
-    def test_channel_permissions_allowlist_mute_and_channel_cooldown(self):
-        channel = create_channel("Effects", locks="send:all();listen:all()")
-        channel.connect(self.account2)
-        self.char2.move_to(self.room2, quiet=True)
-        if HAS_ACCESSIBILITY:
-            self.unmute(self.account2)
-        item = self.item("broadcast", reach="channel", channel="Effects")
-        with patch.object(self.account2, "msg") as msg, self.captureOnCommitCallbacks(execute=True):
-            use(self.char1, item)
-        self.assertEqual(msg.call_count, 1 if HAS_ACCESSIBILITY else 0)
-        if not HAS_ACCESSIBILITY:
-            return
-        second = self.item("broadcast", reach="channel", channel="Effects")
-        self.char1.move_to(self.room2, quiet=True)
-        with self.assertRaisesMessage(CraftingError, "channel"):
-            use(self.char1, second)
-        self.expire()
-        channel.locks.add("send:false()")
-        with self.assertRaises(CraftingError):
-            use(self.char1, second)
-        channel.locks.add("send:all()")
-        with override_settings(RP_CRAFTING_CHANNELS=()), self.assertRaises(CraftingError):
-            use(self.char1, second)
+    def test_broadcast_reaches_rooms_never_channels(self):
+        create_channel("Effects", locks="send:all();listen:all()").connect(self.account2)
+        with self.assertRaisesMessage(CraftingError, "adjacent"):
+            self.item("broadcast", reach="channel")
+        with self.assertRaisesMessage(CraftingError, "Unknown configuration"):
+            self.item("broadcast", channel="Effects")
+        self.assertFalse(CraftRecord.objects.filter(behaviour="broadcast").exists())
+        record = CraftRecord.objects.get(item_id=self.item("broadcast").pk)
+        self.assertEqual(record.prose["configuration"]["reach"], "adjacent")
+        self.assertNotIn("channel", record.prose["configuration"])
 
 
 class EventCommandTests(EventFixture, EvenniaCommandTest):

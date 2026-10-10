@@ -138,7 +138,6 @@ RP_CRAFTING_CONSUMABLE_TYPECLASS = "typeclasses.craft_items.CraftedConsumable"
 RP_CRAFTING_BROADCAST_TYPECLASS = "typeclasses.craft_items.CraftedBroadcast"
 RP_CRAFTING_EVENT_ROOM_COOLDOWN = 30
 RP_CRAFTING_EVENT_FRAME = "<EVENT> {text}"
-RP_CRAFTING_CHANNELS = ()  # Explicit host opt-in; adjacency is the demo default.
 RP_CRAFTING_NICHE_CAP = 5
 RP_CRAFTING_UNLOCK_STEP = 1
 RP_CRAFTING_MONEY_CAP_RAISE = 100
@@ -221,7 +220,7 @@ OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = (
     False,
 )
 OPTIONS_ACCOUNT_DEFAULT["mute_ambient_effects"] = (
-    "Mute effects arriving from other rooms or ambient channels.",
+    "Mute effects arriving from other rooms.",
     "Boolean",
     False,
 )

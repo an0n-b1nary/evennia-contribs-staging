@@ -106,8 +106,3 @@ class EventUse(models.Model):
 class EventRoomLimit(models.Model):
     room_id = models.PositiveBigIntegerField(unique=True)
     last_used = models.DateTimeField(null=True)
-
-
-class EventChannelLimit(models.Model):
-    channel_id = models.PositiveBigIntegerField(unique=True)
-    last_used = models.DateTimeField(null=True)

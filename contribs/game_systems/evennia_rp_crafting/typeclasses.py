@@ -51,4 +51,4 @@ class Consumable(CraftedItemMixin, DefaultObject):
 
 
 class Broadcast(Consumable):
-    """Consumable with optional adjacent-room or configured channel reach."""
+    """Consumable whose EVENT also reaches adjacent rooms."""

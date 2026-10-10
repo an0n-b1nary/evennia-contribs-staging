@@ -4,8 +4,8 @@
 
 - Added: Consumable and Broadcast drafts with one to three paid EVENT beats,
   system-owned framing and canonical prose, and single-use consumption.
-- Added: durable room/channel audience limits, adjacent or explicitly configured
-  channel reach, optional accessibility mute, and use details in staff review.
+- Added: durable room audience limits, adjacent-room reach (Broadcasts never
+  reach channels), optional accessibility mute, and use details in staff review.
 - Added: additive migration preserving existing Workshops and craft history,
   reference-game Cook/Illusionist demos and live reload/mute acceptance.
 

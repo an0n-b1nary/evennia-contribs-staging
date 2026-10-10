@@ -131,9 +131,8 @@ The market also holds a sample spice cake and spark globe. Pick one up and
 `+craft/new cooking/consumable`, `/desc`, repeated `/beat`, `/resources`, preview
 and `/finish`. Broadcast uses `illusions/broadcast` with essence inputs.
 `+ambient/mute` suppresses effects arriving from another room; your current
-scene remains visible. Adjacent reach is enabled; channel reach requires an
-explicit `RP_CRAFTING_CHANNELS` allowlist. Persistent audience limits default
-to 30 seconds and survive server reloads.
+scene remains visible. Broadcasts reach adjacent rooms only, never channels.
+Persistent audience limits default to 30 seconds and survive server reloads.
 
 Use `+workshop/catalog` for current unlock costs, then
 `+workshop/unlock writing = timber:3`. A second active niche costs twice its

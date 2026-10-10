@@ -85,23 +85,20 @@ use a spice cake
 
 `/unbeat <number>` removes a draft beat. The first beat costs the base input;
 each additional beat costs one more unit by default. A Broadcast uses the same
-draft fields, plus `/reach = adjacent` (default) or `/reach = channel` and
-`/channel = <key>`. Adjacent reach follows visible, traversable exits one hop,
-deduplicates destinations, and never recursively propagates. Channels must be
-explicitly allowed in `RP_CRAFTING_CHANNELS`, still exist, and permit the user's
-`send` access. Only subscribers with `listen` access receive their ambient effect.
-Native channel mute is respected alongside the account's ambient preference.
-Delivery is transient and does not enter channel history.
+draft fields; `/reach = adjacent` is the default and only reach. It follows
+visible, traversable exits one hop, deduplicates destinations, and never
+recursively propagates. Broadcasts reach rooms, never channels, so they cannot
+flood a game's chat or count as channel activity.
 
 Install accessibility 0.3 or newer and register `mute_ambient_effects` and its
 `+ambient` command as described in that package's README. The preference belongs
-to the account and covers other-room and channel effects. In-room effects are
+to the account and covers effects arriving from other rooms. In-room effects are
 scene content and remain visible. Without a compatible accessibility partner,
 Broadcast works only in the user's own room. Missing option registration mutes
 remote effects for that account, preserving an effective opt-out.
 
-Each item has one lifetime use. Source rooms, adjacent destination rooms and
-target channels share a persistent cooldown, default 30 seconds, tunable through
+Each item has one lifetime use. Source rooms and adjacent destination rooms
+share a persistent cooldown, default 30 seconds, tunable through
 `+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN` (1–86400 seconds). Limits survive reloads;
 using a different item, user or source room cannot flood the same audience.
 Cooldown, permission, hide, freeze or deletion refusals leave the item unconsumed.

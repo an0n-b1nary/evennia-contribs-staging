@@ -162,18 +162,14 @@ class Consumable(Behaviour):
 
 
 class Broadcast(Consumable):
-    fields = ("beats", "reach", "channel")
+    fields = ("beats", "reach")
     typeclass = "evennia_rp_crafting.typeclasses.Broadcast"
     typeclass_setting = "RP_CRAFTING_BROADCAST_TYPECLASS"
 
     def validate(self, config):
         result = super().validate(config)
+        # Broadcasts reach rooms, never channels; reach stays a field for later room scopes.
         reach = config.get("reach", "adjacent")
-        channel = text(config.get("channel", ""), "Channel", 80)
-        if reach not in ("adjacent", "channel"):
-            raise CraftingError("Broadcast reach must be adjacent or channel.")
-        if reach == "channel" and channel not in getattr(settings, "RP_CRAFTING_CHANNELS", ()):
-            raise CraftingError("Choose a staff-configured ambient channel.")
-        if reach == "adjacent" and channel:
-            raise CraftingError("Adjacent broadcasts don't use a channel.")
-        return result | {"reach": reach, "channel": channel}
+        if reach != "adjacent":
+            raise CraftingError("Broadcast reach must be adjacent.")
+        return result | {"reach": reach}

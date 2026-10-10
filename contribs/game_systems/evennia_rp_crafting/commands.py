@@ -143,8 +143,7 @@ class CmdCraft(_CraftCommand):
       +craft/text = <readable text>
       +craft/beat = <EVENT prose>  (repeat for up to three beats)
       +craft/unbeat <number>
-      +craft/reach = adjacent or channel
-      +craft/channel = <staff-configured channel>
+      +craft/reach = adjacent  (Broadcast; the default)
       +craft/resources = <resource key>:<quantity>[,...]
       +craft                   preview; consumes nothing
       +craft/finish            pay and create once; clears the draft on success
@@ -210,7 +209,6 @@ class CmdCraft(_CraftCommand):
                 "resources",
                 "beat",
                 "reach",
-                "channel",
             ):
                 value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
                 from .behaviours import text
@@ -243,13 +241,7 @@ class CmdCraft(_CraftCommand):
                         ]
                     else:
                         limit = (
-                            12000
-                            if field == "text"
-                            else 30
-                            if field in ("slot", "reach")
-                            else 80
-                            if field == "channel"
-                            else 200
+                            12000 if field == "text" else 30 if field in ("slot", "reach") else 200
                         )
                         draft["configuration"][field] = text(value, field, limit)
             elif switch in ("unrequire", "unbeat"):
@@ -276,7 +268,6 @@ class CmdCraft(_CraftCommand):
                     "slot": "Slot",
                     "text": "Text",
                     "reach": "Reach",
-                    "channel": "Channel",
                 }
                 for field, label in labels.items():
                     if draft["configuration"].get(field):

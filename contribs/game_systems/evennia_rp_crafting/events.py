@@ -8,46 +8,36 @@ from django.apps import apps
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from evennia.comms.models import ChannelDB
 from evennia.objects.models import ObjectDB
 from evennia.utils import logger
 
 from evennia_links.runtime import get
 
 from .errors import CraftingError
-from .models import CraftRecord, EventChannelLimit, EventRoomLimit, EventUse
+from .models import CraftRecord, EventRoomLimit, EventUse
 from .services import _require
 
 
 def _remote(record, actor, room):
-    """No accessibility means no remote recipients, including channel effects."""
+    """Rooms a Broadcast reaches; no accessibility means no remote recipients."""
     if record.behaviour != "broadcast" or not apps.is_installed("evennia_accessibility"):
-        return [], None
+        return []
     try:
         from evennia_accessibility import mutes_ambient  # noqa: F401
     except ImportError:
-        return [], None  # Older partners have no working opt-out.
-    config = record.prose["configuration"]
-    if config["reach"] == "adjacent":
-        destinations = {
-            exit.destination.pk: exit.destination
-            for exit in room.exits
-            if exit.destination
-            and exit.destination != room
-            and exit.access(actor, "view", default=True)
-            and exit.access(actor, "traverse", default=False)
-        }
-        return list(destinations.values()), None
-    key = config["channel"]
-    if key not in getattr(settings, "RP_CRAFTING_CHANNELS", ()):
-        raise CraftingError("That ambient channel is no longer available.")
-    channel = ChannelDB.objects.filter(db_key__iexact=key).first()
-    if channel is None or not channel.access(actor, "send", default=False):
-        raise CraftingError("You cannot broadcast to that channel.")
-    return [], channel
+        return []  # Older partners have no working opt-out.
+    destinations = {
+        exit.destination.pk: exit.destination
+        for exit in room.exits
+        if exit.destination
+        and exit.destination != room
+        and exit.access(actor, "view", default=True)
+        and exit.access(actor, "traverse", default=False)
+    }
+    return list(destinations.values())
 
 
-def _deliver(source_id, destination_ids, channel_id, message):
+def _deliver(source_id, destination_ids, message):
     # Hiding suppresses notifications even if a host defers its outer commit.
     if not get("RP_CRAFTING_REVEALED"):
         return
@@ -56,15 +46,8 @@ def _deliver(source_id, destination_ids, channel_id, message):
     remote = [
         obj for room in ObjectDB.objects.filter(pk__in=destination_ids) for obj in room.contents
     ]
-    channel = ChannelDB.objects.filter(pk=channel_id).first() if channel_id else None
     local_accounts = {obj.account.pk for obj in local if getattr(obj, "account", None)}
     targets = [(obj, False) for obj in local] + [(obj, True) for obj in remote]
-    if channel:
-        targets += [
-            (account, True)
-            for account in channel.subscriptions.all()
-            if account not in channel.mutelist and channel.access(account, "listen", default=False)
-        ]
     seen = set()
     delivered_accounts = set(local_accounts)
     for target, ambient in targets:
@@ -115,20 +98,12 @@ def use(actor, item):
     if EventUse.objects.filter(craft=record).exists():
         raise CraftingError("That item has already been used.")
     room = ObjectDB.objects.get(pk=location_id)
-    rooms, channel = _remote(record, actor, room)
+    rooms = _remote(record, actor, room)
     # Serialize on the actual rooms before creating their first limit rows.
     # Include destination rooms: separate sources cannot flood one audience.
     room_ids = sorted({room.pk, *(destination.pk for destination in rooms)})
     list(ObjectDB.objects.select_for_update().filter(pk__in=room_ids).order_by("pk"))
     now = timezone.now()
-    channel_limit = None
-    if channel:
-        ChannelDB.objects.select_for_update().get(pk=channel.pk)
-        channel_limit, _ = EventChannelLimit.objects.get_or_create(channel_id=channel.pk)
-        if channel_limit.last_used and now < channel_limit.last_used + timedelta(
-            seconds=get("RP_CRAFTING_EVENT_ROOM_COOLDOWN")
-        ):
-            raise CraftingError("An EVENT just reached that channel. Wait a moment.")
     limits = []
     for room_id in room_ids:
         limit, _ = EventRoomLimit.objects.get_or_create(room_id=room_id)
@@ -147,21 +122,15 @@ def use(actor, item):
     except (AttributeError, KeyError, ValueError, IndexError) as exc:
         raise CraftingError("The game's EVENT frame is misconfigured.") from exc
     destination_ids = [destination.pk for destination in rooms]
-    channel_id = channel.pk if channel else None
     result = EventUse.objects.create(
         craft=record,
         actor_id=actor.pk,
         actor_name=actor.key,
         room_id=room.pk,
-        destinations={
-            "rooms": destination_ids,
-            "channel": channel_id,
-        },
+        destinations={"rooms": destination_ids},
     )
     if not item.delete():
         raise CraftingError("The item cannot be consumed right now.")
     EventRoomLimit.objects.filter(pk__in=[limit.pk for limit in limits]).update(last_used=now)
-    if channel_limit:
-        EventChannelLimit.objects.filter(pk=channel_limit.pk).update(last_used=now)
-    transaction.on_commit(lambda: _deliver(room.pk, destination_ids, channel_id, message))
+    transaction.on_commit(lambda: _deliver(room.pk, destination_ids, message))
     return result
