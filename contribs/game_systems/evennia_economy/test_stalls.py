@@ -123,7 +123,9 @@ class StallTests(EvenniaTest):
         self.assertEqual(stalls.directory(self.char1, "weaver"), [])
         with patch.object(
             type(self.obj1), "get_market_keywords", return_value=["Weaver"], create=True
-        ):
+        ) as hook:
+            self.assertEqual(stalls.directory(self.char1), [(store, [listing])])
+            hook.assert_not_called()
             self.assertEqual(stalls.directory(self.char1, "weaver"), [(store, [listing])])
             with self.captureOnCommitCallbacks(execute=True):
                 stalls.buy(self.char1, listing.pk)

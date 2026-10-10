@@ -172,6 +172,14 @@ def directory(character, search="", *, room=None):
     result = []
     for store in stores:
         listings = visible_listings(character, store)
+        text = " ".join(
+            [store.name, store.description, *(assets.describe(row.assets) for row in listings)]
+        )
+        if not search or search.casefold() in text.casefold():
+            result.append((store, listings))
+            continue
+        # Item keyword hooks cost queries per item; consult them only for a
+        # search the store's own text did not already satisfy.
         keywords = []
         for row in listings:
             for asset in row.assets:
@@ -180,15 +188,7 @@ def directory(character, search="", *, room=None):
                     provider = getattr(item, "get_market_keywords", None)
                     if callable(provider):
                         keywords.extend(str(value) for value in (provider(character) or ()))
-        text = " ".join(
-            [
-                store.name,
-                store.description,
-                *(assets.describe(row.assets) for row in listings),
-                *keywords,
-            ]
-        )
-        if not search or search.casefold() in text.casefold():
+        if search.casefold() in " ".join(keywords).casefold():
             result.append((store, listings))
     return result
 
