@@ -37,6 +37,7 @@ out, including the two that stay in `world/sandbox/glue.py`:
 | `RPTRACKER_FLAG_REVIEW_HOOK` | `evennia_jobs.integrations.staff_review.file_review_job` → a staff-only `+discuss` ticket |
 | `BOARDS_ANTIGAMING_REPORTER` | the same jobs reporter |
 | `LORE_SESSION_CONTEXT_PROVIDER` | `evennia_lore.integrations.session_context.get_session_context` → room, primary region, plot threads |
+| `LORE_STAFF_REVIEW_HOOK` | the same jobs reporter → lore affirmation requests, and sealed lore left on a thread a player concluded |
 | `RPTRACKER_XP_PROJECTION` | `evennia_xp.projection.activity_lines` → projected XP under `+activity` (unset without `evennia_xp`) |
 | `RP_RULES_SUBJECT_ADAPTER` | `world/sandbox/glue.py` → chargen sheet, else a sandbox stat block |
 | `RP_RULES_VOCABULARY` | `world/sandbox/glue.py` → chargen's DB vocabulary, else ruleset tags |
@@ -1212,6 +1213,9 @@ different concepts but are not presented as connected players.
 
 The seed varies scene lengths and speakers, with an intentionally empty archive
 entry, plausible timestamps, authored/tagged lore, and posts on both boards.
+The lore shows each layer feature: an affirmed Fact, a false Rumor whose OOC
+notes say so, and a Legend with sealed notes, linked to the seeded plot thread.
+Concluding that thread reminds whoever concludes it that the legend is still sealed.
 
 Browser check: open a live scene from the home page and map, add a pose in-game,
 and confirm it arrives within ten seconds. Check the latest-page rollover, an

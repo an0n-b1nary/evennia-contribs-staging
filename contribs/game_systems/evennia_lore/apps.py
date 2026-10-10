@@ -18,7 +18,10 @@ class LoreConfig(AppConfig):
         from django.conf import settings
 
         from evennia_links import connect_soft_ref_cleanup
-        from evennia_lore import signals  # noqa: F401 — registers signal objects
+        from evennia_lore import (
+            notices,
+            signals,  # noqa: F401 — registers signal objects
+        )
         from evennia_lore.models import (
             LoreRegionLink,
             LoreSceneLink,
@@ -29,6 +32,9 @@ class LoreConfig(AppConfig):
             return apps.is_installed(label) or any(
                 cfg.label == label for cfg in apps.get_app_configs()
             )
+
+        # --- notices kept for offline characters arrive at their next puppet ---
+        notices.connect()
 
         # --- rptracker: register the passive-trickle listener ---
         rptracker_label = getattr(settings, "LORE_RPTRACKER_APP_LABEL", "evennia_rptracker")
@@ -57,6 +63,23 @@ class LoreConfig(AppConfig):
                 connect_soft_ref_cleanup(PlotThread, PlotLoreLink, "thread_id")
             except Exception:
                 pass
+            # Remind whoever concludes a thread that its linked lore is still sealed.
+            # The signal module is found through the label's app, so a game using
+            # its own plots app under LORE_PLOTS_APP_LABEL is not forced to import
+            # evennia_plots; an app without the signal simply gets no reminder.
+            from importlib import import_module
+
+            from evennia_lore.listeners import _on_plot_thread_concluded
+
+            try:
+                plots_module = apps.get_app_config(plots_label).name
+                concluded = import_module(f"{plots_module}.signals").plot_thread_concluded
+            except (LookupError, ImportError, AttributeError):
+                concluded = None
+            if concluded is not None:
+                concluded.connect(
+                    _on_plot_thread_concluded, dispatch_uid="evennia_lore.sealed_reminder"
+                )
 
         # --- regions: cleanup LoreRegionLink.region_id on Region hard-delete ---
         regions_label = getattr(settings, "LORE_REGIONS_APP_LABEL", "evennia_regions")

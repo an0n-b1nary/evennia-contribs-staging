@@ -7,6 +7,28 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0] - 2026-10-10
+
+- **Added:** two layers per entry. `body` is the IC content and may be false; the
+  new `accuracy` (accurate, inaccurate, partly, open) and `ooc_notes` are the OOC
+  layer and are never false. Inaccurate and partly accurate entries need notes.
+- **Added:** kinds (`LORE_KINDS`, default Fact, Rumor, Legend; `LORE_ACCURATE_KINDS`,
+  `LORE_DEFAULT_KIND`). A Fact is always accurate; a new Rumor or Legend starts open.
+- **Added:** affirmation, separate from publication: authors request it, staff affirm
+  or decline with a note. Declines show only to the author and staff. Affirmation
+  pins a digest, so any later edit reads "edited since affirmation".
+  `LORE_STAFF_REVIEW_HOOK` files requests as tickets.
+- **Added:** staff-only sealed notes (accuracy stays open), unsealed by hand with
+  `+lore/unseal`; holders are told now or at next login (`LoreNotice`), and
+  `lore_unsealed` fires. Concluding a plot thread with sealed linked lore reminds
+  whoever concluded it (evennia-plots 0.4.0's `concluded_by`).
+- **Added:** commands `+lore/kind`, `/ooc`, `/accuracy`, `/affirm`, `/decline`,
+  `/seal`, `/unseal`, `/submit/<kind>`; two-part web detail page, kind and
+  affirmation filters, affirmation requests in the queue, API fields; guide pages
+  `lore` and `ic-may-mislead`.
+- **Migrations:** 0003 adds the fields and `LoreNotice`; 0004 marks entries staff
+  approved through `LORE_REQUIRE_APPROVAL` as affirmed.
+
 ## [0.4.1] - 2026-10-09
 
 - **Fixed:** the website now resolves the acting character from the account's

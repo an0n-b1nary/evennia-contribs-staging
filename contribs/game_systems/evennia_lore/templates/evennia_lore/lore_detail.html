@@ -68,14 +68,77 @@
   {% endfor %}
 </div>
 
+<div class="mb-3" aria-label="Kind and affirmation">
+  <span class="text-muted">Kind:</span>
+  <span class="badge badge-info text-dark mr-1">{{ entry.kind_label }}</span>
+  {% if affirmation_label %}
+  <span class="badge {% if entry.affirmation == 'affirmed' %}badge-success{% else %}badge-warning text-dark{% endif %}">{{ affirmation_label }}</span>
+  {% endif %}
+</div>
+
+{% if can_request_affirmation or can_review_affirmation %}
+<div class="evennia-lore-actions" role="group" aria-label="Affirmation">
+  {% if can_request_affirmation %}
+  <form method="post" action="{% url 'lore-affirm' entry.pk %}" class="d-inline">
+    {% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-primary">Request affirmation</button>
+  </form>
+  {% endif %}
+  {% if can_review_affirmation %}
+  <form method="post" action="{% url 'lore-affirm' entry.pk %}" class="d-inline">
+    {% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Affirm as it stands</button>
+  </form>
+  <form method="post" action="{% url 'lore-decline' entry.pk %}" class="evennia-lore-decline">
+    {% csrf_token %}
+    <label for="id_note" class="small mb-0">Decline, with a note to the author</label>
+    <textarea name="note" id="id_note" rows="2" maxlength="500" required class="form-control form-control-sm" aria-describedby="id_note_help"></textarea>
+    <small id="id_note_help" class="form-text text-muted">Only the author and staff see a decline and its note.</small>
+    <button type="submit" class="btn btn-sm btn-outline-danger mt-1">Decline</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if is_accessible %}
+<section class="evennia-lore-ic mb-4" aria-labelledby="evennia-lore-ic-heading">
+  <h2 id="evennia-lore-ic-heading" class="h5">In character</h2>
   {% if entry.body %}
-  <div class="evennia-lore-body mb-4">
+  <div class="evennia-lore-body">
     {{ entry.body|linebreaks }}
   </div>
   {% else %}
-  <p class="text-muted mb-4"><em>(No body content yet.)</em></p>
+  <p class="text-muted"><em>(No body content yet.)</em></p>
   {% endif %}
+</section>
+
+<section class="evennia-lore-ooc mb-4" aria-labelledby="evennia-lore-ooc-heading">
+  <h2 id="evennia-lore-ooc-heading" class="h5">Out of character <small class="text-muted">(always true)</small></h2>
+  <p class="mb-2"><strong>Accuracy:</strong> {{ accuracy_label }}</p>
+  {% if entry.ooc_notes %}
+  <div class="evennia-lore-ooc-notes">{{ entry.ooc_notes|linebreaks }}</div>
+  {% endif %}
+  {% if entry.has_sealed_notes %}
+    {% if is_staff %}
+    <div class="alert alert-info" role="note">
+      <strong>Sealed notes (staff only)</strong>
+      {{ entry.sealed_notes|linebreaks }}
+      <p class="small mb-0">Unseal in game with <code>+lore/unseal {{ entry.entry_number }}=&lt;accuracy&gt;</code>; holders are told.</p>
+    </div>
+    {% else %}
+    <p class="text-muted">Some OOC notes are sealed until the story settles this.</p>
+    {% endif %}
+  {% endif %}
+  {% if show_decline and entry.affirmation == 'declined' %}
+  <div class="alert alert-warning" role="note">
+    <strong>Affirmation declined</strong> (only the author and staff see this): {{ entry.affirmation_note }}
+  </div>
+  {% endif %}
+  {% if is_staff and entry.edited_since_affirmation %}
+  <p class="small text-muted">
+    Edited since affirmation.
+    {% if affirmed_body_version %}<a href="{% url 'lore-diff' entry.pk affirmed_body_version %}">Compare with the affirmed IC content</a>.{% else %}The IC content is unchanged; the OOC layer, title or summary changed.{% endif %}
+  </p>
+  {% endif %}
+</section>
 {% else %}
   <div class="alert alert-warning" role="alert">
     <strong>Restricted Content</strong>

@@ -8,16 +8,19 @@ Include at a path of your choice::
     urlpatterns += [path("lore/", include("evennia_lore.urls"))]
 
 URL names: lore-list, lore-create, lore-compendium, lore-queue, lore-lean,
-           lore-detail, lore-edit, lore-history, lore-diff, lore-approve, lore-reject.
+           lore-detail, lore-edit, lore-history, lore-diff, lore-approve, lore-reject,
+           lore-affirm, lore-decline.
 """
 
 from django.urls import path
 
 from evennia_lore.views import (
+    LoreAffirmView,
     LoreApprovalQueueView,
     LoreApproveView,
     LoreCompendiumView,
     LoreCreateView,
+    LoreDeclineView,
     LoreDetailView,
     LoreEditView,
     LoreLeanView,
@@ -43,4 +46,6 @@ urlpatterns = [
     ),
     path("<int:pk>/approve/", LoreApproveView.as_view(), name="lore-approve"),
     path("<int:pk>/reject/", LoreRejectView.as_view(), name="lore-reject"),
+    path("<int:pk>/affirm/", LoreAffirmView.as_view(), name="lore-affirm"),
+    path("<int:pk>/decline/", LoreDeclineView.as_view(), name="lore-decline"),
 ]
