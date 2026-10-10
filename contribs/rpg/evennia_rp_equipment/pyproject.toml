@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-equipment"
-version = "0.1.1"
+version = "0.1.2"
 description = "Wearable gear for Evennia RP games: worn lines, and requirements on the wearer's build that grant nothing."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

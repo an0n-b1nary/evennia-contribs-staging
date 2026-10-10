@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Integer currency, passive income and audited atomic exchanges for Evennia."""
+"""Workshops, invested niches and provenance for cosmetic crafting."""
 
-__version__ = "0.2.2"
+__version__ = "0.1.0"

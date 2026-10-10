@@ -198,9 +198,13 @@ is chargen's own `locks.locked_message()`.
 
 ---
 
-## Roadmap
+## Crafting and provenance
 
-Linking items to lore entries is planned for a later minor version. A crafting
-contrib will decorate these same items (hallmarks, layered descriptions,
-auras) rather than define its own; trading between characters belongs to an
-economy contrib.
+`+gear/info` calls an optional `get_display_provenance(looker)` item hook to
+show a verified hallmark. Equipment never imports the package supplying it.
+`evennia-rp-crafting` creates new items using `EquipmentMixin`, with its own
+protected craft record and cosmetic aura. Such items omit the plain-gear maker
+tag, so they do not consume `RP_EQUIPMENT_ITEM_CAP`. They still use equipment's
+wear, editing, sealing and build-change safeguards.
+
+Linking items to lore entries is planned for a later minor version.

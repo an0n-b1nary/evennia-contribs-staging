@@ -118,6 +118,21 @@ class StallTests(EvenniaTest):
         )
         self.assertEqual(reconciliation()["money"], {"minted": 100, "burned": 0, "held": 100})
 
+    def test_directory_uses_optional_item_keywords_only_while_stock_is_active(self):
+        store, listing = self.listed()
+        self.assertEqual(stalls.directory(self.char1, "weaver"), [])
+        with patch.object(
+            type(self.obj1), "get_market_keywords", return_value=["Weaver"], create=True
+        ) as hook:
+            self.assertEqual(stalls.directory(self.char1), [(store, [listing])])
+            hook.assert_not_called()
+            self.assertEqual(stalls.directory(self.char1, "weaver"), [(store, [listing])])
+            with self.captureOnCommitCallbacks(execute=True):
+                stalls.buy(self.char1, listing.pk)
+            self.assertEqual(stalls.directory(self.char1, "weaver"), [])
+        with patch.object(type(self.obj1), "get_market_keywords", return_value=None, create=True):
+            self.assertEqual(stalls.directory(self.char1, "weaver"), [])
+
     def test_buy_refuses_own_alt_rechecks_current_membership(self):
         _store, listing = self.listed()
         self.account2.characters.add(self.char1)

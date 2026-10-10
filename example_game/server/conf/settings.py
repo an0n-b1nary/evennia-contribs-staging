@@ -51,6 +51,7 @@ INSTALLED_APPS += [
     "evennia_links",
     "evennia_economy",
     "evennia_rp_resources",
+    "evennia_rp_crafting",
     "evennia_rptracker",
     "evennia_scenes",
     "evennia_boards",
@@ -124,6 +125,20 @@ RP_RESOURCES_LEAN_MULTIPLIER = 2
 RP_RESOURCES_STAFF_LOCK = "cmd:perm(Builder)"
 RP_ECONOMY_ELIGIBLE = None  # Every playable character; no RP/session requirement.
 SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
+
+######################################################################
+# RP crafting (evennia-rp-crafting) — invested niches and cosmetic items
+######################################################################
+RP_CRAFTING_REVEALED = True
+RP_CRAFTING_FROZEN = False
+RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
+RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
+RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
+RP_CRAFTING_NICHE_CAP = 5
+RP_CRAFTING_UNLOCK_STEP = 1
+RP_CRAFTING_MONEY_CAP_RAISE = 100
+RP_CRAFTING_RESOURCE_CAP_RAISE = 6
+RP_CRAFTING_STAFF_LOCK = "cmd:perm(Builder)"
 
 ######################################################################
 # RP rules (evennia-rp-rules) — game values and optional sheet/stat-block seams

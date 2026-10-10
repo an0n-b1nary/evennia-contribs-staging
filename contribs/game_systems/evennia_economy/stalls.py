@@ -177,6 +177,19 @@ def directory(character, search="", *, room=None):
         )
         if not search or search.casefold() in text.casefold():
             result.append((store, listings))
+            continue
+        # Item keyword hooks cost queries per item; consult them only for a
+        # search the store's own text did not already satisfy.
+        keywords = []
+        for row in listings:
+            for asset in row.assets:
+                if asset["kind"] == "item":
+                    item = ObjectDB.objects.filter(pk=int(asset["key"])).first()
+                    provider = getattr(item, "get_market_keywords", None)
+                    if callable(provider):
+                        keywords.extend(str(value) for value in (provider(character) or ()))
+        if search.casefold() in " ".join(keywords).casefold():
+            result.append((store, listings))
     return result
 
 
