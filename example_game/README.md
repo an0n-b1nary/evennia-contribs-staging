@@ -121,10 +121,18 @@ or economy and verify the excluded package cannot be imported.
 
 ### Workshops and crafting
 
-`evennia-rp-crafting` 0.1.0 seeds Weaver, Jeweller, Smith and Scribe niches.
+`evennia-rp-crafting` 0.2.0 seeds Weaver, Jeweller, Smith, Scribe, Cook and
+Illusionist niches.
 At Market Row, a sample field book can be read and a woven cloak shows a
 verified maker hallmark. The demonstration crafter owns a Workshop; resetting
 rebuilds demo stock while preserving player Workshops and craft history.
+The market also holds a sample spice cake and spark globe. Pick one up and
+`use <item>` emits its EVENT and consumes it. Compose your own through
+`+craft/new cooking/consumable`, `/desc`, repeated `/beat`, `/resources`, preview
+and `/finish`. Broadcast uses `illusions/broadcast` with essence inputs.
+`+ambient/mute` suppresses effects arriving from another room; your current
+scene remains visible. Broadcasts reach adjacent rooms only, never channels.
+Persistent audience limits default to 30 seconds and survive server reloads.
 
 Use `+workshop/catalog` for current unlock costs, then
 `+workshop/unlock writing = timber:3`. A second active niche costs twice its
@@ -138,13 +146,14 @@ Wearable drafts use `/line`, optional `/aura`, `/slot` and `/require`.
 Crafted wearables reuse equipment's requirements and sealing and do not use
 the plain-gear cap. Staff `+crafting/review` sees the original prose and costs.
 
-The host's `CraftedBook` and `CraftedWearable` typeclasses put `ObjectParent`
+The host's crafted item typeclasses put `ObjectParent`
 first, so economy's early stock-deletion guard runs before item cleanup.
 Crafting's hallmark mixin precedes equipment/DefaultObject through the contrib
 base classes. No crafting character mixin, startup script, URL or API is needed.
 Without equipment, existing crafted objects retain their hallmark and new
 Wearable crafts are unavailable; Readable continues to work. Without economy,
-unlock costs use resources only. CI tests actual physically absent partners
+unlock costs use resources only. Without accessibility, Broadcast remains in
+its user's room. CI tests actual physically absent partners
 through `scripts/ci_run_crafting_tests.py`.
 
 ### The map, and the web surface

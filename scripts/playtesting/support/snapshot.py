@@ -15,7 +15,7 @@ from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
 from evennia_rp_contest.models import Challenge, CheckRecord
-from evennia_rp_crafting.models import CraftRecord, NicheUnlock, Workshop
+from evennia_rp_crafting.models import CraftRecord, EventUse, NicheUnlock, Workshop
 from evennia_rp_resources.models import ResourceGrant, ResourceHolding
 from evennia_rptracker.models import RPSession
 from evennia_scenes.models import LogEntry, Scene
@@ -169,6 +169,14 @@ def snapshot():
             "character_id",
             "amount",
             "refunded_at",
+        ),
+        "event_uses": rows(
+            EventUse.objects.filter(actor_id__in=ids),
+            "id",
+            "craft_id",
+            "actor_id",
+            "room_id",
+            "destinations",
         ),
         "earn_count": XPLog.objects.filter(character_id__in=ids).count(),
         "challenges": rows(

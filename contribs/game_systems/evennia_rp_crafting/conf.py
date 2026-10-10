@@ -9,10 +9,14 @@ MAX_AMOUNT = 2**63 - 1
 DEFAULT_BEHAVIOURS = {
     "wearable": "evennia_rp_crafting.behaviours.Wearable",
     "readable": "evennia_rp_crafting.behaviours.Readable",
+    "consumable": "evennia_rp_crafting.behaviours.Consumable",
+    "broadcast": "evennia_rp_crafting.behaviours.Broadcast",
 }
 DEFAULT_COSTS = {
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},
     "readable": {"base": {"materials": 1}},
+    "consumable": {"base": {"provisions": 1}, "extra_beat": {"provisions": 1}},
+    "broadcast": {"base": {"essences": 1}, "extra_beat": {"essences": 1}},
 }
 
 
@@ -28,6 +32,10 @@ def boolean(value):
     return type(value) is bool
 
 
+def cooldown(value):
+    return type(value) is int and 1 <= value <= 86400
+
+
 def register_controls():
     for name, default, validator in (
         ("REVEALED", True, boolean),
@@ -36,6 +44,7 @@ def register_controls():
         ("UNLOCK_STEP", 1, nonnegative),
         ("MONEY_CAP_RAISE", 100, nonnegative),
         ("RESOURCE_CAP_RAISE", 6, nonnegative),
+        ("EVENT_ROOM_COOLDOWN", 30, cooldown),
     ):
         register(f"RP_CRAFTING_{name}", default, validator=validator)
 

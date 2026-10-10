@@ -37,6 +37,21 @@ def uses_screenreader(caller) -> bool:
         return False
 
 
+def mutes_ambient(caller) -> bool:
+    """Account preference for effects originating outside the current scene.
+
+    An unregistered option fails closed: remote effects require a working
+    opt-out. NPCs without accounts have no player preference.
+    """
+    account = getattr(caller, "account", caller)
+    if account is None:
+        return False
+    try:
+        return bool(account.options.get("mute_ambient_effects", True))
+    except (AttributeError, ValueError):
+        return True
+
+
 def plain_list(rows, headers=None) -> str:
     """Format *rows* as a plain-text list suited for screen readers.
 
