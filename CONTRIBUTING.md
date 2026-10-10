@@ -291,6 +291,21 @@ present profile. This runs the economy suite plus real resource exchange,
 equipment refusal/sealing and staff-review job seams. The resources matrix
 also checks an environment with economy genuinely unimportable.
 
+When excluding resources, also exclude `evennia-rp-crafting`: resources is a
+hard dependency of crafting, so retaining it would make the installer refuse.
+
+### Crafting partner profiles
+
+Use a fresh environment per profile, initialize `ci_game`, and install contribs
+with `scripts/ci_install_contribs.py ci_game`, optionally excluding
+`evennia-economy`, `evennia-rp-equipment`, or `evennia-accessibility`.
+Run `python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox`, with
+`--absent evennia_economy` (or the matching excluded app label). The destination
+must be new. The runner copies reference-game code without databases or secrets,
+checks physical absence, and runs the crafting suite and actual reference seams.
+The accessibility-absent profile uses an empty URLconf because unrelated web
+extras require accessibility; crafting's commands and items have no web surface.
+
 The full contrib matrix has a 45-minute job limit; partner jobs have 30 minutes.
 These bounds include installation/migration and allow the suite to grow across
 the supported Python versions without cancelling normal progress.

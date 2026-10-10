@@ -214,6 +214,71 @@ class Suite:
             == "closed"
         )
 
+    def crafting(self):
+        state = self.state()
+        alice_id = state["actors"]["alice"]["id"]
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=timber,20,Live crafting", "Resources updated"
+        )
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=ember,2,Live crafting", "Resources updated"
+        )
+        self.command("staff", f"+economy/credit #{alice_id}=500,Live crafting", "Purse updated")
+        self.command("alice", "+workshop/catalog", "Weaver.*Scribe|Scribe.*Weaver")
+        self.command("alice", "+workshop/unlock weaving=timber:3", "Unlocked Weaver")
+        self.command("alice", "+craft/new weaving/wearable = live crafted cloak", "draft saved")
+        self.command("alice", "+craft/desc = A cloak made for the live market.", "draft saved")
+        self.command("alice", "+craft/line = a bright woven cloak", "draft saved")
+        self.command("alice", "+craft/aura = soft ember sparks", "draft saved")
+        self.command("alice", "+craft/slot = body", "draft saved")
+        self.command("alice", "+craft/resources = timber:1,ember:1", "draft saved")
+        before = self.state()
+        self.command("alice", "+craft", "Cost:.*1 materials.*1 essences")
+        self.session.host.reload()
+        self.command("alice", "+craft", "Draft: live crafted cloak")
+        assert self.state()["crafts"] == before["crafts"]
+        self.command("staff", "+runtime RP_CRAFTING_FROZEN=true", "True")
+        try:
+            self.command("alice", "+craft/finish", "Crafting is paused")
+        finally:
+            self.command("staff", "+runtime/reset RP_CRAFTING_FROZEN", "False")
+        self.command("alice", "+craft/finish", "You craft live crafted cloak")
+        self.command("alice", "+craft/finish", "Start a draft")
+        self.command("alice", "+wear live crafted cloak", "put on")
+        self.command("alice", "+worn", "soft ember sparks")
+        self.command("alice", "+remove live crafted cloak", "take off")
+        self.command("alice", "+gear/info live crafted cloak", "Craft hallmark:.*Weaver")
+        self.command("alice", "+stall/claim Crafted counter", "Claimed stall")
+        self.command("alice", "+stall/list live crafted cloak=8", "Listing #")
+        self.command("bob", "+market weaver", "Crafted counter")
+        listing = self.state()["economy_listings"][-1]
+        self.session.disconnect("alice")
+        self.command("bob", f"+buy {listing['id']}", "Bought listing")
+        self.command("bob", "+market weaver", "No matching open stalls")
+        self.session.connect("alice")
+        self.command("bob", "+gear/info live crafted cloak", "Craft hallmark:.*Weaver")
+        self.command("bob", "+gear/desc live crafted cloak = Forged", "Only its maker|fixed now")
+        self.command("alice", "+workshop/unlock writing=timber:6", "Unlocked Scribe")
+        self.command("alice", "+craft/new writing/readable = live field notes", "draft saved")
+        self.command("alice", "+craft/desc = A bound field notebook.", "draft saved")
+        self.command("alice", "+craft/text = A record of the market road.", "draft saved")
+        self.command("alice", "+craft/resources = timber:1", "draft saved")
+        self.command("alice", "+craft/finish", "You craft live field notes")
+        self.command("alice", "read live field notes", "record of the market road")
+        self.command("staff", "+crafting/review", "live field notes")
+        self.command("alice", "+workshop/abandon weaving", "not refunded")
+        self.command("alice", "+workshop", "1/5 active niches")
+        self.command("staff", "+runtime RP_CRAFTING_REVEALED=false", "False")
+        try:
+            self.command(
+                "alice", "+workshop", "not available|not found|Could not find|Unknown command"
+            )
+            self.command("staff", "+crafting/review", "Recent crafts")
+        finally:
+            self.command("staff", "+runtime/reset RP_CRAFTING_REVEALED", "True")
+        self.command("alice", "+stall/close", "stock returned")
+        assert len(self.state()["crafts"]) == len(before["crafts"]) + 2
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -435,6 +500,7 @@ def run_rp(session, smoke=False):
         ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
         ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
         ("reserved stall stock, offline purchase, freeze and stock recovery", suite.stalls),
+        ("invested niches, persistent crafts, hallmarks and offline crafted sale", suite.crafting),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:

@@ -164,7 +164,7 @@ jobs:
             excludes: ""
             absent: ""
           - profile: no-resources
-            excludes: "--exclude evennia-rp-resources"
+            excludes: "--exclude evennia-rp-resources --exclude evennia-rp-crafting"
             absent: "--absent evennia_rp_resources"
           - profile: no-jobs
             excludes: "--exclude evennia-jobs"
@@ -188,6 +188,39 @@ jobs:
         run: evennia migrate --noinput < /dev/null
       - name: Economy suite and real partner seams
         run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
+
+  crafting-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-economy
+            excludes: "--exclude evennia-economy"
+            absent: "--absent evennia_economy"
+          - profile: no-equipment
+            excludes: "--exclude evennia-rp-equipment"
+            absent: "--absent evennia_rp_equipment"
+          - profile: no-accessibility
+            excludes: "--exclude evennia-accessibility"
+            absent: "--absent evennia_accessibility"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize dependency installation host
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected partners
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Crafting suite and reference seams with verified partner absence
+        run: python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox ${{ matrix.absent }}
 
   rp-contest-partners:
     runs-on: ubuntu-latest

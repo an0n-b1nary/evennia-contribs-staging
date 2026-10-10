@@ -98,6 +98,7 @@ class TestContribSettings(EvenniaTestCase):
     def test_contrib_apps_installed(self):
         self.assertIn("evennia_posing", settings.INSTALLED_APPS)
         self.assertIn("evennia_social", settings.INSTALLED_APPS)
+        self.assertIn("evennia_rp_crafting", settings.INSTALLED_APPS)
 
     def test_social_settings_exist(self):
         self.assertTrue(hasattr(settings, "OOC_ROOM_DBREF"))

@@ -25,7 +25,6 @@ from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, C
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
 
 from commands.sandbox import CmdSandbox
-from evennia_accessibility.commands import CmdScreenreader
 from evennia_links.commands import CmdRuntime
 from evennia_maps.commands import CmdMap
 from evennia_posing.commands import (
@@ -99,6 +98,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         ):
             self.add(command)
         for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):
+            self.add(command)
+        for command in _optional_commands(
+            "evennia_rp_crafting", "CmdWorkshop", "CmdCraft", "CmdRead", "CmdCrafting"
+        ):
             self.add(command)
         self.add(CmdEmit)
         self.add(CmdSemipose)
@@ -224,7 +227,8 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # reachable before puppeting — a screen-reader user should not have to
         # read a character-select table to find it. The account cmdset merges
         # into the puppet's, so it works in character too.
-        self.add(CmdScreenreader)
+        for command in _optional_commands("evennia_accessibility", "CmdScreenreader"):
+            self.add(command)
         if apps.is_installed("evennia_rptracker"):
             from evennia_rptracker.channel_commands import CmdICChannel
 
