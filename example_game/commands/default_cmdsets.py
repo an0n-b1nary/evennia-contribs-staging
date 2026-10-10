@@ -202,6 +202,12 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # Not something to copy into a real game.
         self.add(CmdSandbox)
 
+        # Last so NPC-aware pose/say/emit and +test replace the normal commands.
+        if apps.is_installed("evennia_npcs"):
+            from evennia_npcs.commands import NPCCmdSet
+
+            self.add(NPCCmdSet)
+
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
     """
@@ -237,6 +243,11 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # Presence (evennia_social): replaces Evennia's who, leaving staff who
         # have gone dark out of it for players. +unfindable is in-character.
         self.add(CmdWho)
+
+        if apps.is_installed("evennia_npcs"):
+            from evennia_npcs.commands import NPCAccountCmdSet
+
+            self.add(NPCAccountCmdSet)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

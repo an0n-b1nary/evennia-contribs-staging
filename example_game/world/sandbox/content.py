@@ -886,3 +886,15 @@ SCENES = (
 SCENES_BY_SLUG = {scene["slug"]: scene for scene in SCENES}
 
 PLAQUE_KEY = "brass plaque"
+NPCS = (
+    {
+        "name": "Market Porter",
+        "kind": "template",
+        "description": "A porter offers directions and a hand with heavy parcels.",
+    },
+    {
+        "name": "Visiting Envoy",
+        "kind": "unique",
+        "description": "An envoy listens carefully before speaking for the delegation.",
+    },
+)

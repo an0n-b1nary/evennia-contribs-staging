@@ -3,13 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "evennia-rp-contest"
-version = "0.1.1"
-description = "Player-led RP tests, room challenges and private resolution audits for Evennia."
+name = "evennia-npcs"
+version = "0.1.0"
+description = "Player-authored NPC blueprints, sharing, attributed portrayal and durable appearances for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]
 requires-python = ">=3.12"
+dependencies = ["evennia>=6.0", "evennia-links>=0.5", "evennia-rp-rules>=0.1,<0.2"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Framework :: Django",
@@ -17,16 +18,23 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-links>=0.5"]
+
+[project.optional-dependencies]
+scenes = ["evennia-scenes>=0.3"]
+plots = ["evennia-plots>=0.3.3"]
+posing = ["evennia-posing>=0.1"]
+contest = ["evennia-rp-contest>=0.1,<0.2"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
 Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 [tool.setuptools]
-packages = ["evennia_rp_contest", "evennia_rp_contest.integrations", "evennia_rp_contest.migrations"]
+packages = ["evennia_npcs", "evennia_npcs.migrations"]
 
 [tool.setuptools.package-dir]
-"evennia_rp_contest" = "."
-"evennia_rp_contest.integrations" = "integrations"
-"evennia_rp_contest.migrations" = "migrations"
+"evennia_npcs" = "."
+"evennia_npcs.migrations" = "migrations"
+
+[tool.setuptools.package-data]
+evennia_npcs = ["guides/*.md"]

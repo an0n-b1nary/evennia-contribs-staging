@@ -303,6 +303,45 @@ jobs:
       - name: Sandbox gate with verified partner absence
         run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}
 
+  npc-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-scenes
+            excludes: "--exclude evennia-scenes"
+            absent: "--absent evennia_scenes"
+          - profile: no-plots
+            excludes: "--exclude evennia-plots"
+            absent: "--absent evennia_plots"
+          - profile: no-contest
+            excludes: "--exclude evennia-rp-contest"
+            absent: "--absent evennia_rp_contest"
+          - profile: independent
+            excludes: "--exclude evennia-scenes --exclude evennia-plots --exclude evennia-rp-contest --exclude evennia-posing --exclude evennia-social --exclude evennia-rptracker --exclude evennia-xp --exclude evennia-rp-chargen --exclude evennia-rp-equipment"
+            absent: "--absent evennia_scenes --absent evennia_plots --absent evennia_rp_contest --absent evennia_posing --absent evennia_rptracker --absent evennia_xp --absent evennia_rp_chargen"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize disposable host
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected contribs in dependency order
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: NPC suite and verified partner seams
+        run: python scripts/ci_run_npc_tests.py ci_game ${{ matrix.absent }}
+
   live-playtest:
     needs: [rp-sandbox]
     runs-on: ubuntu-latest

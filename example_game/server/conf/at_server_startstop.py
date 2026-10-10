@@ -54,6 +54,11 @@ def at_server_start():
     # maintenance script"). Idempotent — safe on every start/reload.
     from evennia_calendar.scheduler import ensure_calendar_script_running
 
+    if apps.is_installed("evennia_npcs"):
+        from evennia_npcs.scripts import ensure_npc_script_running
+
+        ensure_npc_script_running()
+
     ensure_calendar_script_running()
 
     if apps.is_installed("evennia_rp_resources"):

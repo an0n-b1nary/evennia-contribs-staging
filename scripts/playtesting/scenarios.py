@@ -72,6 +72,8 @@ class Suite:
         self.command("alice", "+playtest/state denied", "Only the playtest staff")
 
     def resources(self):
+        # NPC scenarios release their virtual portrayals before any PC economy
+        # or build work begins.
         before = self.state()
         alice_id = before["actors"]["alice"]["id"]
 
@@ -102,6 +104,43 @@ class Suite:
         finally:
             self.command("staff", "+runtime/reset RP_RESOURCES_REVEALED", "True")
         self.command("alice", "+gather/clear", "lean cleared")
+
+    def npcs(self):
+        bob_name = self.session.host.credentials["bob"]["name"]
+        alice_name = self.session.host.credentials["alice"]["name"]
+        self.command("alice", "+npc/create Driver Guest =unique", "Created NPC blueprint")
+        self.command("alice", "+npc/stats Driver Guest =presence:A", "updated")
+        self.command("bob", "+npc/spawn Driver Guest", "permission")
+        result = self.command("alice", "+npc/spawn Driver Guest", "Spawned Driver Guest")
+        object_id = int(re.search(r"object #(\d+)", result["output"]).group(1))
+        self.command("alice", f"+npc/permit Driver Guest ={bob_name}", "permissions updated")
+        self.command("bob", "+npc/spawn Driver Guest", "already spawned")
+        self.command("alice", f"+npc/puppet #{object_id}", "Now portraying")
+        result = self.command("alice", "pose bows. $You() {literal}", "NPC, played by")
+        assert "bows. $You() {literal}" in self.observer(result)
+        self.command("alice", "say Hello", "NPC, played by.*says")
+        self.command("alice", "+test presence", "NPC, played by.*tests Presence")
+        self.session.host.reload()
+        self.command("alice", "pose returns after the reload.", "NPC, played by")
+        self.command("alice", f"+npc/fullpuppet #{object_id}", "You become|Driver Guest|NPC")
+        self.command("alice", "pose speaks from a full puppet.", "NPC, played by")
+        self.command("alice", "+npc/unfullpuppet", alice_name)
+        self.command(
+            "alice", f"@ic #{object_id}", "permission|not allowed|cannot|not found|Could not find"
+        )
+        self.command("bob", f"+npc/puppet #{object_id}", "Now portraying")
+        self.command("staff", "+runtime NPCS_FROZEN=true", "True")
+        self.command("bob", "pose waits.", "paused")
+        self.command("bob", "+npc/unpuppet", "released")
+        self.command("staff", "+runtime/reset NPCS_FROZEN", "False")
+        self.command("bob", f"+npc/puppet #{object_id}", "Now portraying")
+        self.command("alice", f"+npc/revoke Driver Guest ={bob_name}", "permissions updated")
+        self.command("bob", f"+npc/puppet #{object_id}", "permission")
+        self.command("alice", f"+npc/despawn #{object_id}", "history is retained")
+        self.command("alice", "+npc/history Driver Guest", "despawned")
+        state = self.state()
+        assert all(row["despawned_at"] for row in state["npc_spawns"])
+        assert all(row["controller_id"] is None for row in state["npc_spawns"])
 
     def economy(self):
         state = self.state()
@@ -497,6 +536,7 @@ def run_rp(session, smoke=False):
     suite = Suite(session)
     cases = [
         ("ordinary login, staff role and probe authorization", suite.prepare),
+        ("NPC sharing, attribution, checks, reload and full-puppet return", suite.npcs),
         ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
         ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
         ("reserved stall stock, offline purchase, freeze and stock recovery", suite.stalls),

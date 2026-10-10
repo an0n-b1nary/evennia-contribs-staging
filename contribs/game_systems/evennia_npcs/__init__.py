@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Preview: non-combat RP tests and room challenges for Evennia."""
+"""Reusable, player-authored NPCs for Evennia."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.0"

@@ -11,6 +11,7 @@ from evennia_economy.models import (
     Storefront,
     UBIPayment,
 )
+from evennia_npcs.models import NPCBlueprint, NPCSpawnRecord
 from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
@@ -58,6 +59,17 @@ def snapshot():
             ),
         }
     return {
+        "npc_blueprints": rows(
+            NPCBlueprint.objects.filter(creator_id__in=ids), "id", "name", "kind", "archived"
+        ),
+        "npc_spawns": rows(
+            NPCSpawnRecord.objects.filter(blueprint__creator_id__in=ids),
+            "id",
+            "blueprint_id",
+            "spawned_object_id",
+            "controller_id",
+            "despawned_at",
+        ),
         "actors": actors,
         "economy_purses": rows(
             Purse.objects.filter(character_id__in=ids), "character_id", "balance"
