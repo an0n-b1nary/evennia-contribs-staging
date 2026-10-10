@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-10-09
+
+- Fixed: `evennia_economy.typeclasses` imports `DefaultObject` from its module,
+  not the flat API, which is still unset when a management command such as
+  `evennia check` loads host typeclasses through the URLconf. 0.2.0 crashed
+  those commands in any game whose object typeclass uses `EconomyObjectMixin`.
+
 ## 0.2.0 — 2026-10-09
 
 - Added: market-room stalls, reserved item/resource listings, offline atomic
