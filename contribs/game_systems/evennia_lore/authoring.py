@@ -4,6 +4,7 @@
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
+from evennia.objects.models import ObjectDB
 
 from evennia_lore.permissions import is_staff_user, require_character
 
@@ -45,4 +46,5 @@ class AuthoringMixin(LoginRequiredMixin):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["is_staff"] = is_staff_user(self.request)
+        context["acting_character"] = ObjectDB.objects.filter(pk=self.get_character()).first()
         return context
