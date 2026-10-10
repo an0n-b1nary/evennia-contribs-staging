@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] - 2026-10-10
+
+- **Added:** every authoring form names the character it writes as ("Posting as
+  **Name**") above its submit button, and the button is described by that text for
+  screen readers, so a player with several characters can't post as the wrong
+  one unnoticed. Authoring views put `acting_character` in the template context;
+  the label is `evennia_accessibility/_acting_as.html`. Requires
+  evennia-accessibility 0.3 for the `[web]` extra.
+- A character picked on the website (Evennia's own puppet link) now applies to
+  every page and write here when the game installs evennia-links 0.8.1's
+  `WebCharacterMiddleware`. No change is needed in this package.
+
 ## [0.3.2] - 2026-10-09
 
 - **Fixed:** the website now resolves the acting character from the account's
