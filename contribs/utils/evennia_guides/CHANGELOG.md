@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
+### Fixed
+
+- `guides_check` and `validate()` now recognise a `requires:` name backed by an
+  `evennia_links` runtime setting without reading the database. Before, the
+  value was read while checking that the name existed, so validation without
+  a database reported a contrib's reveal switch as resolving to nothing.
+
 ## [0.1.0] - 2026-10-09
 
 ### Added
