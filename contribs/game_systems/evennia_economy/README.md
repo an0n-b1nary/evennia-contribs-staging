@@ -105,6 +105,11 @@ entries commit together. A sold listing cannot sell twice. Seller sale fees come
 from the proceeds. Listed items cannot be moved or destroyed outside the service.
 Use rp-resources 0.1.3 or newer for returning archived resource stock.
 
+Listed item typeclasses may expose `get_market_keywords(looker)`, returning
+search terms in addition to their name. Crafting uses this optional hook for
+niche names and behaviour keys, so `+market weaver` finds active woven stock.
+Economy does not import or require crafting.
+
 Quiet stalls are flagged once per inactivity period after five weeks without an
 owner login, listing, unlisting or sale. They never close automatically. Call
 `evennia_economy.stalls.note_login(character)` from the character login hook.

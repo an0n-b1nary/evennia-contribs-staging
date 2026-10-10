@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 — 2026-10-09
+
+- Added: market directory search includes an optional item's
+  `get_market_keywords(viewer)` hook, allowing niche discovery without
+  importing crafting or requiring it to be installed.
+
 ## 0.2.1 — 2026-10-09
 
 - Fixed: `evennia_economy.typeclasses` imports `DefaultObject` from its module,

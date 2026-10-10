@@ -172,8 +172,21 @@ def directory(character, search="", *, room=None):
     result = []
     for store in stores:
         listings = visible_listings(character, store)
+        keywords = []
+        for row in listings:
+            for asset in row.assets:
+                if asset["kind"] == "item":
+                    item = ObjectDB.objects.filter(pk=int(asset["key"])).first()
+                    provider = getattr(item, "get_market_keywords", None)
+                    if callable(provider):
+                        keywords.extend(str(value) for value in (provider(character) or ()))
         text = " ".join(
-            [store.name, store.description, *(assets.describe(row.assets) for row in listings)]
+            [
+                store.name,
+                store.description,
+                *(assets.describe(row.assets) for row in listings),
+                *keywords,
+            ]
         )
         if not search or search.casefold() in text.casefold():
             result.append((store, listings))
