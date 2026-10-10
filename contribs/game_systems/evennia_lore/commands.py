@@ -286,16 +286,23 @@ class CmdLore(EditingMixin, MuxCommand):
             return self._do_search(lhs or args)
 
         if "submit" in sw:
+            # Any other switch names the kind. One that names no kind is refused:
+            # filing it under the default would record a rumor as a Fact.
+            kind_switches = [s for s in sw if s not in ("submit", "scene")]
+            kind = layers.match_kind(kind_switches[0]) if len(kind_switches) == 1 else None
+            if kind_switches and kind is None:
+                names = ", ".join(layers.kinds())
+                caller.msg(f"Unknown kind '{'/'.join(kind_switches)}'. Choose from: {names}.")
+                return
             if "scene" in sw:
                 if not lhs or not rhs:
                     caller.msg("Usage: |w+lore/submit/scene <scene#>=<title>|n")
                     return
-                return self._do_submit(rhs, scene_arg=lhs)
+                return self._do_submit(rhs, scene_arg=lhs, kind=kind)
             title = lhs or args
             if not title:
                 caller.msg("Usage: |w+lore/submit <title>|n")
                 return
-            kind = next((layers.match_kind(s) for s in sw if layers.match_kind(s)), None)
             return self._do_submit(title, kind=kind)
 
         if "edit" in sw:
@@ -569,7 +576,10 @@ class CmdLore(EditingMixin, MuxCommand):
                     f"|w+lore/diff #{entry.entry_number}={affirmed_body}|n."
                 )
             else:
-                lines.append("|yEdited since affirmation|n (the OOC layer, title or summary).")
+                lines.append(
+                    "|yEdited since affirmation.|n No IC content edit was recorded; "
+                    "check the OOC layer, title and summary."
+                )
         lines += rule
         if entry.summary:
             lines.append(f"|wSummary:|n {entry.summary}")

@@ -404,6 +404,18 @@ class TestLayerCommands(LayerTestMixin, EvenniaCommandTest):
         entry = LoreEntry.objects.get(title="Eyes Open")
         self.assertEqual((entry.kind, entry.accuracy), ("rumor", "open"))
 
+    def test_submit_switch_names_the_kind_or_is_refused(self):
+        with patch.object(CmdLore, "start_new_edit"):
+            self.call(CmdLore(), "/submit/rumor Eyes Open", caller=self.char2)
+            self.assertEqual(self.char2.ndb._lore_submit_ctx["kind"], "rumor")
+            self.call(CmdLore(), "/submit/scene/legend 4=Old Eyes", caller=self.char2)
+            self.assertEqual(self.char2.ndb._lore_submit_ctx["kind"], "legend")
+            self.char2.ndb._lore_submit_ctx = None
+            # An unknown kind must not quietly file the entry as an accurate Fact.
+            result = self.call(CmdLore(), "/submit/rumour Eyes Open", caller=self.char2)
+        self.assertIn("Unknown kind 'rumour'", result)
+        self.assertIsNone(self.char2.ndb._lore_submit_ctx)
+
     def test_kind_accuracy_and_notes(self):
         entry = _entry(author=self.char2, kind="rumor")
         n = entry.entry_number

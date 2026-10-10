@@ -135,7 +135,7 @@
   {% if is_staff and entry.edited_since_affirmation %}
   <p class="small text-muted">
     Edited since affirmation.
-    {% if affirmed_body_version %}<a href="{% url 'lore-diff' entry.pk affirmed_body_version %}">Compare with the affirmed IC content</a>.{% else %}The IC content is unchanged; the OOC layer, title or summary changed.{% endif %}
+    {% if affirmed_body_version %}<a href="{% url 'lore-diff' entry.pk affirmed_body_version %}">Compare with the affirmed IC content</a>.{% else %}No IC content edit was recorded; check the OOC layer, title and summary.{% endif %}
   </p>
   {% endif %}
 </section>
