@@ -2,4 +2,4 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Integer currency, passive income and audited atomic exchanges for Evennia."""
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"

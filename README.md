@@ -66,7 +66,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
 - [`evennia-rp-equipment`](contribs/rpg/evennia_rp_equipment/README.md) (rpg) — preview 0.1.2; wearable gear anyone can make, with worn lines, provenance display and requirements on the wearer's build that grant nothing; worn gear holds the pips and abilities it needs through chargen's change guard; depends on rules and chargen
 - [`evennia-rp-resources`](contribs/game_systems/evennia_rp_resources/README.md) (game_systems) — preview 0.1.3; passive resource accrual, atomic holdings, gathering leans, optional economy exchanges and reserved-stock refunds; depends only on links
-- [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.2.2; integer purses, passive income, atomic trades, reserved-stock stalls, fee boundaries and staff reconciliation; depends only on links
+- [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.2.3; integer purses, passive income, atomic trades, reserved-stock stalls, fee boundaries and staff reconciliation; depends only on links
 - `evennia-rp-party` (rpg) — party coordination for group combat
 - [`evennia-rp-crafting`](contribs/game_systems/evennia_rp_crafting/README.md) (game_systems) — preview 0.1.0; invested Workshops, escalating niche unlocks, Wearable and Readable items, protected hallmarks and staff review; depends on resources and links, with optional economy and equipment
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
