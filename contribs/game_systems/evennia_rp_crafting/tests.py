@@ -381,6 +381,15 @@ class CommandTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdWorkshop(), "", "Your Workshop: 1/5 active niches.")
         self.call(CmdCraft(), "/cancel", "Craft draft discarded")
 
+    def test_catalogue_and_drafts_survive_a_behaviour_removed_from_the_registry(self):
+        self.call(CmdCraft(), "/new writing-0/readable = book", "Craft draft saved")
+        with override_settings(
+            RP_CRAFTING_BEHAVIOURS={"wearable": conf.DEFAULT_BEHAVIOURS["wearable"]}
+        ):
+            output = self.call(CmdWorkshop(), "/catalog", "Niches — next unlock position 1")
+            self.assertIn("writing-0: Scribe 0 [unavailable] — unavailable", output)
+            self.call(CmdCraft(), "/text = Lost words.", "That crafting behaviour is unavailable")
+
     def test_staff_review_contains_full_snapshot_and_refuses_players(self):
         self.unlock()
         item = self.book()

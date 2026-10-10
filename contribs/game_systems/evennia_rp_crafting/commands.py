@@ -79,12 +79,19 @@ class CmdWorkshop(_CraftCommand):
             rows = [f"Niches — next unlock position {len(held) + 1}:"]
             implementations = registry()
             for definition in NicheDefinition.objects.filter(archived=False):
+                # A stored niche may name a behaviour the host has since
+                # unregistered; list it as unavailable rather than failing.
                 available = [
-                    key for key in definition.behaviours if implementations[key].available()
+                    key
+                    for key in definition.behaviours
+                    if key in implementations and implementations[key].available()
                 ]
-                cost = services.unlock_cost(definition, len(held))
+                try:
+                    cost = costs_text(services.unlock_cost(definition, len(held)))
+                except (CraftingError, ValueError):
+                    cost = "unavailable"
                 rows.append(
-                    f"{definition.key}: {definition.name} [{', '.join(available) or 'unavailable'}] — {costs_text(cost)}\n  {definition.description}"
+                    f"{definition.key}: {definition.name} [{', '.join(available) or 'unavailable'}] — {cost}\n  {definition.description}"
                 )
             self.msg("\n".join(rows))
         elif switch == "unlock":
@@ -204,7 +211,9 @@ class CmdCraft(_CraftCommand):
                         "aura": "aura_line",
                         "require": "requirements",
                     }.get(switch, switch)
-                    implementation = registry()[draft["behaviour"]]
+                    implementation = registry().get(draft["behaviour"])
+                    if implementation is None:
+                        raise CraftingError("That crafting behaviour is unavailable.")
                     if field not in implementation.fields:
                         raise CraftingError("That field isn't available for this behaviour.")
                     if field == "requirements":
