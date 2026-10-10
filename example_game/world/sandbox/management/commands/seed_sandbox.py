@@ -357,7 +357,39 @@ class Command(BaseCommand):
             counts["stalls"] = 1
         if apps.is_installed("evennia_rp_crafting"):
             counts.update(self._create_crafting(authors, rooms))
+        if apps.is_installed("evennia_npcs"):
+            counts.update(self._create_npcs(authors, rooms))
         return counts
+
+    def _create_npcs(self, authors, rooms):
+        from evennia_npcs import services
+        from evennia_npcs.models import NPCBlueprint, NPCPermission
+
+        owner = authors[0]
+        original = owner.location
+        owner.location = rooms["market"]
+        for spec in content.NPCS:
+            blueprint = NPCBlueprint.objects.filter(name=spec["name"]).first()
+            if blueprint is None:
+                blueprint = services.create_blueprint(owner, **spec, stat_block={"presence": "B"})
+            else:
+                # Rebind demo definitions after their old tagged authors were
+                # purged. Player-created NPCs and their history are untouched.
+                blueprint.creator = owner
+                blueprint.creator_name = owner.key
+                blueprint.description = spec["description"]
+                blueprint.archived = False
+                blueprint.save()
+                blueprint.permissions.filter(level="owner").delete()
+                NPCPermission.objects.update_or_create(
+                    blueprint=blueprint,
+                    holder=owner,
+                    defaults={"holder_name": owner.key, "level": "owner"},
+                )
+            record = services.spawn(owner, blueprint)
+            record.spawned_object.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+        owner.location = original
+        return {"npc_blueprints": len(content.NPCS), "npc_spawns": len(content.NPCS)}
 
     def _create_crafting(self, authors, rooms):
         from django.apps import apps
@@ -373,7 +405,7 @@ class Command(BaseCommand):
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
-            credit(owner, 200, note="Sandbox Workshop investment")
+            credit(owner, 1200, note="Sandbox Workshop investment")
         unlock(owner, "writing", {"timber": 3})
         book = craft(
             owner,
@@ -397,6 +429,40 @@ class Command(BaseCommand):
                 {"timber": 1},
             )
             items.append(cloak)
+        grant(owner, "grain", 20, "staff", note="Sandbox Consumables")
+        grant(owner, "ember", 20, "staff", note="Sandbox Broadcasts")
+        from evennia_rp_crafting.models import Workshop
+        from evennia_rp_crafting.services import active_unlocks
+
+        for niche, kind, resource, name, beat in (
+            (
+                "cooking",
+                "consumable",
+                "grain",
+                "a sample spice cake",
+                "A warm scent of spice fills the air.",
+            ),
+            (
+                "illusions",
+                "broadcast",
+                "ember",
+                "a sample spark globe",
+                "A spray of golden sparks blooms and fades.",
+            ),
+        ):
+            count = active_unlocks(Workshop.objects.get(character=owner)).count()
+            unlock(owner, niche, {resource: 3 * (count + 1)})
+            items.append(
+                craft(
+                    owner,
+                    niche,
+                    kind,
+                    name,
+                    "A small demonstration craft.",
+                    {"beats": [beat]},
+                    {resource: 1},
+                )
+            )
         for item in items:
             item.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
             item.move_to(rooms["market"], quiet=True)

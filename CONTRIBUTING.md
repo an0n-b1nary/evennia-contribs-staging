@@ -303,9 +303,27 @@ Run `python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox`, with
 `--absent evennia_economy` (or the matching excluded app label). The destination
 must be new. The runner copies reference-game code without databases or secrets,
 checks physical absence, and runs the crafting suite and actual reference seams.
+This includes Consumable deletion and retained provenance, Broadcast audience
+limits, channel permissions and both mute controls. With accessibility absent,
+Broadcast must remain in its user's room.
 The accessibility-absent profile uses an empty URLconf because unrelated web
 extras require accessibility; crafting's commands and items have no web surface.
 
 The full contrib matrix has a 45-minute job limit; partner jobs have 30 minutes.
 These bounds include installation/migration and allow the suite to grow across
 the supported Python versions without cancelling normal progress.
+
+### NPC partner profiles
+
+Use a fresh environment per profile, initialize and migrate `ci_game`, and
+install with `scripts/ci_install_contribs.py ci_game`. Optionally exclude
+`evennia-scenes`, `evennia-plots`, or `evennia-rp-contest`, then run
+`python scripts/ci_run_npc_tests.py ci_game --absent evennia_scenes`, substituting
+the matching app label. The runner verifies physical absence, imports commands,
+and exercises actual scene, plot and contest partners where installed.
+
+The independent profile excludes scenes, plots, contest, posing, social,
+rptracker, XP, chargen and equipment together. Only links and rules are hard
+NPC dependencies. Consult the `npc-partners` CI matrix for the exact arguments.
+The standard sandbox gate also exercises NPC MRO, reward exclusion, scene
+privacy, session switching and idempotent seeding under all real partners.

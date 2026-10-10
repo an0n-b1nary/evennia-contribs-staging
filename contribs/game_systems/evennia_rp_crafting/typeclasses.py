@@ -39,3 +39,16 @@ class Readable(CraftedItemMixin, DefaultObject):
         if not self.access(reader, "read", default=True):
             raise CraftingError("You cannot read that.")
         return record.prose["configuration"]["text"]
+
+
+class Consumable(CraftedItemMixin, DefaultObject):
+    """Only a verified craft record can authorize this item's EVENT."""
+
+    def use(self, actor):
+        from .events import use
+
+        return use(actor, self)
+
+
+class Broadcast(Consumable):
+    """Consumable whose EVENT also reaches adjacent rooms."""

@@ -90,3 +90,19 @@ class CraftRecord(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Craft records are append-only.")
+
+
+class EventUse(models.Model):
+    """One lifetime use per item; soft identities survive consumption."""
+
+    craft = models.OneToOneField(CraftRecord, on_delete=models.PROTECT)
+    actor_id = models.PositiveBigIntegerField()
+    actor_name = models.CharField(max_length=255)
+    room_id = models.PositiveBigIntegerField()
+    destinations = models.JSONField(default=dict)
+    created = models.DateTimeField(auto_now_add=True)
+
+
+class EventRoomLimit(models.Model):
+    room_id = models.PositiveBigIntegerField(unique=True)
+    last_used = models.DateTimeField(null=True)

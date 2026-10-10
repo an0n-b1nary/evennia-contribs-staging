@@ -24,6 +24,26 @@ Screen-reader helpers, accessible Django form base classes, and MXP URL utilitie
   - `absolute_web_url(path)` — promote site-relative paths to absolute URLs via `SITE_URL`
   - `mxp_link(url, label)` — build `|lu<url>|lt<label>|le` for clickable in-game links
 
+## Ambient effects (0.3)
+
+`mutes_ambient(caller)` reads the per-account `mute_ambient_effects` Boolean.
+It accepts accounts or characters. Register it in host settings:
+
+```python
+OPTIONS_ACCOUNT_DEFAULT["mute_ambient_effects"] = (
+    "Mute effects arriving from other rooms or ambient channels.", "Boolean", False,
+)
+```
+
+Add `evennia_accessibility.commands.CmdAmbient` to `AccountCmdSet` so it is
+available before puppeting and merges into character commands. `+ambient` reports
+the preference; `+ambient/mute` and `/unmute` change it. `@option` works too.
+The option persists across characters, sessions and reloads. Missing registration
+fails closed for remote consumers and the command reports the missing wiring.
+NPCs without accounts have no preference. Consumers must apply this helper only
+to ambient effects: an item used in the viewer's current room is scene content.
+Crafting 0.2 is the first consumer; this package does not emit effects itself.
+
 ## Install
 
 Install directly from this repo with pip:
