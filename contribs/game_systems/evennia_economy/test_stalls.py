@@ -332,6 +332,19 @@ class StallTests(EvenniaTest):
         self.assertEqual(stalls.directory(self.char1, self.obj1.key)[0][1][0].pk, listing.pk)
         self.assertEqual(stalls.directory(self.char1, "missing"), [])
 
+    def test_directory_hides_stalls_in_rooms_the_viewer_cannot_see(self):
+        store, _listing = self.listed()
+        self.char2.location = self.room2
+        self.room1.locks.add("view:perm(Builder)")
+        # Global discovery must not reveal an undiscovered room, even to its stall's owner.
+        self.assertEqual(stalls.directory(self.char2), [])
+        self.assertEqual(stalls.directory(self.char2, self.obj1.key), [])
+        self.assertEqual(stalls.directory(self.char2, room=self.room1), [])
+        # Staff still find every open stall, wherever it is.
+        self.assertEqual([s.pk for s, _rows in stalls.directory(self.char1)], [store.pk])
+        self.room1.locks.add("view:all()")
+        self.assertEqual([s.pk for s, _rows in stalls.directory(self.char2)], [store.pk])
+
     def test_stock_cannot_be_moved_deleted_or_traded_while_listed(self):
         store, listing = self.listed()
         with self.assertRaises(EconomyError):

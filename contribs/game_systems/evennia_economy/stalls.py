@@ -169,8 +169,12 @@ def directory(character, search="", *, room=None):
     )
     if room is not None:
         stores = stores.filter(room_id=getattr(room, "pk", room))
+    staff = conf.is_staff(character)
     result = []
     for store in stores:
+        # Discovery is global, but must not reveal a room the viewer cannot see.
+        if not staff and not store.room.access(character, "view"):
+            continue
         listings = visible_listings(character, store)
         text = " ".join(
             [store.name, store.description, *(assets.describe(row.assets) for row in listings)]
