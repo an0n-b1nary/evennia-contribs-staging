@@ -28,4 +28,24 @@ def catalog():
             ("smithing", "Smith", "Cosmetic arms, armour and metalwork."),
             ("writing", "Scribe", "Books, letters and field notes."),
         )
+    ] + [
+        {
+            "key": key,
+            "name": name,
+            "description": description,
+            "behaviours": [behaviour],
+            "input_categories": [category],
+            "unlock_money": 100,
+            "unlock_resources": {category: 3},
+        }
+        for key, name, description, behaviour, category in (
+            ("cooking", "Cook", "Food, drinks and cosmetic tonics.", "consumable", "provisions"),
+            (
+                "illusions",
+                "Illusionist",
+                "Fireworks and short-lived illusions.",
+                "broadcast",
+                "essences",
+            ),
+        )
     ]

@@ -19,7 +19,7 @@ class CraftingSeams(EvenniaTest):
         from commands.default_cmdsets import CharacterCmdSet
 
         keys = {command.key for command in CharacterCmdSet().commands}
-        self.assertTrue({"+workshop", "+craft", "read", "+crafting"} <= keys)
+        self.assertTrue({"+workshop", "+craft", "read", "use", "+crafting"} <= keys)
 
     def test_seed_reseed_preserves_player_workshop_and_restores_demonstration_items(self):
         call_command("seed_sandbox", verbosity=0)
@@ -35,7 +35,7 @@ class CraftingSeams(EvenniaTest):
         services.unlock(self.char1, "writing", {"timber": 3})
         call_command("seed_sandbox", verbosity=0)
         self.assertTrue(Workshop.objects.filter(character=self.char1).exists())
-        self.assertEqual(NicheDefinition.objects.count(), 4)
+        self.assertEqual(NicheDefinition.objects.count(), 6)
         self.assertTrue(CraftRecord.objects.filter(behaviour="readable").exists())
 
     def test_real_collectors_raise_caps_and_lower_them_on_abandonment(self):
@@ -65,6 +65,27 @@ class CraftingSeams(EvenniaTest):
             self.assertGreater(money_cap(self.char1), money_before)
         services.abandon(self.char1, "writing")
         self.assertEqual(holdings_cap(self.char1), resources_before)
+
+    def test_host_consumable_uses_real_typeclass_guards_and_retains_review(self):
+        from unittest.mock import patch
+
+        from evennia.objects.models import ObjectDB
+        from evennia_rp_crafting.events import use
+        from evennia_rp_crafting.models import EventUse
+        from typeclasses.craft_items import CraftedConsumable
+
+        call_command("seed_sandbox", verbosity=0)
+        item = ObjectDB.objects.get(db_key="a sample spice cake")
+        self.assertIsInstance(item, CraftedConsumable)
+        item.move_to(self.char1, quiet=True)
+        record = item.craft_record
+        item_id = item.pk
+        with patch.object(self.char2, "msg") as msg, self.captureOnCommitCallbacks(execute=True):
+            use(self.char1, item)
+        self.assertIn("<EVENT>", msg.call_args.args[0])
+        self.assertFalse(ObjectDB.objects.filter(pk=item_id).exists())
+        self.assertTrue(CraftRecord.objects.filter(pk=record.pk).exists())
+        self.assertTrue(EventUse.objects.filter(craft=record).exists())
 
     def test_crafted_item_sells_through_real_stall_without_losing_provenance(self):
         if not apps.is_installed("evennia_economy"):

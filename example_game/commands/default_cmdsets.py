@@ -100,7 +100,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):
             self.add(command)
         for command in _optional_commands(
-            "evennia_rp_crafting", "CmdWorkshop", "CmdCraft", "CmdRead", "CmdCrafting"
+            "evennia_rp_crafting", "CmdWorkshop", "CmdCraft", "CmdRead", "CmdUse", "CmdCrafting"
         ):
             self.add(command)
         self.add(CmdEmit)
@@ -227,7 +227,7 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         # reachable before puppeting — a screen-reader user should not have to
         # read a character-select table to find it. The account cmdset merges
         # into the puppet's, so it works in character too.
-        for command in _optional_commands("evennia_accessibility", "CmdScreenreader"):
+        for command in _optional_commands("evennia_accessibility", "CmdScreenreader", "CmdAmbient"):
             self.add(command)
         if apps.is_installed("evennia_rptracker"):
             from evennia_rptracker.channel_commands import CmdICChannel

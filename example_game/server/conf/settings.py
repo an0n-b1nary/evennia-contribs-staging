@@ -134,6 +134,11 @@ RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
 RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
+RP_CRAFTING_CONSUMABLE_TYPECLASS = "typeclasses.craft_items.CraftedConsumable"
+RP_CRAFTING_BROADCAST_TYPECLASS = "typeclasses.craft_items.CraftedBroadcast"
+RP_CRAFTING_EVENT_ROOM_COOLDOWN = 30
+RP_CRAFTING_EVENT_FRAME = "<EVENT> {text}"
+RP_CRAFTING_CHANNELS = ()  # Explicit host opt-in; adjacency is the demo default.
 RP_CRAFTING_NICHE_CAP = 5
 RP_CRAFTING_UNLOCK_STEP = 1
 RP_CRAFTING_MONEY_CAP_RAISE = 100
@@ -212,6 +217,11 @@ RP_CONTEST_RPTRACKER_APP_LABEL = "evennia_rptracker"
 
 OPTIONS_ACCOUNT_DEFAULT["screenreader_mode"] = (
     "Render plain-text output suited for screen readers.",
+    "Boolean",
+    False,
+)
+OPTIONS_ACCOUNT_DEFAULT["mute_ambient_effects"] = (
+    "Mute effects arriving from other rooms or ambient channels.",
     "Boolean",
     False,
 )

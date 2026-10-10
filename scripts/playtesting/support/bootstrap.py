@@ -31,6 +31,15 @@ def at_initial_setup():
         room.tags.add("market", category="rp_economy")
         room.db.rp_economy_stall_slots = 8
         rooms[name] = room
+    gallery = create_object(settings.BASE_ROOM_TYPECLASS, key="Playtest ambient gallery")
+    gallery.room_type = "ic"
+    for key, source, destination in (
+        ("gallery", rooms["telnet"], gallery),
+        ("laboratory", gallery, rooms["telnet"]),
+    ):
+        create_object(
+            settings.BASE_EXIT_TYPECLASS, key=key, location=source, destination=destination
+        )
     identities = {}
     for role, spec in credentials.items():
         account = create_account(

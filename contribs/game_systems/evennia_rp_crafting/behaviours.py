@@ -129,3 +129,51 @@ class Wearable(Behaviour):
         # Crafted stock deliberately has no plain-gear maker tag: its costs,
         # rather than RP_EQUIPMENT_ITEM_CAP, bound production.
         return item
+
+
+class Consumable(Behaviour):
+    fields = ("beats",)
+    typeclass = "evennia_rp_crafting.typeclasses.Consumable"
+    typeclass_setting = "RP_CRAFTING_CONSUMABLE_TYPECLASS"
+
+    def validate(self, config):
+        config = super().validate(config)
+        beats = config.get("beats", [])
+        if not isinstance(beats, list) or not 1 <= len(beats) <= 3:
+            raise CraftingError("Choose 1-3 EVENT beats.")
+        result = []
+        for beat in beats:
+            beat = text(beat, "EVENT beat", 400, required=True)
+            if not beat.isprintable() or "|" in beat or "<EVENT>" in beat:
+                raise CraftingError("EVENT beats must be plain, single-line prose.")
+            result.append(beat)
+        return {"beats": result}
+
+    def cost(self, key, config):
+        rules = getattr(settings, "RP_CRAFTING_COSTS", conf.DEFAULT_COSTS).get(key, {})
+        if "extra_beat" not in rules:
+            raise CraftingError("This behaviour has no extra-beat cost rule.")
+        total = Counter(super().cost(key, config))
+        for _ in config["beats"][1:]:
+            total.update(category_cost(rules["extra_beat"]))
+        if sum(total.values()) > conf.MAX_AMOUNT:
+            raise CraftingError("Craft costs exceed the supported range.")
+        return dict(total)
+
+
+class Broadcast(Consumable):
+    fields = ("beats", "reach", "channel")
+    typeclass = "evennia_rp_crafting.typeclasses.Broadcast"
+    typeclass_setting = "RP_CRAFTING_BROADCAST_TYPECLASS"
+
+    def validate(self, config):
+        result = super().validate(config)
+        reach = config.get("reach", "adjacent")
+        channel = text(config.get("channel", ""), "Channel", 80)
+        if reach not in ("adjacent", "channel"):
+            raise CraftingError("Broadcast reach must be adjacent or channel.")
+        if reach == "channel" and channel not in getattr(settings, "RP_CRAFTING_CHANNELS", ()):
+            raise CraftingError("Choose a staff-configured ambient channel.")
+        if reach == "adjacent" and channel:
+            raise CraftingError("Adjacent broadcasts don't use a channel.")
+        return result | {"reach": reach, "channel": channel}

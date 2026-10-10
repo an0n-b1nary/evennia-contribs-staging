@@ -1,7 +1,8 @@
 # evennia-rp-crafting
 
 Workshops unlock breadth, never quality. Invest money and resources in niches,
-then compose new cosmetic items with **Wearable** or **Readable** behaviours.
+then compose new cosmetic items with **Wearable**, **Readable**, **Consumable**
+or **Broadcast** behaviours.
 Crafting has no XP, RP quota, quality tier or waiting period.
 
 ## Installation
@@ -58,6 +59,57 @@ with the worn line. They consume additional essence inputs. Wear requirements,
 build-change guards, worn-item movement refusal and sealing use equipment.
 Crafted items are excluded from the plain-gear maker tag and its production cap.
 
+## Consumables, Broadcasts and EVENTs
+
+A Consumable emits one to three authored beats together, then is destroyed.
+Each beat is plain, single-line prose of at most 400 characters. Formatting,
+control characters and embedded `<EVENT>` markers are refused. The system
+frames each beat using `RP_CRAFTING_EVENT_FRAME` (default `"<EVENT> {text}"`).
+The prose and provenance come from the original CraftRecord; editable item
+attributes cannot supply or replace an EVENT. Ordinary objects cannot use this
+emitter. Effects are cosmetic: they do not grant stat changes or resource payouts.
+
+Add a niche granting `consumable` with `provisions` inputs, or `broadcast` with
+`essences` inputs, to your host catalogue. For example:
+
+```
++craft/new cooking/consumable = a spice cake
++craft/desc = A small cake dusted with aromatic spice.
++craft/beat = A warm scent of spice fills the air.
++craft/beat = A faint sweetness lingers, then fades.
++craft/resources = grain:2
++craft
++craft/finish
+use a spice cake
+```
+
+`/unbeat <number>` removes a draft beat. The first beat costs the base input;
+each additional beat costs one more unit by default. A Broadcast uses the same
+draft fields, plus `/reach = adjacent` (default) or `/reach = channel` and
+`/channel = <key>`. Adjacent reach follows visible, traversable exits one hop,
+deduplicates destinations, and never recursively propagates. Channels must be
+explicitly allowed in `RP_CRAFTING_CHANNELS`, still exist, and permit the user's
+`send` access. Only subscribers with `listen` access receive their ambient effect.
+Native channel mute is respected alongside the account's ambient preference.
+Delivery is transient and does not enter channel history.
+
+Install accessibility 0.3 or newer and register `mute_ambient_effects` and its
+`+ambient` command as described in that package's README. The preference belongs
+to the account and covers other-room and channel effects. In-room effects are
+scene content and remain visible. Without a compatible accessibility partner,
+Broadcast works only in the user's own room. Missing option registration mutes
+remote effects for that account, preserving an effective opt-out.
+
+Each item has one lifetime use. Source rooms, adjacent destination rooms and
+target channels share a persistent cooldown, default 30 seconds, tunable through
+`+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN` (1–86400 seconds). Limits survive reloads;
+using a different item, user or source room cannot flood the same audience.
+Cooldown, permission, hide, freeze or deletion refusals leave the item unconsumed.
+Consumption and its use record commit together; delivery starts only after commit.
+Delivery failures are logged without undoing the committed use. CraftRecord
+survives consumption, and staff `/review <number>` includes the use identity and
+destination snapshot. No scheduled beats or delayed callbacks survive consumption.
+
 ## Costs and caps
 
 Unlock position is the number of **currently active** niches plus one. Cost is
@@ -83,6 +135,8 @@ to cover the first unlock. Existing balances and stock never decay.
 RP_CRAFTING_COSTS = {
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},
     "readable": {"base": {"materials": 1}},
+    "consumable": {"base": {"provisions": 1}, "extra_beat": {"provisions": 1}},
+    "broadcast": {"base": {"essences": 1}, "extra_beat": {"essences": 1}},
 }
 ```
 
@@ -100,6 +154,8 @@ through equipment's `get_display_provenance` hook. Item typeclasses put
 `CraftedItemMixin` before the host object/equipment class in their MRO.
 Hosts can set `RP_CRAFTING_READABLE_TYPECLASS` and
 `RP_CRAFTING_WEARABLE_TYPECLASS` to subclasses of the shipped item classes.
+Consumable and Broadcast also support `RP_CRAFTING_CONSUMABLE_TYPECLASS` and
+`RP_CRAFTING_BROADCAST_TYPECLASS` with the same host guard ordering.
 Put any early stock-deletion guard before those bases, as `example_game` does.
 
 `+crafting/review` lists recent crafts; `/review <number>` shows full prose,
@@ -114,7 +170,7 @@ Use `+runtime` for `RP_CRAFTING_REVEALED` (True), `FROZEN` (False), `NICHE_CAP`
 (5, minimum 1), `UNLOCK_STEP` (1), `MONEY_CAP_RAISE` (100) and
 `RESOURCE_CAP_RAISE` (6), all with the `RP_CRAFTING_` prefix. Hiding removes
 commands and help access for players; staff can test. Freezing prevents crafts,
-unlocks and abandonment; players can still compose drafts.
+unlocks, abandonment and item use; players can still compose drafts.
 Reads and existing item appearances still work. Economy's freeze also prevents
 new crafts/unlocks when economy is installed. `RP_CRAFTING_STAFF_LOCK` defaults
 to `cmd:perm(Builder)`.
@@ -122,6 +178,6 @@ to `cmd:perm(Builder)`.
 Hard partners: resources and links. Without economy, unlocks use resources only
 and crafting has no money fee. Without equipment, Wearable is unavailable and
 Readable continues to work and existing wearables remain ordinary crafted objects
-with their hallmark. Accessibility is optional and unused by these two
-behaviours. Scenes and jobs are not used in this release. The reference game and
+with their hallmark. Accessibility enables muted remote Broadcast delivery.
+Scenes and jobs are not used in this release. The reference game and
 CI exercise actual partners and fresh environments with them physically absent.

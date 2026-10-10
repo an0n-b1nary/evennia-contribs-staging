@@ -41,7 +41,7 @@ contribs/
 The repo is being populated incrementally. The full anticipated slate, grouped by role:
 
 **Foundation**
-- `evennia-accessibility` (utils) — screen-reader helpers, accessible Django forms, MXP link conventions
+- `evennia-accessibility` (utils) — 0.3.0; screen-reader helpers, account ambient mute, accessible Django forms, MXP link conventions
 - `evennia-links` (base_systems) — shared bridge-model base classes, edit-history & soft-delete mixins, optional notification dispatcher
 
 **RP infrastructure** (all but the posing/social layer depend on `evennia-links`; posing and social are model-free and depend only on each other)
@@ -67,7 +67,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - [`evennia-rp-resources`](contribs/game_systems/evennia_rp_resources/README.md) (game_systems) — preview 0.1.3; passive resource accrual, atomic holdings, gathering leans, optional economy exchanges and reserved-stock refunds; depends only on links
 - [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.2.2; integer purses, passive income, atomic trades, reserved-stock stalls, fee boundaries and staff reconciliation; depends only on links
 - `evennia-rp-party` (rpg) — party coordination for group combat
-- [`evennia-rp-crafting`](contribs/game_systems/evennia_rp_crafting/README.md) (game_systems) — preview 0.1.0; invested Workshops, escalating niche unlocks, Wearable and Readable items, protected hallmarks and staff review; depends on resources and links, with optional economy and equipment
+- [`evennia-rp-crafting`](contribs/game_systems/evennia_rp_crafting/README.md) (game_systems) — preview 0.2.0; invested Workshops, four cosmetic item behaviours, protected hallmarks, rate-limited EVENTs and staff review; depends on resources and links, with optional economy, equipment and accessibility
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
 
 The first three shipped RP packages (rules, chargen, contest) are a **contrib-native pilot**: their generic code

@@ -133,7 +133,7 @@ class CmdCraft(_CraftCommand):
     """Compose an item in a persistent draft, preview its costs, then craft it.
 
     Usage:
-      +craft/new <niche key>/<wearable or readable> = <item name>
+      +craft/new <niche key>/<behaviour key> = <item name>
       +craft/desc = <description>
       +craft/line = <worn line>
       +craft/aura = <optional aura line>
@@ -141,6 +141,10 @@ class CmdCraft(_CraftCommand):
       +craft/require = <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
       +craft/text = <readable text>
+      +craft/beat = <EVENT prose>  (repeat for up to three beats)
+      +craft/unbeat <number>
+      +craft/reach = adjacent or channel
+      +craft/channel = <staff-configured channel>
       +craft/resources = <resource key>:<quantity>[,...]
       +craft                   preview; consumes nothing
       +craft/finish            pay and create once; clears the draft on success
@@ -196,7 +200,18 @@ class CmdCraft(_CraftCommand):
                 self.caller.attributes.remove(DRAFT_KEY)
                 self.msg(f"You craft {item.key}. {item.get_display_provenance(self.caller)}.")
                 return
-            if switch in ("desc", "line", "aura", "slot", "text", "require", "resources"):
+            if switch in (
+                "desc",
+                "line",
+                "aura",
+                "slot",
+                "text",
+                "require",
+                "resources",
+                "beat",
+                "reach",
+                "channel",
+            ):
                 value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
                 from .behaviours import text
 
@@ -210,28 +225,38 @@ class CmdCraft(_CraftCommand):
                         "line": "worn_line",
                         "aura": "aura_line",
                         "require": "requirements",
+                        "beat": "beats",
                     }.get(switch, switch)
                     implementation = registry().get(draft["behaviour"])
                     if implementation is None:
                         raise CraftingError("That crafting behaviour is unavailable.")
                     if field not in implementation.fields:
                         raise CraftingError("That field isn't available for this behaviour.")
-                    if field == "requirements":
+                    if field in ("requirements", "beats"):
                         values = list(draft["configuration"].get(field, []))
                         draft["configuration"][field] = [
                             *values,
-                            text(value, "Requirement", 200, required=True),
+                            text(value, field, 400 if field == "beats" else 200, required=True),
                         ]
                     else:
-                        limit = 12000 if field == "text" else 30 if field == "slot" else 200
+                        limit = (
+                            12000
+                            if field == "text"
+                            else 30
+                            if field in ("slot", "reach")
+                            else 80
+                            if field == "channel"
+                            else 200
+                        )
                         draft["configuration"][field] = text(value, field, limit)
-            elif switch == "unrequire":
-                values = list(draft["configuration"].get("requirements", []))
+            elif switch in ("unrequire", "unbeat"):
+                field = "beats" if switch == "unbeat" else "requirements"
+                values = list(draft["configuration"].get(field, []))
                 number = int(self.args.strip())
                 if not 1 <= number <= len(values):
-                    raise CraftingError("No such draft requirement.")
+                    raise CraftingError("No such draft entry.")
                 values.pop(number - 1)
-                draft["configuration"]["requirements"] = values
+                draft["configuration"][field] = values
             elif switch:
                 raise CraftingError("Unknown craft switch. See help +craft.")
             else:
@@ -247,12 +272,16 @@ class CmdCraft(_CraftCommand):
                     "aura_line": "Aura",
                     "slot": "Slot",
                     "text": "Text",
+                    "reach": "Reach",
+                    "channel": "Channel",
                 }
                 for field, label in labels.items():
                     if draft["configuration"].get(field):
                         rows.append(f"{label}: {draft['configuration'][field]}")
                 for number, rule in enumerate(draft["configuration"].get("requirements", []), 1):
                     rows.append(f"Requirement {number}: {rule}")
+                for number, beat in enumerate(draft["configuration"].get("beats", []), 1):
+                    rows.append(f"EVENT beat {number}: {beat}")
                 selected = (
                     ", ".join(f"{amount} {key}" for key, amount in draft["selected"].items())
                     or "none"
@@ -294,6 +323,30 @@ class CmdRead(_CraftCommand):
         self.msg(f"{item.key}\n{item.read(self.caller)}")
 
 
+class CmdUse(_CraftCommand):
+    """Use a carried crafted Consumable or Broadcast once.
+
+    Usage: use <item>
+
+    Emits its authored EVENT beats together, then consumes the item. Room
+    rate limits survive reloads. Remote Broadcast effects respect +ambient.
+    """
+
+    key = "use"
+    aliases = ["+use"]  # noqa: RUF012
+
+    def run(self, switch):
+        if switch or not self.args.strip():
+            raise CraftingError("Usage: use <item>")
+        item = self.caller.search(self.args.strip(), candidates=list(self.caller.contents))
+        if item is None:
+            return
+        from .events import use
+
+        result = use(self.caller, item)
+        self.msg(f"You use {result.craft.prose['name']}.")
+
+
 class CmdCrafting(_CraftCommand):
     """Staff catalogue maintenance and immutable craft snapshots.
 
@@ -329,6 +382,13 @@ class CmdCrafting(_CraftCommand):
                 self.msg(
                     f"Craft #{row.pk}: {row.hallmark}, item #{row.item_id}, {row.created.isoformat()}\nMaker: {row.crafter_name} (#{row.crafter_id}), accounts {row.crafter_accounts}\nNiche: {row.niche_name} ({row.niche.key}), behaviour {row.behaviour}\nSpent: {dict(row.resources_spent)}, money {row.money_spent}\n{dict(row.prose)}"
                 )
+                from .models import EventUse
+
+                used = EventUse.objects.filter(craft=row).first()
+                if used:
+                    self.msg(
+                        f"Used by {used.actor_name} (#{used.actor_id}) in room #{used.room_id} at {used.created.isoformat()}; destinations: {used.destinations}."
+                    )
             else:
                 rows = CraftRecord.objects.order_by("-pk")[:30]
                 self.msg(
@@ -346,5 +406,5 @@ class CraftingCmdSet(CmdSet):
     key = "rp_crafting"
 
     def at_cmdset_creation(self):
-        for command in (CmdWorkshop, CmdCraft, CmdRead, CmdCrafting):
+        for command in (CmdWorkshop, CmdCraft, CmdRead, CmdUse, CmdCrafting):
             self.add(command())
