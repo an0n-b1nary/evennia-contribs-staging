@@ -94,6 +94,10 @@ expiry across reloads. Archiving despawns active instances and retains history.
 
 ## Optional partners
 
+Use evennia-rp-contest 0.1.1 or later for attributed checks, and evennia-plots
+0.3.3 or later for NPC creative-content contributions. The optional extras
+declare these minimum versions.
+
 Scenes capture attributed NPC text through a gated listener. `NPCSceneAppearance`
 stores scene integer references independently of the spawned object's lifetime:
 despawning preserves history. History resolves titles against current scene

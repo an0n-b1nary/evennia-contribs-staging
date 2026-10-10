@@ -23,7 +23,7 @@ classifiers = [
 scenes = ["evennia-scenes>=0.3"]
 plots = ["evennia-plots>=0.3.3"]
 posing = ["evennia-posing>=0.1"]
-contest = ["evennia-rp-contest>=0.1,<0.2"]
+contest = ["evennia-rp-contest>=0.1.1,<0.2"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
