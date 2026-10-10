@@ -640,7 +640,21 @@ EVENNIA_WEB_STAFF_LOCK = "cmd:perm(Builder)"
 # that list.
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "web.website.context_processors.site_menu",
+    "evennia_links.web.web_character_context",
 ]
+
+######################################################################
+# Web character (evennia_links)
+######################################################################
+
+# Evennia's own "puppet" link (the account menu's character list) stores the
+# website's chosen character in the session. Every web contrib resolves its
+# acting character from request.user alone, so this middleware passes that
+# choice on for each request; without it the menu could name one character
+# while a board post went out as another. Appended so it runs after Django's
+# session and authentication middleware. The context processor above gives
+# _menu.html `web_character`, the character those pages act as.
+MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

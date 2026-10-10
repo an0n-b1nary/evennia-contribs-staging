@@ -216,6 +216,25 @@ scripts and layout, with a reserved link back to the site, an 80-character
 reading measure, and a smaller default input pane. Existing browser-local
 layout preferences are not rewritten.
 
+### Which character the website acts as
+
+A visitor doesn't need to be connected in-game to act as their character on the
+site. Every web contrib resolves the character through
+`evennia_links.characters.web_character`. An account with several characters
+picks one from the account menu, which uses Evennia's own puppet link. The
+menu then reads "Playing as *Name*", and every page and write follows that
+choice. `evennia_links.web.WebCharacterMiddleware` (the `####`-bannered block in
+`settings.py`) passes the choice to the contribs, and the
+`web_character_context` processor gives `_menu.html` the same character. Every
+authoring form says "Posting as **Name**" above its submit button.
+`world/sandbox/test_web_character.py` is the seam test: it picks a character
+through the real link, then checks the menu, three contribs' forms and a real
+job write.
+
+Browser check: with two characters on one account, pick each in turn from the
+account menu. Confirm that the menu, a board post form and the job form all
+name the same character, and that a filed job lists it as the author.
+
 ### The guide
 
 `/guide/` serves the Markdown pages in `world/guides/`, along with any pages
