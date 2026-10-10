@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-economy"
-version = "0.2.0"
+version = "0.2.1"
 description = "Integer purses, passive income, atomic exchanges and reserved-stock stalls for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
