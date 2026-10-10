@@ -14,7 +14,7 @@ map.
 
 Why a signal instead of reading the partner models directly
 -----------------------------------------------------------
-Five of the six overlays carry a privacy rule *only the owning domain
+Most overlays carry a privacy rule *only the owning domain
 knows*. ``evennia_scenes`` exposes ``room.active_scene_id`` as a bare pk
 with no privacy dimension — light a pin from it and a view-private scene
 announces itself to every anonymous visitor. Same for the heatmap (window
@@ -43,7 +43,14 @@ Key                  Owner         Value
 ``recent_scenes``    scenes        ``[{"id": int, "title": str}, ...]``
 ``has_lore``         lore          ``True`` where lore is attached
 ``upcoming_events``  calendar      ``[{"id": int, "title": str}, ...]``
+``present``          social        ``[str, ...]`` — names of connected characters
+                                   in the room, findable ones only for players
+                                   (live map only, see below)
 ===================  ============  ===============================================
+
+``present`` reaches only the live map's tile API, which requires a login.
+The SVG map can be served to logged-out visitors, so it never shows who is
+where.
 
 ``hangout_type`` is *not* collected here. It is a bare room attribute with
 no table and no privacy rule, so evennia_maps reads it duck-typed exactly

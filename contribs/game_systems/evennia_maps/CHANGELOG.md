@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.7.0] - 2026-10-10
+
+- **Added:** a `present` overlay key, `[name, ...]` per room, provided by
+  evennia-social 0.5 or later. The live map shows "N here" in the tile
+  tooltip and room list, and "Here now: …" in the popup; the tile API
+  always carries `present` (`[]` when no provider answers). It is live-map
+  only: the tile API requires a login, while the SVG map can be served to
+  logged-out visitors and never shows who is where. The provider applies
+  its own presence rule; the map shows what it's given.
+
 ## [0.6.0] - 2026-10-09
 
 - **Added:** `MAPS_TERRAINS`, `{key: {"label", "color", "sprite"}}`, and

@@ -1675,6 +1675,7 @@ def _full_provider(sender, room_ids, staff, **kwargs):
         "recent_scenes": {rid: [{"id": 11, "title": "A log"}] for rid in room_ids},
         "has_lore": {rid: True for rid in room_ids},
         "upcoming_events": {rid: [{"id": 22, "title": "A moot"}] for rid in room_ids},
+        "present": {rid: ["Ashwren", "Brannoc"] for rid in room_ids},
     }
 
 
@@ -2080,6 +2081,14 @@ class TestPlaneMapTerrains(MapsWebTestCase):
         response.render()
         return response.content.decode()
 
+    def test_the_public_svg_never_names_who_is_here(self):
+        # Logged-out visitors can load this page; who's here is live-map only.
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        with _provider(_full_provider):
+            html = self._render()
+        self.assertIn(self.room1.key, html)
+        self.assertNotIn("Ashwren", html)
+
     @override_settings(
         MAPS_TERRAINS={
             "scrub": {"label": "Dry scrub", "color": "#8a7a4a"},
@@ -2136,6 +2145,11 @@ class TestSvgContextQueryCost(MapsWebTestCase):
         # that, and an N+1 introduced inside a real provider is exactly the
         # regression the seam is most exposed to.
         placement.place_tile(self.room1, self.plane, 0, 0)
+        # Warm-up: a provider may fill a per-object cache on its first answer
+        # (social's who's-here reads each connected character's presence
+        # Attribute once). That cost follows players online, not tiles, so it
+        # is kept out of the comparison.
+        self._render()
         small = self._render()
         for i in range(5):
             placement.place_tile(_make_room(f"Real grid {i}"), self.plane, i + 1, 0)
@@ -2347,6 +2361,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
             "has_lore",
             "recent_scenes",
             "upcoming_events",
+            "present",
         ):
             self.assertIn(key, tile)
         self.assertEqual(tile["room_id"], self.room1.id)
@@ -2364,6 +2379,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
         self.assertEqual(tile["recent_scene_count"], 0)
         self.assertEqual(tile["recent_scenes"], [])
         self.assertEqual(tile["upcoming_events"], [])
+        self.assertEqual(tile["present"], [])
 
     def test_provider_values_reach_the_payload(self):
         with _provider(_full_provider):
@@ -2375,6 +2391,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
         self.assertEqual(tile["recent_scene_count"], 3)
         self.assertEqual(tile["recent_scenes"], [{"id": 11, "title": "A log"}])
         self.assertEqual(tile["upcoming_events"], [{"id": 22, "title": "A moot"}])
+        self.assertEqual(tile["present"], ["Ashwren", "Brannoc"])
 
     def test_a_broken_provider_does_not_break_the_map(self):
         with _provider(_exploding_provider):

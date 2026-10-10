@@ -31,8 +31,12 @@
  * corner, and a room list beneath the map gives keyboard and screen-reader
  * users every tile, each with a button that opens the same popup.
  *
+ * Who's here (tile.present, from evennia_social) is a "N here" badge and a
+ * list of names in the popup. The server has already left out characters
+ * who chose not to be found, so this file shows what it is given.
+ *
  * Overlay data arrives only from whichever partner contribs the game has
- * installed (evennia_regions/scenes/lore/calendar). Absent ones simply
+ * installed (evennia_regions/scenes/lore/calendar/social). Absent ones simply
  * leave their field at its empty value, and an outbound URL template that
  * came back empty means that contrib's pages aren't mounted — the link is
  * dropped rather than pointed at nothing.
@@ -185,6 +189,9 @@
 
   function badges(tile) {
     var items = [];
+    if (tile.present && tile.present.length) {
+      items.push(tile.present.length + " here");
+    }
     if (tile.has_active_scene) {
       items.push("Scene now");
     }
@@ -277,6 +284,13 @@
     }
     if (tile.primary_region_id && urls.region) {
       html += '<a href="' + urlFor(urls.region, tile.primary_region_id) + '">View region</a>';
+    }
+    if (tile.present && tile.present.length) {
+      // Character names are player-chosen, so they are escaped.
+      html +=
+        "<div>Here now: " +
+        tile.present.map(escapeHtml).join(", ") +
+        "</div>";
     }
     html += linkList("Happening now", tile.active_scenes, urls.scene);
     html += linkList("Recent logs", tile.recent_scenes, urls.scene);

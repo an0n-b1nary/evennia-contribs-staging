@@ -82,3 +82,6 @@ class RoomTileSerializer(serializers.Serializer):
     has_lore = serializers.BooleanField()
     recent_scenes = MapPopupLinkSerializer(many=True)
     upcoming_events = MapPopupLinkSerializer(many=True)
+    # Names of connected characters here (evennia_social), already filtered
+    # by presence: findable ones for players, everyone (marked) for staff.
+    present = serializers.ListField(child=serializers.CharField())
