@@ -313,3 +313,13 @@ class EventCommandTests(EventFixture, EvenniaCommandTest):
         self.call(CmdCraft(), "/finish", "You craft command cake")
         self.call(CmdUse(), "command cake", "You use command cake")
         self.assertEqual(EventUse.objects.count(), 1)
+
+    def test_beat_errors_name_the_beat(self):
+        self.call(CmdCraft(), "/new cooking/consumable = command cake", "Craft draft saved")
+        self.call(CmdCraft(), "/beat = " + "x" * 401, "EVENT beat must contain 1-400 characters.")
+
+    def test_requirement_errors_still_name_the_requirement(self):
+        if not apps.is_installed("evennia_rp_equipment"):
+            self.skipTest("equipment absent")
+        self.call(CmdCraft(), "/new weaving/wearable = command cloak", "Craft draft saved")
+        self.call(CmdCraft(), "/require = ", "Requirement must contain 1-200 characters.")

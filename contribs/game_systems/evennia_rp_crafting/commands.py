@@ -234,9 +234,12 @@ class CmdCraft(_CraftCommand):
                         raise CraftingError("That field isn't available for this behaviour.")
                     if field in ("requirements", "beats"):
                         values = list(draft["configuration"].get(field, []))
+                        label, limit = (
+                            ("EVENT beat", 400) if field == "beats" else ("Requirement", 200)
+                        )
                         draft["configuration"][field] = [
                             *values,
-                            text(value, field, 400 if field == "beats" else 200, required=True),
+                            text(value, label, limit, required=True),
                         ]
                     else:
                         limit = (
