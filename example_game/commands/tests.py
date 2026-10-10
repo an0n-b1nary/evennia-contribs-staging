@@ -21,6 +21,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia_jobs.commands import CmdJobs
+from evennia_npcs.commands import CmdNPCPose, contest_command
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 from world.sandbox.tests import SeededSandboxMixin
@@ -63,7 +64,8 @@ class TestCharacterCmdSet(EvenniaTest):
         for name in ("pose", "emote"):
             cmd = _resolve(self.cmdset, name)
             self.assertIsNotNone(cmd, f"no command resolved for {name!r}")
-            self.assertIs(type(cmd), CmdPose)
+            self.assertIs(type(cmd), CmdNPCPose)
+            self.assertIsInstance(cmd, CmdPose)
 
     def test_tel_resolves_to_contrib_cmdtel(self):
         for name in ("@tel", "tel"):
@@ -99,7 +101,8 @@ class TestCharacterCmdSet(EvenniaTest):
         from evennia.commands.cmdparser import cmdparser
         from evennia_rp_contest.commands import CmdTest
 
-        expected = {"+test": CmdTest}
+        expected = {"+test": contest_command()}
+        self.assertTrue(issubclass(expected["+test"], CmdTest))
         chargen = importlib.import_module("evennia_rp_chargen.commands")
         for name in (
             "Sheet",

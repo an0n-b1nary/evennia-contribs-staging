@@ -30,6 +30,7 @@ from typeclasses.rooms import Room
 
 from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
+from world.sandbox.test_npcs import NPCCommandSeams, NPCSeams
 
 # Keep the resources seam in the standard sandbox gate as well as the
 # explicitly targeted fresh-environment partner profile.

@@ -80,6 +80,7 @@ INSTALLED_APPS += [
     # so it is absent whenever chargen is.
     "evennia_rp_equipment",
     "evennia_rp_contest",
+    "evennia_npcs",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -216,6 +217,15 @@ RP_CONTEST_SHOW_RATINGS_TO_ROOM = False
 RP_CONTEST_CHALLENGE_IDLE_TTL = 3 * 60 * 60
 RP_CONTEST_SCENES_APP_LABEL = "evennia_scenes"
 RP_CONTEST_RPTRACKER_APP_LABEL = "evennia_rptracker"
+
+######################################################################
+# NPCs (evennia-npcs) - reusable identities, sharing and attributed portrayal
+######################################################################
+NPCS_REVEALED = True
+NPCS_FROZEN = False
+NPCS_COMBAT_PROFILES_REVEALED = False
+NPCS_TYPECLASS = "typeclasses.npcs.NPC"
+NPCS_ALLOW_FULL_PUPPET = True
 
 ######################################################################
 # Accessibility (evennia-accessibility)

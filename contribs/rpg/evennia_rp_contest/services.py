@@ -236,7 +236,9 @@ def perform_test(caller, req, *, roller=None):
         )
         record = CheckRecord.objects.create(
             character=caller,
-            actor_name=caller.key,
+            actor_name=caller.get_rp_actor_name()
+            if callable(getattr(caller, "get_rp_actor_name", None))
+            else caller.key,
             room=room,
             room_name=room.key,
             scene_id=scene_id,

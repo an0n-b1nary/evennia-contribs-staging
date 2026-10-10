@@ -155,6 +155,8 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
             ("evennia_xp", ("xp",)),
         ):
             modules = {f"{label}.commands"}
+            if label == "evennia_rp_contest" and apps.is_installed("evennia_npcs"):
+                modules.add("evennia_npcs.commands")
             names = {
                 command.key.lstrip(CMD_IGNORE_PREFIXES)
                 for command in commands

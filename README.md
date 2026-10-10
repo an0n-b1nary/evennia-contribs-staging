@@ -58,6 +58,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-scenes` (game_systems) — scene logging with live entries, participants, web surface
 - `evennia-calendar` (game_systems) — events, RSVP, optional cluster-lottery seating
 - `evennia-plots` (game_systems) — plot threads and arcs with task checklists and bonuses
+- [`evennia-npcs`](contribs/game_systems/evennia_npcs/README.md) (game_systems) — preview 0.1.0; reusable templates and unique characters, sharing, attributed portrayal, retained scene appearances and optional plot/contest seams; depends on links and rules, independently of combat
 
 **RP cluster** — mechanics for RP-focused games; named with the `rp-` prefix to distinguish from PvE-leveling-loot systems
 - [`evennia-rp-rules`](contribs/rpg/evennia_rp_rules/README.md) (rpg) — preview 0.1.0; value-neutral graded resolution, modifier pipeline, subjects, vocabulary and exact odds
