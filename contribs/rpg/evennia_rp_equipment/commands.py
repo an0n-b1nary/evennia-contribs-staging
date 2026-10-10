@@ -227,6 +227,9 @@ def render_info(item, looker) -> str:
     lines = [f"|w{name}|n{slot}"]
     if item.maker_name:
         lines.append(f"Made by {item.maker_name}.")
+    provenance = getattr(item, "get_display_provenance", None)
+    if callable(provenance) and (hallmark := provenance(looker)):
+        lines.append(f"Craft hallmark: {hallmark}")
     if item.is_worn and item.location is not None:
         lines.append(f"Worn by {item.location.get_display_name(looker)}.")
     lines.append(item.db.desc or "No description yet.")
