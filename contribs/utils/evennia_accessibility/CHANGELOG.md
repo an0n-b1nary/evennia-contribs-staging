@@ -2,6 +2,12 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
+## [0.3.0] - 2026-10-10
+
+- Added: per-account ambient mute helper and `+ambient` command, shared across
+  characters and logins. Remote effects fail closed when the option is missing;
+  in-room scene effects are unaffected. Hosts explicitly register the option.
+
 ## [0.2.0] - 2026-10-07
 
 - **Added:** `+screenreader` (alias `+sr`) in `evennia_accessibility.commands` — a
