@@ -57,8 +57,9 @@
     </div>
     {% endfor %}
   </fieldset>
+  {% include "evennia_accessibility/_acting_as.html" %}
   <div class="evennia-calendar-actions mt-3">
-    <button type="submit" class="btn btn-primary">Create Tag</button>
+    <button type="submit" class="btn btn-primary"{% if acting_character %} aria-describedby="form-acting-as"{% endif %}>Create Tag</button>
     <a href="{% url 'evennia_calendar:calendar-list' %}" class="btn btn-secondary">Cancel</a>
   </div>
 </form>

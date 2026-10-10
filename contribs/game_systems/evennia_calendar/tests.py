@@ -1617,3 +1617,54 @@ class TestWebCharacterWithoutLiveSession(EvenniaTest):
 
         request = SimpleNamespace(user=self.account2)
         self.assertEqual(require_character(request), self.char2.pk)
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class TestClusterPageWithoutLiveSession(EvenniaTest):
+    """Regression: the cluster RSVP page kept its own first-live-puppet lookup.
+
+    A visitor not connected in-game saw "Log in with a character to RSVP"
+    instead of their ranked preferences, and could not RSVP from the website.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.account2.characters.add(self.char2)
+        self.cluster = _make_cluster(self.char1, title="Midwinter Slate", locked=True)
+        self.event = _make_event(self.char1, title="Harvest Revel", cluster=self.cluster)
+
+    def _request(self, method="get", data=None):
+        request = getattr(RequestFactory(), method)(f"/calendar/cluster/{self.cluster.pk}/", data)
+        request.user = self.account2
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        return request
+
+    def test_existing_preferences_show_without_a_live_puppet(self):
+        crsvp = ClusterRSVP.objects.create(
+            cluster=self.cluster, character=self.char2, character_name=self.char2.key
+        )
+        ClusterRSVPPreference.objects.create(cluster_rsvp=crsvp, event=self.event, rank=1)
+        response = ClusterDetailView.as_view()(self._request(), pk=self.cluster.pk)
+        response.render()
+        html = response.content.decode()
+        self.assertEqual(response.context_data["existing_ranked_ids"], [self.event.pk])
+        self.assertIn(f"Posting as <strong>{self.char2.key}</strong>", html)
+        self.assertIn('aria-describedby="form-acting-as"', html)
+        self.assertNotIn("to RSVP.</p>", html)
+
+    def test_rsvp_without_a_live_puppet(self):
+        request = self._request("post", {"preferences": [self.event.pk]})
+        request._dont_enforce_csrf_checks = True
+        response = ClusterDetailView.as_view()(request, pk=self.cluster.pk)
+        self.assertEqual(response.status_code, 302)
+        crsvp = ClusterRSVP.objects.get(cluster=self.cluster, character=self.char2)
+        self.assertEqual([p.event_id for p in crsvp.get_ordered_preferences()], [self.event.pk])
+
+    def test_authoring_form_names_the_acting_character(self):
+        request = RequestFactory().get("/calendar/new/")
+        request.user = self.account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        self.account.characters.add(self.char1)
+        response = EventCreateView.as_view()(request)
+        response.render()
+        self.assertIn(f"Posting as <strong>{self.char1.key}</strong>", response.content.decode())
