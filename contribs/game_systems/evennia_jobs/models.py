@@ -297,3 +297,50 @@ class JobComment(models.Model):
             content=content,
             is_staff_only=is_staff_only,
         )
+
+
+class RequestSubmission(models.Model):
+    """An immutable revision of a structured request, including its question wording."""
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="submissions")
+    revision = models.PositiveIntegerField()
+    form_key = models.CharField(max_length=64, db_index=True)
+    schema = models.JSONField()
+    answers = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["revision"]  # noqa: RUF012
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(fields=["job", "revision"], name="jobs_request_revision_unique")
+        ]
+
+    @property
+    def answer_rows(self):
+        """Saved labels and answers for terminal and web rendering."""
+        from evennia_jobs.requests import answer_rows
+
+        return answer_rows(self)
+
+
+class RequestOutcome(models.TextChoices):
+    """Review outcomes are independent of the ticket's administrative status."""
+
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined"
+    CHANGES_REQUESTED = "changes_requested", "Changes requested"
+
+
+class RequestDecision(models.Model):
+    """A single final review of one submitted revision."""
+
+    submission = models.OneToOneField(
+        RequestSubmission, on_delete=models.CASCADE, related_name="decision"
+    )
+    outcome = models.CharField(max_length=20, choices=RequestOutcome.choices)
+    reviewer = models.ForeignKey(
+        "objects.ObjectDB", on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    reviewer_name = models.CharField(max_length=255)
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)

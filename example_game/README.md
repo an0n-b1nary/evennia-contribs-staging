@@ -534,6 +534,27 @@ map then draws every tile as a fallback swatch.
 There is deliberately no `scrub.png`, so one tile on the grid always renders
 the fallback. Adding one would remove that demonstration.
 
+### Structured staff requests
+
+Jobs 0.4 adds matching web and in-game questionnaires. Open **My Tickets** and
+choose **Propose a build**, or use `+request/forms` then
+`+request/form build=My proposal`. Answer with `+request/answer <key>=<answer>`,
+inspect `/preview`, and `/submit`. `/resume` continues an unfinished questionnaire.
+Use `+request/edit <key>` for a multiline text answer in the editor.
+The enabled form covers homes, shops and frontier proposals and requires an
+acknowledgement that the author's content may return in a later game or storyline.
+Questions and consent wording live in `world/sandbox/content.py`.
+
+`seed_sandbox` creates one demonstration library proposal visible to staff at
+`/jobs/all/`. Reseeding replaces that demonstration by its stored identity;
+player requests survive even if they have the same title.
+Staff can request changes, approve or decline via the ticket's **Review proposal**
+link or `+jobs/approve <ticket> <revision>=<explanation>` (also `/decline` and
+`/revise`). Changes requested enable a new revision; previous answers and decisions
+stay visible. Pattern and Region form examples are disabled until those workflows
+are ready. This release collects and reviews proposals; room construction and
+promotion arrive with building. No building partner is needed to use Jobs.
+
 ### Editing what the demo says
 
 **All player-visible prose lives in `world/sandbox/content.py`**, keyed by

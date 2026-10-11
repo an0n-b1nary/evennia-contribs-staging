@@ -14,9 +14,11 @@ in-game commands and (optionally) a web interface + REST API.
 |---|---|
 | `Job` + `JobComment` models | Ticket + comment storage |
 | `Job.create_job()` | Public programmatic API for filing tickets from other systems |
+| Request-form registry | Settings-owned questionnaires with matching command and web validation |
+| `RequestSubmission` + `RequestDecision` | Preserved revisions, saved question wording, explicit staff decisions |
 | `integrations.staff_review` | Ready-made `(title, description)` reporter for the rptracker and boards flag hooks |
 | 5 commands | `CmdRequest`, `CmdBug`, `CmdIssue` (players); `CmdDiscuss`, `CmdJobs` (staff) |
-| Website surface (`[web]`) | 5 views, accessible forms, Bootstrap 4 templates |
+| Website surface (`[web]`) | Accessible ticket, questionnaire, revision and staff-review pages |
 | DRF API (`[web]`) | Read-only `JobViewSet` with privacy filtering |
 
 ---
@@ -72,10 +74,123 @@ class CharacterCmdSet(CmdSet):
 | Setting | Default | Description |
 |---|---|---|
 | `JOBS_STAFF_LOCK` | `"cmd:perm(Builder)"` | Lock string for `+discuss` and `+jobs`; HTTP staff checks use the shared web policy |
+| `JOBS_REQUEST_FORMS` | `{}` | Enabled structured request forms, described below |
 
 The staff check is consistent across commands, website views, and the API — all read
 from `JOBS_STAFF_LOCK` for in-game commands. HTTP views use `EVENNIA_WEB_STAFF_LOCK`
 through `evennia_links.is_staff_user`.
+
+## Structured requests
+
+Games configure question sets; Jobs supplies their submission and review workflow.
+No building, crafting, regions or other domain partner is required. Ordinary
+free-text requests keep working alongside structured forms.
+
+```python
+JOBS_REQUEST_FORMS = {
+    "proposal": {
+        "label": "Propose an addition",
+        "description": "Explain the addition you would like staff to review.",
+        "questions": [
+            {"key": "name", "label": "Name", "type": "text", "max_length": 255},
+            {"key": "description", "label": "Describe the addition"},
+            {"key": "purpose", "label": "Purpose", "type": "choice",
+             "choices": ["home", "shop", "public"]},
+            {"key": "notes", "label": "Additional notes", "required": False},
+            {"key": "reuse", "label": "I acknowledge that my contribution may be reused.",
+             "type": "boolean"},
+        ],
+    },
+}
+```
+
+Form and question keys are stable lowercase identifiers, up to 64 characters.
+Question types are `text`, `longtext` (default), `choice`, and `boolean`.
+Questions default to required, with a 10,000-character limit; `help_text` is
+optional. A required boolean is an acknowledgement that must be affirmative.
+The shorthand `("name", "Question wording")` defines a required long-text question.
+Set `enabled=False` on a form to hide it and refuse new submissions or revisions;
+saved history remains readable. Configuration errors fail explicitly.
+
+In game:
+
+```text
++request/forms
++request/form proposal=My proposal
++request/answer name=The Reading Room
++request/answer description=A quiet place with a shared table.
++request/answer purpose=public
++request/answer notes=
++request/answer reuse=yes
++request/preview
++request/submit
+```
+
+Use `+request/edit <key>` for the multiline editor on text questions; save with
+`:w` and return with `:q`. Choices and acknowledgements use `/answer`.
+The questionnaire is saved on the character across reloads. `/resume` shows
+the next unanswered question, `/answer` can change any answer, and `/cancel`
+discards unsubmitted answers. Web forms are linked from My Tickets and use
+`/jobs/forms/<key>/` (`job-request-form`). Both surfaces use the same validation.
+Form changes during completion require reloading or restarting, so acknowledgement
+wording cannot change unnoticed.
+
+Staff review the displayed revision explicitly:
+
+```text
++jobs/approve 12 1=This fits the setting.
++jobs/decline 12 1=Please use the existing location instead.
++jobs/revise 12 1=Please describe the entrance.
+```
+
+The website offers the same outcomes at `/jobs/<pk>/review/`
+(`job-request-review`). HTTP staff policy and the acting character's
+`JOBS_STAFF_LOCK` must both permit a review. Every decision records its explanation,
+reviewer and timestamp. Decisions are independent of ticket status: changing status,
+closing or reopening a ticket never grants approval or emits an approval signal.
+
+After **Changes requested**, the submitter uses `+request/revise 12` or the
+**Revise proposal** link (`job-request-revise`). A new revision retains the old
+answers and decision; acknowledgements must be renewed. Pending, approved and
+declined revisions cannot be overwritten. Stale reviews and resubmissions are
+refused. The ticket title stays unchanged across revisions. Corrections to
+free-text tickets still use comments. Collaborator consent
+is a domain review concern: one person's acknowledgement cannot cover another's work.
+
+### Programmatic submission and approval listeners
+
+```python
+from evennia_jobs import submit_request
+
+submission = submit_request(
+    author=character, form_key="proposal", title="My proposal",
+    answers={"name": "Reading Room", "description": "A quiet library.",
+             "purpose": "public", "reuse": True},
+)
+```
+
+For a requested revision, also pass `job=submission.job` and
+`expected_revision=submission.revision`. `review_request(job=..., reviewer=...,
+outcome="approved", reason=..., expected_revision=...)` enforces the Jobs staff lock.
+Treat submissions and decisions as append-only; use these services for writes.
+Their snapshots are read-only in the admin and appear in ticket detail and the
+existing privacy-filtered, read-only API.
+
+Optional partners connect to `evennia_jobs.signals.request_approved` in a gated
+`AppConfig.ready()` integration. Receivers get `sender=RequestSubmission`,
+`submission` and `decision`; filter by `submission.form_key`. Jobs never imports
+partners or creates their content. A Pattern receiver, for example, can create a
+draft for staff to finish instead of immediately publishing it.
+
+The signal runs **inside the review transaction**. A failing receiver rolls back
+the decision and transactional database changes, allowing a retry. Repeating an
+already recorded approval returns its decision without emitting again. Receivers
+should use `submission.pk` as an idempotency key and schedule external effects with
+`transaction.on_commit()`; this is not a durable external-message delivery queue.
+With no listeners installed, approval simply records staff authorization.
+
+Upgrade with ordinary migrations. Existing jobs and comments remain unchanged;
+the new tables begin empty. Do not regenerate earlier migrations.
 
 ---
 

@@ -7,13 +7,26 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.5.0] - 2026-10-10
+## [0.6.0] - 2026-10-10
 
 - **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
   token with its previous colour as the fallback, so a host stylesheet that
   sets the tokens on `:root` rethemes this contrib's pages along with the
   others. Nothing changes until a host sets one. The token list is in
   evennia-accessibility's README.
+
+## [0.5.0] - 2026-10-10
+
+- **Added:** settings-owned request questionnaires with shared command/web
+  validation, required acknowledgements, resumable in-game answers, and web forms.
+- **Added:** preserved submission revisions with saved question wording, explicit
+  approval/decline/change-request decisions, reviewer attribution and explanations.
+  Revisions require staff to request changes; stale submissions and reviews fail.
+- **Added:** transactional `request_approved` seam for optional partners. Duplicate
+  approvals and ordinary ticket-status changes never repeat partner work. Listener
+  failure rolls back the review and transactional writes.
+- **Added:** read-only proposal history in ticket commands, web pages, admin and
+  the existing privacy-filtered API. Existing tickets retain their workflow.
 
 ## [0.4.0] - 2026-10-10
 

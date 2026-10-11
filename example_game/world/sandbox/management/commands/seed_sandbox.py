@@ -359,6 +359,23 @@ class Command(BaseCommand):
             counts.update(self._create_crafting(authors, rooms))
         if apps.is_installed("evennia_npcs"):
             counts.update(self._create_npcs(authors, rooms))
+        if apps.is_installed("evennia_jobs"):
+            from evennia.server.models import ServerConfig
+            from evennia_jobs.models import Job
+            from evennia_jobs.review import submit_request
+
+            # Store the demo's identity, so a player using the same title is safe.
+            previous_id = ServerConfig.objects.conf("sandbox_request_demo_id")
+            if previous_id is not None:
+                Job.objects.filter(pk=previous_id).delete()
+            submission = submit_request(
+                author=authors[-1],
+                form_key="build",
+                title=content.REQUEST_DEMO_TITLE,
+                answers=content.REQUEST_DEMO_ANSWERS,
+            )
+            ServerConfig.objects.conf("sandbox_request_demo_id", submission.job_id)
+            counts["request_proposals"] = 1
         return counts
 
     def _create_npcs(self, authors, rooms):

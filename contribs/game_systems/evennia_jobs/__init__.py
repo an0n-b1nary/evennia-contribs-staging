@@ -27,7 +27,7 @@ Web/API surface (requires [web] extra):
     # wire URLs with: include("evennia_jobs.urls") / include("evennia_jobs.api.urls")
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 _LAZY = {
     "Job": "models",
@@ -35,6 +35,11 @@ _LAZY = {
     "JobType": "models",
     "JobStatus": "models",
     "JobPriority": "models",
+    "RequestSubmission": "models",
+    "RequestDecision": "models",
+    "RequestOutcome": "models",
+    "submit_request": "review",
+    "review_request": "review",
 }
 
 __all__ = [
@@ -43,6 +48,11 @@ __all__ = [
     "JobPriority",
     "JobStatus",
     "JobType",
+    "RequestDecision",
+    "RequestOutcome",
+    "RequestSubmission",
+    "review_request",
+    "submit_request",
 ]
 
 

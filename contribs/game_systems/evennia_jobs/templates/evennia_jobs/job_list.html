@@ -8,6 +8,16 @@
 {% block titleblock %}{% if show_all %}Ticket Queue{% else %}My Tickets{% endif %}{% endblock %}
 
 {% block content %}
+{% if request_forms %}
+<nav aria-label="Request forms" class="mb-3">
+  <ul>
+  {% for key, definition in request_forms.items %}
+    <li><a href="{% url 'job-request-form' key %}">{{ definition.label }}</a></li>
+  {% empty %}<li>No questionnaires are currently available.</li>
+  {% endfor %}
+  </ul>
+</nav>
+{% endif %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="mb-0">{% if show_all %}Ticket Queue{% else %}My Tickets{% endif %}</h1>
   <div class="evennia-jobs-actions align-items-center" role="group" aria-label="Player actions">
