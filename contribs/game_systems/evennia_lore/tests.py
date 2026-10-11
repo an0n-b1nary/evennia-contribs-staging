@@ -1155,6 +1155,125 @@ class TestMapsOverlayWiring(EvenniaTest):
         self.assertTrue(overlays["has_lore"][self.room1.id])
 
 
+def _fake_entry_url(pk):
+    return f"/lore/{pk}/"
+
+
+@unittest.skipUnless(apps.is_installed("evennia_regions"), "requires evennia_regions")
+@patch.object(maps_overlays, "_entry_url", _fake_entry_url)
+class TestMapsRoomPanelLore(EvenniaTest):
+    """
+    The room panel's lore section: N entries tied to the region, K known.
+
+    char1 is staff in EvenniaTest; the viewer here is char2.
+    """
+
+    def setUp(self):
+        super().setUp()
+        Region = apps.get_model("evennia_regions", "Region")
+        self.region = Region.objects.create(name="The Drowned Coast")
+        _membership_model().objects.create(region=self.region, room=self.room1)
+        self.known = self._entry("Bell Tower")
+        self.unknown = self._entry("Ash Market")
+        self.secret = self._entry("Cistern Pact", privacy=LoreEntry.Privacy.RESTRICTED)
+        LoreAcquisition.objects.create(entry=self.known, character=self.char2)
+
+    def _entry(self, title, **kwargs):
+        entry = _make_entry(title, author=self.char1, **kwargs)
+        LoreRegionLink.objects.create(entry=entry, region_id=self.region.pk)
+        return entry
+
+    def _section(self, *, viewer=None, staff=False, room=None):
+        room = room or self.room1
+        answer = maps_overlays.provide_detail(
+            sender=None, room_id=room.id, room=room, staff=staff, viewer=viewer
+        )
+        return answer.get("lore")
+
+    def test_known_entries_link_and_unknown_public_ones_are_locked(self):
+        section = self._section(viewer=self.char2)
+        self.assertEqual(
+            section["items"],
+            [
+                {"label": "Bell Tower", "url": f"/lore/{self.known.pk}/"},
+                {
+                    "label": "Ash Market",
+                    "locked": True,
+                    "note": maps_overlays.DEFAULT_LOCKED_NOTE,
+                },
+            ],
+        )
+        self.assertEqual(
+            section["summary"],
+            "3 entries are tied to this region. You know 1. 1 other is only shared by a storyteller.",
+        )
+
+    def test_an_unknown_restricted_entry_is_counted_never_titled(self):
+        labels = [item["label"] for item in self._section(viewer=self.char2)["items"]]
+        self.assertNotIn("Cistern Pact", labels)
+
+    def test_a_known_restricted_entry_is_listed(self):
+        LoreAcquisition.objects.create(entry=self.secret, character=self.char2)
+        section = self._section(viewer=self.char2)
+        self.assertIn("Cistern Pact", [item["label"] for item in section["items"]])
+        self.assertEqual(section["summary"], "3 entries are tied to this region. You know 2.")
+
+    def test_without_a_character_nothing_is_known(self):
+        section = self._section()
+        self.assertTrue(all(item.get("locked") for item in section["items"]))
+        self.assertNotIn("You know", section["summary"])
+
+    @override_settings(LORE_MAP_LOCKED_NOTE="ask around")
+    def test_the_locked_note_is_the_games_to_word(self):
+        self.assertEqual(self._section(viewer=self.char2)["items"][1]["note"], "ask around")
+
+    def test_staff_see_every_entry_linked(self):
+        section = self._section(staff=True)
+        self.assertEqual(
+            [(item["label"], item["note"]) for item in section["items"]],
+            [("Ash Market", ""), ("Bell Tower", ""), ("Cistern Pact", "restricted")],
+        )
+        self.assertTrue(all(item["url"] for item in section["items"]))
+
+    def test_unpublished_and_archived_entries_are_left_out(self):
+        draft = self._entry("Draft Notes")
+        draft.status = LoreEntry.Status.DRAFT
+        draft.save()
+        self._entry("Old Tale").archive()
+        self.assertEqual(len(self._section(staff=True)["items"]), 3)
+
+    def test_a_room_without_a_region_or_lore_has_no_section(self):
+        self.assertIsNone(self._section(viewer=self.char2, room=self.room2))
+        LoreRegionLink.objects.all().delete()
+        self.assertIsNone(self._section(viewer=self.char2))
+
+    def test_three_queries(self):
+        with self.assertNumQueries(3):
+            self._section(viewer=self.char2)
+
+
+@unittest.skipUnless(
+    apps.is_installed("evennia_maps") and apps.is_installed("evennia_regions"),
+    "requires evennia_maps and evennia_regions",
+)
+class TestMapsRoomPanelWiring(EvenniaTest):
+    """LoreConfig.ready() connected provide_detail to the room panel's seam."""
+
+    def test_the_panel_collects_the_lore_section(self):
+        from evennia_maps.detail import collect_sections
+
+        Region = apps.get_model("evennia_regions", "Region")
+        region = Region.objects.create(name="The Drowned Coast")
+        apps.get_model("evennia_regions", "RegionMembership").objects.create(
+            region=region, room=self.room1
+        )
+        LoreRegionLink.objects.create(
+            entry=_make_entry("Tidal Rites", author=self.char1), region_id=region.pk
+        )
+        sections = collect_sections(self.room1, staff=False, viewer=self.char2)
+        self.assertIn("lore", [section["key"] for section in sections])
+
+
 # ---------------------------------------------------------------------------
 # Shipped LORE_SESSION_CONTEXT_PROVIDER (integrations/session_context.py)
 # ---------------------------------------------------------------------------

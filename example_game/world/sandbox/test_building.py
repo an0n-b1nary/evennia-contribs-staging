@@ -60,6 +60,7 @@ class BuildingFoundationSeams(EvenniaTest):
             reverse("evennia_regions:room-detail", args=[self.entry.pk]),
             f"/api/v1/planes/{plane.pk}/",
             f"/api/v1/planes/{plane.pk}/tiles/",
+            f"/api/v1/planes/{plane.pk}/tiles/{self.entry.pk}/detail/",
         ]
         self.client.force_login(self.account2)
         for path in paths:

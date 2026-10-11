@@ -129,6 +129,7 @@ These settings are no-ops unless `evennia-xp` is installed.
 | `PLOTS_SCENES_APP_LABEL` | `"evennia_scenes"` | Django app label for the scenes app; used by `apps.py` to register soft-ref cleanup for `ScenePlotLink.scene_id`. |
 | `PLOTS_CALENDAR_APP_LABEL` | `"evennia_calendar"` | Same, for `PlotCalendarLink.event_id`. |
 | `PLOTS_BOARDS_APP_LABEL` | `"evennia_boards"` | Same, for `PlotBoardLink.post_id`. |
+| `PLOTS_MAPS_APP_LABEL` | `"evennia_maps"` | When that app is installed (evennia-maps 0.9+), adds a "Plots here" section to the live map's room panel. See below. |
 | `SITE_URL` | `""` | When set, `+plot` output includes a clickable web URL link to the thread's detail page. |
 
 ---
@@ -146,6 +147,21 @@ These settings are no-ops unless `evennia-xp` is installed.
 The web `PlotDetailView` excludes PRIVATE threads from its queryset entirely
 (404 for unauthenticated or non-staff visitors). The API `PlotThreadViewSet`
 hides PRIVATE threads and non-ACTIVE threads from non-staff users.
+
+### On the map
+
+With evennia-maps 0.9+ and evennia-scenes installed, clicking a room on the live map
+lists the plot threads that have had a scene there, in a "Plots here" section of its
+room panel. Plots record no places of their own, so a thread reaches a room only
+through a `ScenePlotLink` to a scene held there. Both privacy rules apply:
+
+- **Scenes:** players count only scenes the web may show, so a view-private scene
+  never reveals that a thread passed through a room.
+- **Threads:** private threads are left out for players, as on the plot pages. Staff
+  see them, noted "private" and unlinked, because the thread page doesn't serve them.
+
+Active and concluded threads are listed, newest first, up to ten; proposed and archived
+ones are not. Each notes its arc when it has one.
 
 ---
 

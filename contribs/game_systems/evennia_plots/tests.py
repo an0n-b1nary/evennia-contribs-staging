@@ -1577,3 +1577,98 @@ class TestAuthoringNamesTheActingCharacter(EvenniaTest):
         context = view.get_context_data()
         self.assertEqual(context["acting_character"], self.char2)
         self.assertEqual(context["acting_character"].pk, view.get_character())
+
+
+# ---------------------------------------------------------------------------
+# Maps room panel: "Plots here" (integrations/maps.py)
+# ---------------------------------------------------------------------------
+
+
+@unittest.skipUnless(apps.is_installed("evennia_scenes"), "requires evennia_scenes")
+@patch("evennia_plots.integrations.maps._thread_url", lambda pk: f"/plots/{pk}/")
+class TestMapsRoomPanelPlots(EvenniaTest):
+    """Threads touch a room through scenes held there; each domain keeps its privacy."""
+
+    def setUp(self):
+        super().setUp()
+        self.Scene = apps.get_model("evennia_scenes", "Scene")
+
+    def _thread(self, name, *, privacy="public", status=PlotThread.Status.ACTIVE, arc=None):
+        thread = PlotThread.create_thread(name, self.char1, privacy=privacy)
+        thread.status = status
+        thread.arc = arc
+        thread.save()
+        return thread
+
+    def _scene_in(self, room, thread, privacy="public"):
+        scene = self.Scene.objects.create(room=room, privacy=privacy, title="A scene")
+        ScenePlotLink.create_link(scene, thread)
+        return scene
+
+    def _section(self, *, staff=False, room=None):
+        from evennia_plots.integrations.maps import provide_detail
+
+        room = room or self.room1
+        return provide_detail(sender=None, room_id=room.id, room=room, staff=staff).get("plots")
+
+    def test_a_thread_with_a_scene_here_is_listed(self):
+        arc = PlotArc.create_arc("The Long Night", self.char1)
+        thread = self._thread("Bells at Dusk", arc=arc)
+        self._scene_in(self.room1, thread)
+        section = self._section()
+        self.assertEqual((section["title"], section["order"]), ("Plots here", 50))
+        self.assertEqual(
+            section["items"],
+            [
+                {
+                    "label": "Bells at Dusk",
+                    "url": f"/plots/{thread.pk}/",
+                    "note": "part of The Long Night",
+                }
+            ],
+        )
+
+    def test_scenes_elsewhere_do_not_count(self):
+        self._scene_in(self.room2, self._thread("Elsewhere"))
+        self.assertIsNone(self._section())
+
+    def test_a_private_scene_never_reveals_a_thread_to_players(self):
+        self._scene_in(self.room1, self._thread("Quiet Pact"), privacy="view_private")
+        self.assertIsNone(self._section())
+        self.assertEqual(self._section(staff=True)["items"][0]["label"], "Quiet Pact")
+
+    def test_a_private_thread_is_staff_only_and_unlinked(self):
+        self._scene_in(self.room1, self._thread("Hidden Hand", privacy="private"))
+        self.assertIsNone(self._section())
+        item = self._section(staff=True)["items"][0]
+        self.assertEqual((item["url"], item["note"]), ("", "private"))
+
+    def test_concluded_threads_are_noted_and_proposed_ones_left_out(self):
+        self._scene_in(self.room1, self._thread("Done", status=PlotThread.Status.CONCLUDED))
+        self._scene_in(self.room1, self._thread("Maybe", status=PlotThread.Status.PROPOSED))
+        items = self._section()["items"]
+        self.assertEqual([(item["label"], item["note"]) for item in items], [("Done", "concluded")])
+
+    def test_active_threads_come_first(self):
+        self._scene_in(self.room1, self._thread("Done", status=PlotThread.Status.CONCLUDED))
+        self._scene_in(self.room1, self._thread("Ongoing"))
+        self.assertEqual([item["label"] for item in self._section()["items"]], ["Ongoing", "Done"])
+
+
+@unittest.skipUnless(
+    apps.is_installed("evennia_maps") and apps.is_installed("evennia_scenes"),
+    "requires evennia_maps and evennia_scenes",
+)
+class TestMapsRoomPanelPlotsWiring(EvenniaTest):
+    """PlotsConfig.ready() connected provide_detail to the room panel's seam."""
+
+    def test_the_panel_collects_the_plots_section(self):
+        from evennia_maps.detail import collect_sections
+
+        Scene = apps.get_model("evennia_scenes", "Scene")
+        thread = PlotThread.create_thread("Bells at Dusk", self.char1)
+        thread.status = PlotThread.Status.ACTIVE
+        thread.save()
+        ScenePlotLink.create_link(Scene.objects.create(room=self.room1, title="A scene"), thread)
+        sections = collect_sections(self.room1, staff=False, viewer=self.char2)
+        self.assertIn("plots", [section["key"] for section in sections])

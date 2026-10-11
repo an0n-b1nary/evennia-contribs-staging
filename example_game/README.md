@@ -233,10 +233,19 @@ end-to-end proof, and it can only live here: no contrib's own suite installs
 the others.
 
 Who's here shows only on the live map, which requires a login: "N here" in the
-tooltip and room list, and the names in the popup. It honors `+unfindable`.
-Players never see unfindable or dark characters there; staff see them with a
-marker. Browser check: connect two characters to one room, set one
-`+unfindable`, and compare the live map as a player and as staff.
+tooltip and room list, and the names in the room panel. It honors `+unfindable`.
+Players don't see unfindable or dark characters there unless their own
+connected character is in the same room; staff see them with a marker. Browser
+check: connect two characters to one room, set one `+unfindable`, and compare
+the live map as a player in that room, a player elsewhere, and staff.
+
+Clicking a tile opens its **room panel**: beside the map on a wide screen, a
+bottom sheet on a phone. Market Row shows every section the sandbox has: lore
+tied to the Commons (what your character knows, linked, and the rest locked),
+The Founding Storm through its market-day scene, and the scrap its urban terrain
+yields. `world/sandbox/test_map_panel.py` checks each section from the real
+partners, including that learning an entry unlocks it and that gathering waits
+for `RP_RESOURCES_REVEALED`.
 
 ### Native website pages and client shell
 
@@ -654,6 +663,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
+         contribs/rpg/evennia_rp_combat \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -820,6 +830,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
+         contribs/rpg/evennia_rp_combat \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -1258,9 +1269,12 @@ Three mechanisms, for three different needs:
     event, the Archive shows the heaviest heat (three closed scenes against
     Market Row's one) and recent logs, three rooms show different hangout
     letters, and tiles are labelled `The Commons` *or* `The Waterfront` rather
-    than all the same. Click through a tile popup to the region, the scene log
-    and the event page. Then click the **portal marker** on Consulate Hall and
-    confirm it navigates to the `Consulate Interior` plane.
+    than all the same. Click a tile to open its room panel, and click through
+    to the region, the scene log and the event page. Open Market Row's panel
+    and check its lore, plot and gathering sections, then narrow the window
+    below 768px and confirm the panel becomes a bottom sheet that Escape
+    closes. Then click the **portal marker** on Consulate Hall and confirm it
+    navigates to the `Consulate Interior` plane.
 12. **Staff-room privacy and public lottery mode** — as the fresh account
     from step 4, confirm the Warren is absent from the map, from `/regions/`
     and from `+where`. Market Row still shows the Staff Briefing event for
@@ -1444,8 +1458,8 @@ verified shutdown.
 
 ## Building foundations: private previews and transplant checks
 
-The sandbox demonstrates Links 0.8.2 room rights, Maps 0.9 private stacks and
-transplants, Regions 0.5 viewer-aware room pages, and Social 0.6 configuration
+The sandbox demonstrates Links 0.8.2 room rights, Maps 0.10 private stacks and
+transplants, Regions 0.5 viewer-aware room pages, and Social 0.7 configuration
 permissions. Install Links before its consumers; Social now declares Links
 as a direct dependency. Existing commands and URLs supply the preview surface.
 
@@ -1467,3 +1481,25 @@ selected characters. Links permission/owner providers remain unset until an
 ownership package is installed. `world/sandbox/test_building.py` exercises
 seed idempotence, selected-character SVG/live/API/region access, the transplant
 command and Social's room-permission seam under the actual partners.
+
+## Combat practice
+
+The Proving Grounds wires `evennia-rp-combat` after rules/chargen/NPCs.
+Seeded sample builds carry an equipped Ready Guard Signature and Balanced
+Tactics; the room has an empty open practice fight, so no PC is enrolled by
+seeding. `+combat/join side` explicitly accepts. See `/guide/combat/` and
+`help +combat`; `+combatstory` is available to ordinary players, and its
+changes to another player's character wait for that player's
+`+combat/accept`. Use the Market's permitted NPC templates with
+`/template blueprint=side,boss,cap` for an attributed practice opponent. NPC
+stat blocks include all combat roles. `+combatstory/shelve` sets a fight aside
+so the room and everyone's sheets are free; `/unshelve number` brings it back.
+
+No typeclass mixin or new URL/API mount is needed. The package guide is
+loaded by evennia-guides. Combat sends SYSTEM Scene entries without posing
+or RP/XP credit, listens for real poses, and keeps separate NPC/controller
+resources. Optional chargen validation uses `world.sandbox.glue`; removing
+combat leaves the Signature library usable. The sandbox tests include
+`world.sandbox.test_combat` for real partner seams. Run the integration gate
+with `evennia test --settings test_settings.py typeclasses commands world`
+and closed stdin; confirm a positive test count.

@@ -279,6 +279,21 @@ class TestPrivateWeb(MapsApiTestCase):
         self.assertEqual(tiles[0]["portal_plane_id"], self.plane.pk)
         self.assertEqual(self.client2.get(f"{self.base}/planes/{self.floor.pk}/").status_code, 200)
 
+    def test_room_panel_uses_the_same_offline_viewer_as_tiles(self):
+        path = f"{self.base}/planes/{self.plane.pk}/tiles/{self.room1.pk}/detail/"
+        response = self.client2.get(path, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["room_id"], self.room1.pk)
+        self.room1.locks.add(f"control:id({self.char1.pk})")
+        self.assertEqual(self.client2.get(path).status_code, 404)
+
+    def test_room_panel_checks_viewer_rights_even_on_an_unanchored_plane(self):
+        placement.move_tile(self.room1, 1, 0, plane=self.public)
+        path = f"{self.base}/planes/{self.public.pk}/tiles/{self.room1.pk}/detail/"
+        self.assertEqual(self.client2.get(path).status_code, 200)
+        self.room1.locks.add(f"control:id({self.char1.pk})")
+        self.assertEqual(self.client2.get(path).status_code, 404)
+
     def test_interior_portal_links_back_to_the_world(self):
         tiles = self.client2.get(f"{self.base}/planes/{self.plane.pk}/tiles/", format="json").data[
             "results"

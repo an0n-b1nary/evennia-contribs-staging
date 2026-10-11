@@ -383,19 +383,24 @@ class Command(BaseCommand):
         from evennia_npcs import services
         from evennia_npcs.models import NPCBlueprint, NPCPermission
 
+        from evennia_rp_rules.ruleset import get_ruleset
+
         owner = authors[0]
         original = owner.location
         owner.location = rooms["market"]
         for spec in content.NPCS:
             blueprint = NPCBlueprint.objects.filter(name=spec["name"]).first()
             if blueprint is None:
-                blueprint = services.create_blueprint(owner, **spec, stat_block={"presence": "B"})
+                blueprint = services.create_blueprint(
+                    owner, **spec, stat_block={key: "B" for key in get_ruleset().stats}
+                )
             else:
                 # Rebind demo definitions after their old tagged authors were
                 # purged. Player-created NPCs and their history are untouched.
                 blueprint.creator = owner
                 blueprint.creator_name = owner.key
                 blueprint.description = spec["description"]
+                blueprint.stat_block = {key: "B" for key in get_ruleset().stats}
                 blueprint.archived = False
                 blueprint.save()
                 blueprint.permissions.filter(level="owner").delete()
@@ -541,6 +546,29 @@ class Command(BaseCommand):
                 counts["rp_challenges"] += 1
         if apps.is_installed("evennia_rp_equipment"):
             counts["rp_gear"] = self._create_rp_gear(room, authors)
+        if apps.is_installed("evennia_rp_combat"):
+            from evennia_rp_combat import services as combat
+            from evennia_rp_combat import tactics
+
+            combat.setup(authors[0], reason="Proving Grounds: consent-based practice")
+            for author in authors:
+                tactics.save(author, "Balanced", appetite="balanced", rps_appetite="balanced")
+            counts["combat_tactics"] = len(authors)
+            if apps.is_installed("evennia_rp_chargen"):
+                from evennia_rp_chargen import moves
+
+                for author in authors:
+                    move = moves.create(
+                        author, "Ready Guard", power=1, accuracy=1, effects=["resist_stance"]
+                    )
+                    moves.equip(author, move.key)
+                counts["combat_signatures"] = len(authors)
+            room.db.desc += (
+                "\n\nCombat practice: +combat shows personal turns and your queue. "
+                "+combat/join <side> explicitly accepts a fight; everyone may use "
+                "+combatstory. Sample builds carry Ready Guard Signatures and Balanced Tactics. "
+                "See help +combat and the Combat guide."
+            )
         return counts
 
     def _create_rp_gear(self, room, authors):

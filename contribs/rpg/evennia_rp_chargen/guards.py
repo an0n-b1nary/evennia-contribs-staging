@@ -58,6 +58,7 @@ TAKE_FLAW = "take_flaw"
 REMOVE_FLAW = "remove_flaw"
 GRANT = "grant"
 REVOKE = "revoke"
+SIGNATURE = "signature"
 
 GUARD_FAILED = (
     "That change couldn't be checked just now, so nothing changed. "
@@ -136,6 +137,7 @@ __all__ = [
     "RATING",
     "REMOVE_FLAW",
     "REVOKE",
+    "SIGNATURE",
     "TAKE_FLAW",
     "UNEQUIP",
     "UPGRADE",
