@@ -6,9 +6,10 @@ requires: RP_COMBAT_REVEALED
 summary: Join by consent, take personal turns, and choose reactions.
 ---
 Combat supports your RP. Each player explicitly joins a side with
-`+combat/join side`; an invitation can be refused without a penalty. Anyone
-may set up a fight with `+combat/setup` and use publicly attributed
-`+combatstory` controls. Your NPC permissions remain separate.
+`+combat/join side`; an invitation can be refused privately, without a
+penalty. `+combat` commands act only as your own character. Anyone may set up
+a fight with `+combat/setup` and take the storyteller's role with publicly
+attributed `+combatstory` controls. Your NPC permissions remain separate.
 
 ## Your turn
 
@@ -74,17 +75,32 @@ including alts and channel filtering, until you restore it yourself.
 You can still cancel an unaccepted attack or share a fight without directly
 interacting with someone you ignore.
 
-Your Abilities, Edge and Signatures freeze throughout the fight. An agreed
-correction uses `+combat/unlock reason` and `+combat/relock reason` with clear
-queues, announcing both steps. Fade and rejoin preserve the frozen build,
-resources and turns. `+combat/fade` is neutral absence;
-`+combat/withdraw` counts remaining Vitality as lost. An incapacitated or
-withdrawn character needs a visible `+combatstory/requestreturn name=Vitality;reason`
-and their own `+combat/acceptreturn` to return; `/refusereturn` declines.
-Returning retains turns, resources and loadout, and restored Vitality adds
-assessment exposure rather than erasing prior loss. Late arrivals can
-voluntarily reduce their cap with `+combat/cap number`, or accept/refuse a
-storyteller's request. Assessment suggests RP outcomes; it imposes none.
+Joining freezes your Abilities, Edge and Signatures for that fight, and your
+sheet stays locked while you are active in it. An agreed correction uses
+`+combat/unlock reason` and `+combat/relock reason` with clear queues,
+announcing both steps. `+combat/fade` steps out neutrally and releases your
+sheet, so you can edit it or join another fight; `+combat/join` later puts
+you back exactly where you were, with the build you had in this fight. You
+are active in one fight at a time. `+combat/withdraw` counts remaining
+Vitality as lost. If you stop sending any commands for an hour, or disconnect
+that long, you are Faded safely; quietly waiting for poses is fine.
+
+The storyteller cannot change your character without you. Damage, healing,
+Spirit, conditions, a lower Turn Limit or a return to the fight arrive as a
+numbered request in `+combat`; answer with `+combat/accept n` or
+`+combat/decline n`. Ending a fight needs every present player's agreement.
+An incapacitated or withdrawn character returns only through a visible
+`+combatstory/requestreturn name=Vitality;reason` they accept. Returning
+retains turns, resources and loadout, and restored Vitality adds assessment
+exposure rather than erasing prior loss. Late arrivals can voluntarily reduce
+their cap with `+combat/cap number`. Assessment suggests RP outcomes; it
+imposes none.
+
+Need to stop for a few days? `+combatstory/shelve reason` sets the fight
+aside: everyone steps out with their place kept, sheets unlock and the room
+is free. Later, `+combatstory/shelved` lists it and `+combatstory/unshelve
+number` brings it back; everyone rejoins with `+combat/join`, then anyone uses
+`+combatstory/resume`.
 
 ## Accessibility and NPCs
 

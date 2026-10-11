@@ -44,8 +44,9 @@ Absent partners are checked through the app registry before importing them.
 +combat/act
 ```
 
-Every PC explicitly joins. Attacking an unenrolled character invites them;
-refusal spends nothing. An ignore crossing prompts its owner privately.
+Every PC explicitly joins. Attacking an unenrolled character privately
+invites them to join any side; refusal spends nothing, is not announced and
+only tells the inviter. An ignore crossing prompts its owner privately.
 `+combat/unignore character` explicitly removes the account-wide entry,
 including alts/channel filtering, until manually restored. Ignore never
 prevents unrelated members of the same fight from participating.
@@ -55,7 +56,9 @@ Reactions remain available while an outgoing exchange or a pose is pending.
 Each actor has a personal Turn Limit (default 4), with no global rounds.
 Multiple targets share one draw; no result appears before every target has
 accepted or canceled. Boss multipliers increase Vitality and per-turn action
-allowances. A Burst is one exchange with at most three manually pressed hits.
+allowances; any player may choose them, and every join announces the
+resulting Vitality, Turn Limit and Boss Mode to the room. A Burst is one
+exchange with at most three manually pressed hits.
 
 `+combat/cancel token` works only before reaction acceptance, including an
 automatic acceptance. It refunds unexecuted reservations without a turn tick.
@@ -65,23 +68,41 @@ superseded operations. Prose, XP and external ignore/build edits are not
 rewound; external build differences pause recovery for reconciliation.
 
 `+combat/journal` shows public transition summaries; `+combat/result exchange`
-recovers committed public outcomes after reconnect. Mechanical writes and
-operation results commit atomically under a coordinator row lock; service
-`operation_id` retries reuse the recorded result. Room delivery follows the
+recovers committed public outcomes after reconnect. Each fight is a `Fight`
+row; every mechanical write locks it, saves the new state and appends one
+`FightEntry` (the state before, plus the result) in one transaction. History
+is append-only, so cost per command stays flat however long the fight runs.
+Service `operation_id` retries reuse the recorded result. Room delivery follows the
 commit and is not a durable chat transport. Inspecting results never reapplies
 damage. Private RPS and draws are excluded from pending policy/UI views.
 
-Abilities, Edge, stats and Signatures freeze for the whole fight, including
-Fade/rejoin, reload and ordinary chargen lock expiry. Clear queues, then use
+Joining freezes a build (Abilities, Edge, stats, Signatures) for that fight,
+and the sheet stays locked while the character is active in it, through
+reload and ordinary chargen lock expiry. Clear queues, then use
 `+combat/unlock reason` / `+combat/relock reason` for an announced correction.
-Fade retains resources and assessment contributions; withdrawal counts
-remaining Vitality as lost. Idle/movement maintenance cancels only unaccepted
-packets and Fades safely; it never acts or reacts for an unwilling player.
+A character is active in at most one fight at a time. Fade (and withdrawal)
+releases the sheet: you may edit it or fight elsewhere, and `+combat/join`
+later restores your exact place, including the build frozen for this fight,
+and says so if your sheet has changed since. Fade retains resources and
+assessment contributions; withdrawal counts remaining Vitality as lost.
+Maintenance cancels only unaccepted packets and Fades safely, when you leave
+the room or your connection is idle or disconnected for
+`RP_COMBAT_IDLE_SECONDS` (default one hour); waiting for others' poses while
+connected is not idleness. It never acts or reacts for an unwilling player.
+When nobody is left active the fight pauses, and joining a paused fight says
+so; anyone may then `+combatstory/resume`.
 An incapacitated or withdrawn character returns only after a visible
 `+combatstory/requestreturn name=Vitality;reason` and their own
-`+combat/acceptreturn` (or `/refusereturn`). Restored Vitality adds exposure;
+`+combat/accept` (or `/decline`). Restored Vitality adds exposure;
 turns, resources, conditions and the frozen build are retained. Ordinary
 healing and Fade/rejoin cannot bypass this consent step.
+
+`+combatstory/shelve reason` sets a whole fight aside: unaccepted packets are
+canceled with refunds, everyone Fades with their place retained, sheets
+unlock and the room is free for other fights. `+combatstory/shelved` lists
+shelved fights you took part in or that were set aside in your room;
+`/unshelve number` brings one back to your room, where each participant
+rejoins with `+combat/join` and anyone resumes.
 
 ## Automation and storytelling
 
@@ -97,10 +118,16 @@ explicitly requests one outgoing exchange, useful for accessibility as well
 as NPCs. Neither enables a scheduler or creates RP poses. Auto-Act never
 selects Burst or Empower. `front_first` falls back to random without Party.
 
-All players may use attributed `+combatstory` controls to pause/resume/end,
-adjust resources/conditions, request a reduced personal cap, and direct
-permitted NPCs. PCs accept or refuse cap requests. NPC ownership and control
-permissions still apply. `/template blueprint=side,boss,cap` attaches a
+`+combat` acts only as your own character (or, with `/npc`, the NPC you
+control). `+combatstory` is the storyteller's toolbox, open to every player
+and publicly attributed. Anyone may pause at any time. A storyteller change
+to another player's character (Vitality, Spirit, conditions, a reduced
+Turn Limit, a return) is a numbered request that player sees in `+combat` and
+answers with `+combat/accept n` or `/decline n`; changes to NPCs you may
+direct apply at once. `/end` needs every present, active player character's
+agreement (the proposer's is implied); one decline withdraws it. A pause for
+reconciliation after staff rollback is resumed by staff. NPC ownership and
+control permissions still apply. `/template blueprint=side,boss,cap` attaches a
 reusable template; `/act npc,npc` runs at most one action per permitted NPC in
 stable order. Ordinary `/npc` combat switches address the controlled NPC,
 leaving the controller's PC separate. Boss Checks and Party formation/cover
@@ -115,7 +142,9 @@ ones total 1; Power/Accuracy each start at -2 minimum. Stances subtract
 Accuracy and consume Effect/Reserve budget. Each distinct reaction Stance
 can coexist: its next matching reaction gains 10 after an attack beats the
 defense, or 2 when defended. Unused bonuses expire after the actor's next
-own action. Strain reserves 5 Vitality per packet, leaving at least 1.
+own action. Strain reserves 5 Vitality per packet, leaving at least 1. Ward
+absorbs the next harmful condition from someone else; Assist's
+vulnerability and Burst's overextension are chosen costs and bypass it.
 
 Successful Resist starts at 60 + .7 Defense + .3 Agility - 4 Accuracy - Spirit
 percent. Its damage fraction starts .30 - .005 Defense, clamped .25..85.
@@ -144,7 +173,7 @@ check hooks and never receive a live opponent or hidden result.
 
 Settings default to hidden: `RP_COMBAT_REVEALED`, `RP_COMBAT_FROZEN`,
 `RP_COMBAT_TACTICS_REVEALED` are independent runtime switches. Other defaults:
-`RP_COMBAT_TURN_LIMIT=4`, `RP_COMBAT_IDLE_SECONDS=900` (0 disables idle Fade),
+`RP_COMBAT_TURN_LIMIT=4`, `RP_COMBAT_IDLE_SECONDS=3600` (connection idle; 0 disables idle Fade),
 `RP_COMBAT_TACTICS_LIMIT=8`, `RP_COMBAT_NPC_MOVES={}` (stable move identifiers),
 `RP_COMBAT_DOMAIN_EFFECTS={}`, `RP_COMBAT_ELEMENT_TRAITS={}`,
 `RP_COMBAT_ELEMENT_KIND="style"`, `RP_COMBAT_STAFF_LOCK="cmd:perm(Builder)"`.

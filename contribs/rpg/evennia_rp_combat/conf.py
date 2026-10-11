@@ -23,7 +23,8 @@ DEFAULTS = {
     "RP_COMBAT_ELEMENT_KIND": "style",
     "RP_COMBAT_STAFF_LOCK": "cmd:perm(Builder)",
     "RP_COMBAT_TURN_LIMIT": 4,
-    "RP_COMBAT_IDLE_SECONDS": 900,
+    # Connection idle (no command from the player at all), not combat idle.
+    "RP_COMBAT_IDLE_SECONDS": 3600,
     "RP_COMBAT_RULES": {},
     "RP_COMBAT_NPC_MOVES": {},
     "RP_COMBAT_TACTICS_LIMIT": 8,

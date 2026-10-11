@@ -1,28 +1,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""A persistent room coordinator. No wall-clock action scheduler."""
+"""One game-wide maintenance ticker. No wall-clock action scheduler."""
 
 from evennia import DefaultScript
 
-from .engine import new_state
 
+class CombatMaintenance(DefaultScript):
+    """Absence and idle cleanup for every open fight; it never acts or reacts."""
 
-class CombatCoordinator(DefaultScript):
     def at_script_creation(self):
-        self.key = "rp_combat_coordinator"
-        self.desc = "Consent-based room combat and its retained audit journal"
+        self.key = "rp_combat_maintenance"
+        self.desc = "Consent-based combat absence maintenance"
         self.persistent = True
         self.interval = 60
         self.start_delay = True
-        self.db.state = new_state()
-        self.db.journal = []
-        self.db.operations = {}
-        self.db.invitations = {}
-
-    def is_valid(self):
-        return self.obj is not None
 
     def at_repeat(self):
-        from .maintenance import maintain
+        from .maintenance import maintain_all
 
-        maintain(self)
+        maintain_all()

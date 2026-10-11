@@ -4,6 +4,7 @@
 
 import json
 import random
+import time
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction as F
 from types import SimpleNamespace
@@ -373,6 +374,24 @@ class TestStateMachine(SimpleTestCase):
         # exchange closes and its ordinary +8 is clamped at the cap.
         self.assertEqual((actor["transcendence"], actor["outgoing"]), (100, None))
 
+    def test_ward_never_absorbs_assist_or_burst_self_costs(self):
+        state = duel()
+        engine.join(state, 3, "Ally", "one", build())
+        actor = engine.participant(state, 1)
+        engine.condition(actor, "warded", 1, 2)
+        engine.declaration(state, 1, [3], Move(key="assist", action="assist"), 50)
+        self.assertEqual(engine.value(actor, "vulnerable"), 20)
+        actor["pose"] = False
+        token = declare(state, burst=True)
+        engine.reaction(state, 2, token, "resist")
+        engine.press(state, 1, 100)
+        self.assertEqual(engine.value(actor, "overextended"), 5)
+        self.assertIn("warded", actor["conditions"])
+        # Someone else's harmful condition still spends the Ward.
+        engine.condition(actor, "grappled", 10, 1)
+        self.assertNotIn("grappled", actor["conditions"])
+        self.assertNotIn("warded", actor["conditions"])
+
     def test_incapacitated_burst_actor_can_still_stop(self):
         state = duel()
         engine.join(state, 3, "Third", "two", build())
@@ -629,8 +648,6 @@ class TestCoordinator(EvenniaCommandTest):
         services.react(self.char2, token, "resist", operation_id="reaction")
         first = services.state_for(self.char1)
         services.react(self.char2, token, "resist", operation_id="reaction")
-        script = services.coordinator(self.char1.location)
-        script.attributes.reset_cache()
         self.assertEqual(services.state_for(self.char1), first)
         self.assertEqual(first["participants"][str(self.char1.pk)]["turns"], 1)
         self.assertEqual(len(first["exchanges"]), 1)
@@ -696,13 +713,13 @@ class TestCoordinator(EvenniaCommandTest):
     def test_returning_participant_is_no_longer_absent(self):
         from .maintenance import maintain
 
-        script = services.coordinator(self.char1.location)
+        fight = services.open_fight(self.char1.location)
 
         def mark_absent(state):
             engine.participant(state, self.char2.pk)["absent"] = True
 
         services.execute(self.char1, "test absence", mark_absent)
-        maintain(script)
+        maintain(fight)
         self.assertNotIn(
             "absent", services.state_for(self.char1)["participants"][str(self.char2.pk)]
         )
@@ -723,10 +740,156 @@ class TestCoordinator(EvenniaCommandTest):
         view = policy.call_args.args[0]
         self.assertEqual([target for target, _hp in view.targets], [self.char2.pk])
 
+    def lock(self, obj):
+        return obj.attributes.get("build_lock", category="rp_combat")
+
+    def summary(self):
+        return services.open_fight(self.char1.location).entries.last().summary
+
+    def test_fade_releases_sheet_and_rejoin_restores_the_fight_build(self):
+        fight = services.open_fight(self.char1.location)
+        self.assertEqual(self.lock(self.char2)["fight"], fight.pk)
+        services.control(self.char2, "fade")
+        self.assertIsNone(self.lock(self.char2))
+        with patch("evennia_rp_combat.services.snapshot", return_value=build(agility=40)):
+            services.join(self.char2)
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual(
+            (row["status"], Build.from_dict(row["build"]).score("agility")), ("active", 0)
+        )
+        self.assertEqual(self.lock(self.char2)["fight"], fight.pk)
+        self.assertIn("current sheet differs", self.summary())
+
+    def test_one_active_fight_per_character_and_faded_places_are_kept(self):
+        first = services.open_fight(self.char1.location)
+        self.char2.location = self.room2
+        services.setup(self.char2)
+        with self.assertRaisesRegex(CombatError, "active in another fight"):
+            services.join(self.char2, "elsewhere")
+        self.char2.location = self.char1.location
+        services.control(self.char2, "fade")
+        self.char2.location = self.room2
+        services.join(self.char2, "elsewhere")
+        self.assertNotEqual(self.lock(self.char2)["fight"], first.pk)
+        self.char2.location = self.char1.location
+        with self.assertRaisesRegex(CombatError, "active in another fight"):
+            services.join(self.char2)
+
+    def test_shelve_frees_the_room_and_unshelve_restores_everyone_later(self):
+        services.declare(self.char1, [self.char2])
+        fight = services.open_fight(self.char1.location)
+        services.storyteller(self.char2, "shelve", reason="Resume Friday")
+        fight.refresh_from_db()
+        self.assertEqual(fight.status, fight.SHELVED)
+        first = fight.state["participants"][str(self.char1.pk)]
+        self.assertEqual((first["status"], first["outgoing"], first["clock"]), ("faded", None, 0))
+        self.assertIsNone(self.lock(self.char1))
+        # The room hosts other fights meanwhile.
+        services.setup(self.char1)
+        services.storyteller(self.char1, "end")
+        stranger = self.character("Stranger", location=self.room2)
+        with self.assertRaisesRegex(CombatError, "involves you"):
+            services.unshelve(stranger, fight.pk)
+        self.assertIn(f"#{fight.pk}: Resume Friday", services.shelved(self.char2))
+        services.unshelve(self.char2, fight.pk)
+        self.assertTrue(services.state_for(self.char1)["paused"])
+        services.join(self.char1)
+        services.join(self.char2)
+        services.storyteller(self.char1, "resume")
+        services.declare(self.char1, [self.char2])
+
+    def test_story_changes_to_a_player_character_need_their_acceptance(self):
+        services.storyteller(
+            self.char1, "vitality", target=self.char2, value=40, reason="Falling rocks"
+        )
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual((row["hp"], row["requests"][0]["kind"]), (100, "vitality"))
+        self.assertIn("Falling rocks", services.render(self.char2))
+        services.control(self.char2, "decline")
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual((row["hp"], row["requests"]), (100, []))
+        services.storyteller(self.char1, "condition", target=self.char2, value="poisoned")
+        services.control(self.char2, "accept")
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual(engine.value(row, "poisoned"), 3)
+        services.control(self.char2, "withdraw")
+        with self.assertRaisesRegex(CombatError, "requestreturn"):
+            services.storyteller(self.char1, "vitality", target=self.char2, value=30)
+
+    def test_ending_needs_the_present_players_agreement(self):
+        services.storyteller(self.char1, "end", reason="Truce")
+        self.assertFalse(services.state_for(self.char1)["ended"])
+        services.control(self.char2, "decline")
+        state = services.state_for(self.char1)
+        self.assertEqual((state["ended"], state["end_proposal"]), (False, None))
+        services.storyteller(self.char1, "end", reason="Truce")
+        services.control(self.char2, "accept")
+        self.assertIn("Combat: ended", services.render(self.char1))
+        self.assertIsNone(self.lock(self.char1))
+
+    def test_only_staff_resume_a_reconciliation_pause(self):
+        services.execute(
+            self.char1,
+            "test reconciliation",
+            lambda state: state.update(paused=True, pause_reason="reconciliation"),
+        )
+        with (
+            patch("evennia_rp_combat.services.staff", return_value=False),
+            self.assertRaisesRegex(CombatError, "staff"),
+        ):
+            services.storyteller(self.char2, "resume")
+        with patch("evennia_rp_combat.services.staff", return_value=True):
+            services.storyteller(self.char2, "resume")
+        self.assertFalse(services.state_for(self.char1)["paused"])
+
+    def test_joining_announces_boss_mode_and_a_paused_fight(self):
+        boss = self.character("Boss")
+        services.join(boss, "two", boss=3, turn_limit=6)
+        self.assertIn("300 Vitality, personal Turn Limit 6", self.summary())
+        self.assertIn("Boss Mode x3", self.summary())
+        services.storyteller(self.char1, "pause")
+        services.control(self.char2, "fade")
+        services.join(self.char2)
+        self.assertIn("anyone may +combatstory/resume", self.summary())
+
+    def test_journal_appends_one_entry_per_operation_without_build_copies(self):
+        fight = services.open_fight(self.char1.location)
+        entries = list(fight.entries.values_list("sequence", "before"))
+        ex_id = services.declare(self.char1, [self.char2])
+        services.react(self.char2, f"{ex_id}:1", "resist")
+        self.assertEqual(list(fight.entries.values_list("sequence", "before"))[:-2], entries)
+        self.assertEqual(fight.entries.count(), len(entries) + 2)
+        exchange = services.state_for(self.char1)["exchanges"][ex_id]
+        self.assertNotIn("attack_build", exchange)
+        self.assertNotIn("build", exchange["reactions"][str(self.char2.pk)])
+
+    def test_connected_players_waiting_quietly_are_not_idle(self):
+        from .maintenance import maintain
+
+        fight = services.open_fight(self.char1.location)
+        state = fight.state
+        for row in state["participants"].values():
+            row["last_activity"] = time.time() - 7200
+        fight.state = state
+        fight.save()
+        idle = {self.char1.pk: 5, self.char2.pk: 5}
+        with (
+            patch.object(type(self.char1), "idle_time", property(lambda obj: idle.get(obj.pk))),
+            override_settings(RP_COMBAT_IDLE_SECONDS=60),
+        ):
+            maintain(fight)
+            idle[self.char2.pk] = None  # Disconnects; the grace period starts now.
+            maintain(fight)
+            rows = services.state_for(self.char1)["participants"]
+            self.assertEqual({row["status"] for row in rows.values()}, {"active"})
+            maintain(fight, now=time.time() + 120)
+        self.assertEqual(
+            services.state_for(self.char1)["participants"][str(self.char2.pk)]["status"], "faded"
+        )
+
     def test_staff_rollback_restores_interleaved_costs_and_invalidates_tokens(self):
         ex_id = services.declare(self.char1, [self.char2], operation_id="old-declare")
-        script = services.coordinator(self.char1.location)
-        sequence = len(script.db.journal) + 1
+        sequence = services.next_sequence(services.open_fight(self.char1.location))
         services.react(self.char2, f"{ex_id}:1", "resist", operation_id="old-react")
         with (
             patch("evennia_rp_combat.services.staff", return_value=False),
@@ -749,7 +912,7 @@ class TestCoordinator(EvenniaCommandTest):
             '/save Careful={"appetite":"cautious","rps_appetite":"bold"}',
             "Active Tactics: Careful.",
         )
-        self.call(CmdCombat(), "/act", "2.")
+        self.call(CmdCombat(), "/act", "1.1")
         state = services.state_for(self.char1)
         self.assertEqual(len(state["exchanges"]), 1)
         self.assertFalse(state["participants"][str(self.char1.pk)]["auto"])
@@ -764,8 +927,7 @@ class TestCoordinator(EvenniaCommandTest):
 
         services.declare(self.char1, [self.char2])
         self.char2.location = self.room2
-        script = services.coordinator(self.char1.location)
-        maintain(script)
+        maintain(services.open_fight(self.char1.location))
         state = services.state_for(self.char1)
         row = state["participants"][str(self.char2.pk)]
         self.assertEqual((row["status"], row["hp"]), ("faded", 100))
@@ -775,10 +937,10 @@ class TestCoordinator(EvenniaCommandTest):
     def test_idle_fades_without_enabling_automation(self):
         from .maintenance import maintain
 
-        script = services.coordinator(self.char1.location)
-        now = max(row["last_activity"] for row in script.db.state["participants"].values())
+        fight = services.open_fight(self.char1.location)
+        now = max(row["last_activity"] for row in fight.state["participants"].values())
         with override_settings(RP_COMBAT_IDLE_SECONDS=10):
-            maintain(script, now=now + 11)
+            maintain(fight, now=now + 11)
         state = services.state_for(self.char1)
         self.assertTrue(state["paused"])
         self.assertTrue(
@@ -828,8 +990,8 @@ class TestCoordinator(EvenniaCommandTest):
         with patch("evennia_rp_combat.services.staff", return_value=False):
             self.call(CmdCombatStory(), f"/requestcap {self.char2.key}=2;short scene", "")
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
-        self.assertEqual((row["turn_limit"], row["cap_request"]), (4, 2))
-        services.control(self.char2, "acceptcap")
+        self.assertEqual((row["turn_limit"], row["requests"][0]["kind"]), (4, "cap"))
+        services.control(self.char2, "accept")
         self.assertEqual(
             services.state_for(self.char2)["participants"][str(self.char2.pk)]["turn_limit"], 2
         )
@@ -842,26 +1004,35 @@ class TestCoordinator(EvenniaCommandTest):
             key="Unenrolled",
             location=self.char1.location,
         )
-        before = services.state_for(self.char1)
-        services.declare(self.char1, [target])
+        fight = services.open_fight(self.char1.location)
+        before, entries = services.state_for(self.char1), fight.entries.count()
+        with patch.object(self.char1, "msg") as inviter:
+            services.declare(self.char1, [target])
+            invited = services.state_for(self.char1)
+            self.assertEqual(invited["invitations"][str(target.pk)]["by"], self.char1.pk)
+            self.assertIn("Invitation from", services.render(target))
+            services.refuse(target)
+        # Private: nothing executed, was journaled or announced, and only the
+        # inviter hears about the refusal.
         self.assertEqual(services.state_for(self.char1), before)
-        services.refuse(target)
-        self.assertNotIn(str(target.pk), services.state_for(self.char1)["participants"])
+        self.assertEqual(fight.entries.count(), entries)
+        self.assertIn("declined your combat invitation", str(inviter.call_args_list))
 
     def test_return_requires_story_request_and_personal_acceptance(self):
         services.control(self.char2, "withdraw")
         before = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         with self.assertRaises(CombatError):
-            services.control(self.char2, "acceptreturn")
+            services.control(self.char2, "accept")
         with patch("evennia_rp_combat.services.staff", return_value=False):
             self.call(CmdCombatStory(), f"/requestreturn {self.char2.key}=25;agreed correction", "")
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
-        self.assertEqual((row["status"], row["hp"], row["return_request"]), ("withdrawn", 0, 25))
-        self.call(CmdCombat(), "/refusereturn", "", caller=self.char2)
+        self.assertEqual((row["status"], row["hp"]), ("withdrawn", 0))
+        self.assertEqual((row["requests"][0]["kind"], row["requests"][0]["value"]), ("return", 25))
+        self.call(CmdCombat(), "/decline", "", caller=self.char2)
         with self.assertRaises(CombatError):
-            services.control(self.char2, "acceptreturn")
+            services.control(self.char2, "accept")
         services.storyteller(self.char1, "requestreturn", target=self.char2, value=25)
-        self.call(CmdCombat(), "/acceptreturn", "", caller=self.char2)
+        self.call(CmdCombat(), "/accept", "", caller=self.char2)
         after = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         self.assertEqual((after["status"], after["hp"]), ("active", 25))
         for key in ("turns", "turn_limit", "build", "reserves", "transcendence", "pressure"):
@@ -879,7 +1050,7 @@ class TestCoordinator(EvenniaCommandTest):
         with self.assertRaisesRegex(CombatError, "return"):
             services.join(self.char2, "two")
         services.storyteller(self.char1, "requestreturn", target=self.char2, value=20)
-        services.control(self.char2, "acceptreturn")
+        services.control(self.char2, "accept")
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         self.assertEqual((row["hp"], row["status"]), (20, "active"))
 
@@ -904,7 +1075,6 @@ class TestCoordinator(EvenniaCommandTest):
         self.assertNotIn("subtle", services.result(self.char1, ex_id))
         services.react(self.char2, f"{ex_id}:1", "resist")
         before = services.state_for(self.char1)
-        services.coordinator(self.char1.location).attributes.reset_cache()
         self.assertIn("subtle", services.result(self.char1, ex_id))
         self.assertEqual(before, services.state_for(self.char1))
 
@@ -930,10 +1100,11 @@ class TestCoordinator(EvenniaCommandTest):
         membership_changed.connect(receiver, weak=False)
         self.addCleanup(membership_changed.disconnect, receiver)
         self.char2.location = self.room2
+        fight = services.open_fight(self.char1.location)
         with self.captureOnCommitCallbacks(execute=True):
-            maintain(services.coordinator(self.char1.location))
+            maintain(fight)
         self.assertIn((self.char2.pk, "faded"), received)
-        sequence = services.coordinator(self.char1.location).db.journal[-1]["sequence"]
+        sequence = services.next_sequence(fight) - 1
         self.char2.location = self.char1.location
         with (
             patch("evennia_rp_combat.services.staff", return_value=True),
@@ -945,14 +1116,17 @@ class TestCoordinator(EvenniaCommandTest):
     def test_unsupported_state_version_preserves_progress(self):
         from .maintenance import maintain
 
-        script = services.coordinator(self.char1.location)
-        state = services.clone(script.db.state)
+        fight = services.open_fight(self.char1.location)
+        state = services.clone(fight.state)
         state["schema"] = 999
-        script.db.state = state
+        fight.state = state
+        fight.save()
         with self.assertRaisesRegex(CombatError, "Unsupported combat state"):
             services.auto_act(self.char1)
-        maintain(script)
-        self.assertEqual(services.clone(script.db.state), state)
+        maintain(fight)
+        fight.refresh_from_db()
+        self.assertEqual(fight.state, state)
+        self.assertTrue(fight.unsupported_notice)
 
     def test_player_text_is_literal_in_public_mechanics(self):
         text = "{name} $You() |rcolored|n " + "x" * 200
@@ -1071,6 +1245,6 @@ class TestNPCWithoutSheets(RulesetTestMixin, EvenniaCommandTest):
         )
         services.declare(self.char1, [self.char2], subject=npc)
         with override_settings(RP_COMBAT_IDLE_SECONDS=900):
-            maintain(services.coordinator(self.char1.location), now=time.time())
+            maintain(services.open_fight(self.char1.location), now=time.time())
         row = services.state_for(self.char1)["participants"][str(npc.pk)]
         self.assertEqual((row["status"], bool(row["outgoing"])), ("active", True))

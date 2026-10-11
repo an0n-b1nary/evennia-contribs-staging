@@ -43,9 +43,15 @@ def new_state():
         "denominators": {},
         "started": False,
         "paused": False,
+        # Why the fight is paused: storyteller, faded (nobody active) or
+        # reconciliation (after staff rollback; staff resume).
+        "pause_reason": "",
         "ended": False,
         "imbalance": "",
         "templates": {},
+        "invitations": {},
+        "next_request": 1,
+        "end_proposal": None,
     }
 
 
@@ -77,17 +83,13 @@ def progress(state):
 
 
 def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, npc=False):
+    """Enroll, or restore a Faded participant exactly as they left.
+
+    A rejoin ignores ``side``, ``build``, ``boss`` and ``turn_limit``: the
+    retained row, including the build frozen for this fight, is restored.
+    """
     if state["ended"]:
         raise CombatError("This fight has ended.")
-    if (
-        type(boss) is not int
-        or not 1 <= boss <= 10
-        or type(turn_limit) is not int
-        or not 1 <= turn_limit <= 20
-    ):
-        raise CombatError("Boss multiplier must be 1..10 and personal Turn Limit 1..20.")
-    if not side or len(side) > 40:
-        raise CombatError("Choose a side name of 1..40 characters.")
     key = str(ident)
     if key in state["participants"]:
         row = participant(state, key)
@@ -100,6 +102,17 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
         # Restore the exact retained state, including its frozen build.
         row["exposure"] += row["hp"] - row.pop("faded_hp", row["hp"])
         return row
+    if (
+        type(boss) is not int
+        or not 1 <= boss <= 10
+        or type(turn_limit) is not int
+        or not 1 <= turn_limit <= 20
+    ):
+        raise CombatError("Boss multiplier must be 1..10 and personal Turn Limit 1..20.")
+    if build is None:
+        raise CombatError("No combat build is available to join with.")
+    if not side or len(side) > 40:
+        raise CombatError("Choose a side name of 1..40 characters.")
     row = {
         "id": key,
         "name": name,
@@ -128,7 +141,8 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
         "exposure": 100 * boss,
         "support_history": {},
         "carry": 0,
-        "cap_request": None,
+        # Storyteller changes awaiting this participant's acceptance.
+        "requests": [],
     }
     state["participants"][key] = row
     return row
@@ -162,19 +176,28 @@ def assessment(state):
     return result
 
 
-def condition(row, name, magnitude, duration=1, source=""):
-    """Named conditions refresh at maximum magnitude, never arbitrary stacks."""
-    if name not in (
-        "warded",
-        "evade_stance",
-        "resist_stance",
-        "overpower_stance",
-        "endure",
-        "slip_inside",
-        "analyzed",
-        "read",
-        "bulwark",
-    ) and row["conditions"].get("warded"):
+def condition(row, name, magnitude, duration=1, source="", *, wardable=True):
+    """Named conditions refresh at maximum magnitude, never arbitrary stacks.
+
+    Ward absorbs the next harmful condition from someone else. The costs an
+    actor accepts by choosing Assist or Burst pass ``wardable=False``.
+    """
+    if (
+        wardable
+        and name
+        not in (
+            "warded",
+            "evade_stance",
+            "resist_stance",
+            "overpower_stance",
+            "endure",
+            "slip_inside",
+            "analyzed",
+            "read",
+            "bulwark",
+        )
+        and row["conditions"].get("warded")
+    ):
         del row["conditions"]["warded"]
         return
     old = row["conditions"].get(name, {})
@@ -334,7 +357,6 @@ def declaration(
         before = actor["spirit"]
         actor["spirit"], exchange["debt"] = math.burst_ante(before)
         exchange["paid_ante"] = before - actor["spirit"]
-    exchange["attack_build"] = actor["build"]
     exchange["attack_spirit"] = actor["spirit"]
     exchange["carry"] = actor["carry"]
     actor["outgoing"] = ex_id
@@ -427,7 +449,6 @@ def reaction(
         "counter": counter.as_dict(),
         "empower": empower,
         "domain_effect": domain_effect,
-        "build": defender["build"],
         "spirit": defender["spirit"],
         "pressure": defender["pressure"],
         "conditions": frozen_conditions,
@@ -472,7 +493,7 @@ def reaction_view(state, ident, token):
     move = Move.from_dict(exchange["move"])
     # Accuracy is declared publicly, including paid Stance costs and exposure
     # from unpaid ante. The private RPS bet and draw never enter this view.
-    attack_build = Build.from_dict(exchange["attack_build"])
+    attack_build = Build.from_dict(participant(state, exchange["actor"])["build"])
     empowered = (
         exchange["empower"]
         and not exchange["empower_used"]
@@ -545,7 +566,9 @@ def reaction_view(state, ident, token):
 
 def resolve_exchange(state, exchange):
     actor = participant(state, exchange["actor"])
-    attack_build = Build.from_dict(exchange["attack_build"])
+    # Queued participants cannot relock, so their frozen builds are this
+    # exchange's inputs; exchanges and reactions keep no private copies.
+    attack_build = Build.from_dict(actor["build"])
     move = Move.from_dict(exchange["move"])
     token = f"{exchange['id']}:{exchange['hit']}"
     broken = False
@@ -554,7 +577,7 @@ def resolve_exchange(state, exchange):
             continue
         defender = participant(state, target_id)
         choice = exchange["reactions"][target_id]
-        defense_build = Build.from_dict(choice["build"])
+        defense_build = Build.from_dict(defender["build"])
         frozen_defender = {"conditions": choice["conditions"]}
         counter = Move.from_dict(choice["counter"])
         reaction_kind = choice["kind"]
@@ -670,6 +693,7 @@ def resolve_exchange(state, exchange):
                     "overextended",
                     value(actor, "overextended") + (10 if reaction_kind == "overpower" else 5),
                     2,
+                    wardable=False,
                 )
                 if reaction_kind == "overpower":
                     change_spirit(actor, -200)
@@ -901,7 +925,7 @@ def support_exchange(state, exchange):
         if exchange["domain"] and success and not exchange["domain_used"]:
             apply_domain(state, actor, target, exchange["domain_effect"])
             exchange["domain_used"] = True
-    condition(actor, "vulnerable", 20, 2)
+    condition(actor, "vulnerable", 20, 2, wardable=False)
     finish_exchange(state, exchange)
 
 
@@ -943,7 +967,7 @@ def press(state, ident, draw, *, stop=False, empower=False):
         stance_strengths=[],
     )
     exchange["attack_spirit"] = actor["spirit"]
-    condition(actor, "overextended", value(actor, "overextended") + 5, 2)
+    condition(actor, "overextended", value(actor, "overextended") + 5, 2, wardable=False)
     for target in exchange["targets"]:
         participant(state, target)["incoming"].append(f"{exchange['id']}:{exchange['hit']}")
 
@@ -1007,8 +1031,10 @@ def fade(state, ident, *, withdraw=False):
     else:
         row["faded_hp"] = row["hp"]
         row["status"] = "faded"
-    if not any(p["status"] == "active" and p["hp"] > 0 for p in state["participants"].values()):
-        state["paused"] = True
+    if not state["paused"] and not any(
+        p["status"] == "active" and p["hp"] > 0 for p in state["participants"].values()
+    ):
+        state["paused"], state["pause_reason"] = True, "faded"
 
 
 def correction(state, ident, *, build=None):
@@ -1027,4 +1053,3 @@ def reduce_cap(state, ident, limit):
     if type(limit) is not int or not max(1, row["turns"]) <= limit <= row["turn_limit"]:
         raise CombatError("Choose a reduced cap no lower than turns already used.")
     row["turn_limit"] = limit
-    row["cap_request"] = None

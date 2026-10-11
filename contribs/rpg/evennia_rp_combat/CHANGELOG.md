@@ -21,3 +21,11 @@
 - Plain-text commands, player guide, reference-game demonstrations and tests.
 - Storyteller-requested returns with explicit participant acceptance or refusal,
   retained personal progress and assessment exposure for restored Vitality.
+- Fights stored as `Fight` rows with an append-only `FightEntry` journal
+  (migration 0002), so command cost stays flat over a long fight.
+- Storyteller changes to a player character are numbered requests the player
+  accepts or declines; ending a fight needs the present players' agreement.
+- Fade releases the sheet and rejoin restores the fight's frozen build; one
+  active fight per character; shelving and unshelving whole fights.
+- Connection-based idle detection (default one hour); join announcements of
+  Vitality, Turn Limit and Boss Mode; private invitations and refusals.

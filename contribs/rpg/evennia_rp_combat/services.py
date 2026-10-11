@@ -2,8 +2,16 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Authorization, transactional persistence and optional partner seams.
 
-All mechanical writes use execute(), which locks the Script row, copies its
-state and commits a checkpoint plus result atomically. Messages follow commit.
+Every mechanical write goes through execute(): it locks the room's open
+Fight row, runs the engine on a copy of its state and, in one transaction,
+saves the new state and appends a single FightEntry holding the state before
+the operation and its result. History is append-only, so a long fight never
+rewrites its journal. Messages follow commit.
+
+Player actions (+combat) act only on your own character or an NPC you may
+direct. Storyteller actions (+combatstory) are open to everyone and publicly
+attributed; a change to another player's character is a request that player
+accepts or declines, and ending a fight needs the present players' agreement.
 """
 
 import json
@@ -11,12 +19,12 @@ import random
 import time
 import uuid
 from copy import deepcopy
-from datetime import UTC, datetime
 
 from django.apps import apps
 from django.db import transaction
+from django.db.models import Max
+from django.utils import timezone
 from evennia.objects.models import ObjectDB
-from evennia.scripts.models import ScriptDB
 from evennia.utils.create import create_script
 
 from evennia_links import runtime
@@ -24,6 +32,8 @@ from evennia_links import runtime
 from . import conf, engine, policies, tactics
 from .data import TIERS, ActionView, Build, CombatError, Move
 from .sources import snapshot
+
+MAINTENANCE_KEY = "rp_combat_maintenance"
 
 
 def plain(text, limit=200):
@@ -33,10 +43,13 @@ def plain(text, limit=200):
 
 
 def clone(value):
-    # Detach Evennia's mutable saver containers from their Attribute owner.
-    from evennia.utils.dbserialize import deserialize
+    """A detached JSON copy; fight state is plain JSON by construction."""
+    return json.loads(json.dumps(value))
 
-    return json.loads(json.dumps(deserialize(value)))
+
+def notice(state, text):
+    """Append to this operation's public summary. Never persisted in state."""
+    state.setdefault("notices", []).append(plain(text, 400))
 
 
 def staff(actor):
@@ -52,22 +65,36 @@ def require(actor, *, progress=False):
         raise CombatError("Combat is frozen. Inspection, cancellation and fade remain available.")
 
 
-def coordinator(room, *, create=False):
-    with transaction.atomic():
-        ObjectDB.objects.select_for_update().get(pk=room.pk)
-        script = room.scripts.get("rp_combat_coordinator")
-        if script:
-            return script[0]
-        if create:
-            return create_script("evennia_rp_combat.scripts.CombatCoordinator", obj=room)
-    raise CombatError("No combat has been set up here. Use +combat/setup.")
+def _fights():
+    from .models import Fight
+
+    return Fight
+
+
+def open_fight(room):
+    Fight = _fights()
+    fight = Fight.objects.filter(room=room, status=Fight.OPEN).first() if room else None
+    if fight is None:
+        raise CombatError("No combat has been set up here. Use +combat/setup.")
+    return fight
+
+
+def current_fight(room):
+    """The room's open fight, else the one that most recently ended here."""
+    Fight = _fights()
+    here = Fight.objects.filter(room=room) if room else Fight.objects.none()
+    fight = (
+        here.filter(status=Fight.OPEN).first()
+        or here.filter(status=Fight.ENDED).order_by("-closed_at", "-pk").first()
+    )
+    if fight is None:
+        raise CombatError("No combat has been set up here. Use +combat/setup.")
+    return fight
 
 
 def state_for(actor):
     require(actor)
-    script = coordinator(actor.location)
-    script.attributes.reset_cache()
-    state = clone(script.db.state)
+    state = clone(current_fight(actor.location).state)
     validate_state(state)
     return state
 
@@ -77,6 +104,25 @@ def validate_state(state):
         raise CombatError(
             "Unsupported combat state version; staff must restore or migrate this fight. No progress was applied."
         )
+
+
+def ensure_maintenance():
+    """One game-wide ticker cleans up absence across every open fight."""
+    from evennia.scripts.models import ScriptDB
+
+    if not ScriptDB.objects.filter(db_key=MAINTENANCE_KEY).exists():
+        create_script(
+            "evennia_rp_combat.scripts.CombatMaintenance", key=MAINTENANCE_KEY, persistent=True
+        )
+
+
+def room_row(subject):
+    """The subject's row in the open fight where it currently stands."""
+    if subject is None or subject.location is None:
+        return None
+    Fight = _fights()
+    fight = Fight.objects.filter(room=subject.location, status=Fight.OPEN).first()
+    return fight.state.get("participants", {}).get(str(subject.pk)) if fight else None
 
 
 def npc_record(subject):
@@ -97,11 +143,7 @@ def authorize(actor, subject, *, cleanup=False, batch=False):
 
         try:
             npcs.require(actor, write=not cleanup, cleanup=cleanup)
-            batch_row = None
-            marker = subject.attributes.get("build_lock", category="rp_combat")
-            if marker:
-                script = ScriptDB.objects.filter(pk=marker["fight"]).first()
-                batch_row = script.db.state["participants"].get(str(subject.pk)) if script else None
+            batch_row = room_row(subject)
             batch_allowed = (
                 batch or (batch_row and batch_row.get("batch_controller") == actor.pk)
             ) and record.controller_id in (None, actor.pk)
@@ -125,12 +167,9 @@ def owner(subject):
         return subject
     if record.controller:
         return record.controller
-    marker = subject.attributes.get("build_lock", category="rp_combat")
-    if marker:
-        script = ScriptDB.objects.filter(pk=marker["fight"]).first()
-        row = script.db.state["participants"].get(str(subject.pk)) if script else None
-        if row and row.get("batch_controller"):
-            return ObjectDB.objects.filter(pk=row["batch_controller"]).first()
+    row = room_row(subject)
+    if row and row.get("batch_controller"):
+        return ObjectDB.objects.filter(pk=row["batch_controller"]).first()
     return None
 
 
@@ -201,6 +240,8 @@ def identity(subject):
 
 def emit(room, actor, text):
     """Mechanics are SYSTEM entries only, never posing or tracker activity."""
+    if room is None:
+        return
     text = "[Combat] " + text
     room.msg_contents(("{combat_text}", {"type": "rp_combat"}), mapping={"combat_text": text})
     if apps.is_installed("evennia_scenes"):
@@ -226,41 +267,118 @@ def emit(room, actor, text):
             )
 
 
-def synchronize_locks(script, state):
+def synchronize_locks(fight, state, *, release=()):
+    """Freeze sheets only while a character is active in an open fight.
+
+    Fading, withdrawing, shelving and ending release the sheet. The build
+    frozen for the fight stays in its row, so a rejoin restores it exactly
+    whatever happened to the sheet in between.
+    """
+    closed = fight.status != fight.OPEN or state["ended"]
     for key, row in state["participants"].items():
         obj = ObjectDB.objects.filter(pk=key).first()
-        if obj:
-            if state["ended"]:
-                marker = obj.attributes.get("build_lock", category="rp_combat")
-                if marker and marker.get("fight") == script.pk:
-                    obj.attributes.remove("build_lock", category="rp_combat")
-            else:
-                obj.attributes.add(
-                    "build_lock",
-                    {"fight": script.pk, "correction": row["correction"]},
-                    category="rp_combat",
-                )
+        if obj is None:
+            continue
+        marker = obj.attributes.get("build_lock", category="rp_combat")
+        if not closed and row["status"] == "active":
+            wanted = {"fight": fight.pk, "correction": row["correction"]}
+            if marker is None or dict(marker) != wanted:
+                obj.attributes.add("build_lock", wanted, category="rp_combat")
+        elif marker and marker.get("fight") == fight.pk:
+            obj.attributes.remove("build_lock", category="rp_combat")
+    for key in release:
+        obj = ObjectDB.objects.filter(pk=key).first()
+        marker = obj.attributes.get("build_lock", category="rp_combat") if obj else None
+        if marker and marker.get("fight") == fight.pk:
+            obj.attributes.remove("build_lock", category="rp_combat")
 
 
-def notify_membership(script, before, state, actor_id):
+def active_elsewhere(subject, fight_pk):
+    """True while the subject is active (sheet frozen) in another open fight."""
+    marker = subject.attributes.get("build_lock", category="rp_combat")
+    if not marker or marker.get("fight") == fight_pk:
+        return False
+    Fight = _fights()
+    other = Fight.objects.filter(pk=marker["fight"], status=Fight.OPEN).first()
+    row = other.state.get("participants", {}).get(str(subject.pk)) if other else None
+    return bool(row and row["status"] == "active")
+
+
+def notify_membership(fight, before, state, actor_id):
     """Publish the same post-commit seam for actions, maintenance and rollback."""
     from .signals import membership_changed
 
+    closed = fight.status != fight.OPEN
     for key in before["participants"].keys() | state["participants"].keys():
         old = before["participants"].get(key)
         row = state["participants"].get(key)
         status = "ended" if row is None or state["ended"] else row["status"]
         old_status = "ended" if old is None or before["ended"] else old["status"]
-        if status != old_status:
+        if status != old_status or (closed and status == "active"):
             transaction.on_commit(
                 lambda key=key, status=status: membership_changed.send_robust(
-                    sender=type(script),
+                    sender=type(fight),
                     character_id=int(key),
-                    fight_id=script.pk,
+                    fight_id=fight.pk,
                     status=status,
                     actor_id=actor_id,
                 )
             )
+
+
+def next_sequence(fight):
+    return (fight.entries.aggregate(top=Max("sequence"))["top"] or 0) + 1
+
+
+def commit(
+    fight,
+    before,
+    state,
+    *,
+    actor,
+    label,
+    operation_id,
+    result,
+    summary,
+    sequence,
+    announce_exchanges=True,
+    release=(),
+):
+    """Save state and append one journal entry; caller holds the row lock."""
+    from .models import FightEntry
+
+    notes = state.pop("notices", [])
+    if notes:
+        summary = f"{summary} {' '.join(notes)}"
+    FightEntry.objects.create(
+        fight=fight,
+        sequence=sequence,
+        operation=operation_id,
+        actor_id=getattr(actor, "pk", None),
+        label=plain(label, 500),
+        summary=summary,
+        before=before,
+        result=result,
+    )
+    if state["ended"] and fight.status == fight.OPEN:
+        fight.status, fight.closed_at = fight.ENDED, timezone.now()
+    fight.state = state
+    fight.save()
+    synchronize_locks(fight, state, release=release)
+    notify_membership(fight, before, state, getattr(actor, "pk", None))
+    room = fight.room
+    transaction.on_commit(lambda: emit(room, actor, summary))
+    if announce_exchanges:
+        for key, exchange in state["exchanges"].items():
+            prior = before["exchanges"].get(key)
+            if prior is None or prior["hit"] != exchange["hit"]:
+                text = render_declaration(state, exchange)
+                transaction.on_commit(lambda text=text: emit(room, actor, text))
+            old_count = len((prior or {}).get("outcomes", []))
+            if len(exchange["outcomes"]) > old_count:
+                text = render_outcomes(state, exchange, old_count)
+                transaction.on_commit(lambda text=text: emit(room, actor, text))
+    return summary
 
 
 def execute(
@@ -272,24 +390,27 @@ def execute(
     operation_id=None,
     storyteller=False,
     subject=None,
+    fight=None,
+    close=None,
 ):
     require(actor, progress=progressing)
     room = actor.location
-    script = coordinator(room)
+    Fight = _fights()
+    fight_pk = (fight or open_fight(room)).pk
     operation_id = operation_id or str(uuid.uuid4())
     with transaction.atomic():
-        ScriptDB.objects.select_for_update().get(pk=script.pk)
-        script.attributes.reset_cache()
-        state = clone(script.db.state)
-        validate_state(state)
-        journal, operations = clone(script.db.journal), clone(script.db.operations)
-        if operation_id in operations:
-            record = operations[operation_id]
-            if record["superseded"]:
+        fight = Fight.objects.select_for_update().get(pk=fight_pk)
+        prior = fight.entries.filter(operation=operation_id).first()
+        if prior is not None:
+            if prior.superseded:
                 raise CombatError("That operation was superseded by staff rollback.")
-            if record.get("actor") != actor.pk or record.get("label") != label:
+            if prior.actor_id != actor.pk or prior.label != plain(label, 500):
                 raise CombatError("That operation identifier belongs to a different request.")
-            return deepcopy(record["result"])
+            return deepcopy(prior.result)
+        if fight.status != Fight.OPEN or fight.room_id != room.pk:
+            raise CombatError("That fight is no longer open in this room.")
+        state = clone(fight.state)
+        validate_state(state)
         before = clone(state)
         # Acting from this room proves presence for the actor and for the
         # character it directs, so neither stays marked absent or goes idle.
@@ -315,59 +436,67 @@ def execute(
                 state["outcome"] = (
                     "Personal Turn Limits exhausted; assessment informs RP without imposing an outcome"
                 )
-        sequence = len(journal) + 1
+        if close:
+            fight.status, fight.closed_at = close, timezone.now()
+        sequence = next_sequence(fight)
         summary = f"{'Storyteller ' if storyteller else ''}{identity(actor)}: {plain(label, 500)} (sequence {sequence})."
-        journal.append(
-            {
-                "sequence": sequence,
-                "operation": operation_id,
-                "actor": actor.pk,
-                "at": datetime.now(UTC).isoformat(),
-                "summary": summary,
-                "before": before,
-                "superseded": False,
-            }
+        commit(
+            fight,
+            before,
+            state,
+            actor=actor,
+            label=label,
+            operation_id=operation_id,
+            result=result,
+            summary=summary,
+            sequence=sequence,
         )
-        operations[operation_id] = {
-            "sequence": sequence,
-            "result": result,
-            "superseded": False,
-            "actor": actor.pk,
-            "label": label,
-        }
-        script.db.state, script.db.journal, script.db.operations = state, journal, operations
-        synchronize_locks(script, state)
-        notify_membership(script, before, state, actor.pk)
-        transaction.on_commit(lambda: emit(room, actor, summary))
-        for key, exchange in state["exchanges"].items():
-            prior = before["exchanges"].get(key)
-            if prior is None or prior["hit"] != exchange["hit"]:
-                text = render_declaration(state, exchange)
-                transaction.on_commit(lambda text=text: emit(room, actor, text))
-            old_count = len(before["exchanges"].get(key, {}).get("outcomes", []))
-            if len(exchange["outcomes"]) > old_count:
-                text = render_outcomes(state, exchange, old_count)
-                transaction.on_commit(lambda text=text: emit(room, actor, text))
         return result
 
 
 def setup(actor, *, reason="", operation_id=None):
     require(actor, progress=True)
-    script = coordinator(actor.location, create=True)
+    Fight = _fights()
+    room = actor.location
+    with transaction.atomic():
+        ObjectDB.objects.select_for_update().get(pk=room.pk)
+        fight = Fight.objects.filter(room=room, status=Fight.OPEN).first()
+        replay = bool(operation_id and fight and fight.entries.filter(operation=operation_id))
+        if fight and fight.state.get("participants") and not replay:
+            raise CombatError("This room already has a fight. End or shelve it first.")
+        if fight is None:
+            # A fresh fight. An empty open fight (nobody joined) is reused.
+            fight = Fight.objects.create(room=room, state=engine.new_state(), label=plain(reason))
+        elif not replay:
+            fight.label = plain(reason)
+            fight.save(update_fields=["label", "updated_at"])
+        ensure_maintenance()
 
-    def operation(state):
-        if state["participants"] and not state["ended"]:
-            raise CombatError("This room already has an active fight.")
-        epoch = state["epoch"] + 1
-        state.clear()
-        state.update(engine.new_state())
-        state["epoch"] = epoch
-        state["imbalance"] = plain(reason)
-        return script.pk
+        def operation(state):
+            state["imbalance"] = plain(reason)
+            return fight.pk
 
-    return execute(
-        actor, f"set up combat. {reason}", operation, storyteller=True, operation_id=operation_id
-    )
+        return execute(
+            actor,
+            f"set up combat #{fight.pk}. {reason}",
+            operation,
+            storyteller=True,
+            operation_id=operation_id,
+            fight=fight,
+        )
+
+
+def quietly(fight, mutate):
+    """A small locked write that is not a mechanical transition or journaled."""
+    Fight = _fights()
+    with transaction.atomic():
+        fight = Fight.objects.select_for_update().get(pk=fight.pk)
+        state = clone(fight.state)
+        validate_state(state)
+        result = mutate(state)
+        fight.state = state
+        fight.save(update_fields=["state", "updated_at"])
+        return result
 
 
 def npc_build(subject, record):
@@ -408,20 +537,37 @@ def npc_policy(profile):
     return policy
 
 
-def join(actor, side, *, subject=None, boss=1, turn_limit=None, batch=False, operation_id=None):
+def paused_hint(state):
+    if state.get("pause_reason") == "reconciliation":
+        return "The fight is paused for reconciliation after a staff rollback; staff resume it."
+    return "The fight is paused. Once everyone is back, anyone may +combatstory/resume."
+
+
+def join(actor, side="", *, subject=None, boss=1, turn_limit=None, batch=False, operation_id=None):
     subject = subject or actor
     record = authorize(actor, subject, batch=batch)
-    build = npc_build(subject, record) if record else snapshot(subject)
+    fight = open_fight(actor.location)
+    retained = fight.state.get("participants", {}).get(str(subject.pk))
+    try:
+        build = npc_build(subject, record) if record else snapshot(subject)
+    except CombatError:
+        if retained is None:
+            raise
+        build = None  # A rejoin restores this fight's build; the sheet may be mid-edit.
+    cap = conf.get("RP_COMBAT_TURN_LIMIT") if turn_limit is None else turn_limit
+    name = (
+        f"{plain(subject.key)} (NPC, directed by {identity(actor)})"
+        if batch and record
+        else identity(subject)
+    )
 
     def operation(state):
-        other_lock = subject.attributes.get("build_lock", category="rp_combat")
-        if other_lock and other_lock.get("fight") != coordinator(actor.location).pk:
-            raise CombatError("That character is still enrolled in another fight.")
-        name = (
-            f"{plain(subject.key)} (NPC, directed by {identity(actor)})"
-            if batch and record
-            else identity(subject)
-        )
+        if active_elsewhere(subject, fight.pk):
+            raise CombatError(
+                "That character is active in another fight. Fade there first; "
+                "rejoining that fight later restores their place."
+            )
+        existing = state["participants"].get(str(subject.pk))
         row = engine.join(
             state,
             subject.pk,
@@ -429,24 +575,38 @@ def join(actor, side, *, subject=None, boss=1, turn_limit=None, batch=False, ope
             plain(side, 40),
             build,
             boss=boss,
-            turn_limit=conf.get("RP_COMBAT_TURN_LIMIT") if turn_limit is None else turn_limit,
+            turn_limit=cap,
             npc=bool(record),
         )
         row["last_activity"] = time.time()
-        if record:
-            if batch:
-                row["batch_controller"] = actor.pk
-            profile = getattr(record.blueprint, "combat_profile", None)
-            if profile:
-                row["policy"] = npc_policy(profile)
+        state["invitations"].pop(str(subject.pk), None)
+        if existing is None:
+            if record:
+                if batch:
+                    row["batch_controller"] = actor.pk
+                profile = getattr(record.blueprint, "combat_profile", None)
+                if profile:
+                    row["policy"] = npc_policy(profile)
+        elif build is not None and build.as_dict() != row["build"]:
+            notice(
+                state,
+                f"{row['name']}'s current sheet differs from the build frozen for this fight; "
+                "the fight's build is restored. +combat/unlock and /relock adopt the current "
+                "sheet if everyone agrees.",
+            )
+        if state["paused"]:
+            notice(state, paused_hint(state))
         return row["id"]
 
-    return execute(
-        actor,
-        f"{identity(subject)} explicitly joined side {plain(side, 40)}",
-        operation,
-        operation_id=operation_id,
-    )
+    if retained:
+        label = f"{identity(subject)} rejoined, restoring their retained place in this fight"
+    else:
+        label = (
+            f"{identity(subject)} explicitly joined side {plain(side, 40)} with "
+            f"{100 * boss} Vitality, personal Turn Limit {cap} and {boss} action(s) per turn"
+            + (f" (Boss Mode x{boss})" if boss != 1 else "")
+        )
+    return execute(actor, label, operation, operation_id=operation_id, subject=subject)
 
 
 def template(actor, blueprint, side, *, boss=1, turn_limit=None):
@@ -485,35 +645,56 @@ def auto_batch(actor, subjects):
     return "\n".join(lines)
 
 
-def invite(actor, target, side):
+def sides(state):
+    return sorted({p["side"] for p in state["participants"].values()})
+
+
+def invite(actor, target, side=""):
+    """A private invitation. The invitee chooses any side, or declines."""
     require(actor, progress=True)
-    script = coordinator(actor.location)
     if target.location != actor.location:
         raise CombatError("Invite a character in this room.")
-    with transaction.atomic():
-        ScriptDB.objects.select_for_update().get(pk=script.pk)
-        script.attributes.reset_cache()
-        invitations = clone(script.db.invitations)
-        invitations[str(target.pk)] = {"by": actor.pk, "side": plain(side, 40)}
-        script.db.invitations = invitations
-    target.msg(
-        f"{identity(actor)} invites you to combat on side {plain(side, 40)}. "
-        "Use +combat/join <side> to explicitly accept, or +combat/refuse. No attack has executed."
-    )
+    fight = open_fight(actor.location)
+
+    def mutate(state):
+        if str(target.pk) in state["participants"]:
+            raise CombatError(f"{identity(target)} is already in this fight.")
+        state["invitations"][str(target.pk)] = {
+            "by": actor.pk,
+            "by_name": identity(actor),
+            "side": plain(side, 40),
+        }
+        return sides(state)
+
+    present = quietly(fight, mutate)
+    suggestion = f", suggesting side {plain(side, 40)}" if side else ""
+    recipient = owner(target)
+    if recipient:
+        recipient.msg(
+            f"{identity(actor)} invites {identity(target)} to combat{suggestion}. "
+            f"Sides so far: {', '.join(present) or 'none yet'}. Use +combat/join <side> to "
+            "accept explicitly on any side, or +combat/refuse. No attack has executed."
+        )
     return (
         "Invitation sent; the attack has not been declared or paid. Declare again after acceptance."
     )
 
 
 def refuse(actor):
+    """Decline privately: only the inviter is told, and nothing is announced."""
     require(actor)
-    script = coordinator(actor.location)
-    with transaction.atomic():
-        ScriptDB.objects.select_for_update().get(pk=script.pk)
-        script.attributes.reset_cache()
-        invitations = clone(script.db.invitations)
-        invitations.pop(str(actor.pk), None)
-        script.db.invitations = invitations
+    fight = open_fight(actor.location)
+
+    def mutate(state):
+        invitation = state["invitations"].pop(str(actor.pk), None)
+        if invitation is None:
+            raise CombatError("You have no pending combat invitation here.")
+        return invitation["by"]
+
+    inviter = ObjectDB.objects.filter(pk=quietly(fight, mutate)).first()
+    recipient = owner(inviter) if inviter else None
+    if recipient:
+        recipient.msg(f"{identity(actor)} declined your combat invitation.")
     actor.msg("Invitation refused. No attack executes and no resources are spent.")
 
 
@@ -556,7 +737,7 @@ def declare(
     state = state_for(actor)
     for target in targets:
         if str(target.pk) not in state["participants"]:
-            return invite(actor, target, "opposition")
+            return invite(actor, target)
 
     def operation(state):
         for target in targets:
@@ -763,19 +944,153 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
     )
 
 
+REQUESTS = {
+    "vitality": "vitality",
+    "spirit": "spirit",
+    "condition": "condition",
+    "clearcondition": "clearcondition",
+    "requestcap": "cap",
+    "requestreturn": "return",
+}
+STORY_CONDITIONS = {
+    "grappled": 10,
+    "poisoned": 3,
+    "warded": 1,
+    "vulnerable": 20,
+    "endure": 1,
+    "slip_inside": 1,
+}
+
+
+def describe(request):
+    value, kind = request["value"], request["kind"]
+    text = {
+        "vitality": lambda: f"set your Vitality to {value}",
+        "spirit": lambda: f"set your Spirit to {value / 100:.2f}",
+        "condition": lambda: f"apply {value}",
+        "clearcondition": lambda: f"clear {value}",
+        "cap": lambda: f"lower your personal Turn Limit to {value}",
+        "return": lambda: f"return you to the fight at {value} Vitality",
+        "end": lambda: "end the fight",
+    }[kind]()
+    reason = f" ({request['reason']})" if request.get("reason") else ""
+    return f"{request['by_name']} proposes to {text}{reason}"
+
+
+def end_fight(state, reason):
+    if any(p["incoming"] or p["outgoing"] for p in state["participants"].values()):
+        raise CombatError("Clear pending exchanges before ending combat.")
+    state["ended"] = True
+    state["outcome"] = plain(reason) or "Ended by agreement; no narrative outcome imposed"
+    state["end_proposal"] = None
+    for row in state["participants"].values():
+        row["requests"] = [r for r in row["requests"] if r["kind"] != "end"]
+
+
+def apply_request(state, row, request, *, fight_pk):
+    """Apply an accepted storyteller change (or one to a directed NPC)."""
+    kind, value = request["kind"], request["value"]
+    if kind == "vitality":
+        if value > 0 and (
+            row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
+        ):
+            raise CombatError("Use requestreturn; the participant must accept their return.")
+        row["hp"] = math_clamp(0, row["max_hp"], value)
+        if row["hp"] == 0:
+            row["return_required"] = True
+    elif kind == "spirit":
+        row["spirit"] = math_clamp(-1000, 2000, value)
+    elif kind == "condition":
+        if value not in STORY_CONDITIONS:
+            raise CombatError("Choose a supported named condition.")
+        # The participant agreed to it, so a Ward does not absorb it.
+        engine.condition(row, value, STORY_CONDITIONS[value], 2, wardable=False)
+    elif kind == "clearcondition":
+        row["conditions"].pop(value, None)
+    elif kind == "cap":
+        if type(value) is not int or not max(1, row["turns"]) <= value <= row["turn_limit"]:
+            raise CombatError(
+                "Choose a lower personal Turn Limit within the participant's used/current caps."
+            )
+        engine.reduce_cap(state, row["id"], value)
+    elif kind == "return":
+        if state["ended"] or not (
+            row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
+        ):
+            raise CombatError(
+                "Return applies to an incapacitated or withdrawn participant in an ongoing fight."
+            )
+        if type(value) is not int or not 1 <= value <= row["max_hp"]:
+            raise CombatError("Choose return Vitality from 1 to the participant's maximum.")
+        if row["incoming"] or row["outgoing"]:
+            raise CombatError("Clear pending exchanges before returning.")
+        subject = ObjectDB.objects.filter(pk=row["id"]).first()
+        if subject is not None and active_elsewhere(subject, fight_pk):
+            raise CombatError("That character is active in another fight. Fade there first.")
+        # Restored Vitality is new exposure: returning never erases prior
+        # assessment loss or resets personal progress/resources.
+        prior_hp = row.get("faded_hp", row["hp"])
+        row["exposure"] += value - prior_hp
+        row["hp"], row["status"] = value, "active"
+        for key in ("faded_hp", "absent", "return_required"):
+            row.pop(key, None)
+    elif kind == "end":
+        proposal = state["end_proposal"]
+        if not proposal or proposal["id"] != value:
+            raise CombatError("That end proposal is no longer open.")
+        proposal["pending"] = [key for key in proposal["pending"] if key != row["id"]]
+        if not proposal["pending"]:
+            end_fight(state, proposal["reason"])
+    else:
+        raise CombatError("Unknown storyteller request.")
+
+
+def pending_request(row, argument):
+    requests = row["requests"]
+    if not requests:
+        raise CombatError("You have no pending storyteller requests.")
+    if not argument:
+        if len(requests) > 1:
+            raise CombatError(
+                "Several requests are pending; name one: "
+                + ", ".join(str(r["id"]) for r in requests)
+                + "."
+            )
+        return requests[0]
+    try:
+        number = int(str(argument).strip())
+    except ValueError:
+        raise CombatError("Name a request by its number, as +combat shows it.") from None
+    for request in requests:
+        if request["id"] == number:
+            return request
+    raise CombatError("No pending request has that number.")
+
+
+def withdraw_end_proposal(state):
+    state["end_proposal"] = None
+    for row in state["participants"].values():
+        row["requests"] = [r for r in row["requests"] if r["kind"] != "end"]
+
+
 def control(
     actor, operation, *, subject=None, argument=None, reason="", rng=None, operation_id=None
 ):
     subject = subject or actor
-    cleanup = operation in ("cancel", "fade", "withdraw", "posed")
+    cleanup = operation in ("cancel", "fade", "withdraw", "posed", "decline")
     authorize(actor, subject, cleanup=cleanup)
+    fight_pk = open_fight(actor.location).pk
 
     def change(state):
         row = engine.participant(state, subject.pk)
         if operation == "cancel":
             engine.cancel(state, subject.pk, argument)
         elif operation in ("fade", "withdraw"):
+            was_paused = state["paused"]
             engine.fade(state, subject.pk, withdraw=operation == "withdraw")
+            notice(state, f"{row['name']}'s sheet is released until they rejoin.")
+            if state["paused"] and not was_paused:
+                notice(state, "Nobody is active, so the fight is paused. " + paused_hint(state))
         elif operation == "posed":
             row["pose"] = False
         elif operation == "auto":
@@ -810,28 +1125,20 @@ def control(
             run_automatic(state, actor.location)
         elif operation == "cap":
             engine.reduce_cap(state, subject.pk, argument)
-        elif operation == "acceptcap":
-            if row["cap_request"] is None:
-                raise CombatError("No pending Turn Limit request.")
-            engine.reduce_cap(state, subject.pk, row["cap_request"])
-        elif operation == "refusecap":
-            row["cap_request"] = None
-        elif operation == "acceptreturn":
-            if state["ended"] or row.get("return_request") is None:
-                raise CombatError("No pending return request in an ongoing fight.")
-            if row["incoming"] or row["outgoing"]:
-                raise CombatError("Clear pending exchanges before accepting a return.")
-            # Treat restored Vitality as new exposure: returning never erases
-            # prior assessment loss or resets personal progress/resources.
-            prior_hp = row.get("faded_hp", row["hp"])
-            restored = row.pop("return_request")
-            row["exposure"] += restored - prior_hp
-            row["hp"], row["status"] = restored, "active"
-            row.pop("faded_hp", None)
-            row.pop("absent", None)
-            row.pop("return_required", None)
-        elif operation == "refusereturn":
-            row.pop("return_request", None)
+        elif operation in ("accept", "decline"):
+            request = pending_request(row, argument)
+            row["requests"].remove(request)
+            if operation == "accept":
+                apply_request(state, row, request, fight_pk=fight_pk)
+                notice(
+                    state, f"{row['name']} accepted request {request['id']}: {describe(request)}."
+                )
+            else:
+                if request["kind"] == "end":
+                    withdraw_end_proposal(state)
+                notice(
+                    state, f"{row['name']} declined request {request['id']}: {describe(request)}."
+                )
         else:
             raise CombatError("Unknown combat control.")
         return operation
@@ -844,6 +1151,329 @@ def control(
         operation_id=operation_id,
         subject=subject,
     )
+
+
+def propose_end(state, actor, reason):
+    """Ending needs every present, active player character's agreement."""
+    if any(p["incoming"] or p["outgoing"] for p in state["participants"].values()):
+        raise CombatError("Clear pending exchanges before ending combat.")
+    if state["end_proposal"]:
+        raise CombatError("An end proposal is already waiting for answers.")
+    voters = [
+        p
+        for p in state["participants"].values()
+        if not p["npc"]
+        and p["status"] == "active"
+        and not p.get("absent")
+        and p["id"] != str(actor.pk)
+    ]
+    if not voters:
+        end_fight(state, reason)
+        return
+    number = state["next_request"]
+    state["next_request"] += 1
+    state["end_proposal"] = {
+        "id": number,
+        "pending": [p["id"] for p in voters],
+        "reason": plain(reason),
+    }
+    for p in voters:
+        p["requests"].append(
+            {
+                "id": number,
+                "kind": "end",
+                "value": number,
+                "by": actor.pk,
+                "by_name": identity(actor),
+                "reason": plain(reason),
+            }
+        )
+    notice(
+        state,
+        f"Ending needs agreement from {', '.join(p['name'] for p in voters)}: "
+        f"+combat/accept {number} or /decline {number}.",
+    )
+
+
+def storyteller(actor, operation, *, target=None, value=None, reason="", operation_id=None):
+    """Open to everyone and publicly attributed. Changes to another player's
+    character wait for that player's acceptance; NPCs you may direct change
+    immediately; ending needs the present players' agreement."""
+    if operation == "boss":
+        raise CombatError(
+            "Set Boss Mode when joining; live reconfiguration and Boss Checks are not in 0.1."
+        )
+    if operation == "shelve":
+        return shelve(actor, reason, operation_id=operation_id)
+    is_staff = staff(actor)
+    fight_pk = open_fight(actor.location).pk
+
+    def change(state):
+        row = engine.participant(state, target.pk) if target else None
+        if operation == "pause":
+            if not state["paused"]:
+                state["paused"], state["pause_reason"] = True, "storyteller"
+        elif operation == "resume":
+            if not state["paused"]:
+                raise CombatError("This fight is not paused.")
+            if state.get("pause_reason") == "reconciliation" and not is_staff:
+                raise CombatError(paused_hint(state))
+            state["paused"], state["pause_reason"] = False, ""
+            run_automatic(state, actor.location)
+        elif operation == "end":
+            propose_end(state, actor, reason)
+        elif operation == "imbalance":
+            state["imbalance"] = plain(reason)
+        elif operation in REQUESTS and row:
+            request = {
+                "kind": REQUESTS[operation],
+                "value": value,
+                "by": actor.pk,
+                "by_name": identity(actor),
+                "reason": plain(reason),
+            }
+            if row["npc"]:
+                authorize(actor, target, batch=True)
+                apply_request(state, row, request, fight_pk=fight_pk)
+            else:
+                # Validate now, so a request that could never apply is refused.
+                trial = clone(state)
+                apply_request(trial, trial["participants"][row["id"]], request, fight_pk=fight_pk)
+                request["id"] = state["next_request"]
+                state["next_request"] += 1
+                row["requests"].append(request)
+                notice(
+                    state,
+                    f"{row['name']} may +combat/accept {request['id']} or /decline {request['id']}.",
+                )
+        else:
+            raise CombatError("Unknown storyteller operation or missing target.")
+        return operation
+
+    return execute(
+        actor,
+        f"{operation} {identity(target) if target else ''} {plain(value if value is not None else '')}. {plain(reason)}",
+        change,
+        progressing=operation not in ("pause", "end"),
+        storyteller=True,
+        operation_id=operation_id,
+    )
+
+
+def math_clamp(low, high, value):
+    if type(value) is not int:
+        raise CombatError("Supply a whole resource value.")
+    return max(low, min(high, value))
+
+
+def release_pending(state, row):
+    """Cancel only what has not executed for this participant.
+
+    Unaccepted incoming packets and unaccepted targets of its own outgoing
+    exchange are canceled with refunds, and an open Burst is closed. An
+    accepted reaction stays committed until its peers answer.
+    """
+    for token in list(row["incoming"]):
+        exchange = engine.get_exchange(state, token)
+        if row["id"] not in exchange["reactions"]:
+            engine.cancel(state, row["id"], token)
+    if row["outgoing"]:
+        exchange = state["exchanges"][row["outgoing"]]
+        if exchange["phase"] == "press":
+            engine.finish_exchange(state, exchange)
+        elif exchange["phase"] == "waiting":
+            token = f"{exchange['id']}:{exchange['hit']}"
+            for target in exchange["targets"]:
+                if target not in exchange["reactions"] and target not in exchange["canceled"]:
+                    engine.cancel(state, target, token)
+
+
+def shelve_state(state):
+    for row in state["participants"].values():
+        release_pending(state, row)
+    for row in state["participants"].values():
+        if row["status"] == "active":
+            engine.fade(state, row["id"])
+            row.pop("absent", None)
+    state["paused"], state["pause_reason"] = True, "faded"
+    state["end_proposal"] = None
+    for row in state["participants"].values():
+        row["requests"] = [r for r in row["requests"] if r["kind"] != "end"]
+
+
+def shelve(actor, reason="", *, operation_id=None):
+    """Set a fight aside: everyone Fades with their place retained, sheets
+    unlock, and the room is free. Nothing executed is undone."""
+    Fight = _fights()
+
+    def change(state):
+        if state["ended"]:
+            raise CombatError("This fight has ended.")
+        shelve_state(state)
+        notice(
+            state,
+            "Unaccepted packets were canceled with refunds. Anyone in it can later "
+            "+combatstory/unshelve this fight and each participant rejoins with +combat/join.",
+        )
+        return "shelved"
+
+    fight = open_fight(actor.location)
+    with transaction.atomic():
+        result = execute(
+            actor,
+            f"shelved fight #{fight.pk}. {plain(reason)}",
+            change,
+            progressing=False,
+            storyteller=True,
+            operation_id=operation_id,
+            fight=fight,
+            close=Fight.SHELVED,
+        )
+        if plain(reason).strip():
+            # The reason names the fight in +combatstory/shelved listings.
+            Fight.objects.filter(pk=fight.pk).update(label=plain(reason))
+        return result
+
+
+def visible_shelved(actor):
+    """Shelved fights the actor took part in, or that were set aside here."""
+    Fight = _fights()
+    return [
+        fight
+        for fight in Fight.objects.filter(status=Fight.SHELVED).order_by("-updated_at")
+        if str(actor.pk) in fight.state.get("participants", {})
+        or fight.room_id == getattr(actor.location, "pk", None)
+    ]
+
+
+def shelved(actor):
+    require(actor)
+    lines = [
+        f"#{fight.pk}: {plain(fight.label) or 'untitled'}; "
+        + ", ".join(p["name"] for p in fight.state.get("participants", {}).values())
+        + f"; shelved {fight.closed_at:%Y-%m-%d}."
+        for fight in visible_shelved(actor)[:20]
+    ]
+    return "\n".join(lines) or "No shelved fights involve you or this room."
+
+
+def unshelve(actor, number, *, operation_id=None):
+    require(actor, progress=True)
+    Fight = _fights()
+    room = actor.location
+    with transaction.atomic():
+        ObjectDB.objects.select_for_update().get(pk=room.pk)
+        if Fight.objects.filter(room=room, status=Fight.OPEN).exists():
+            raise CombatError("This room already has a fight. End or shelve it first.")
+        fight = next((f for f in visible_shelved(actor) if f.pk == number), None)
+        if fight is None:
+            raise CombatError("No shelved fight with that number involves you or this room.")
+        fight = Fight.objects.select_for_update().get(pk=fight.pk)
+        fight.status, fight.room, fight.closed_at = Fight.OPEN, room, None
+        fight.save()
+        ensure_maintenance()
+
+        def operation(state):
+            notice(state, "Each participant rejoins with +combat/join. " + paused_hint(state))
+            return fight.pk
+
+        return execute(
+            actor,
+            f"brought shelved fight #{fight.pk} here",
+            operation,
+            storyteller=True,
+            operation_id=operation_id,
+            fight=fight,
+        )
+
+
+def rollback(actor, sequence, reason):
+    require(actor)
+    if not staff(actor):
+        raise CombatError("Only staff may roll back accepted or resolved combat.")
+    if not plain(reason).strip():
+        raise CombatError("Staff rollback requires a visible reason.")
+    Fight = _fights()
+    fight = current_fight(actor.location)
+    with transaction.atomic():
+        fight = Fight.objects.select_for_update().get(pk=fight.pk)
+        if fight.status == Fight.ENDED and Fight.objects.filter(
+            room=actor.location, status=Fight.OPEN
+        ).exclude(pk=fight.pk):
+            raise CombatError("Another fight is open here; end or shelve it before rolling back.")
+        checkpoint = fight.entries.filter(sequence=sequence, superseded=False).first()
+        if checkpoint is None or checkpoint.before is None:
+            raise CombatError("Choose a retained, unsuperseded sequence.")
+        current = clone(fight.state)
+        restored = clone(checkpoint.before)
+        restored["epoch"] = current["epoch"] + 1
+        # Re-key pending exchange tokens. Old commands cannot act on restored
+        # state, even if their original exchange number still exists.
+        remap = {key: f"{restored['epoch']}.{key.split('.')[-1]}" for key in restored["exchanges"]}
+        restored["exchanges"] = {
+            remap[key]: {**ex, "id": remap[key]} for key, ex in restored["exchanges"].items()
+        }
+        for row in restored["participants"].values():
+            row["incoming"] = [
+                f"{remap[t.split(':')[0]]}:{t.split(':')[1]}" for t in row["incoming"]
+            ]
+            row["outgoing"] = remap.get(row["outgoing"])
+        reconciliation = []
+        for key, row in restored["participants"].items():
+            if row["status"] != "active":
+                continue  # Faded rows restore their own frozen build on rejoin.
+            subject = ObjectDB.objects.filter(pk=key).first()
+            try:
+                live = (
+                    npc_build(subject, npc_record(subject))
+                    if subject and row["npc"]
+                    else snapshot(subject)
+                    if subject
+                    else None
+                )
+                if live is None or live.as_dict() != row["build"]:
+                    reconciliation.append(row["name"])
+            except (CombatError, ValueError):
+                reconciliation.append(row["name"])
+        if reconciliation:
+            restored["paused"], restored["pause_reason"] = True, "reconciliation"
+        fight.entries.filter(sequence__gte=sequence).update(superseded=True)
+        fight.status, fight.closed_at = Fight.OPEN, None
+        summary = (
+            f"Staff {identity(actor)} rolled the whole fight back before sequence {sequence}: "
+            f"{plain(reason)}. Pending tokens changed."
+        )
+        if reconciliation:
+            summary += (
+                " Fight paused: reconcile external build changes/deletions for "
+                + ", ".join(reconciliation)
+                + "."
+            )
+        removed = [key for key in current["participants"] if key not in restored["participants"]]
+        commit(
+            fight,
+            current,
+            restored,
+            actor=actor,
+            label=summary,
+            operation_id=str(uuid.uuid4()),
+            result="rollback",
+            summary=summary,
+            sequence=next_sequence(fight),
+            announce_exchanges=False,
+            release=removed,
+        )
+
+
+def journal(actor, *, limit=40):
+    require(actor)
+    fight = current_fight(actor.location)
+    entries = list(fight.entries.order_by("-sequence")[:limit])[::-1]
+    lines = [
+        f"{entry.sequence}: {'superseded; ' if entry.superseded else ''}{entry.summary}"
+        for entry in entries
+    ]
+    return "\n".join(lines) or "No recorded transitions."
 
 
 def read(actor, token, domain, *, subject=None, operation_id=None):
@@ -878,189 +1508,6 @@ def read(actor, token, domain, *, subject=None, operation_id=None):
         operation_id=operation_id,
         subject=subject,
     )
-
-
-def storyteller(actor, operation, *, target=None, value=None, reason="", operation_id=None):
-    """Culturally open interventions; PC enrollment/cap acceptance stay personal."""
-    if operation == "boss":
-        raise CombatError(
-            "Set Boss Mode when joining; live reconfiguration and Boss Checks are not in 0.1."
-        )
-
-    def change(state):
-        row = engine.participant(state, target.pk) if target else None
-        if row and row["npc"]:
-            authorize(actor, target, batch=True)
-        if operation == "pause":
-            state["paused"] = True
-        elif operation == "resume":
-            state["paused"] = False
-            run_automatic(state, actor.location)
-        elif operation == "end":
-            if any(p["incoming"] or p["outgoing"] for p in state["participants"].values()):
-                raise CombatError("Clear pending exchanges before ending combat.")
-            state["ended"] = True
-            state["outcome"] = plain(reason) or "Ended by agreement; no narrative outcome imposed"
-        elif operation == "imbalance":
-            state["imbalance"] = plain(reason)
-        elif operation == "vitality" and row:
-            if value > 0 and (
-                row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
-            ):
-                raise CombatError("Use requestreturn; the participant must accept their return.")
-            row["hp"] = math_clamp(0, row["max_hp"], value)
-            if row["hp"] == 0:
-                row["return_required"] = True
-        elif operation == "spirit" and row:
-            row["spirit"] = math_clamp(-1000, 2000, value)
-        elif operation == "requestcap" and row:
-            if type(value) is not int or not max(1, row["turns"]) <= value <= row["turn_limit"]:
-                raise CombatError(
-                    "Choose a lower personal Turn Limit within the participant's used/current caps."
-                )
-            row["cap_request"] = value
-        elif operation == "requestreturn" and row:
-            if state["ended"] or not (
-                row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
-            ):
-                raise CombatError(
-                    "Request return for an incapacitated or withdrawn participant in an ongoing fight."
-                )
-            if type(value) is not int or not 1 <= value <= row["max_hp"]:
-                raise CombatError("Choose return Vitality from 1 to the participant's maximum.")
-            row["return_request"] = value
-        elif operation == "condition" and row:
-            if value not in (
-                "grappled",
-                "poisoned",
-                "warded",
-                "vulnerable",
-                "endure",
-                "slip_inside",
-            ):
-                raise CombatError("Choose a supported named condition.")
-            engine.condition(
-                row,
-                value,
-                3
-                if value == "poisoned"
-                else 20
-                if value == "vulnerable"
-                else 10
-                if value == "grappled"
-                else 1,
-                2,
-            )
-        elif operation == "clearcondition" and row:
-            row["conditions"].pop(value, None)
-        else:
-            raise CombatError("Unknown storyteller operation or missing target.")
-        return operation
-
-    return execute(
-        actor,
-        f"{operation} {identity(target) if target else ''} {plain(value or '')}. {plain(reason)}",
-        change,
-        progressing=operation not in ("pause", "end"),
-        storyteller=True,
-        operation_id=operation_id,
-    )
-
-
-def math_clamp(low, high, value):
-    if type(value) is not int:
-        raise CombatError("Supply a whole resource value.")
-    return max(low, min(high, value))
-
-
-def rollback(actor, sequence, reason):
-    require(actor)
-    if not staff(actor):
-        raise CombatError("Only staff may roll back accepted or resolved combat.")
-    if not plain(reason).strip():
-        raise CombatError("Staff rollback requires a visible reason.")
-    script = coordinator(actor.location)
-    with transaction.atomic():
-        ScriptDB.objects.select_for_update().get(pk=script.pk)
-        script.attributes.reset_cache()
-        journal, operations = clone(script.db.journal), clone(script.db.operations)
-        checkpoint = next(
-            (item for item in journal if item["sequence"] == sequence and not item["superseded"]),
-            None,
-        )
-        if checkpoint is None:
-            raise CombatError("Choose a retained, unsuperseded sequence.")
-        current = clone(script.db.state)
-        restored = clone(checkpoint["before"])
-        restored["epoch"] = current["epoch"] + 1
-        # Re-key pending exchange tokens. Old commands cannot act on restored
-        # state, even if their original exchange number still exists.
-        remap = {key: f"{restored['epoch']}.{key.split('.')[-1]}" for key in restored["exchanges"]}
-        restored["exchanges"] = {
-            remap[key]: {**ex, "id": remap[key]} for key, ex in restored["exchanges"].items()
-        }
-        for row in restored["participants"].values():
-            row["incoming"] = [
-                f"{remap[t.split(':')[0]]}:{t.split(':')[1]}" for t in row["incoming"]
-            ]
-            row["outgoing"] = remap.get(row["outgoing"])
-        reconciliation = []
-        for key, row in restored["participants"].items():
-            subject = ObjectDB.objects.filter(pk=key).first()
-            try:
-                live = (
-                    npc_build(subject, npc_record(subject))
-                    if subject and row["npc"]
-                    else snapshot(subject)
-                    if subject
-                    else None
-                )
-                if live is None or live.as_dict() != row["build"]:
-                    reconciliation.append(row["name"])
-            except (CombatError, ValueError):
-                reconciliation.append(row["name"])
-        if reconciliation:
-            restored["paused"] = True
-        for item in journal:
-            if item["sequence"] >= sequence:
-                item["superseded"] = True
-                operations[item["operation"]]["superseded"] = True
-        # Remove locks for participants introduced after the checkpoint.
-        removed = {
-            k: p for k, p in current["participants"].items() if k not in restored["participants"]
-        }
-        synchronize_locks(script, {"participants": removed, "ended": True})
-        script.db.state, script.db.journal, script.db.operations = restored, journal, operations
-        synchronize_locks(script, restored)
-        summary = f"Staff {identity(actor)} rolled the whole fight back before sequence {sequence}: {plain(reason)}. Pending tokens changed."
-        if reconciliation:
-            summary += (
-                " Fight paused: reconcile external build changes/deletions for "
-                + ", ".join(reconciliation)
-                + "."
-            )
-        operation_id = str(uuid.uuid4())
-        journal.append(
-            {
-                "sequence": len(journal) + 1,
-                "operation": operation_id,
-                "actor": actor.pk,
-                "at": datetime.now(UTC).isoformat(),
-                "summary": summary,
-                "before": current,
-                "superseded": False,
-            }
-        )
-        operations[operation_id] = {
-            "sequence": len(journal),
-            "result": "rollback",
-            "superseded": False,
-            "actor": actor.pk,
-            "label": summary,
-        }
-        script.db.journal, script.db.operations = journal, operations
-        notify_membership(script, current, restored, actor.pk)
-        transaction.on_commit(lambda: emit(actor.location, actor, summary))
 
 
 def render_declaration(state, exchange):
@@ -1128,13 +1575,23 @@ def render(actor, *, subject=None):
         f"Combat: {'ended' if state['ended'] else 'paused' if state['paused'] else 'active'}. "
         f"Personal turns; no global rounds. {plain(state['imbalance'])}"
     ]
+    if state["paused"] and not state["ended"]:
+        lines.append(paused_hint(state))
     for row in state["participants"].values():
         lines.append(
             f"{row['name']} [{row['side']}]: {row['hp']}/{row['max_hp']} Vitality; "
             f"turns {row['turns']}/{row['turn_limit']}, allowance {row['actions_left']}; {row['status']}; "
             f"{'acted' if row['clock'] else 'has not acted'}; incoming {len(row['incoming'])}."
         )
-    own = state["participants"].get(str((subject or actor).pk))
+    key = str((subject or actor).pk)
+    own = state["participants"].get(key)
+    invitation = state.get("invitations", {}).get(key)
+    if invitation and not own:
+        suggestion = f", suggesting side {invitation['side']}" if invitation["side"] else ""
+        lines.append(
+            f"Invitation from {invitation['by_name']}{suggestion}. Sides: "
+            f"{', '.join(sides(state)) or 'none yet'}. +combat/join <side> or +combat/refuse."
+        )
     if own:
         if subject and subject != actor:
             authorize(actor, subject, cleanup=True)
@@ -1144,13 +1601,10 @@ def render(actor, *, subject=None):
             f"Auto-Resolve {'on' if own['auto'] else 'off'}; pose {'owed' if own['pose'] else 'clear'}; "
             f"build {'unlocked for correction' if own['correction'] else 'frozen'}."
         )
-        if own["cap_request"]:
+        for request in own["requests"]:
             lines.append(
-                f"Requested personal Turn Limit {own['cap_request']}: +combat/acceptcap or /refusecap."
-            )
-        if own.get("return_request") is not None:
-            lines.append(
-                f"Requested return at {own['return_request']} Vitality: +combat/acceptreturn or /refusereturn."
+                f"Request {request['id']}: {describe(request)}. "
+                f"+combat/accept {request['id']} or /decline {request['id']}."
             )
         for information in own.get("information", {}).values():
             traits = ", ".join(f"{key}: {tag}" for key, tag in information["traits"]) or "none"

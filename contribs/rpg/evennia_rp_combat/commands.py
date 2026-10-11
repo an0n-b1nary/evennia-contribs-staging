@@ -18,8 +18,9 @@ class CmdCombat(MuxCommand):
     +combat                     Public pace and your private queue/resources
     +combat/setup [reason]       Storyteller setup (available to everyone)
     +combat/join side[=boss,cap]  Explicit acceptance; defaults boss 1, cap 4
-    +combat/invite name=side     Invite; never enroll another PC
-    +combat/refuse               Decline an invitation without penalty
+    +combat/join                 Rejoin after Fade, restoring your place
+    +combat/invite name[=side]   Private invitation; never enroll another PC
+    +combat/refuse               Decline an invitation privately, no penalty
     +combat/attack names=move[;rps=bet;domain=key;burst;empower]
     +combat/spell names=move     The same options as Attack
     +combat/assist name[=move]   Another ally; special move may Heal
@@ -34,20 +35,23 @@ class CmdCombat(MuxCommand):
     +combat/press [empower]      Press an open Burst (maximum three hits)
     +combat/stop                 End an open Burst
     +combat/posed                Acknowledge your own RP; grants no RP/XP
-    +combat/fade                 Neutral absence; /join restores your state
+    +combat/fade                 Step out; releases your sheet, /join restores
     +combat/withdraw             Leave accounting remaining Vitality as lost
-    +combat/acceptreturn|refusereturn  Answer a storyteller's return request
+    +combat/accept [n]           Accept a storyteller request shown by +combat
+    +combat/decline [n]          Decline it (Vitality, Spirit, conditions,
+                                 cap, return or ending the fight)
     +combat/unlock [reason]      Announced correction, clear queues first
     +combat/relock [reason]      Validate and freeze a corrected build
     +combat/cap number           Voluntarily reduce your personal Turn Limit
-    +combat/acceptcap|refusecap   Respond to a storyteller's request
     +combat/unignore character   Remove account-wide ignore, including alts
     +combat/rollback seq=reason  Staff only, whole-fight consistent checkpoint
     +combat/journal              Public sequence summaries for recovery
     +combat/result exchange      Recover committed results after reconnect
 
-    Add /npc to direct your currently controlled NPC, e.g. /npc/act. Your PC
-    remains separate. Automatic reactions close cancellation on acceptance.
+    +combat acts only as your own character (or, with /npc, as the NPC you
+    control). Storyteller actions live in +combatstory. Add /npc to direct
+    your currently controlled NPC, e.g. /npc/act. Your PC remains separate.
+    Automatic reactions close cancellation on acceptance.
     RPS bets: reaching, penetrating, subtle. No action timer or global rounds.
     """
 
@@ -102,7 +106,7 @@ class CmdCombat(MuxCommand):
         elif operation == "invite":
             target = self.target(self.lhs)
             if target:
-                self.msg(services.invite(self.caller, target, self.rhs or "opposition"))
+                self.msg(services.invite(self.caller, target, (self.rhs or "").strip()))
         elif operation == "refuse":
             services.refuse(self.caller)
         elif operation in ("attack", "spell", "assist", "dispirit", "improv"):
@@ -171,15 +175,7 @@ class CmdCombat(MuxCommand):
         elif operation == "rollback":
             services.rollback(self.caller, int(self.lhs), self.rhs or "")
         elif operation == "journal":
-            services.require(self.caller)
-            script = services.coordinator(self.caller.location)
-            self.msg(
-                "\n".join(
-                    f"{row['sequence']}: {'superseded; ' if row['superseded'] else ''}{row['summary']}"
-                    for row in script.db.journal
-                )
-                or "No recorded transitions."
-            )
+            self.msg(services.journal(self.caller))
         elif operation == "result":
             self.msg(services.result(self.caller, self.args.strip()))
         elif operation in (
@@ -193,10 +189,8 @@ class CmdCombat(MuxCommand):
             "unlock",
             "relock",
             "cap",
-            "acceptcap",
-            "refusecap",
-            "acceptreturn",
-            "refusereturn",
+            "accept",
+            "decline",
         ):
             argument = int(self.args) if operation == "cap" else self.args.strip()
             services.control(
@@ -213,12 +207,16 @@ class CmdCombat(MuxCommand):
 class CmdCombatStory(MuxCommand):
     """Publicly attributed storyteller controls, available to ordinary players.
 
-    +combatstory/pause|resume|end [reason]
+    +combatstory/pause|resume [reason]  Anyone may pause at any time
+    +combatstory/end [reason]           Ends once present players accept
+    +combatstory/shelve [reason]        Set the fight aside; everyone Fades
+    +combatstory/shelved                Shelved fights you or this room had
+    +combatstory/unshelve number        Bring one back here; players rejoin
     +combatstory/imbalance description
     +combatstory/vitality name=value[;reason]   Story damage/healing
     +combatstory/spirit name=value[;reason]     Spirit displayed as decimal
-    +combatstory/requestcap name=cap[;reason]   Player accepts or refuses
-    +combatstory/requestreturn name=Vitality[;reason] Consent to return
+    +combatstory/requestcap name=cap[;reason]   Lower a personal Turn Limit
+    +combatstory/requestreturn name=Vitality[;reason] Return to the fight
     +combatstory/condition name=condition[;reason]
     +combatstory/clearcondition name=condition[;reason]
     +combatstory/template blueprint=side[,boss,cap] Spawn an allowed template
@@ -227,8 +225,10 @@ class CmdCombatStory(MuxCommand):
     +combatstory/auto name=on|off                  NPC reactions only
     +combatstory/act names                         One action per allowed NPC
 
-    Everyone can tell a story. These commands never enroll unwilling PCs or
-    grant NPC permissions. Staff rollback remains +combat/rollback.
+    Everyone can tell a story. A change to another player's character is a
+    request they +combat/accept or /decline; NPCs you may direct change at
+    once. These commands never enroll unwilling PCs or grant NPC
+    permissions. Staff rollback remains +combat/rollback.
     """
 
     key = "+combatstory"
@@ -241,6 +241,12 @@ class CmdCombatStory(MuxCommand):
                 raise CombatError("Choose one storyteller switch. See help +combatstory.")
             operation = self.switches[0]
             target, value, reason = None, None, self.args.strip()
+            if operation == "shelved":
+                self.msg(services.shelved(self.caller))
+                return
+            if operation == "unshelve":
+                services.unshelve(self.caller, int(self.args.strip().lstrip("#")))
+                return
             if operation in ("template", "enrollnpc", "removenpc", "auto", "act"):
                 from django.apps import apps
 
