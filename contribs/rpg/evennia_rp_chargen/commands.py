@@ -29,6 +29,7 @@ from evennia.utils.utils import inherits_from
 from evennia_rp_chargen import abilities, conf, locks, services
 from evennia_rp_chargen.catalog import split_ability_text
 from evennia_rp_chargen.models import AbilityDefinition, CharacterBuild, TagDefinition
+from evennia_rp_chargen.move_commands import CmdMoves
 from evennia_rp_chargen.services import ChargenError
 from evennia_rp_chargen.sheet import ability_lines, render_sheet, stat_lines
 
@@ -632,6 +633,7 @@ class ChargenCmdSet(CmdSet):
             CmdSpend,
             CmdUpgrade,
             CmdChargen,
+            CmdMoves,
         ):
             self.add(cmd())
 
@@ -641,6 +643,7 @@ __all__ = [
     "CmdAbilities",
     "CmdChargen",
     "CmdLock",
+    "CmdMoves",
     "CmdPips",
     "CmdSheet",
     "CmdSpend",

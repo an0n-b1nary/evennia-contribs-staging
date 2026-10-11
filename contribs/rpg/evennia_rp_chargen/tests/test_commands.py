@@ -157,6 +157,7 @@ class StaffCommandTests(ChargenCommandTest):
                 "+spend",
                 "+upgrade",
                 "+chargen",
+                "+moves",
             },
         )
 

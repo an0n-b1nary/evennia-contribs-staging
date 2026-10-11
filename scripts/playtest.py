@@ -98,8 +98,13 @@ def run_host(args, profile):
         else:
             from playtesting.scenarios import run_rp
 
-            results.extend(run_rp(session, smoke=profile == "normal"))
-            if args.browser and profile == "deterministic":
+            if getattr(args, "suite", "rp") == "combat":
+                from playtesting.combat import run_combat
+
+                results.extend(run_combat(session))
+            else:
+                results.extend(run_rp(session, smoke=profile == "normal"))
+            if args.browser and profile == "deterministic" and getattr(args, "suite", "rp") == "rp":
                 from playtesting.browser import run_browser
 
                 results.extend(run_browser(session, args.browser_timeout))
@@ -166,7 +171,7 @@ def main(argv=None):
         raise HostError("Playtests require assertions; do not run Python with -O.")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("run", "interactive"))
-    parser.add_argument("--suite", choices=("rp",), default="rp")
+    parser.add_argument("--suite", choices=("rp", "combat"), default="rp")
     parser.add_argument("--profile", choices=("both", "deterministic", "normal"))
     parser.add_argument("--browser", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--startup-timeout", type=float, default=180)

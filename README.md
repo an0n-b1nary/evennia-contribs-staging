@@ -62,7 +62,8 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 
 **RP cluster** — mechanics for RP-focused games; named with the `rp-` prefix to distinguish from PvE-leveling-loot systems
 - [`evennia-rp-rules`](contribs/rpg/evennia_rp_rules/README.md) (rpg) — preview 0.1.0; value-neutral graded resolution, modifier pipeline, subjects, vocabulary and exact odds
-- [`evennia-rp-chargen`](contribs/rpg/evennia_rp_chargen/README.md) (rpg) — preview 0.3.0; sheets, allocation, pips, catalog, loadouts, allowance/XP spending, build locks and change guards; depends on rules and links
+- [`evennia-rp-chargen`](contribs/rpg/evennia_rp_chargen/README.md) (rpg) — preview 0.4.0; sheets, allocation, pips, catalog, loadouts, allowance/XP spending, build locks and change guards; depends on rules and links
+- [`evennia-rp-combat`](contribs/rpg/evennia_rp_combat/README.md) (rpg) - preview 0.1.0; consent-based personal turns, queued reactions, Signatures, Tactics, Boss allowances and optional NPC/storytelling integration
 - [`evennia-rp-contest`](contribs/rpg/evennia_rp_contest/README.md) (rpg) — preview 0.1.0; playable `+test` checks and player-led room challenges with private audits; depends on rules and links, with optional chargen, scenes and session integration
 - `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
 - [`evennia-rp-equipment`](contribs/rpg/evennia_rp_equipment/README.md) (rpg) — preview 0.1.2; wearable gear anyone can make, with worn lines, provenance display and requirements on the wearer's build that grant nothing; worn gear holds the pips and abilities it needs through chargen's change guard; depends on rules and chargen

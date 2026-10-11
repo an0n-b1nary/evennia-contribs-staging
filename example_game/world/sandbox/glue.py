@@ -25,6 +25,14 @@ from django.apps import apps
 _logger = logging.getLogger(__name__)
 
 
+def validate_signature_move(data, *, signature=True):
+    """Keep authored libraries usable when the optional combat app is absent."""
+    if apps.is_installed("evennia_rp_combat"):
+        from evennia_rp_combat.integrations import validate_move
+
+        validate_move(data, signature=signature)
+
+
 def rp_subject_adapter(obj):
     """Use a real chargen sheet, or the object's sandbox stat block.
 
