@@ -19,3 +19,12 @@ class ResourcesConfig(AppConfig):
 
             asset_providers.connect(provide_assets, dispatch_uid="resources_economy_assets")
             economy_figures.connect(provide_figures, dispatch_uid="resources_economy_figures")
+        if self.apps.is_installed("evennia_maps"):
+            from evennia_maps import signals as maps_signals
+
+            # The room panel's seam arrived in evennia-maps 0.9.
+            collect_tile_detail = getattr(maps_signals, "collect_tile_detail", None)
+            if collect_tile_detail is not None:
+                from .map_panel import provide_detail
+
+                collect_tile_detail.connect(provide_detail, dispatch_uid="resources_map_panel")

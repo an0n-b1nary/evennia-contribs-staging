@@ -149,6 +149,17 @@ Plot Thread payouts arrive in a later release; no plots signal is connected
 yet. Without maps, the tag fallback and common pool work without imports of any
 optional partner.
 
+With evennia-maps 0.9+, clicking a room on the live map shows a "Gathering here"
+section in its room panel: the categories of resource tied to the room's terrain,
+each with its resource names, and a note when the viewer's gathering lean matches
+one. It gives no weights, quantities or odds. Players see nothing until
+`RP_RESOURCES_REVEALED` is on, and nothing for a terrain outside
+`RP_RESOURCES_OPEN_TERRAINS`, so a room in a stage that hasn't opened doesn't give
+away what it will hold. Staff see a closed terrain's list, marked as not open yet.
+The common pool is found everywhere, so it isn't listed. With
+`RP_RESOURCES_OPEN_TERRAINS` unset, any terrain a room has counts as open, and the
+panel doesn't scan the room typeclasses.
+
 ## Tests
 
 From a game with links and resources installed:
