@@ -20,7 +20,7 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
     if appetite not in APPETITES:
         raise CombatError("Choose Cautious, Balanced or Bold.")
     if not view.estimates:
-        return preferred if preferred in REACTIONS else "resist", Move()
+        return preferred if preferred in view.reactions else "resist", Move()
     attacker = Build(tuple((role, "0") for role, _ in view.build.scores))
     move = Move(power=0, accuracy=0, action=view.action)
     k, cost = APPETITES[appetite]
@@ -31,7 +31,7 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
         for move in view.build.moves
         if move.action in ("attack", "spell") and move_cost(view.build, move) <= view.reserves
     ]
-    for reaction in REACTIONS:
+    for reaction in view.reactions:
         for counter in counters if reaction == "overpower" else [Move()]:
             if "strain" in counter.effects and view.hp <= 5:
                 continue
@@ -59,6 +59,8 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
                     # Only a publicly called bet; a hidden one is never seen.
                     rps=view.public_bet,
                     rps_shift=tuple(F(v) for v in view.public_shift),
+                    damage_boost=F(view.damage_boost),
+                    surge=F(view.surge),
                 )
                 for roll in range(1, 101)
             ]

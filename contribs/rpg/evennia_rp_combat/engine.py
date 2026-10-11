@@ -7,12 +7,15 @@ An operation mutates a private copy under one database transaction. Failed
 operations discard that copy, including reservations and accepted reactions.
 """
 
+from copy import deepcopy
 from fractions import Fraction as F
 
 from . import arithmetic as math
+from . import partners
 from .data import Build, CombatError, Move, ReactionView
 from .modifiers import bonus as passive
 from .modifiers import move_cost, rps_shift, rules
+from .state import SCHEMA
 
 DOMAIN_ACTIONS = {
     "grapple": ("attack", "spell"),
@@ -35,25 +38,45 @@ DOMAIN_ACTIONS = {
 
 
 def new_state():
-    return {
-        "schema": 1,
-        "epoch": 1,
-        "next_exchange": 1,
-        "participants": {},
-        "exchanges": {},
-        "denominators": {},
-        "started": False,
-        "paused": False,
-        # Why the fight is paused: storyteller, faded (nobody active) or
-        # reconciliation (after staff rollback; staff resume).
-        "pause_reason": "",
-        "ended": False,
-        "imbalance": "",
-        "templates": {},
-        "invitations": {},
-        "next_request": 1,
-        "end_proposal": None,
-    }
+    return partners.upgrade_sections(
+        {
+            "schema": SCHEMA,
+            "partners": {},
+            "epoch": 1,
+            "next_exchange": 1,
+            "participants": {},
+            "exchanges": {},
+            "denominators": {},
+            "started": False,
+            "paused": False,
+            # Why the fight is paused: storyteller, faded (nobody active) or
+            # reconciliation (after staff rollback; staff resume).
+            "pause_reason": "",
+            "ended": False,
+            "imbalance": "",
+            "templates": {},
+            "invitations": {},
+            "next_request": 1,
+            "end_proposal": None,
+        }
+    )
+
+
+def participating(row):
+    """Saved mechanical eligibility, independent of live connection presence.
+
+    A personal cap limits outgoing actions, not defensive participation.
+    A revived participant awaiting their recovery action is treated as
+    incapacitated: not participating, targetable or able to Cover.
+    """
+    return (
+        row["status"] == "active"
+        and row["hp"] > 0
+        and not row.get("return_required")
+        and not row.get("recovering")
+        and not row["correction"]
+        and not row.get("absent")
+    )
 
 
 def participant(state, ident):
@@ -148,6 +171,9 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
         "carry": 0,
         # Storyteller changes awaiting this participant's acceptance.
         "requests": [],
+        "recovering": False,
+        "revive": "ask",
+        "tempo": 0,
     }
     state["participants"][key] = row
     return row
@@ -483,7 +509,9 @@ def declaration(
     exchange["attack_spirit"] = actor["spirit"]
     exchange["carry"] = actor["carry"]
     actor["outgoing"] = ex_id
+    partners.snapshot(state, exchange)
     state["exchanges"][ex_id] = exchange
+    partners.emit(state, partners.Event("declare", actor["id"], ex_id, 1))
     if move.action in ("attack", "spell"):
         for target_id in targets:
             participant(state, target_id)["incoming"].append(f"{ex_id}:1")
@@ -591,9 +619,11 @@ def reaction(
     exchange = get_exchange(state, token)
     if token not in defender["incoming"] or defender["id"] in exchange["reactions"]:
         raise CombatError("No unaccepted incoming reaction matches that token.")
+    if exchange.get("revival"):
+        raise CombatError("That is a revival offer: +combat/accept or /decline it.")
     counter = counter or Move()
-    if kind not in ("evade", "resist", "overpower"):
-        raise CombatError("Choose Evade, Resist or Overpower.")
+    if kind not in partners.reactions(exchange, defender["id"]):
+        raise CombatError("Choose an available reaction; intercepted packets cannot be Evaded.")
     if kind != "overpower" and (counter != Move() or empower):
         raise CombatError("Only Overpower selects or Empowers a counter.")
     builtin_effect = (domain_effects or {}).get(counter.domain)
@@ -704,6 +734,12 @@ def cancel(state, ident, token):
     if defender["id"] in exchange["reactions"]:
         raise CombatError("Your reaction is already accepted. Further rollback requires staff.")
     exchange["canceled"].append(defender["id"])
+    partners.emit(
+        state,
+        partners.Event(
+            "cancel", exchange["actor"], exchange["id"], exchange["hit"], defender["id"]
+        ),
+    )
     defender["incoming"].remove(token)
     actor = participant(state, exchange["actor"])
     blood = exchange.get("blood") or {}
@@ -738,6 +774,7 @@ def reaction_view(state, ident, token):
     defender = participant(state, ident)
     exchange = get_exchange(state, token)
     move = Move.from_dict(exchange["move"])
+    packet = partners.modifiers(exchange, ident)
     # Accuracy is declared publicly, including paid Stance costs and exposure
     # from unpaid ante. The private RPS bet and draw never enter this view.
     attack_build = Build.from_dict(participant(state, exchange["actor"])["build"])
@@ -771,6 +808,8 @@ def reaction_view(state, ident, token):
             r,
             str(
                 exposure(defender, own_build, r)
+                + F(packet.reaction_penalty)
+                + F(exchange.get("interception_penalties", {}).get(str(ident), "0"))
                 + (
                     value(defender, "grappled")
                     if r == "evade"
@@ -794,6 +833,7 @@ def reaction_view(state, ident, token):
             str(
                 value(defender, f"{r}_stance")
                 + value(defender, f"flowing_{r}")
+                + F(packet.formation_penalty)
                 + passive(own_build, "before_reaction", r, move.action)
                 + passive(own_build, "before_resolution", r, move.action)
             ),
@@ -814,9 +854,12 @@ def reaction_view(state, ident, token):
         penalties,
         bonuses,
         not bool(value(defender, "misdirected")),
+        packet.damage_boost,
+        packet.surge,
+        partners.reactions(exchange, ident),
         # Only a bet its attacker called publicly; hidden bets stay hidden.
-        exchange["bet"] if exchange.get("public_bet") else "",
-        tuple(str(v) for v in shift(attack_build, exchange))
+        public_bet=exchange["bet"] if exchange.get("public_bet") else "",
+        public_shift=tuple(str(v) for v in shift(attack_build, exchange))
         if exchange.get("public_bet")
         else ("0", "0"),
     )
@@ -839,11 +882,16 @@ def resolve_exchange(state, exchange):
         frozen_defender = {"conditions": choice["conditions"]}
         counter = Move.from_dict(choice["counter"])
         reaction_kind = choice["kind"]
+        packet = partners.modifiers(exchange, target_id)
         stance = f"{reaction_kind}_stance"
         bonus = value(frozen_defender, stance) + value(frozen_defender, f"flowing_{reaction_kind}")
         bonus += passive(defense_build, "before_reaction", reaction_kind, move.action)
         bonus += passive(defense_build, "before_resolution", reaction_kind, move.action)
+        bonus += F(packet.formation_penalty)
         penalty = exposure(frozen_defender, defense_build, reaction_kind)
+        penalty += F(packet.reaction_penalty) + F(
+            exchange.get("interception_penalties", {}).get(target_id, "0")
+        )
         if reaction_kind == "evade":
             penalty += value(frozen_defender, "grappled")
         ambushed = exchange["domain_effect"] == "ambush"
@@ -905,7 +953,12 @@ def resolve_exchange(state, exchange):
             counter_multiplier=damage_multiplier(attack_build, counter.element),
             ignore_penetrating=bool(value(frozen_defender, "bulwark")),
             rps_shift=shift(attack_build, exchange),
+            damage_boost=F(packet.damage_boost),
+            surge=F(packet.surge),
         )
+        transfer_basis = min(defender["hp"], result.burst_damage)
+        actor_was_participating = participating(actor)
+        target_was_participating = participating(defender)
         incoming = harm(
             defender,
             result.damage,
@@ -963,7 +1016,7 @@ def resolve_exchange(state, exchange):
         if exchange["burst"]:
             actor["spirit"], defender["spirit"], exchange["debt"], requested, transferred = (
                 math.burst_transfer(
-                    incoming,
+                    transfer_basis,
                     defense_build.score("will"),
                     actor["spirit"],
                     defender["spirit"],
@@ -1018,6 +1071,21 @@ def resolve_exchange(state, exchange):
                         1,
                     )
         exchange["outcomes"].append(details)
+        partners.emit(
+            state,
+            partners.Event(
+                "packet",
+                actor["id"],
+                exchange["id"],
+                exchange["hit"],
+                target_id,
+                damage=incoming,
+                counter_damage=counter_loss,
+                empowered=empowered,
+                actor_was_participating=actor_was_participating,
+                target_was_participating=target_was_participating,
+            ),
+        )
         change_spirit(
             actor,
             math.rounded(100 * passive(attack_build, "after_resolution", "spirit", move.action)),
@@ -1170,6 +1238,7 @@ def support_exchange(state, exchange):
     move = Move.from_dict(exchange["move"])
     for target_id in exchange["targets"]:
         target = participant(state, target_id)
+        packet = partners.modifiers(exchange, target_id)
         key = f"{move.action}:{target_id}"
         previous = actor["support_history"].get(key)
         repeated = previous is not None and actor["clock"] - previous <= 3
@@ -1198,6 +1267,7 @@ def support_exchange(state, exchange):
             repeat=repeated,
             heals=target["heals"],
             empower=exchange["empower"] and exchange["resolved"] == 0,
+            surge=F(packet.surge),
         )
         provoked = actor["conditions"].get("provoked")
         if provoked and provoked["source"] != target_id:
@@ -1236,6 +1306,22 @@ def support_exchange(state, exchange):
             ):
                 exchange["outcomes"][-1]["domain_resisted"] = True
             exchange["domain_used"] = True
+        partners.emit(
+            state,
+            partners.Event(
+                "packet",
+                actor["id"],
+                exchange["id"],
+                exchange["hit"],
+                target_id,
+                healing=restored,
+                spirit=actual_spirit,
+                potential_spirit=spirit,
+                empowered=exchange["empower"] and exchange["resolved"] == 1,
+                actor_was_participating=participating(actor),
+                target_was_participating=participating(target),
+            ),
+        )
     taunting = rules(actor_build).get("taunting_opener")
     if taunting and move.action == "dispirit" and any(o["success"] for o in exchange["outcomes"]):
         # One charge for the next Burst, gone after the next own action.
@@ -1289,6 +1375,10 @@ def press(state, ident, draw, *, stop=False, empower=False):
         stance_strengths=[],
     )
     exchange["attack_spirit"] = actor["spirit"]
+    exchange["covered_targets"] = []
+    exchange["interception_penalties"] = {}
+    partners.snapshot(state, exchange)
+    partners.emit(state, partners.Event("declare", actor["id"], exchange["id"], exchange["hit"]))
     condition(
         actor, "overextended", value(actor, "overextended") + extension(build, 5), 2, wardable=False
     )
@@ -1345,8 +1435,77 @@ def finish_exchange(state, exchange):
     actor["outgoing"] = None
     actor["pose"] = not actor["auto"]
     exchange["phase"] = "done"
+    partners.emit(
+        state, partners.Event("exchange_end", actor["id"], exchange["id"], exchange["hit"])
+    )
     # Poison at the end of an own action can incapacitate the actor.
     settle(state)
+
+
+def redirect(
+    state,
+    token,
+    original_id,
+    replacement_id,
+    kind,
+    *,
+    counter=None,
+    empower=False,
+    domain="",
+    domain_effects=None,
+    reaction_penalty="0",
+):
+    """Atomically intercept and react; the caller checks party/ignore consent.
+
+    Original packet modifiers/draw/costs stay fixed. A Burst remains the
+    same exchange against the replacement; later hits declare fresh inputs.
+    Even direct pure-engine callers get no partial transfer on failure.
+    """
+    candidate = deepcopy(state)
+    progress(candidate)
+    original = participant(candidate, original_id)
+    replacement = active(candidate, replacement_id)
+    exchange = get_exchange(candidate, token)
+    penalty = partners.number(reaction_penalty)
+    if not 0 <= penalty <= 100:
+        raise CombatError("Interception reaction penalty must be between 0 and 100.")
+    if (
+        original["id"] not in exchange["targets"]
+        or token not in original["incoming"]
+        or exchange["reactions"]
+        or exchange.get("revival")
+        or exchange.get("covered_targets")
+        or replacement["id"] in exchange["targets"]
+        or replacement["side"] != original["side"]
+        or replacement["incoming"]
+        or replacement["outgoing"]
+        or kind not in ("resist", "overpower")
+    ):
+        raise CombatError("That packet cannot be intercepted by this participant.")
+    index = exchange["targets"].index(original["id"])
+    exchange["targets"][index] = replacement["id"]
+    original["incoming"].remove(token)
+    replacement["incoming"].append(token)
+    snapshots = exchange.get("partner_modifiers", {})
+    if original["id"] in snapshots:
+        snapshots[replacement["id"]] = snapshots.pop(original["id"])
+    exchange["covered_targets"] = [replacement["id"]]
+    exchange["interception_penalties"] = {replacement["id"]: str(penalty)}
+    exchange.setdefault("redirects", []).append(
+        {"from": original["id"], "to": replacement["id"], "hit": exchange["hit"]}
+    )
+    reaction(
+        candidate,
+        replacement["id"],
+        token,
+        kind,
+        counter=counter,
+        empower=empower,
+        domain=domain,
+        domain_effects=domain_effects,
+    )
+    state.clear()
+    state.update(candidate)
 
 
 def fade(state, ident, *, withdraw=False):

@@ -768,6 +768,9 @@ RP_RULES_EFFECT_KINDS = (
     if "evennia_rp_combat" in INSTALLED_APPS
     else {}
 )
+# Pure combat partner providers are opt-in. Their versioned state is kept
+# through rollback and provider removal; no Party provider ships yet.
+RP_COMBAT_PARTNERS = {}
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

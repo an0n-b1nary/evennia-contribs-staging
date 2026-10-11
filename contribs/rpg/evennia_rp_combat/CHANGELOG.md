@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-11
+
 ### Added
 
 - Consented revival: a Heal may name one incapacitated, present ally. The
@@ -36,6 +38,25 @@
 - A Faded participant at 0 Vitality may rejoin, still incapacitated, so an
   ally can offer a revival. Withdrawal still needs a storyteller return.
 - Reaction views carry a bet only when its attacker called it publicly.
+- Fight state schema 3 (read-time upgrade from 2) adds each participant's
+  pending recovery, revival preference and Measured Tempo charges.
+
+## [0.1.1] - 2026-10-11
+
+### Added
+
+- Pure, validated partner contracts for frozen packet modifiers, versioned
+  partner state, engine events and plain-text status/help extensions.
+- Read-time state upgrades, including old journal rollback, preserving
+  stored snapshots and content-addressed builds.
+- Retained partner data and visible unavailable notices when a provider
+  is absent; new declarations never acquire modifiers retroactively.
+- Atomic interception primitive: a queued attack and the rest of its Burst
+  can move to a replacement defender with a legal Resist/Overpower in the
+  same operation. No interception command or Party rules ship here.
+- Shared exact damage/support modifier inputs for manual results, neutral
+  odds and Auto-Resolve. Party damage boosts are excluded from Burst's
+  Spirit-transfer basis; paid output modifiers remain distinct.
 
 ## [0.1.0] - 2026-10-10
 

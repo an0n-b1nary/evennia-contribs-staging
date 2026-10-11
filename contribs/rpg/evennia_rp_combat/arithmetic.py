@@ -92,6 +92,7 @@ class Outcome:
     damage: int
     counter_damage: int
     pressure_gain: int
+    burst_damage: int = 0
 
 
 def resolve(
@@ -119,6 +120,8 @@ def resolve(
     counter_multiplier=1,
     ignore_penetrating=False,
     rps_shift=(0, 0),
+    damage_boost=0,
+    surge=0,
 ):
     """Resolve one packet; damage is before remaining-Vitality truncation.
 
@@ -220,6 +223,10 @@ def resolve(
     raw = raw_damage(
         attack.score(move.action), defensive, power, strain=strain, multiplier=multiplier
     )
+    # Party damage cannot feed its own Spirit-transfer loop. Surge is a
+    # separate paid output benefit and remains in the transfer basis.
+    burst_damage = rounded(raw * (1 + F(surge) / 100) * fraction)
+    raw *= 1 + (F(damage_boost) + F(surge)) / 100
     damage = rounded(raw * fraction)
     counter_damage = 0
     if reaction == "overpower" and success:
@@ -233,16 +240,28 @@ def resolve(
             )
         )
     gain = rounded(raw) - damage if reaction == "resist" and success and not endure else 0
-    return Outcome(reaction, chance, success, glancing, domain, damage, counter_damage, gain)
+    return Outcome(
+        reaction, chance, success, glancing, domain, damage, counter_damage, gain, burst_damage
+    )
 
 
 def support_values(
-    actor, target, action, roll, *, active=None, factor=1, repeat=False, heals=0, empower=False
+    actor,
+    target,
+    action,
+    roll,
+    *,
+    active=None,
+    factor=1,
+    repeat=False,
+    heals=0,
+    empower=False,
+    surge=0,
 ):
     active = (
         max(actor.score(k) for k in ("attack", "spell", "dispirit")) if active is None else active
     )
-    multiplier = F(3, 2) if empower else F(1)
+    multiplier = (F(3, 2) if empower else F(1)) + F(surge) / 100
     if action == "assist":
         magnitude = F(3, 4) + F(roll - 1, 198)
         value = (4 + active / 10) * magnitude * factor * multiplier

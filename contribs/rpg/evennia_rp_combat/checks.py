@@ -13,6 +13,12 @@ def check_configuration(app_configs=None, **kwargs):
     from .engine import DOMAIN_ACTIONS
 
     errors = []
+    from .partners import registered
+
+    try:
+        registered()
+    except ValueError as exc:
+        errors.append(Error(str(exc), id="rp_combat.E008"))
     required = {"attack", "attack_defense", "spell", "spell_defense", "dispirit", "will", "agility"}
     roles = conf.get("RP_COMBAT_ROLES")
     if (

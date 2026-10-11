@@ -839,7 +839,7 @@ class TestRevival(SimpleTestCase):
         ally["heals"] = 40
         engine.accept_revival(state, 3, self.offer(state))
         self.assertEqual((ally["hp"], ally["return_required"]), (0, True))
-        self.assertNotIn("recovering", ally)
+        self.assertFalse(ally["recovering"])
         self.assertEqual(healer["clock"], 1)
 
     def test_poison_keeps_its_clock_and_ticks_once_at_recovery(self):
@@ -1290,6 +1290,9 @@ class TestPolicies(SimpleTestCase):
                 "estimates",
                 "public_bet",
                 "public_shift",
+                "damage_boost",
+                "surge",
+                "reactions",
             },
         )
         # Only a bet the attacker called publicly ever appears.
