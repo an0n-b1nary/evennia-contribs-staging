@@ -60,12 +60,6 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   resolver, including scaling and suppression, rather than bypassing it.
   Default arc gating and credit idempotency remain unchanged.
 
-## [0.3.1] - 2026-10-08
-
-- **Fixed:** weekly thread bonuses honor the host-configured XP multiplier
-  resolver, including scaling and suppression, rather than bypassing it.
-  Existing arc gating and credit idempotency remain unchanged.
-
 ## [0.3.0] - 2026-10-02
 
 - **Breaking:** remove the deprecated top-level `collectors.py`,

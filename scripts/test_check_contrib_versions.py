@@ -64,6 +64,11 @@ class VersionChecks(unittest.TestCase):
                 self.changelog(text)
                 self.assertIn("Unreleased must", checker.check_contrib(self.package)[0])
 
+    def test_duplicate_release_is_rejected(self):
+        """Two branches cutting the same version merge cleanly into two sections."""
+        self.changelog("## [0.2.0] - today\n## [0.2.0] - today\n## [0.1.0] - earlier\n")
+        self.assertIn("releases 0.2.0 more than once", checker.check_contrib(self.package)[0])
+
     def test_missing_changelog_or_headings_is_rejected(self):
         self.changelog("# Changelog\n")
         self.assertTrue(checker.check_contrib(self.package))
