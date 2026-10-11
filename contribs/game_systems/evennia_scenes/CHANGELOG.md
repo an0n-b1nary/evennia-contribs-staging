@@ -1,5 +1,13 @@
 # Changelog — evennia-scenes
 
+## [0.8.1] - 2026-10-10
+
+- **Added:** a player guide page for evennia-guides, `scenes` (opening a scene,
+  privacy tiers and logs), in `guides/` and the package data. It describes the
+  system in general terms, without exact numbers, and links only to pages this
+  contrib or its required dependencies ship. Without evennia-guides it's
+  ignored.
+
 ## [0.8.0] - 2026-10-10
 
 - **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme

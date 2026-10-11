@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-scenes"
-version = "0.8.0"
+version = "0.8.1"
 description = "Scene logging system (+scene/+log) with web UI and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -57,4 +57,5 @@ evennia_scenes = [
     "templates/evennia_scenes/*.html",
     "static/evennia_scenes/css/*.css",
     "static/evennia_scenes/js/*.js",
+    "guides/*.md",
 ]
