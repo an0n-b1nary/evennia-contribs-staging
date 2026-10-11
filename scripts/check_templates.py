@@ -48,7 +48,18 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", ".venv_sandbox", "ci_game"}
+SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    ".venv_sandbox",
+    "ci_game",
+    # Local, gitignored artifacts: setuptools build/ copies of contrib
+    # packages and disposable playtest hosts with their own virtualenvs.
+    "build",
+    ".playtest-runs",
+}
 
 # Libraries a contrib template may {% load %}. Only the importable ones are
 # installed, so a missing optional dependency degrades to "that {% load %}
