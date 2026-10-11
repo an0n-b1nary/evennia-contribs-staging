@@ -994,3 +994,9 @@ REQUEST_DEMO_ANSWERS = {
     "rooms": "[Placeholder] A reading room with shelves and a shared table.",
     "reuse": True,
 }
+
+
+# A private, off-grid preview: no project or player construction tool yet.
+PRIVATE_PREVIEW_PLANES = ("Private Draft Preview", "Private Draft Preview - Upper")
+PRIVATE_PREVIEW_ROOMS = ("Draft Entry", "Draft Upper Room")
+PRIVATE_PREVIEW_DESC = "[Placeholder] A private workbench for a two-floor map preview."

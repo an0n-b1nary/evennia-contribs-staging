@@ -1440,3 +1440,30 @@ the CLI. A source-project adapter is future work.
 On Linux, identity uses `/proc`'s boot-relative start counter so WSL/NTP clock
 adjustments cannot hide an owned process. `evidence/cleanup.json` records the
 verified shutdown.
+
+
+## Building foundations: private previews and transplant checks
+
+The sandbox demonstrates Links 0.8.2 room rights, Maps 0.9 private stacks and
+transplants, Regions 0.5 viewer-aware room pages, and Social 0.6 configuration
+permissions. Install Links before its consumers; Social now declares Links
+as a direct dependency. Existing commands and URLs supply the preview surface.
+
+`seed_sandbox` creates **Private Draft Preview** and its upper floor, with two
+OOC, secret rooms disconnected from the world. Its demo author controls them;
+Builder staff can also preview them on `/map/`. Other visitors cannot discover
+the planes through pages or API endpoints. Floor access shares the entry
+room's privacy anchor. Resetting the demo replaces this disposable preview. Use the existing public
+scratch plane for persistent digging experiments.
+
+Run `+sandbox/builder on`, then `+sandbox/transplant` to see a read-only
+translation of that two-floor draft northwest of the world-map origin. The
+report lists proposed cells, blockers and unconnected neighbors and writes
+nothing. The command is demonstration glue, not a player construction tool.
+
+`world/sandbox/building.py` supplies one viewer-aware visibility callback for
+Maps and Regions; the shared web-character middleware handles offline and
+selected characters. Links permission/owner providers remain unset until an
+ownership package is installed. `world/sandbox/test_building.py` exercises
+seed idempotence, selected-character SVG/live/API/region access, the transplant
+command and Social's room-permission seam under the actual partners.

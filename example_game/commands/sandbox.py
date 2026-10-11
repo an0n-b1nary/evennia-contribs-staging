@@ -65,6 +65,7 @@ class CmdSandbox(MuxCommand):
         +sandbox/builder on       - Grant yourself the Builder permission
         +sandbox/builder off      - Drop it again
         +sandbox/reset            - (Admin) Rebuild the seeded world
+        +sandbox/transplant       - (Builder) Preview the two-floor draft on the world map
 
     Builder is a single switch for the whole game: every installed system
     gates its staff side on perm(Builder). Turning it on opens map and region
@@ -92,6 +93,8 @@ class CmdSandbox(MuxCommand):
         switch = self.switches[0].lower()
         if switch == "builder":
             self._do_builder()
+        elif switch == "transplant":
+            self._do_transplant()
         elif switch == "reset":
             self._do_reset()
         else:
@@ -229,3 +232,29 @@ class CmdSandbox(MuxCommand):
             " Anyone standing in a purged room was sent home to the Sandbox Plaza."
         )
         caller.msg(f"Rooms made by hand, left untouched by the purge: |w{strays}|n")
+
+    def _do_transplant(self):
+        """Read-only demo of the service future build checks will consume."""
+        from evennia.objects.models import ObjectDB
+        from world.sandbox import content
+
+        from evennia_maps.transplant import plan_transplant
+
+        if not self.caller.locks.check_lockstring(self.caller, "perm(Builder)"):
+            self.caller.msg("Builder permission is required to preview the seeded draft.")
+            return
+        rooms = [ObjectDB.objects.get(db_key=name) for name in content.PRIVATE_PREVIEW_ROOMS]
+        anchor = ObjectDB.objects.get(db_key=content.IC_ROOMS_BY_SLUG[content.MAP_ORIGIN_SLUG].name)
+        plan = plan_transplant(
+            rooms, entry_room=rooms[0], anchor_room=anchor, direction_name="northwest"
+        )
+        lines = ["Transplant preview (no changes saved):"]
+        lines.extend(
+            f"  {move.room.key}: {move.plane.name} ({move.x}, {move.y})" for move in plan.moves
+        )
+        lines.extend(f"  Blocked: {conflict}" for conflict in plan.conflicts)
+        lines.extend(
+            f"  Unconnected neighbors: #{a.room_id} beside #{a.neighbor_room_id}"
+            for a in plan.adjacency
+        )
+        self.caller.msg("\n".join(lines))

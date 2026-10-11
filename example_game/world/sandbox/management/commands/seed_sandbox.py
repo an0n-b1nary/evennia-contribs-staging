@@ -312,6 +312,7 @@ class Command(BaseCommand):
         counts["region_memberships"] = sum(r.memberships.count() for r in regions.values())
         counts["map_tiles"] = self._create_map(rooms)
         counts["scratch_tiles"] = self._create_scratch_plane(rooms)
+        counts["private_preview_tiles"] = self._create_private_preview(authors)
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
@@ -1213,3 +1214,34 @@ class Command(BaseCommand):
             )
             count += 1
         return count
+
+    def _create_private_preview(self, authors):
+        """Seed an off-grid stacked preview; anchor deletion purges its planes."""
+        from evennia.utils.create import create_object
+
+        from evennia_maps import placement
+
+        rooms = []
+        for name in content.PRIVATE_PREVIEW_ROOMS:
+            room = create_object("typeclasses.rooms.Room", key=name)
+            self._tag(room)
+            room.tags.add("private_preview", category="sandbox")
+            room.room_type = "ooc"
+            room.allow_teleport = "secret"
+            room.db.desc = content.PRIVATE_PREVIEW_DESC
+            room.locks.add(f"control:id({authors[0].pk})")
+            rooms.append(room)
+        plane = placement.create_private_stack(
+            rooms[0], content.PRIVATE_PREVIEW_PLANES[0], actor=authors[0]
+        )
+        floor = placement.resolve_stacked_plane(plane, 1)
+        floor.name = content.PRIVATE_PREVIEW_PLANES[1]
+        floor.save(update_fields=["name"])
+        placement.place_tile(rooms[1], floor, 0, 0)
+        for key, source, target in (("up", rooms[0], rooms[1]), ("down", rooms[1], rooms[0])):
+            self._tag(
+                create_object(
+                    "typeclasses.exits.Exit", key=key, location=source, destination=target
+                )
+            )
+        return len(rooms)
