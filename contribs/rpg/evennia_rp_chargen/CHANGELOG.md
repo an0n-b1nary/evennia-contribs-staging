@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-10
+
+### Fixed
+
+- The `xp` extra accepts evennia-xp up to 0.5 (`>=0.2,<0.6`). It still capped
+  at `<0.3`, so `pip install evennia-rp-chargen[xp]` couldn't resolve against
+  current evennia-xp. The ledger calls it makes (`spend_xp`, `refund_xp`,
+  `CharacterXP.current_balance`) are unchanged since 0.2.
+
 ## [0.3.0] - 2026-10-08
 
 ### Added
