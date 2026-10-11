@@ -365,6 +365,8 @@ jobs:
         run: |
           python scripts/playtest.py run --suite rp < /dev/null
           python scripts/playtest.py run --suite rp < /dev/null
+      - name: Combat consent, reload and ordinary-player commands
+        run: python scripts/playtest.py run --suite combat --profile normal --no-browser < /dev/null
       - name: Persistent exploratory JSONL session
         run: python scripts/test_playtest_interactive.py < /dev/null
       - name: Sanitized live evidence

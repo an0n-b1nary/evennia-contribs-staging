@@ -5,7 +5,7 @@ No source-project tables or Python modules are imported. Install hard
 partners first, configure stat-role/content mappings, migrate, register the
 cmdset, then reveal combat in a staging game for playtesting.
 
-Chargen 0.4 adds migration 0004 (SignatureMove), preserving 0001?0003.
+Chargen 0.4 adds migration 0004 (SignatureMove), preserving 0001-0003.
 Combat 0.1 adds its initial Tactics table. Existing sheets, abilities,
 equipment and XP are unchanged by migration. Back up a populated database,
 apply migrations, compare preserved rows, then rehearse through the real

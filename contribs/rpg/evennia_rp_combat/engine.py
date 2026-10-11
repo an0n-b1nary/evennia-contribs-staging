@@ -58,7 +58,7 @@ def participant(state, ident):
 
 def active(state, ident):
     row = participant(state, ident)
-    if row["status"] != "active" or row["hp"] <= 0:
+    if row["status"] != "active" or row["hp"] <= 0 or row.get("return_required"):
         raise CombatError("That participant is Faded, withdrawn or incapacitated.")
     if row["correction"]:
         raise CombatError("Relock the corrected build before combat progress.")
@@ -91,6 +91,8 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
     key = str(ident)
     if key in state["participants"]:
         row = participant(state, key)
+        if row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn":
+            raise CombatError("A storyteller must request your return; accept it explicitly.")
         if row["status"] != "faded":
             raise CombatError("You already joined; withdrawn participants cannot rejoin.")
         row["status"] = "active"
@@ -190,6 +192,8 @@ def value(row, name):
 def harm(row, amount, *, half_transcendence=False):
     actual = min(row["hp"], max(0, amount))
     row["hp"] -= actual
+    if row["hp"] == 0:
+        row["return_required"] = True
     award = min(25, math.rounded(F(5, 4) * actual))
     if half_transcendence:
         award = math.rounded(F(award, 2))
@@ -989,6 +993,7 @@ def fade(state, ident, *, withdraw=False):
         raise CombatError("You have already withdrawn.")
     if withdraw:
         row["status"], row["hp"] = "withdrawn", 0
+        row["return_required"] = True
         row.pop("faded_hp", None)
     else:
         row["faded_hp"] = row["hp"]

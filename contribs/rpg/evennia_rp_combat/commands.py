@@ -36,6 +36,7 @@ class CmdCombat(MuxCommand):
     +combat/posed                Acknowledge your own RP; grants no RP/XP
     +combat/fade                 Neutral absence; /join restores your state
     +combat/withdraw             Leave accounting remaining Vitality as lost
+    +combat/acceptreturn|refusereturn  Answer a storyteller's return request
     +combat/unlock [reason]      Announced correction, clear queues first
     +combat/relock [reason]      Validate and freeze a corrected build
     +combat/cap number           Voluntarily reduce your personal Turn Limit
@@ -194,6 +195,8 @@ class CmdCombat(MuxCommand):
             "cap",
             "acceptcap",
             "refusecap",
+            "acceptreturn",
+            "refusereturn",
         ):
             argument = int(self.args) if operation == "cap" else self.args.strip()
             services.control(
@@ -215,6 +218,7 @@ class CmdCombatStory(MuxCommand):
     +combatstory/vitality name=value[;reason]   Story damage/healing
     +combatstory/spirit name=value[;reason]     Spirit displayed as decimal
     +combatstory/requestcap name=cap[;reason]   Player accepts or refuses
+    +combatstory/requestreturn name=Vitality[;reason] Consent to return
     +combatstory/condition name=condition[;reason]
     +combatstory/clearcondition name=condition[;reason]
     +combatstory/template blueprint=side[,boss,cap] Spawn an allowed template
@@ -293,7 +297,14 @@ class CmdCombatStory(MuxCommand):
                         argument=self.rhs or "",
                     )
                 return
-            if operation in ("vitality", "spirit", "requestcap", "condition", "clearcondition"):
+            if operation in (
+                "vitality",
+                "spirit",
+                "requestcap",
+                "requestreturn",
+                "condition",
+                "clearcondition",
+            ):
                 target = self.caller.search(self.lhs.strip())
                 if target is None:
                     return
@@ -302,7 +313,7 @@ class CmdCombatStory(MuxCommand):
                     int(Decimal(value) * 100)
                     if operation == "spirit"
                     else int(value)
-                    if operation in ("vitality", "requestcap")
+                    if operation in ("vitality", "requestcap", "requestreturn")
                     else value.strip()
                 )
             services.storyteller(self.caller, operation, target=target, value=value, reason=reason)

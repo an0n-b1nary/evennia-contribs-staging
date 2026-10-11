@@ -77,6 +77,11 @@ Fade/rejoin, reload and ordinary chargen lock expiry. Clear queues, then use
 Fade retains resources and assessment contributions; withdrawal counts
 remaining Vitality as lost. Idle/movement maintenance cancels only unaccepted
 packets and Fades safely; it never acts or reacts for an unwilling player.
+An incapacitated or withdrawn character returns only after a visible
+`+combatstory/requestreturn name=Vitality;reason` and their own
+`+combat/acceptreturn` (or `/refusereturn`). Restored Vitality adds exposure;
+turns, resources, conditions and the frozen build are retained. Ordinary
+healing and Fade/rejoin cannot bypass this consent step.
 
 ## Automation and storytelling
 

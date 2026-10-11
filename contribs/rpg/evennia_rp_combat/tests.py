@@ -742,6 +742,41 @@ class TestCoordinator(EvenniaCommandTest):
         services.refuse(target)
         self.assertNotIn(str(target.pk), services.state_for(self.char1)["participants"])
 
+    def test_return_requires_story_request_and_personal_acceptance(self):
+        services.control(self.char2, "withdraw")
+        before = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        with self.assertRaises(CombatError):
+            services.control(self.char2, "acceptreturn")
+        with patch("evennia_rp_combat.services.staff", return_value=False):
+            self.call(CmdCombatStory(), f"/requestreturn {self.char2.key}=25;agreed correction", "")
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual((row["status"], row["hp"], row["return_request"]), ("withdrawn", 0, 25))
+        self.call(CmdCombat(), "/refusereturn", "", caller=self.char2)
+        with self.assertRaises(CombatError):
+            services.control(self.char2, "acceptreturn")
+        services.storyteller(self.char1, "requestreturn", target=self.char2, value=25)
+        self.call(CmdCombat(), "/acceptreturn", "", caller=self.char2)
+        after = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual((after["status"], after["hp"]), ("active", 25))
+        for key in ("turns", "turn_limit", "build", "reserves", "transcendence", "pressure"):
+            self.assertEqual(after[key], before[key])
+        self.assertEqual(after["exposure"], before["exposure"] + 25)
+
+    def test_incapacitation_cannot_be_bypassed_by_healing_and_fade(self):
+        def incapacitate(state):
+            engine.harm(engine.participant(state, self.char2.pk), 100)
+
+        services.execute(self.char1, "test injury", incapacitate)
+        with self.assertRaisesRegex(CombatError, "return"):
+            services.storyteller(self.char1, "vitality", target=self.char2, value=20)
+        services.control(self.char2, "fade")
+        with self.assertRaisesRegex(CombatError, "return"):
+            services.join(self.char2, "two")
+        services.storyteller(self.char1, "requestreturn", target=self.char2, value=20)
+        services.control(self.char2, "acceptreturn")
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual((row["hp"], row["status"]), (20, "active"))
+
     def test_ignore_removal_is_explicit_account_wide_and_mutual(self):
         if not apps.is_installed("evennia_social"):
             self.skipTest("optional social partner absent")
@@ -895,7 +930,10 @@ class TestNPCWithoutSheets(RulesetTestMixin, EvenniaCommandTest):
         row = services.state_for(self.char1)["participants"][str(npc.pk)]
         self.assertEqual(row["build"]["scores"]["attack"], "0")
         self.assertEqual(row["batch_controller"], self.char1.pk)
-        services.auto_batch(self.char1, [npc])
+        # Auto-Act may legally choose Dispirit, which has no reaction queue.
+        # Fix the random stream to exercise an incoming attack in this seam.
+        with patch("evennia_rp_combat.services.random.SystemRandom", return_value=random.Random(0)):
+            services.auto_batch(self.char1, [npc])
         state = services.state_for(self.char1)
         self.assertEqual(len(state["participants"][str(self.char2.pk)]["incoming"]), 1)
         with override_settings(NPCS_FROZEN=True), self.assertRaisesRegex(CombatError, "paused"):

@@ -53,6 +53,21 @@ class CombatSuite(Suite):
         self.command("bob", "+combatstory/end Agreed outcome", "end")
         self.command("alice", "+combat", "ended")
 
+    def consensual_return(self):
+        self.command("alice", "+combat/setup Agreed return rehearsal", "set up combat")
+        self.command("alice", "+combat/join one", "joined")
+        self.command("bob", "+combat/join two", "joined")
+        self.command("bob", "+combat/withdraw", "withdraw")
+        self.command("bob", "+combat/join two", "request your return")
+        self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
+        self.command("bob", "+combat", "Requested return at 25")
+        self.command("bob", "+combat/refusereturn", "refusereturn")
+        self.command("bob", "+combat/acceptreturn", "No pending return")
+        self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
+        self.command("bob", "+combat/acceptreturn", "acceptreturn")
+        self.command("bob", "+combat", "25/100 Vitality; turns 0/4")
+        self.command("alice", "+combatstory/end Agreed outcome", "end")
+
 
 def run_combat(session):
     suite = CombatSuite(session)
@@ -67,6 +82,10 @@ def run_combat(session):
         (
             "opt-in automation, player storyteller, reduced cap and retained Fade",
             suite.automation_storytelling_and_fade,
+        ),
+        (
+            "storyteller-requested return with personal refusal and acceptance",
+            suite.consensual_return,
         ),
     ]
     for name, function in cases:

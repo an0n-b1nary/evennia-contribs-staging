@@ -767,6 +767,22 @@ def control(
             engine.reduce_cap(state, subject.pk, row["cap_request"])
         elif operation == "refusecap":
             row["cap_request"] = None
+        elif operation == "acceptreturn":
+            if state["ended"] or row.get("return_request") is None:
+                raise CombatError("No pending return request in an ongoing fight.")
+            if row["incoming"] or row["outgoing"]:
+                raise CombatError("Clear pending exchanges before accepting a return.")
+            # Treat restored Vitality as new exposure: returning never erases
+            # prior assessment loss or resets personal progress/resources.
+            prior_hp = row.get("faded_hp", row["hp"])
+            restored = row.pop("return_request")
+            row["exposure"] += restored - prior_hp
+            row["hp"], row["status"] = restored, "active"
+            row.pop("faded_hp", None)
+            row.pop("absent", None)
+            row.pop("return_required", None)
+        elif operation == "refusereturn":
+            row.pop("return_request", None)
         else:
             raise CombatError("Unknown combat control.")
         return operation
@@ -836,7 +852,13 @@ def storyteller(actor, operation, *, target=None, value=None, reason="", operati
         elif operation == "imbalance":
             state["imbalance"] = plain(reason)
         elif operation == "vitality" and row:
+            if value > 0 and (
+                row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
+            ):
+                raise CombatError("Use requestreturn; the participant must accept their return.")
             row["hp"] = math_clamp(0, row["max_hp"], value)
+            if row["hp"] == 0:
+                row["return_required"] = True
         elif operation == "spirit" and row:
             row["spirit"] = math_clamp(-1000, 2000, value)
         elif operation == "requestcap" and row:
@@ -845,6 +867,16 @@ def storyteller(actor, operation, *, target=None, value=None, reason="", operati
                     "Choose a lower personal Turn Limit within the participant's used/current caps."
                 )
             row["cap_request"] = value
+        elif operation == "requestreturn" and row:
+            if state["ended"] or not (
+                row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn"
+            ):
+                raise CombatError(
+                    "Request return for an incapacitated or withdrawn participant in an ongoing fight."
+                )
+            if type(value) is not int or not 1 <= value <= row["max_hp"]:
+                raise CombatError("Choose return Vitality from 1 to the participant's maximum.")
+            row["return_request"] = value
         elif operation == "condition" and row:
             if value not in (
                 "grappled",
@@ -1063,6 +1095,10 @@ def render(actor, *, subject=None):
         if own["cap_request"]:
             lines.append(
                 f"Requested personal Turn Limit {own['cap_request']}: +combat/acceptcap or /refusecap."
+            )
+        if own.get("return_request") is not None:
+            lines.append(
+                f"Requested return at {own['return_request']} Vitality: +combat/acceptreturn or /refusereturn."
             )
         for information in own.get("information", {}).values():
             traits = ", ".join(f"{key}: {tag}" for key, tag in information["traits"]) or "none"

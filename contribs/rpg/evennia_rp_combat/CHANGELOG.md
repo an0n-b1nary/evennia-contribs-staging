@@ -1,4 +1,4 @@
-# Changelog ? evennia-rp-combat
+# Changelog - evennia-rp-combat
 
 ## [Unreleased]
 
@@ -19,3 +19,5 @@
 - Transaction checkpoints, idempotent service retries, retained operation
   history, staff whole-fight rollback, result recovery and membership signals.
 - Plain-text commands, player guide, reference-game demonstrations and tests.
+- Storyteller-requested returns with explicit participant acceptance or refusal,
+  retained personal progress and assessment exposure for restored Vitality.

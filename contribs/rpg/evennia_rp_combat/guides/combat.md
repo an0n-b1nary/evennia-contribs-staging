@@ -78,7 +78,11 @@ Your Abilities, Edge and Signatures freeze throughout the fight. An agreed
 correction uses `+combat/unlock reason` and `+combat/relock reason` with clear
 queues, announcing both steps. Fade and rejoin preserve the frozen build,
 resources and turns. `+combat/fade` is neutral absence;
-`+combat/withdraw` counts remaining Vitality as lost. Late arrivals can
+`+combat/withdraw` counts remaining Vitality as lost. An incapacitated or
+withdrawn character needs a visible `+combatstory/requestreturn name=Vitality;reason`
+and their own `+combat/acceptreturn` to return; `/refusereturn` declines.
+Returning retains turns, resources and loadout, and restored Vitality adds
+assessment exposure rather than erasing prior loss. Late arrivals can
 voluntarily reduce their cap with `+combat/cap number`, or accept/refuse a
 storyteller's request. Assessment suggests RP outcomes; it imposes none.
 
