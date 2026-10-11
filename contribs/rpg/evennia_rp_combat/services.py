@@ -936,6 +936,7 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
             if (
                 p["status"] != "active"
                 or p["hp"] <= 0
+                or p.get("recovering")
                 or p["id"] == row["id"]
                 or p["correction"]
                 or p.get("absent")

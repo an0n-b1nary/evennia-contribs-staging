@@ -1432,12 +1432,15 @@ class TestCoordinator(EvenniaCommandTest):
     def test_auto_act_offers_only_present_reachable_targets(self):
         away = self.character("Away", "two")
         absent = self.character("Absent", "two")
+        rising = self.character("Rising", "two")
         away.location = self.room2
-        services.execute(
-            self.char1,
-            "test absence",
-            lambda state: engine.participant(state, absent.pk).update(absent=True),
-        )
+
+        def unreachable(state):
+            engine.participant(state, absent.pk).update(absent=True)
+            # Revived but not yet recovered: treated as incapacitated.
+            engine.participant(state, rising.pk).update(recovering=True)
+
+        services.execute(self.char1, "test absence", unreachable)
         with patch.object(services.policies, "auto_act", wraps=policies.auto_act) as policy:
             services.auto_act(self.char1, rng=random.Random(3))
         view = policy.call_args.args[0]
