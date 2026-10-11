@@ -692,9 +692,6 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
 MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 
 ######################################################################
-# Settings given in secret_settings.py override those in this file.
-######################################################################
-######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues
 ######################################################################
 RP_COMBAT_REVEALED = True
@@ -759,6 +756,9 @@ RP_RULES_EFFECT_KINDS = (
     else {}
 )
 
+######################################################################
+# Settings given in secret_settings.py override those in this file.
+######################################################################
 try:
     from server.conf.secret_settings import *
 except ImportError:
