@@ -482,7 +482,9 @@ class PlotThread(models.Model):
         self.status = self.Status.CONCLUDED
         self.concluded_at = timezone.now()
         self.save(update_fields=["status", "concluded_at", "bonus_xp_computed"])
-        plot_signals.plot_thread_concluded.send(sender=type(self), thread=self, bonus_xp=bonus)
+        plot_signals.plot_thread_concluded.send(
+            sender=type(self), thread=self, bonus_xp=bonus, concluded_by=concluded_by
+        )
         return bonus
 
     def archive(self):
@@ -513,7 +515,12 @@ class PlotThread(models.Model):
             total += 3
         if self.scene_links.count() >= 2:
             total += 1
-        if self.board_links.filter(is_ic_post=True).exists():
+        from evennia_links.collect import collect_dicts
+
+        content = collect_dicts(plot_signals.collect_thread_content, sender=type(self), thread=self)
+        if self.board_links.filter(is_ic_post=True).exists() or any(
+            value is True for value in content.values()
+        ):
             total += 1
         return total
 

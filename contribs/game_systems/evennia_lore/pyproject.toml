@@ -51,4 +51,5 @@ packages = ["evennia_lore", "evennia_lore.migrations", "evennia_lore.integration
 evennia_lore = [
     "templates/evennia_lore/*.html",
     "static/evennia_lore/css/*.css",
+    "guides/*.md",
 ]

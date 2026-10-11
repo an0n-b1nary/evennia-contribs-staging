@@ -20,6 +20,7 @@ a live site.
 """
 
 import logging
+from functools import partial
 
 from django.utils.module_loading import import_string
 
@@ -43,14 +44,19 @@ def registered():
 
 
 def _runtime_setting(name):
-    """(found, value) for an evennia_links runtime setting."""
+    """
+    (found, getter) for an evennia_links runtime setting.
+
+    The getter reads the database only when the check runs, so ``is_known``
+    (and ``guides_check``) can recognise the name without a database.
+    """
     try:
         from evennia_links import runtime
     except ImportError:
         return False, None
     if name not in runtime.registered():
         return False, None
-    return True, runtime.get(name)
+    return True, partial(runtime.get, name)
 
 
 def _resolve(name):

@@ -18,6 +18,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A character picked on the website (Evennia's own puppet link) now applies to
   every page and write here when the game installs evennia-links 0.8.1's
   `WebCharacterMiddleware`. No change is needed in this package.
+- **Added:** `plot_thread_concluded` now also sends `concluded_by`, the character
+  passed to `PlotThread.conclude()` (`None` when nobody was named). Receivers that
+  take `**kwargs` are unaffected. evennia-lore 0.5 uses it to remind whoever
+  concluded a thread that its linked lore still has sealed notes.
+
+## [0.3.3] - 2026-10-10
+
+- Add `collect_thread_content`, an optional collector for creative-content
+  providers such as NPCs. Its boolean contributions share the IC-post checklist
+  item; linking both never awards the point twice. No NPC dependency is added.
 
 ## [0.3.2] - 2026-10-09
 

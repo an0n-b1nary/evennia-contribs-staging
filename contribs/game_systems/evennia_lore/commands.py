@@ -18,8 +18,11 @@ Settings:
 
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
+from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
+from evennia_lore import layers
+from evennia_lore.layers import LoreLayerError
 from evennia_lore.models import (
     LoreAcquisition,
     LoreEntry,
@@ -112,10 +115,81 @@ def _can_edit_entry(entry, caller):
     return entry.author_id and caller.id == entry.author_id
 
 
+def _badges(entry, show_decline=False):
+    """Kind and affirmation badges, e.g. " |c[Legend]|n |g[Affirmed by staff]|n"."""
+    text = f" |c[{entry.kind_label}]|n"
+    label = entry.affirmation_label(show_decline=show_decline)
+    if label:
+        colour = "|g" if entry.affirmation == LoreEntry.Affirmation.AFFIRMED else "|y"
+        text += f" {colour}[{label}]|n"
+    return text
+
+
 def _format_entry_row(entry):
     """One-line compendium list row for a LoreEntry."""
     lock_badge = " |r[RESTRICTED]|n" if entry.privacy == LoreEntry.Privacy.RESTRICTED else ""
-    return f"  |w#{entry.entry_number}|n {entry.title}{lock_badge}{_web_link(entry)}"
+    return (
+        f"  |w#{entry.entry_number}|n {entry.title}{_badges(entry)}{lock_badge}{_web_link(entry)}"
+    )
+
+
+def _is_author(entry, caller):
+    return bool(entry.author_id and caller.id == entry.author_id)
+
+
+def _layer_summary(entry):
+    """Kind and accuracy after a submission, with where to go next."""
+    n = entry.entry_number
+    return (
+        f"\nKind: {entry.kind_label} | Accuracy: {layers.accuracy_label(entry.accuracy)}\n"
+        f"Change them with |w+lore/kind #{n}=<kind>|n and |w+lore/accuracy #{n}=<accuracy>|n; "
+        f"add OOC notes with |w+lore/ooc #{n}|n."
+    )
+
+
+# ---------------------------------------------------------------------------
+# EvEditor callbacks for the OOC notes and sealed notes (no length limit)
+# ---------------------------------------------------------------------------
+
+
+def _layer_load(caller):
+    ctx = getattr(caller.ndb, "_lore_layer_ctx", None) or {}
+    entry = LoreEntry.all_objects.filter(pk=ctx.get("pk")).first()
+    return getattr(entry, ctx.get("field", ""), "") if entry else ""
+
+
+def _layer_save(caller, buffer):
+    ctx = getattr(caller.ndb, "_lore_layer_ctx", None) or {}
+    entry = LoreEntry.all_objects.filter(pk=ctx.get("pk")).first()
+    if entry is None:
+        caller.msg("|rThat lore entry no longer exists.|n")
+        return False
+    return _apply_layer_text(caller, entry, ctx.get("field"), buffer.strip())
+
+
+def _layer_quit(caller):
+    caller.ndb._lore_layer_ctx = None
+    caller.msg("Editor closed.")
+
+
+def _apply_layer_text(caller, entry, field, text):
+    """Save OOC notes or sealed notes, reporting a broken rule instead of saving."""
+    try:
+        if field == "sealed_notes":
+            entry.seal(text)
+        else:
+            entry.update_layers(ooc_notes=text)
+    except LoreLayerError as err:
+        caller.msg(f"|r{err}|n")
+        return False
+    if field == "sealed_notes":
+        if text:
+            caller.msg(f"|gSealed notes saved on #{entry.entry_number}. Only staff can see them.|n")
+        else:
+            caller.msg(f"Sealed notes removed from #{entry.entry_number}. Nothing was published.")
+    else:
+        caller.msg(f"|gOOC notes saved on #{entry.entry_number}.|n")
+    return True
 
 
 def _get_model(label_setting_key, model_name, default_label):
@@ -141,7 +215,15 @@ class CmdLore(EditingMixin, MuxCommand):
         +lore/search <term>                Search by title or body text
         +lore/submit <title>               Open editor to write a new entry
         +lore/submit/scene <scene#>=<title> Submit + auto-link to a scene
-        +lore/edit <id>                    Edit your entry's body (EvEditor)
+        +lore/submit/<kind> <title>        Submit as a kind, e.g. +lore/submit/rumor
+        +lore/edit <id>                    Edit your entry's IC content (EvEditor)
+        +lore/kind <id>=<kind>             Fact, Rumor or Legend (your game may differ)
+        +lore/ooc <id>[=<text>]            Edit the OOC notes (EvEditor without text)
+        +lore/accuracy <id>=<accuracy>     accurate, inaccurate, partly or open
+        +lore/affirm <id>                  Ask staff to affirm your entry (staff: affirm)
+        +lore/decline <id>=<note>          Decline to affirm, with a note (staff only)
+        +lore/seal <id>[=<text>]           Edit sealed OOC notes (staff only)
+        +lore/unseal <id>=<accuracy>       Publish sealed notes, settle accuracy (staff)
         +lore/tag <id>=<tag>               Add a tag (creates if new)
         +lore/tag/major <id>=<tag>         Add a major tag (staff only)
         +lore/untag <id>=<tag>             Remove a tag
@@ -158,7 +240,21 @@ class CmdLore(EditingMixin, MuxCommand):
         +lore/history <id>                 View edit history for an entry
         +lore/diff <id>=<version#>         Show diff between a version and current
         +lore/acquired                     List entries you have acquired
-        +lore/queue                        List entries awaiting approval (staff only)
+        +lore/queue                        Entries awaiting approval or affirmation (staff)
+
+    Every entry has two layers. Its IC content is what characters know, and
+    it may be false: rumors and legends can be. Its OOC layer, the accuracy
+    and OOC notes, is what players know about it, and it is never false.
+
+    Affirmation is a visible staff mark that an entry is canon as described,
+    OOC notes included. Affirming a rumor never makes its claim true; it says
+    the rumor really circulates and its OOC notes are right. A decline is
+    shown only to the author. An edit after affirmation shows as "edited
+    since" until staff look again.
+
+    Sealed notes are OOC truths staff keep until the story settles them.
+    Accuracy stays open while notes are sealed, and holders are told when
+    staff unseal them.
     """
 
     key = "+lore"
@@ -190,22 +286,83 @@ class CmdLore(EditingMixin, MuxCommand):
             return self._do_search(lhs or args)
 
         if "submit" in sw:
+            # Any other switch names the kind. One that names no kind is refused:
+            # filing it under the default would record a rumor as a Fact.
+            kind_switches = [s for s in sw if s not in ("submit", "scene")]
+            kind = layers.match_kind(kind_switches[0]) if len(kind_switches) == 1 else None
+            if kind_switches and kind is None:
+                names = ", ".join(layers.kinds())
+                caller.msg(f"Unknown kind '{'/'.join(kind_switches)}'. Choose from: {names}.")
+                return
             if "scene" in sw:
                 if not lhs or not rhs:
                     caller.msg("Usage: |w+lore/submit/scene <scene#>=<title>|n")
                     return
-                return self._do_submit(rhs, scene_arg=lhs)
+                return self._do_submit(rhs, scene_arg=lhs, kind=kind)
             title = lhs or args
             if not title:
                 caller.msg("Usage: |w+lore/submit <title>|n")
                 return
-            return self._do_submit(title)
+            return self._do_submit(title, kind=kind)
 
         if "edit" in sw:
             if not lhs and not args:
                 caller.msg("Usage: |w+lore/edit <id>|n")
                 return
             return self._do_edit(lhs or args)
+
+        if "kind" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/kind <id>=<kind>|n")
+                return
+            return self._do_kind(lhs, rhs)
+
+        if "ooc" in sw:
+            if not lhs:
+                caller.msg("Usage: |w+lore/ooc <id>[=<text>]|n")
+                return
+            text = rhs if "=" in self.args else None
+            return self._do_layer_text(lhs, "ooc_notes", text)
+
+        if "accuracy" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/accuracy <id>=<accurate|inaccurate|partly|open>|n")
+                return
+            return self._do_accuracy(lhs, rhs)
+
+        if "affirm" in sw:
+            if not lhs:
+                caller.msg("Usage: |w+lore/affirm <id>|n")
+                return
+            return self._do_affirm(lhs)
+
+        if "decline" in sw:
+            if not is_staff(caller):
+                caller.msg("Only staff can decline affirmation.")
+                return
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/decline <id>=<note to the author>|n")
+                return
+            return self._do_decline(lhs, rhs)
+
+        if "unseal" in sw:
+            if not is_staff(caller):
+                caller.msg("Only staff can unseal notes.")
+                return
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/unseal <id>=<accurate|inaccurate|partly|open>|n")
+                return
+            return self._do_unseal(lhs, rhs)
+
+        if "seal" in sw:
+            if not is_staff(caller):
+                caller.msg("Only staff can seal notes.")
+                return
+            if not lhs:
+                caller.msg("Usage: |w+lore/seal <id>[=<text>]|n")
+                return
+            text = rhs if "=" in self.args else None
+            return self._do_layer_text(lhs, "sealed_notes", text)
 
         if "tag" in sw and "untag" not in sw:
             make_major = "major" in sw
@@ -334,7 +491,9 @@ class CmdLore(EditingMixin, MuxCommand):
         for e in entries:
             tags_str = " ".join(f"|c[{t.name}]|n" for t in e.tags.all()[:3]) or ""
             lock_badge = " |r[RESTRICTED]|n" if e.privacy == LoreEntry.Privacy.RESTRICTED else ""
-            lines.append(f"  |w#{e.entry_number}|n {e.title}{lock_badge}{_web_link(e)} {tags_str}")
+            lines.append(
+                f"  |w#{e.entry_number}|n {e.title}{_badges(e)}{lock_badge}{_web_link(e)} {tags_str}"
+            )
             if e.summary:
                 lines.append(f"      {e.summary[:80]}{'...' if len(e.summary) > 80 else ''}")
         lines.append("-" * 50)
@@ -351,10 +510,18 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg(err)
             return
 
-        if entry.privacy == LoreEntry.Privacy.RESTRICTED and not entry.is_accessible_to(caller):
+        staff = is_staff(caller)
+        badges = _badges(entry, show_decline=staff or _is_author(entry, caller))
+
+        if (
+            entry.privacy == LoreEntry.Privacy.RESTRICTED
+            and not staff
+            and not entry.is_accessible_to(caller)
+        ):
+            # The OOC layer follows the IC content: hidden until acquired.
             tags_str = ", ".join(t.name for t in entry.tags.all()) or "none"
             caller.msg(
-                f"|w== #{entry.entry_number}: {entry.title} ==|n\n"
+                f"|w== #{entry.entry_number}: {entry.title} ==|n{badges}\n"
                 f"|r[RESTRICTED]|n — Full contents require a storyteller to share this with you.\n"
                 f"Tags: {tags_str}\n"
                 + (f"Hint: {entry.summary}" if entry.summary else "(No hint available.)")
@@ -378,17 +545,49 @@ class CmdLore(EditingMixin, MuxCommand):
         except Exception:
             pass
 
+        # Labelled sections rather than rules alone, so a screen reader announces
+        # where the IC content ends and the always-true OOC layer begins.
+        rule = [] if uses_screenreader(caller) else ["-" * 50]
         lines = [
-            f"|w== #{entry.entry_number}: {entry.title} ==|n{_web_link(entry)}",
+            f"|w== #{entry.entry_number}: {entry.title} ==|n{badges}{_web_link(entry)}",
             f"Author: {entry.author_name} | Tags: {tags_str} | Regions: {regions_str}",
             f"Written: {entry.created_at.strftime('%Y-%m-%d')}",
-            "-" * 50,
+            *rule,
+            "|wIn character:|n",
             entry.body if entry.body else "|x(No content yet.)|n",
-            "-" * 50,
+            *rule,
+            "|wOut of character (always true):|n",
+            f"Accuracy: {layers.accuracy_label(entry.accuracy)}",
         ]
+        if entry.ooc_notes:
+            lines.append(entry.ooc_notes)
+        if entry.has_sealed_notes:
+            if staff:
+                lines.append(f"|ySealed notes (staff only):|n\n{entry.sealed_notes}")
+            else:
+                lines.append("Some OOC notes are sealed until the story settles this.")
+        if entry.affirmation == LoreEntry.Affirmation.DECLINED and (
+            staff or _is_author(entry, caller)
+        ):
+            lines.append(
+                f"|yAffirmation declined (only you and staff see this):|n {entry.affirmation_note}"
+            )
+        if staff and entry.edited_since_affirmation and entry.affirmed_version is not None:
+            affirmed_body = entry.affirmed_version + 1
+            if entry.versions.filter(version_number=affirmed_body).exists():
+                lines.append(
+                    f"|yEdited since affirmation.|n The affirmed IC content is "
+                    f"|w+lore/diff #{entry.entry_number}={affirmed_body}|n."
+                )
+            else:
+                lines.append(
+                    "|yEdited since affirmation.|n No IC content edit was recorded; "
+                    "check the OOC layer, title and summary."
+                )
+        lines += rule
         if entry.summary:
             lines.append(f"|wSummary:|n {entry.summary}")
-        if is_staff(caller) and entry.is_flagged:
+        if staff and entry.is_flagged:
             lines.append(f"|r[FLAGGED]|n {entry.flag_reason}")
         caller.msg("\n".join(lines))
 
@@ -410,7 +609,7 @@ class CmdLore(EditingMixin, MuxCommand):
             lines.append(_format_entry_row(e))
         caller.msg("\n".join(lines))
 
-    def _do_submit(self, title, scene_arg=None):
+    def _do_submit(self, title, scene_arg=None, kind=None):
         caller = self.caller
         if LoreEntry.objects.filter(
             title__iexact=title, status=LoreEntry.Status.PUBLISHED
@@ -419,7 +618,7 @@ class CmdLore(EditingMixin, MuxCommand):
                 f"|rA PUBLISHED entry titled '{title}' already exists.|n Use a different title."
             )
             return
-        caller.ndb._lore_submit_ctx = {"title": title, "scene_arg": scene_arg}
+        caller.ndb._lore_submit_ctx = {"title": title, "scene_arg": scene_arg, "kind": kind}
         self.start_new_edit(_lore_submit_save)
 
     def _do_edit(self, arg):
@@ -432,6 +631,166 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg("You can only edit your own lore entries.")
             return
         self.start_edit(entry, field_name="body", version_model_class=LoreVersion)
+
+    def _editable(self, arg, action):
+        """Resolve an entry the caller may edit, or message why not and return None."""
+        caller = self.caller
+        entry, err = _resolve_entry(arg, caller)
+        if err:
+            caller.msg(err)
+            return None
+        if not _can_edit_entry(entry, caller):
+            caller.msg(f"Only the entry author (or staff) can {action}.")
+            return None
+        return entry
+
+    def _do_kind(self, entry_arg, kind_text):
+        caller = self.caller
+        entry = self._editable(entry_arg, "change its kind")
+        if entry is None:
+            return
+        kind = layers.match_kind(kind_text)
+        if kind is None:
+            names = ", ".join(layers.kinds().values())
+            caller.msg(f"Unknown kind '{kind_text}'. Choose from: {names}.")
+            return
+        try:
+            entry.update_layers(kind=kind)
+        except LoreLayerError as err:
+            caller.msg(f"|r{err}|n")
+            return
+        caller.msg(
+            f"|g#{entry.entry_number} is now a {entry.kind_label}.|n "
+            f"Accuracy: {layers.accuracy_label(entry.accuracy)}."
+        )
+
+    def _do_accuracy(self, entry_arg, accuracy_text):
+        caller = self.caller
+        entry = self._editable(entry_arg, "change its accuracy")
+        if entry is None:
+            return
+        accuracy = layers.match_accuracy(accuracy_text)
+        if accuracy is None:
+            caller.msg("Accuracy is one of: accurate, inaccurate, partly, open.")
+            return
+        try:
+            entry.update_layers(accuracy=accuracy)
+        except LoreLayerError as err:
+            hint = ""
+            if accuracy in layers.NEEDS_NOTES and not entry.ooc_notes.strip():
+                hint = f" Add them with |w+lore/ooc #{entry.entry_number}|n first."
+            caller.msg(f"|r{err}|n{hint}")
+            return
+        caller.msg(
+            f"|g#{entry.entry_number}'s accuracy is now {layers.accuracy_label(accuracy)}.|n"
+        )
+
+    def _do_layer_text(self, entry_arg, field, text):
+        """Set OOC or sealed notes inline, or open the editor when no text is given."""
+        caller = self.caller
+        if field == "sealed_notes":
+            entry, err = _resolve_entry(entry_arg, caller)
+            if err:
+                caller.msg(err)
+                return
+            if text is None and not entry.has_sealed_notes:
+                # Say now, not after the editor closes, that the entry can't be sealed.
+                try:
+                    layers.validate(
+                        entry.kind, entry.accuracy, entry.ooc_notes, "sealed", check_kind=False
+                    )
+                except LoreLayerError as err:
+                    caller.msg(
+                        f"|r{err}|n Set it with |w+lore/accuracy #{entry.entry_number}=open|n."
+                    )
+                    return
+        else:
+            entry = self._editable(entry_arg, "edit its OOC notes")
+            if entry is None:
+                return
+        if text is not None:
+            _apply_layer_text(caller, entry, field, text.strip())
+            return
+        if getattr(caller.ndb, "_editing_context", None) or getattr(
+            caller.ndb, "_lore_layer_ctx", None
+        ):
+            caller.msg(
+                "You already have an editing session open. "
+                "Finish or quit it first (|w:q|n or |w:wq|n)."
+            )
+            return
+        caller.ndb._lore_layer_ctx = {"pk": entry.pk, "field": field}
+        EvEditor(
+            caller,
+            loadfunc=_layer_load,
+            savefunc=_layer_save,
+            quitfunc=_layer_quit,
+            key="lore_notes",
+            persistent=False,
+        )
+
+    def _do_affirm(self, arg):
+        caller = self.caller
+        entry, err = _resolve_entry(arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        try:
+            if is_staff(caller):
+                entry.affirm(affirmed_by=caller)
+                caller.msg(
+                    f"|g#{entry.entry_number} '{entry.title}' affirmed as it stands, "
+                    f"OOC notes included.|n"
+                )
+                return
+            if not _is_author(entry, caller):
+                caller.msg("Only an entry's author can ask staff to affirm it.")
+                return
+            entry.request_affirmation(requested_by=caller)
+        except LoreLayerError as err:
+            caller.msg(f"|r{err}|n")
+            return
+        caller.msg(
+            f"|gAffirmation requested for #{entry.entry_number}.|n Everyone sees the request; "
+            "staff will affirm the entry or tell you what they'd change."
+        )
+
+    def _do_decline(self, entry_arg, note):
+        caller = self.caller
+        entry, err = _resolve_entry(entry_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        try:
+            entry.decline(declined_by=caller, note=note)
+        except LoreLayerError as err:
+            caller.msg(f"|r{err}|n")
+            return
+        caller.msg(
+            f"|y#{entry.entry_number} declined.|n Only its author and staff see the decline "
+            "and your note."
+        )
+
+    def _do_unseal(self, entry_arg, accuracy_text):
+        caller = self.caller
+        entry, err = _resolve_entry(entry_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        accuracy = layers.match_accuracy(accuracy_text)
+        if accuracy is None:
+            caller.msg("Accuracy is one of: accurate, inaccurate, partly, open.")
+            return
+        try:
+            holders = entry.unseal(accuracy, unsealed_by=caller)
+        except LoreLayerError as err:
+            caller.msg(f"|r{err}|n")
+            return
+        plural = "" if holders == 1 else "s"
+        caller.msg(
+            f"|gUnsealed #{entry.entry_number}.|n Its notes are now public and its accuracy "
+            f"is {layers.accuracy_label(accuracy)}. {holders} holder{plural} told."
+        )
 
     def _do_tag(self, entry_arg, tag_name, make_major=False):
         caller = self.caller
@@ -713,17 +1072,35 @@ class CmdLore(EditingMixin, MuxCommand):
 
     def _do_queue(self):
         entries = LoreEntry.objects.filter(status=LoreEntry.Status.SUBMITTED).order_by("created_at")
-        if not entries.exists():
-            self.caller.msg("No entries awaiting approval.")
+        requests = LoreEntry.objects.filter(
+            status=LoreEntry.Status.PUBLISHED, affirmation=LoreEntry.Affirmation.REQUESTED
+        ).order_by("entry_number")
+        if not entries.exists() and not requests.exists():
+            self.caller.msg("No entries awaiting approval or affirmation.")
             return
-        lines = ["|w== Approval Queue ==|n"]
-        for e in entries:
-            flag_badge = " |r[FLAGGED]|n" if e.is_flagged else ""
+        lines = []
+        if entries.exists():
+            lines.append("|w== Approval Queue ==|n")
+            for e in entries:
+                flag_badge = " |r[FLAGGED]|n" if e.is_flagged else ""
+                lines.append(
+                    f"  #{e.entry_number} {e.title} — by {e.author_name} "
+                    f"({e.created_at.strftime('%Y-%m-%d')}){flag_badge}"
+                )
+            lines.append("Use |w+lore/approve #N|n or |w+lore/reject #N=<reason>|n to action.")
+        if requests.exists():
+            if lines:
+                lines.append("")
+            lines.append("|w== Affirmation Requests ==|n")
+            for e in requests:
+                lines.append(
+                    f"  #{e.entry_number} {e.title} — by {e.author_name} "
+                    f"({e.kind_label}, {layers.accuracy_label(e.accuracy)})"
+                )
             lines.append(
-                f"  #{e.entry_number} {e.title} — by {e.author_name} "
-                f"({e.created_at.strftime('%Y-%m-%d')}){flag_badge}"
+                "Read each with |w+lore/read #N|n, then |w+lore/affirm #N|n or "
+                "|w+lore/decline #N=<note>|n."
             )
-        lines.append("\nUse |w+lore/approve #N|n or |w+lore/reject #N=<reason>|n to action.")
         self.caller.msg("\n".join(lines))
 
 
@@ -732,9 +1109,10 @@ def _lore_submit_save(caller, content):
     ctx = getattr(caller.ndb, "_lore_submit_ctx", None)
     title = ctx["title"] if ctx else "Untitled"
     scene_arg = ctx.get("scene_arg") if ctx else None
+    kind = ctx.get("kind") if ctx else None
     caller.ndb._lore_submit_ctx = None
 
-    entry = LoreEntry.create_entry(title=title, author=caller, body=content)
+    entry = LoreEntry.create_entry(title=title, author=caller, body=content, kind=kind)
 
     if scene_arg and scene_arg.isdigit():
         try:
@@ -749,6 +1127,7 @@ def _lore_submit_save(caller, content):
                 f"|gLore entry #{entry.entry_number} '{entry.title}' submitted "
                 f"and linked to scene #{scene_arg}.|n\n"
                 f"Status: {entry.get_status_display()}"
+                f"{_layer_summary(entry)}"
             )
             return
         except Exception:
@@ -759,6 +1138,7 @@ def _lore_submit_save(caller, content):
     caller.msg(
         f"|gLore entry #{entry.entry_number} '{entry.title}' submitted.|n\n"
         f"Status: {entry.get_status_display()}"
+        f"{_layer_summary(entry)}"
     )
 
 

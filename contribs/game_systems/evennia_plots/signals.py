@@ -8,7 +8,8 @@ Thread lifecycle signals:
     plot_thread_created   — new PlotThread created (proposed status).
     plot_thread_activated — PlotThread transitioned proposed → active.
     plot_thread_concluded — PlotThread concluded; bonus_xp computed.
-                            kwargs: thread, bonus_xp
+                            kwargs: thread, bonus_xp, concluded_by (the
+                            character who concluded it, or None)
     plot_thread_archived  — PlotThread archived (stale, no bonus).
 
 Content-linking signals:
@@ -65,3 +66,7 @@ plot_thread_edited = Signal()
 # Arc typology (XP-batch seam)
 arc_type_changed = Signal()
 arc_currency_changed = Signal()
+
+# kwargs: thread; providers return {provider_key: bool}. A True contributes
+# creative content to the existing one-point checklist item, never extra XP.
+collect_thread_content = Signal()

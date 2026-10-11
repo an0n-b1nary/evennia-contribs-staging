@@ -43,8 +43,22 @@
     <label for="id_region_filter" class="sr-only">Filter by region</label>
     <input type="text" id="id_region_filter" name="region" value="{{ region_filter }}"
            class="form-control form-control-sm evennia-lore-filter-control evennia-lore-narrow" placeholder="Region…">
+    <label for="id_kind_filter" class="sr-only">Filter by kind</label>
+    <select id="id_kind_filter" name="kind" class="form-control form-control-sm evennia-lore-filter-control evennia-lore-narrow">
+      <option value="">Any kind</option>
+      {% for key, label in kind_choices %}
+      <option value="{{ key }}"{% if key == kind_filter %} selected{% endif %}>{{ label }}</option>
+      {% empty %}<option value="" disabled>No kinds configured</option>
+      {% endfor %}
+    </select>
+    <label for="id_affirmation_filter" class="sr-only">Filter by affirmation</label>
+    <select id="id_affirmation_filter" name="affirmation" class="form-control form-control-sm evennia-lore-filter-control evennia-lore-narrow">
+      <option value="">Any affirmation</option>
+      <option value="affirmed"{% if affirmation_filter == "affirmed" %} selected{% endif %}>Affirmed by staff</option>
+      <option value="requested"{% if affirmation_filter == "requested" %} selected{% endif %}>Affirmation requested</option>
+    </select>
     <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
-    {% if search_filter or tag_filter or theme_filter or region_filter %}
+    {% if search_filter or tag_filter or theme_filter or region_filter or kind_filter or affirmation_filter %}
     <a href="{% url 'lore-list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
     {% endif %}
   </form>
@@ -66,6 +80,7 @@
     <tr role="row">
       <th role="columnheader" scope="col">#</th>
       <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Kind</th>
       <th role="columnheader" scope="col">Tags</th>
       <th role="columnheader" scope="col">Author</th>
       {% if is_staff %}<th role="columnheader" scope="col">Privacy</th>{% endif %}
@@ -83,10 +98,16 @@
         {% if entry.pk in acquired_pks %}
         <span class="badge badge-success ml-1">Acquired</span>
         {% endif %}
+        {% if entry.affirmation == 'affirmed' %}
+        <span class="badge badge-success ml-1">{{ entry.affirmation_label }}</span>
+        {% elif entry.affirmation == 'requested' %}
+        <span class="badge badge-warning text-dark ml-1">Affirmation requested</span>
+        {% endif %}
         {% if entry.summary %}
         <br><small class="text-muted">{{ entry.summary|truncatechars:100 }}</small>
         {% endif %}
       </td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Kind</span>{{ entry.kind_label }}</td>
       <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Tags</span>
         {% for tag in entry.tags.all %}
         <a href="?tag={{ tag.name|urlencode }}"
@@ -107,7 +128,7 @@
 {% include "evennia_lore/_pagination.html" with extra_params=extra_params %}
 
 {% else %}
-{% if search_filter or tag_filter or theme_filter or region_filter %}
+{% if search_filter or tag_filter or theme_filter or region_filter or kind_filter or affirmation_filter %}
 {% include "evennia_lore/_empty_state.html" with message="No lore entries found matching your filters." action_url="/lore/new/" action_label="Submit the first entry" %}
 {% else %}
 {% include "evennia_lore/_empty_state.html" with message="No lore entries found." action_url="/lore/new/" action_label="Submit the first entry" %}

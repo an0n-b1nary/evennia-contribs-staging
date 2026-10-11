@@ -58,4 +58,37 @@
 {% else %}
 {% include "evennia_lore/_empty_state.html" with message="No entries awaiting approval." %}
 {% endif %}
+
+<h2 class="h4 mt-4 mb-3">Affirmation requests</h2>
+<p class="text-muted small mb-3">
+  Affirming says an entry is canon as described, OOC notes included. It never makes a rumor's claim true.
+</p>
+{% if affirmation_requests %}
+<div class="evennia-lore-table-scroll" role="region" aria-label="Affirmation requests" tabindex="0">
+<table role="table" class="evennia-lore-table-stack table table-striped">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">#</th>
+      <th role="columnheader" scope="col">Title</th>
+      <th role="columnheader" scope="col">Kind</th>
+      <th role="columnheader" scope="col">Accuracy</th>
+      <th role="columnheader" scope="col">Author</th>
+    </tr>
+  </thead>
+  <tbody role="rowgroup">
+    {% for entry in affirmation_requests %}
+    <tr role="row">
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Number</span>{{ entry.entry_number }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Title</span><a href="{% url 'lore-detail' entry.pk %}">{{ entry.title }}</a></td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Kind</span>{{ entry.kind_label }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Accuracy</span>{{ entry.get_accuracy_display }}</td>
+      <td role="cell"><span class="evennia-lore-cell-label" aria-hidden="true">Author</span>{% if not entry.author_id and entry.author_name == "Unknown" %}Unattributed{% else %}{{ entry.author_name|default:"Unattributed" }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+{% include "evennia_lore/_empty_state.html" with message="No affirmation requests." %}
+{% endif %}
 {% endblock %}

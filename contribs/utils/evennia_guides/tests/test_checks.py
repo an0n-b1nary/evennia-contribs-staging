@@ -52,6 +52,32 @@ class TestResolution(SimpleTestCase):
             checks.register_check("guides.test", True)
 
 
+class TestRuntimeSettingIsKnownWithoutDatabase(SimpleTestCase):
+    """Validation recognises a runtime setting's name; only checking reads it."""
+
+    def tearDown(self):
+        try:
+            from evennia_links import runtime
+        except ImportError:
+            return
+        runtime._registry.pop("GUIDES_TEST_RUNTIME_NAME", None)
+
+    def test_is_known_reads_no_database(self):
+        try:
+            from evennia_links import runtime
+        except ImportError:
+            self.skipTest("evennia_links isn't installed")
+        runtime.register(
+            "GUIDES_TEST_RUNTIME_NAME",
+            False,
+            validator=lambda v: isinstance(v, bool),
+            description="",
+        )
+        # SimpleTestCase refuses database queries, so reading the value here
+        # would make the name look unknown.
+        self.assertTrue(checks.is_known("GUIDES_TEST_RUNTIME_NAME"))
+
+
 class TestRuntimeSetting(EvenniaTest):
     """A links runtime setting follows a staff change without a restart."""
 

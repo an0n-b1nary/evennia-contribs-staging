@@ -28,3 +28,7 @@
   .evennia-lore-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
   .evennia-lore-table-stack .evennia-lore-cell-label { display: block; font-size: .8rem; font-weight: 600; }
 }
+
+/* The OOC layer reads as a separate, always-true panel beside the IC content. */
+.evennia-lore-ooc { border-left: 4px solid #6c757d; padding-left: 1rem; }
+.evennia-lore-decline { flex-basis: 100%; max-width: 32rem; }

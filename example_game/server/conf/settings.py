@@ -80,6 +80,7 @@ INSTALLED_APPS += [
     # so it is absent whenever chargen is.
     "evennia_rp_equipment",
     "evennia_rp_contest",
+    "evennia_npcs",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -220,6 +221,15 @@ RP_CONTEST_SHOW_RATINGS_TO_ROOM = False
 RP_CONTEST_CHALLENGE_IDLE_TTL = 3 * 60 * 60
 RP_CONTEST_SCENES_APP_LABEL = "evennia_scenes"
 RP_CONTEST_RPTRACKER_APP_LABEL = "evennia_rptracker"
+
+######################################################################
+# NPCs (evennia-npcs) - reusable identities, sharing and attributed portrayal
+######################################################################
+NPCS_REVEALED = True
+NPCS_FROZEN = False
+NPCS_COMBAT_PROFILES_REVEALED = False
+NPCS_TYPECLASS = "typeclasses.npcs.NPC"
+NPCS_ALLOW_FULL_PUPPET = True
 
 ######################################################################
 # Accessibility (evennia-accessibility)
@@ -528,6 +538,16 @@ LORE_REGIONS_APP_LABEL = "evennia_regions"
 # Shipped provider: room, primary region and plot threads, each through the
 # label settings above (an absent partner just drops its part).
 LORE_SESSION_CONTEXT_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
+
+# Kinds say how the world treats an entry's IC content. These are lore's
+# defaults, spelled out so the sandbox shows where a game would change them.
+# A Fact is always accurate; a new Rumor or Legend starts with accuracy "open".
+LORE_KINDS = {"fact": "Fact", "rumor": "Rumor", "legend": "Legend"}
+LORE_ACCURATE_KINDS = ("fact",)
+LORE_DEFAULT_KIND = "fact"
+# Affirmation requests, and sealed lore left on a thread a player concluded,
+# become +discuss tickets. Without the hook they wait in +lore/queue.
+LORE_STAFF_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
 
 ######################################################################
 # Regions configuration

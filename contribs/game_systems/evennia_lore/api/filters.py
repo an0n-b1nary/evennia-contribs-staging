@@ -3,6 +3,7 @@
 """django-filter FilterSets for evennia_lore API."""
 
 import django_filters
+from django.db.models import Q
 
 from evennia_lore.models import LoreEntry, LoreTag
 
@@ -21,10 +22,31 @@ class LoreEntryFilter(django_filters.FilterSet):
     privacy = django_filters.CharFilter(field_name="privacy", lookup_expr="exact")
     status = django_filters.CharFilter(field_name="status", lookup_expr="exact")
     region = django_filters.NumberFilter(method="filter_region")
+    kind = django_filters.CharFilter(field_name="kind", lookup_expr="exact")
+    affirmation = django_filters.CharFilter(method="filter_affirmation")
 
     class Meta:
         model = LoreEntry
-        fields = ["privacy", "status"]  # noqa: RUF012
+        fields = ["privacy", "status", "kind"]  # noqa: RUF012
+
+    def filter_affirmation(self, queryset, name, value):
+        """Filter by affirmation; only staff may list declined entries."""
+        from evennia_lore.models import LoreEntry
+        from evennia_lore.permissions import get_character_id, is_staff_user
+
+        if not is_staff_user(self.request):
+            if value == LoreEntry.Affirmation.DECLINED:
+                return queryset.none()
+            if value == LoreEntry.Affirmation.NONE:
+                # Match the serialized state: other authors' declines read as
+                # "none". Excluding them here would reveal a private decline by
+                # comparing the unfiltered listing with ?affirmation=none.
+                hidden_declines = Q(affirmation=LoreEntry.Affirmation.DECLINED)
+                character_id = get_character_id(self.request.user) if self.request else None
+                if character_id:
+                    hidden_declines &= ~Q(author_id=character_id)
+                return queryset.filter(Q(affirmation=value) | hidden_declines)
+        return queryset.filter(affirmation=value)
 
     def filter_region(self, queryset, name, value):
         """Filter entries linked to a region via the LoreRegionLink bridge."""

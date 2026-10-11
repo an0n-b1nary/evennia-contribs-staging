@@ -12,10 +12,12 @@ Public API (model classes loaded lazily to avoid AppRegistryNotReady):
     PlotLoreLink        — bridge: LoreEntry ↔ PlotThread (integer soft-ref)
     LoreSceneLink       — bridge: LoreEntry ↔ Scene (integer soft-ref)
     LoreRegionLink      — bridge: LoreEntry ↔ Region (integer soft-ref)
+    LoreNotice          — an OOC notice kept for an offline character
 
 Signals (eagerly exported — plain Signal() objects, safe at app-load time):
 
-    lore_entry_created, lore_entry_published, lore_entry_edited, lore_acquired
+    lore_entry_created, lore_entry_published, lore_entry_edited, lore_acquired,
+    lore_affirmation_changed, lore_unsealed
 
 Commands (import explicitly):
 
@@ -35,9 +37,11 @@ __version__ = "0.5.0"
 
 from evennia_lore.signals import (
     lore_acquired,
+    lore_affirmation_changed,
     lore_entry_created,
     lore_entry_edited,
     lore_entry_published,
+    lore_unsealed,
 )
 
 _LAZY = {
@@ -48,20 +52,24 @@ _LAZY = {
     "PlotLoreLink": "models",
     "LoreSceneLink": "models",
     "LoreRegionLink": "models",
+    "LoreNotice": "models",
 }
 
 __all__ = [
     "LoreAcquisition",
     "LoreEntry",
+    "LoreNotice",
     "LoreRegionLink",
     "LoreSceneLink",
     "LoreTag",
     "LoreVersion",
     "PlotLoreLink",
     "lore_acquired",
+    "lore_affirmation_changed",
     "lore_entry_created",
     "lore_entry_edited",
     "lore_entry_published",
+    "lore_unsealed",
 ]
 
 

@@ -357,7 +357,39 @@ class Command(BaseCommand):
             counts["stalls"] = 1
         if apps.is_installed("evennia_rp_crafting"):
             counts.update(self._create_crafting(authors, rooms))
+        if apps.is_installed("evennia_npcs"):
+            counts.update(self._create_npcs(authors, rooms))
         return counts
+
+    def _create_npcs(self, authors, rooms):
+        from evennia_npcs import services
+        from evennia_npcs.models import NPCBlueprint, NPCPermission
+
+        owner = authors[0]
+        original = owner.location
+        owner.location = rooms["market"]
+        for spec in content.NPCS:
+            blueprint = NPCBlueprint.objects.filter(name=spec["name"]).first()
+            if blueprint is None:
+                blueprint = services.create_blueprint(owner, **spec, stat_block={"presence": "B"})
+            else:
+                # Rebind demo definitions after their old tagged authors were
+                # purged. Player-created NPCs and their history are untouched.
+                blueprint.creator = owner
+                blueprint.creator_name = owner.key
+                blueprint.description = spec["description"]
+                blueprint.archived = False
+                blueprint.save()
+                blueprint.permissions.filter(level="owner").delete()
+                NPCPermission.objects.update_or_create(
+                    blueprint=blueprint,
+                    holder=owner,
+                    defaults={"holder_name": owner.key, "level": "owner"},
+                )
+            record = services.spawn(owner, blueprint)
+            record.spawned_object.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+        owner.location = original
+        return {"npc_blueprints": len(content.NPCS), "npc_spawns": len(content.NPCS)}
 
     def _create_crafting(self, authors, rooms):
         from django.apps import apps
@@ -825,8 +857,16 @@ class Command(BaseCommand):
                 author=author,
                 body=spec["body"],
                 privacy=LoreEntry.Privacy.PUBLIC,
+                kind=spec.get("kind"),
+                accuracy=spec.get("accuracy"),
+                ooc_notes=spec.get("ooc_notes", ""),
             )
             entry.tags.set([tags[name] for name in spec.get("tags", ())])
+            if spec.get("sealed_notes"):
+                entry.seal(spec["sealed_notes"])
+            if spec.get("affirmed"):
+                # Seeded, not decided by anyone: no notice to the author.
+                entry.affirm(notify=False)
             entries[spec["slug"]] = entry
         return entries
 
@@ -1119,7 +1159,7 @@ class Command(BaseCommand):
         everywhere is indistinguishable from one that is broken.
         """
         from evennia_calendar.models import SceneCalendarLink
-        from evennia_lore.models import LoreRegionLink, LoreSceneLink
+        from evennia_lore.models import LoreRegionLink, LoreSceneLink, PlotLoreLink
         from evennia_plots.models import PlotThread, ScenePlotLink
 
         count = 0
@@ -1138,6 +1178,9 @@ class Command(BaseCommand):
 
         thread = PlotThread.objects.get(name=content.PLOT_THREAD["name"])
         thread.activate()
+        for entry_slug in content.LORE_PLOT_LINKS:
+            PlotLoreLink.objects.create(thread_id=thread.pk, entry=entries[entry_slug])
+            count += 1
         for scene_slug in content.PLOT_SCENE_SLUGS:
             if scene_slug not in scenes:
                 continue
