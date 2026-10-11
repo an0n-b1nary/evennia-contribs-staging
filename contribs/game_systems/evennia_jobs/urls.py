@@ -12,6 +12,7 @@ URL names: job-list, job-all, job-create, job-detail, job-comment.
 
 from django.urls import path
 
+from evennia_jobs.request_views import RequestReviewView, StructuredRequestView
 from evennia_jobs.views import (
     JobAllView,
     JobCommentCreateView,
@@ -23,6 +24,9 @@ from evennia_jobs.views import (
 urlpatterns = [
     path("", JobListView.as_view(), name="job-list"),
     path("all/", JobAllView.as_view(), name="job-all"),
+    path("forms/<slug:form_key>/", StructuredRequestView.as_view(), name="job-request-form"),
+    path("<int:pk>/revise/", StructuredRequestView.as_view(), name="job-request-revise"),
+    path("<int:pk>/review/", RequestReviewView.as_view(), name="job-request-review"),
     path("new/<str:job_type>/", JobCreateView.as_view(), name="job-create"),
     path("<int:pk>/", JobDetailView.as_view(), name="job-detail"),
     path("<int:pk>/comment/", JobCommentCreateView.as_view(), name="job-comment"),

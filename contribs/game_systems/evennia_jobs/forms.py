@@ -9,7 +9,8 @@ Requires the [web] optional-dependency set (evennia-accessibility).
 from django import forms
 
 from evennia_accessibility import AccessibleForm, AccessibleModelForm
-from evennia_jobs.models import Job
+from evennia_jobs.models import Job, RequestOutcome
+from evennia_jobs.requests import clean_answer, clean_answers
 
 
 class JobCreateForm(AccessibleModelForm):
@@ -70,3 +71,72 @@ class JobCommentForm(AccessibleForm):
         if not content:
             raise forms.ValidationError("Comment cannot be empty.")
         return content
+
+
+class AcknowledgementWidget(forms.CheckboxInput):
+    """Preserve the submitted value for shared yes/no validation."""
+
+    def value_from_datadict(self, data, files, name):
+        return data.get(name, False)
+
+
+class RequestAnswerField(forms.Field):
+    """Django field adapter for the core answer validator."""
+
+    def __init__(self, question):
+        self.question = question
+        kind = question["type"]
+        if kind == "boolean":
+            widget = AcknowledgementWidget()
+        elif kind == "choice":
+            widget = forms.Select(
+                choices=[("", "Choose an answer"), *[(v, v) for v in question["choices"]]]
+            )
+        elif kind == "longtext":
+            widget = forms.Textarea(attrs={"rows": 4, "maxlength": question["max_length"]})
+        else:
+            widget = forms.TextInput(attrs={"maxlength": question["max_length"]})
+        super().__init__(
+            label=question["label"],
+            help_text=question["help_text"],
+            required=question["required"],
+            widget=widget,
+        )
+
+    def to_python(self, value):
+        return clean_answer(self.question, value)
+
+
+class StructuredRequestForm(AccessibleForm):
+    """Accessible fields built from the same schema used by the command questionnaire."""
+
+    title = forms.CharField(max_length=255)
+    schema_token = forms.CharField(widget=forms.HiddenInput)
+    revision = forms.IntegerField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, schema, locked_title=None, **kwargs):
+        self.schema = schema
+        super().__init__(*args, **kwargs)
+        if locked_title is not None:
+            self.fields["title"].disabled = True
+            self.fields["title"].initial = locked_title
+        for question in schema["questions"]:
+            self.fields[f"answer_{question['key']}"] = RequestAnswerField(question)
+        # The base form ran before these dynamic fields existed.
+        self._add_widget_attrs()
+
+    def clean(self):
+        """Use the shared validator after field-level HTML form validation."""
+        data = super().clean()
+        if not self.errors:
+            answers = {q["key"]: data[f"answer_{q['key']}"] for q in self.schema["questions"]}
+            data["answers"] = clean_answers(self.schema, answers)
+        return data
+
+
+class RequestReviewForm(AccessibleForm):
+    """An explicit staff decision with a stale-review guard."""
+
+    revision = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+    outcome = forms.ChoiceField(choices=RequestOutcome.choices)
+    reason = forms.CharField(label="Explanation", max_length=10000, widget=forms.Textarea)

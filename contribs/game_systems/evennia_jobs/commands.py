@@ -24,6 +24,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
 from evennia_jobs.models import JobPriority, JobStatus, JobType
+from evennia_jobs.request_commands import format_submissions, handle_request, handle_review
 
 try:
     from evennia_accessibility import uses_screenreader
@@ -153,6 +154,7 @@ def _format_job_detail(job, viewer_is_staff, sr_mode=False):
         if job.closed_at:
             lines.append(f"  Closed: {job.closed_at.strftime('%Y-%m-%d %H:%M')} UTC")
         lines.append(f"Description: {job.description}")
+        lines.append(format_submissions(job))
         if comments.exists():
             lines.append("Comments:")
             for c in comments:
@@ -187,6 +189,7 @@ def _format_job_detail(job, viewer_is_staff, sr_mode=False):
         lines.append(f" Closed   : {job.closed_at.strftime('%Y-%m-%d %H:%M')} UTC")
     lines.append("|b" + "-" * 70 + "|n")
     lines.append(job.description)
+    lines.append(format_submissions(job))
     lines.append("|b" + "-" * 70 + "|n")
 
     if comments.exists():
@@ -304,6 +307,15 @@ class CmdRequest(MuxCommand):
         +request <title>=<description>  - Submit a new request (inline)
         +request/comment <id>           - Add a comment (opens editor)
         +request/comment <id>=<text>    - Add a comment (inline)
+        +request/forms                 - List enabled questionnaires
+        +request/form <key>=<title>     - Start a questionnaire
+        +request/answer <key>=<text>    - Answer or change a question
+        +request/edit <key>             - Write a multiline text answer in the editor
+        +request/resume                - Show the next unanswered question
+        +request/preview               - Review your answers
+        +request/submit                - Submit the questionnaire
+        +request/cancel                - Discard unsubmitted answers
+        +request/revise <id>            - Revise after staff request changes
 
     Creates a ticket of type 'request' for staff review. Use this for
     proposals, suggestions, questions, or anything that needs staff input.
@@ -317,6 +329,9 @@ class CmdRequest(MuxCommand):
     def func(self):
         caller = self.caller
         switches = [s.lower() for s in self.switches]
+
+        if handle_request(self):
+            return
 
         if "comment" in switches:
             self._add_comment()
@@ -675,6 +690,9 @@ class CmdJobs(MuxCommand):
         +jobs/staffonly <id>=<text>     - Add staff-only note (inline)
         +jobs/close <id>                - Close a ticket
         +jobs/reopen <id>               - Reopen a closed ticket
+        +jobs/approve <id> <revision>=<reason> - Approve this revision
+        +jobs/decline <id> <revision>=<reason> - Decline this revision
+        +jobs/revise <id> <revision>=<reason>  - Ask for a new revision
 
     Staff-only command for full ticket management. Staff-only notes
     (via /staffonly) are hidden from the ticket submitter.
@@ -688,6 +706,9 @@ class CmdJobs(MuxCommand):
     def func(self):
         caller = self.caller
         switches = [s.lower() for s in self.switches]
+
+        if handle_review(self):
+            return
 
         if not switches:
             if not self.args:

@@ -49,6 +49,26 @@
   </div>
 </div>
 
+{% for submission in submissions %}
+<section aria-label="Submission revision {{ submission.revision }}" class="mb-4">
+  <h2>{{ submission.schema.label }} — revision {{ submission.revision }}</h2>
+  <p>Submitted {{ submission.created_at|date:"Y-m-d H:i" }} UTC</p>
+  <dl>
+    {% for row in submission.answer_rows %}
+    <dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd>
+    {% empty %}<dt>Answers</dt><dd>No saved answers.</dd>
+    {% endfor %}
+  </dl>
+  {% if submission.decision %}
+    <p><strong>{{ submission.decision.get_outcome_display }}</strong> by {{ submission.decision.reviewer_name }}, {{ submission.decision.created_at|date:"Y-m-d H:i" }} UTC</p>
+    <p>{{ submission.decision.reason|linebreaksbr }}</p>
+  {% else %}<p>Awaiting review.</p>{% endif %}
+</section>
+{% empty %}{% comment %}Ordinary tickets have no structured submission history.{% endcomment %}
+{% endfor %}
+{% if can_revise %}<p><a class="btn btn-primary" href="{% url 'job-request-revise' job.pk %}">Revise proposal</a></p>{% endif %}
+{% if can_review %}<p><a class="btn btn-primary" href="{% url 'job-request-review' job.pk %}">Review proposal</a></p>{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="mb-0">Comments <span class="badge badge-secondary">{{ comments|length }}</span></h2>
   {% if is_submitter or is_staff %}

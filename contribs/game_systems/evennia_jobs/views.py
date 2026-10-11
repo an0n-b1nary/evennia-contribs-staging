@@ -40,6 +40,7 @@ from evennia_jobs.authoring import AuthoringMixin
 from evennia_jobs.forms import JobCommentForm, JobCreateForm
 from evennia_jobs.models import Job, JobComment, JobStatus, JobType
 from evennia_jobs.permissions import get_character_id, is_staff_user
+from evennia_jobs.requests import request_forms
 
 _VALID_JOB_TYPES = frozenset({JobType.REQUEST.value, JobType.BUG.value, JobType.ISSUE.value})
 # Query-string prefill is a starting point the submitter edits, never trusted input.
@@ -80,6 +81,7 @@ class JobListView(LoginRequiredMixin, ListView):
         context["page_title"] = "My Tickets"
         context["is_staff"] = is_staff_user(self.request)
         context["show_all"] = False
+        context["request_forms"] = request_forms()
         return context
 
 
@@ -150,6 +152,19 @@ class JobDetailView(LoginRequiredMixin, DetailView):
         context["comments"] = comments_qs
         context["hide_reporter"] = job.job_type == JobType.ISSUE and not staff
         context["is_submitter"] = character_id is not None and job.author_id == character_id
+        context["submissions"] = job.submissions.select_related("decision")
+        latest = job.submissions.last()
+        context["can_revise"] = (
+            context["is_submitter"]
+            and job.status != JobStatus.CLOSED
+            and latest
+            and hasattr(latest, "decision")
+            and latest.decision.outcome == "changes_requested"
+            and latest.form_key in request_forms()
+        )
+        context["can_review"] = (
+            staff and latest and not hasattr(latest, "decision") and job.status != JobStatus.CLOSED
+        )
 
         return context
 

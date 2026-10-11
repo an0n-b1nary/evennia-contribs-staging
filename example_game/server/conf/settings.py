@@ -515,6 +515,10 @@ CALENDAR_STAFF_LOCK = "cmd:perm(Builder)"
 
 JOBS_STAFF_LOCK = "cmd:perm(Builder)"
 
+# Settings own the question sets and narrative consent wording. Only the
+# building proposal is enabled; Pattern and Region workflows are examples.
+from world.sandbox.content import JOBS_REQUEST_FORMS as JOBS_REQUEST_FORMS
+
 ######################################################################
 # Lore configuration
 ######################################################################

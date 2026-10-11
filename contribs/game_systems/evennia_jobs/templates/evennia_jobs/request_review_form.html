@@ -1,0 +1,25 @@
+{% extends "website/base.html" %}
+{% block header_ext %}{{ block.super }}{% include "evennia_jobs/_styles.html" %}{% endblock %}
+{% block titleblock %}{{ page_title }}{% endblock %}
+{% block content %}
+<h1>{{ page_title }}</h1>
+<p>{{ submission.schema.label }} — revision {{ submission.revision }}</p>
+<dl>
+{% for row in submission.answer_rows %}
+  <dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd>
+{% empty %}<dt>Answers</dt><dd>No saved answers.</dd>
+{% endfor %}
+</dl>
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  {{ form.revision }}
+  <fieldset>
+    <legend>Staff decision</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.outcome %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.reason %}
+  </fieldset>
+  {% url 'job-detail' job.pk as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Record decision" %}
+</form>
+{% endblock %}
