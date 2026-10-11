@@ -85,12 +85,24 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         self.assertEqual(self.grounds.room_type, "ooc")
         plaque = next(obj for obj in self.grounds.contents if obj.key == content.PLAQUE_KEY)
         self.assertIn("+test/set", plaque.db.desc)
-        for sample, spec in zip(self.samples, content.RP_SAMPLE_BUILDS, strict=True):
+        from world.ruleset import COMBAT_ABILITIES
+
+        combat = apps.is_installed("evennia_rp_combat")
+        costs = {entry["key"]: entry.get("budget_cost", 0) for entry in COMBAT_ABILITIES}
+        for index, (sample, spec) in enumerate(
+            zip(self.samples, content.RP_SAMPLE_BUILDS, strict=True)
+        ):
             build = CharacterBuild.objects.get(character=sample)
             self.assertTrue(build.is_playable)
             self.assertEqual(build.allocation_spent, 14)
             self.assertEqual(build.allowance_spent, 0)
-            self.assertEqual(abilities.loadout_used(sample), 10)
+            # Combat Abilities join the domain ability only when combat is installed.
+            extra = (
+                sum(costs[key] for key in content.RP_SAMPLE_COMBAT_ABILITIES[index])
+                if combat
+                else 0
+            )
+            self.assertEqual(abilities.loadout_used(sample), 10 + extra)
             for ability, tag in spec["abilities"]:
                 self.assertTrue(abilities.find_owned(sample, ability, tag).equipped)
         challenges = list(Challenge.objects.filter(room=self.grounds))
