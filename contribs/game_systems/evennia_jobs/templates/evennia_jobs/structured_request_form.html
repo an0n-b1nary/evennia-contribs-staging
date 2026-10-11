@@ -1,0 +1,22 @@
+{% extends "website/base.html" %}
+{% block header_ext %}{{ block.super }}{% include "evennia_jobs/_styles.html" %}{% endblock %}
+{% block titleblock %}{{ page_title }}{% endblock %}
+{% block content %}
+<h1>{{ page_title }}</h1>
+<p>{{ description|linebreaksbr }}</p>
+{% if job %}<p>Revising ticket #{{ job.job_number }}. Earlier submissions remain in its history.</p>{% endif %}
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  {% for field in form.hidden_fields %}{{ field }}{% empty %}{% comment %}No hidden fields.{% endcomment %}{% endfor %}
+  <fieldset>
+    <legend>Proposal details</legend>
+    {% for field in form.visible_fields %}
+      {% include "evennia_accessibility/_form_field.html" with field=field %}
+    {% empty %}<p>No questions are available.</p>
+    {% endfor %}
+  </fieldset>
+  {% url 'job-list' as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Submit for review" %}
+</form>
+{% endblock %}

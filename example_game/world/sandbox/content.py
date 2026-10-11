@@ -919,3 +919,78 @@ NPCS = (
         "description": "An envoy listens carefully before speaking for the delegation.",
     },
 )
+######################################################################
+# Structured Jobs requests (no construction tools are required to propose)
+######################################################################
+
+JOBS_REQUEST_FORMS = {
+    "build": {
+        "label": "Propose a build",
+        "description": (
+            "Propose a home, shop or public extension for staff review. "
+            "Construction tools will follow; approval of this proposal does not create rooms."
+        ),
+        "questions": [
+            {
+                "key": "kind",
+                "label": "Kind of build",
+                "type": "choice",
+                "choices": ["interior", "frontier"],
+            },
+            {
+                "key": "purpose",
+                "label": "Purpose",
+                "type": "choice",
+                "choices": ["home", "shop", "public", "other"],
+            },
+            {
+                "key": "attachment",
+                "label": "Where should it attach?",
+                "help_text": "Name the existing room; include a compass direction for a frontier extension.",
+            },
+            {"key": "rooms", "label": "Proposed rooms and descriptions"},
+            {"key": "terrain", "label": "Requested terrain changes", "required": False},
+            {"key": "region", "label": "Requested region changes", "required": False},
+            {
+                "key": "collaborators",
+                "label": "Collaborators and their contributions",
+                "required": False,
+                "help_text": "Each contributor must separately acknowledge reuse before their content is approved.",
+            },
+            {
+                "key": "reuse",
+                "label": "I acknowledge that content I contribute to this build may be reused in a later game or storyline. Reuse is not guaranteed.",
+                "type": "boolean",
+            },
+        ],
+    },
+    "pattern": {
+        "label": "Propose a Pattern",
+        "enabled": False,
+        "questions": [
+            ("name", "Pattern name"),
+            ("origin", "Origin in the setting"),
+            ("niches", "Applicable niches"),
+            ("behavior", "What does it allow?"),
+            ("hallmark", "Proposed hallmark"),
+        ],
+    },
+    "region": {
+        "label": "Propose a Region",
+        "enabled": False,
+        "questions": [
+            ("name", "Region name"),
+            ("description", "Describe the region"),
+            ("rooms", "Included rooms"),
+        ],
+    },
+}
+
+REQUEST_DEMO_TITLE = "[Demo] A library proposal"
+REQUEST_DEMO_ANSWERS = {
+    "kind": "interior",
+    "purpose": "public",
+    "attachment": IC_ROOMS_BY_SLUG["market"].name,
+    "rooms": "[Placeholder] A reading room with shelves and a shared table.",
+    "reuse": True,
+}

@@ -2,7 +2,20 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from django.contrib import admin
 
-from evennia_jobs.models import Job, JobComment
+from evennia_jobs.models import Job, JobComment, RequestDecision, RequestSubmission
+
+
+class RequestSubmissionInline(admin.TabularInline):
+    """Inspect historical submissions without editing or deleting them."""
+
+    model = RequestSubmission
+    extra = 0
+    can_delete = False
+    fields = ["revision", "form_key", "schema", "answers", "created_at"]  # noqa: RUF012
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class JobCommentInline(admin.TabularInline):
@@ -29,7 +42,21 @@ class JobAdmin(admin.ModelAdmin):
     readonly_fields = ["job_number", "created_at", "updated_at", "closed_at"]  # noqa: RUF012
     raw_id_fields = ["author", "assignee"]  # noqa: RUF012
     ordering = ["-priority", "created_at"]  # noqa: RUF012
-    inlines = [JobCommentInline]  # noqa: RUF012
+    inlines = [JobCommentInline, RequestSubmissionInline]  # noqa: RUF012
+
+
+@admin.register(RequestDecision)
+class RequestDecisionAdmin(admin.ModelAdmin):
+    """Decisions are recorded through review services, never raw admin writes."""
+
+    list_display = ["submission", "outcome", "reviewer_name", "created_at"]  # noqa: RUF012
+    readonly_fields = [field.name for field in RequestDecision._meta.fields]  # noqa: RUF012
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(JobComment)
