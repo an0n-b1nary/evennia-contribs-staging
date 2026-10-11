@@ -895,6 +895,28 @@ class TestRevival(SimpleTestCase):
         self.assertEqual(F(engine.assessment(state)["one"]), before + F(ally["hp"], 200))
         self.assertEqual(ally["exposure"], exposure)
 
+    def test_fights_saved_by_0_1_resolve_without_the_new_fields(self):
+        new_exchange = ("revival", "waive_recovery", "public_bet", "blood", "tempo", "taunting")
+        new_row = ("recovering", "revive", "tempo")
+        for burst in (False, True):
+            state = duel(attacker=ruled({"rule": "measured_tempo", "amount": "1/4", "cap": 2}))
+            token = declare(state, burst=burst)
+            exchange = exchange_of(state, token)
+            for key in (*new_exchange, "tempo_accuracy"):
+                exchange.pop(key, None)
+            for row in state["participants"].values():
+                for key in new_row:
+                    row.pop(key, None)
+            saved = json.loads(json.dumps(state))
+            engine.reaction_view(saved, 2, token)
+            engine.cancel(saved, 2, token)
+            self.assertEqual(exchange_of(saved, token)["phase"], "canceled")
+            engine.reaction(state, 2, token, "resist")
+            if burst:
+                engine.press(state, 1, 50, stop=True)
+            self.assertEqual(exchange_of(state, token)["phase"], "done")
+            self.assertEqual(engine.participant(state, 1).get("tempo", 0), 0 if burst else 1)
+
     def test_fade_and_rejoin_keep_incapacitation_and_recovery(self):
         state, ally, _healer = self.party()
         engine.fade(state, 3)
