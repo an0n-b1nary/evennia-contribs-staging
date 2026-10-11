@@ -32,7 +32,7 @@ Odds tool:
     python -m evennia_rp_rules.odds --help
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 _LAZY = {
     "Scale": "scales",

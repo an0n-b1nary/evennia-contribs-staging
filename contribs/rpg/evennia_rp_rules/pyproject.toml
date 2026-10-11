@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-rules"
-version = "0.1.0"
+version = "0.1.1"
 description = "Value-neutral resolution kernel for Evennia RP games: graded stats with pips, outcome ladders, pluggable resolvers, exact odds."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -36,3 +36,6 @@ packages = ["evennia_rp_rules"]
 
 [tool.setuptools.package-dir]
 "evennia_rp_rules" = "."
+
+[tool.setuptools.package-data]
+evennia_rp_rules = ["guides/*.md"]

@@ -368,3 +368,13 @@ check it was asked for modifiers on.
 `evennia-rp-contest` (`+test` challenges) are built on this release. Combat
 will add the reserved phases' behaviour (declarations, reaction offers) and an
 action/reaction layer on top of the same checks, modifiers and outcome ladder.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `checks`,
+`glossary-grade`, `glossary-pip`. They explain the system to players in general
+terms, without exact numbers, and link only to pages this contrib or its
+required dependencies ship. With evennia-guides installed they appear on its
+web guide; without it they're ignored. To restate one for your game, add a page
+with the same key to `GUIDES_DIRS`.

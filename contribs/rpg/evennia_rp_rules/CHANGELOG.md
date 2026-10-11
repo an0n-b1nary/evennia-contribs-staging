@@ -7,7 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.1.1] - 2026-10-10
+
+### Added
+
+- A player guide page for evennia-guides, `checks` (grades, pips and
+  outcomes) and the `glossary-grade` and `glossary-pip` terms, in `guides/` and
+  the package data. It describes the system in general terms, without exact
+  numbers, and links only to pages this contrib or its required dependencies
+  ship. Without evennia-guides it's ignored.
 
 ### Documentation
 
