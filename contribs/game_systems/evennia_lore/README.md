@@ -92,6 +92,8 @@ class CharacterCmdSet(CmdSet):
 | `LORE_SCENES_APP_LABEL` | `"evennia_scenes"` | App label for scenes (used for scene links + hint regions) |
 | `LORE_PLOTS_APP_LABEL` | `"evennia_plots"` | App label for plots (used for plot-lore links and lean) |
 | `LORE_REGIONS_APP_LABEL` | `"evennia_regions"` | App label for regions (used for region weighting and hint) |
+| `LORE_MAP_LOCKED_NOTE` | `"not yet known: learned through roleplay"` | The note beside a public entry the viewer's character hasn't learned, in the map's room panel |
+| `LORE_MAP_ENTRY_URL_NAME` | `"lore-detail"` | Route the room panel links known entries to; `""` for no links |
 
 ---
 
@@ -238,7 +240,7 @@ The trickle and bridge cleanup register only when the partner app is present:
 | `LORE_SCENES_APP_LABEL` | Register `connect_soft_ref_cleanup` for Scene→LoreSceneLink | LoreSceneLink rows orphaned on hard-delete (rare; harmless) |
 | `LORE_PLOTS_APP_LABEL` | Register cleanup for PlotThread→PlotLoreLink; remind whoever concludes a thread of its sealed lore | Same; no reminder |
 | `LORE_REGIONS_APP_LABEL` | Register cleanup for Region→LoreRegionLink | Same |
-| `LORE_MAPS_APP_LABEL` | Offer the `has_lore` map tile overlay | No overlay; nothing imported |
+| `LORE_MAPS_APP_LABEL` | Offer the `has_lore` map tile overlay, and the `lore` section of the map's room panel (evennia-maps 0.9+) | No overlay or section; nothing imported |
 
 ### The map tile overlay
 
@@ -259,6 +261,23 @@ The pin uses the same eligibility as the passive pool — PUBLISHED + PUBLIC + n
 **regardless of whether the viewer is staff**. A pin does not name an entry; it says "there
 is lore here" on a public page, and widening it for staff would only make the map disagree
 with the compendium.
+
+### The room panel's lore section
+
+Clicking a room on the live map opens its panel, and `provide_detail` answers the map's
+`collect_tile_detail` signal with a `lore` section for the room's primary region. It's
+per viewer, the character the visitor plays on the website:
+
+- **Known entries**, ones the character holds a `LoreAcquisition` for, are listed and linked.
+- **Public entries it doesn't know yet** are listed by title, locked, with
+  `LORE_MAP_LOCKED_NOTE` beside them. That's the point of the section: it shows a player
+  there's lore here they could still pick up through play.
+- **Restricted entries it doesn't know** are counted, never titled. Only a storyteller's
+  `+share` grants them, so naming one would publish what the restriction holds back.
+
+The summary reads like "4 entries are tied to this region. You know 1." Staff see every
+entry listed and linked, restricted ones noted as such. Three queries per click: the
+region, its entries, and which of them the viewer knows.
 
 
 ---

@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.7.0] - 2026-10-10
+
+- **Added:** a `lore` section in evennia-maps' room panel (0.9+), for the room's
+  primary region and the viewer's character. Entries it knows are linked; public
+  entries it doesn't know are listed locked, with `LORE_MAP_LOCKED_NOTE` beside
+  them; restricted entries it doesn't know are counted, never titled. Staff see
+  every entry, restricted ones noted. `LORE_MAP_ENTRY_URL_NAME` names the entry
+  route. Three queries per click.
+
 ## [0.6.0] - 2026-10-10
 
 - **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
