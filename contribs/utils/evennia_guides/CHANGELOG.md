@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.1] - 2026-10-10
+
+- **Docs:** a contrib's pages link and tag only pages that it or its required
+  dependencies ship; optional partners are named in prose.
+
 ## [0.2.0] - 2026-10-10
 
 - **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
