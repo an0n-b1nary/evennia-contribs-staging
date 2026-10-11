@@ -569,6 +569,9 @@ class TestPolicies(SimpleTestCase):
                 "penalties",
                 "bonuses",
                 "estimates",
+                "damage_boost",
+                "surge",
+                "reactions",
             },
         )
         self.assertNotIn("bet", vars(view))

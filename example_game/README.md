@@ -1503,3 +1503,11 @@ combat leaves the Signature library usable. The sandbox tests include
 `world.sandbox.test_combat` for real partner seams. Run the integration gate
 with `evennia test --settings test_settings.py typeclasses commands world`
 and closed stdin; confirm a positive test count.
+
+Combat 0.1.1 exposes the optional `RP_COMBAT_PARTNERS` registry, empty by
+default here. Providers keep versioned fight data, freeze public packet
+modifiers and append plain-text status/help through the contracts in
+`contribs/rpg/evennia_rp_combat/PARTNERS.md`. The combat seam also checks
+retained data and pending packets with a provider disabled. No additional
+database migration, seed content or golden-database change is required for
+this API alone.
