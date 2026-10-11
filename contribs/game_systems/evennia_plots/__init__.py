@@ -34,7 +34,7 @@ Web/API surface (requires [web] extra):
     from evennia_plots.api.views import PlotThreadViewSet
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 from evennia_plots.signals import (
     arc_currency_changed,
