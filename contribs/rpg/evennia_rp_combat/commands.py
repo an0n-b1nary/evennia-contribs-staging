@@ -47,6 +47,7 @@ class CmdCombat(MuxCommand):
     +combat/rollback seq=reason  Staff only, whole-fight consistent checkpoint
     +combat/journal              Public sequence summaries for recovery
     +combat/result exchange      Recover committed results after reconnect
+    +combat/help                 Core help and installed partner commands
 
     +combat acts only as your own character (or, with /npc, as the NPC you
     control). Storyteller actions live in +combatstory. Add /npc to direct
@@ -90,6 +91,8 @@ class CmdCombat(MuxCommand):
         operation = switches[0] if switches else ""
         if not operation:
             self.msg(services.render(self.caller, subject=subject))
+        elif operation == "help":
+            self.msg(services.help_for(self.caller))
         elif operation == "setup":
             services.setup(self.caller, reason=self.args.strip())
         elif operation == "join":

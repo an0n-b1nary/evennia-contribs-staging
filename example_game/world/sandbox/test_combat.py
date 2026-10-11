@@ -9,9 +9,50 @@ from evennia.utils.test_resources import EvenniaCommandTest
 
 from world.sandbox.test_rp_partners import RPSeedMixin
 
+FOUNDATION_PROVIDER = None  # Assigned only within the extension seam test.
+
 
 @skipUnless(apps.is_installed("evennia_rp_combat"), "Combat partner absent")
 class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
+    def test_partner_snapshots_use_real_frozen_sheets_and_survive_absence(self):
+        from evennia_rp_combat import partners, services
+
+        provider = partners.Provider(
+            upgrade=lambda section: section or {"schema": 1, "data": {"retained": True}},
+            snapshot=lambda state, declaration: partners.PacketModifiers(
+                damage_boost="20", facts=(("target", declaration.target_id),)
+            ),
+            status=lambda state, subject: ("Foundation partner active.",),
+        )
+        registry = {
+            "foundation": {
+                "app": "evennia_rp_combat",
+                "provider": "world.sandbox.test_combat.FOUNDATION_PROVIDER",
+            }
+        }
+        first, second = self.samples[:2]
+        with (
+            patch("world.sandbox.test_combat.FOUNDATION_PROVIDER", provider),
+            override_settings(RP_COMBAT_PARTNERS=registry),
+        ):
+            services.setup(first)
+            services.join(first, "one")
+            services.join(second, "two")
+            exchange_id = services.declare(first, [second])
+            state = services.state_for(first)
+            saved = state["exchanges"][exchange_id]["partner_modifiers"][str(second.pk)]
+            self.assertEqual(saved["foundation"]["damage_boost"], "20")
+            self.assertTrue(state["participants"][str(first.pk)]["build"]["scores"])
+            self.assertIn("Foundation partner active", services.render(first))
+            with override_settings(RP_COMBAT_PARTNERS={}):
+                services.react(second, f"{exchange_id}:1", "resist")
+                self.assertIn("partner rules unavailable", services.render(first))
+            reloaded = services.state_for(first)
+            self.assertEqual(reloaded["partners"]["foundation"]["data"], {"retained": True})
+            self.assertEqual(
+                reloaded["exchanges"][exchange_id]["partner_modifiers"][str(second.pk)], saved
+            )
+
     def test_seeded_signatures_tactics_and_command_registration(self):
         from commands.default_cmdsets import CharacterCmdSet
         from evennia_rp_chargen.models import SignatureMove

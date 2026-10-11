@@ -1,6 +1,6 @@
 # evennia-rp-combat
 
-> **Preview (0.1.0, Pre-Alpha).** Pin an exact commit. Initial coefficients
+> **Preview (0.1.1, Pre-Alpha).** Pin an exact commit. Initial coefficients
 > are a playtesting baseline; no human balance result is claimed.
 
 Consent-based room combat for Evennia 6.x: personal turns, queued reactions,
@@ -187,6 +187,13 @@ status and actor_id. Companion emitters may pause from it. Mechanics carry
 views are plain text with explicit labels and no color-dependent choices.
 No web endpoints, rewards, PvP ownership, Party or Boss Check subsystem ships.
 The included guide is discovered automatically by optional evennia-guides.
+
+The [partner contract](PARTNERS.md) provides pure, registered declaration
+modifiers, journaled partner state and plain-text status/help extensions.
+State upgrades happen on load, including rollback, without rewriting old
+snapshots or frozen builds. Uninstalled providers leave their data intact
+and display an unavailable notice. This foundation does not install Party
+or add revival, Boss Checks or new Ability mechanics.
 
 ## Verification
 

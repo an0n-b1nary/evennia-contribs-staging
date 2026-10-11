@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-combat"
-version = "0.1.0"
+version = "0.1.1"
 description = "Consent-based RP combat with durable tactics, bounded exchanges and host-defined stat sources."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -31,4 +31,4 @@ packages = ["evennia_rp_combat", "evennia_rp_combat.migrations"]
 "evennia_rp_combat.migrations" = "migrations"
 
 [tool.setuptools.package-data]
-evennia_rp_combat = ["guides/*.md"]
+evennia_rp_combat = ["guides/*.md", "PARTNERS.md"]

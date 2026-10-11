@@ -30,9 +30,10 @@ from evennia.utils.create import create_script
 
 from evennia_links import runtime
 
-from . import conf, engine, policies, tactics
+from . import conf, engine, partners, policies, tactics
 from .data import TIERS, ActionView, Build, CombatError, Move
 from .sources import snapshot
+from .state import upgrade
 
 MAINTENANCE_KEY = "rp_combat_maintenance"
 
@@ -107,6 +108,7 @@ def hydrate(fight, state):
     """Replace each participant's build digest with its frozen build, in place."""
     from .models import FightBuild
 
+    state = upgrade(state)
     rows = [row for row in state["participants"].values() if "build_id" in row]
     builds = dict(
         FightBuild.objects.filter(
@@ -138,15 +140,11 @@ def stored(fight, state):
 def load(fight):
     """The fight's validated state with builds in place, detached from the row."""
     state = clone(fight.state)
-    validate_state(state)
     return hydrate(fight, state)
 
 
 def validate_state(state):
-    if not isinstance(state, dict) or state.get("schema") != 1:
-        raise CombatError(
-            "Unsupported combat state version; staff must restore or migrate this fight. No progress was applied."
-        )
+    return upgrade(state)
 
 
 def ensure_maintenance():
@@ -405,6 +403,7 @@ def commit(
     )
     if state["ended"] and fight.status == fight.OPEN:
         fight.status, fight.closed_at = fight.ENDED, timezone.now()
+    partners.emit(state, partners.Event("state_changed", str(getattr(actor, "pk", "")), "", 0))
     fight.state = stored(fight, state)
     fight.save()
     synchronize_locks(fight, state, release=release)
@@ -536,8 +535,7 @@ def quietly(fight, mutate):
     Fight = _fights()
     with transaction.atomic():
         fight = Fight.objects.select_for_update().get(pk=fight.pk)
-        state = clone(fight.state)
-        validate_state(state)
+        state = validate_state(fight.state)
         result = mutate(state)
         fight.state = state
         fight.save(update_fields=["state", "updated_at"])
@@ -891,6 +889,8 @@ def run_automatic(state, room):
         for token in list(row["incoming"]):
             exchange = engine.get_exchange(state, token)
             if row["id"] in exchange["reactions"]:
+                continue
+            if not partners.modifiers(exchange, row["id"]).auto_resolve:
                 continue
             attacker = ObjectDB.objects.filter(pk=exchange["actor"]).first()
             if attacker is None or ignored_by(subject, attacker) or ignored_by(attacker, subject):
@@ -1681,7 +1681,20 @@ def render(actor, *, subject=None):
             for side, value in engine.assessment(state).items()
         )
     )
+    lines.extend(plain(line, 500) for line in partners.lines(state, key))
     return "\n".join(lines)
+
+
+def help_for(actor):
+    require(actor)
+    fight = _fights().objects.filter(room=actor.location, status="open").first()
+    state = load(fight) if fight else engine.new_state()
+    return "\n".join(
+        [
+            "Use help +combat for core commands.",
+            *(plain(line, 500) for line in partners.lines(state, actor.pk, help=True)),
+        ]
+    )
 
 
 def odds(actor, token, *, subject=None):
@@ -1704,7 +1717,7 @@ def odds(actor, token, *, subject=None):
     lines = [
         f"Incoming {plain(token)}: neutral RPS estimates; unseen offensive scores use a neutral damage estimate."
     ]
-    for reaction in ("evade", "resist", "overpower"):
+    for reaction in view.reactions:
         result = arithmetic.resolve(
             incoming,
             view.build,
@@ -1718,6 +1731,8 @@ def odds(actor, token, *, subject=None):
             pressure=view.pressure,
             penalty=Fraction(dict(view.penalties)[reaction]),
             bonus=Fraction(dict(view.bonuses)[reaction]),
+            damage_boost=Fraction(view.damage_boost),
+            surge=Fraction(view.surge),
         )
         lines.append(
             f"{reaction.title()}: {result.chance}% success; successful incoming damage estimate {result.damage}. "

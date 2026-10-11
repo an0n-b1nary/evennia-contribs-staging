@@ -188,6 +188,9 @@ class ReactionView:
     penalties: tuple[tuple[str, str], ...] = ()
     bonuses: tuple[tuple[str, str], ...] = ()
     estimates: bool = True
+    damage_boost: str = "0"
+    surge: str = "0"
+    reactions: tuple[str, ...] = REACTIONS
 
 
 @dataclass(frozen=True)
