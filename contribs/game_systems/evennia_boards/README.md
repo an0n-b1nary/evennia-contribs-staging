@@ -199,6 +199,14 @@ post_created.connect(my_handler)
 board_unread_notified.connect(my_handler)
 ```
 
+## Theming
+
+Every colour in this contrib's stylesheet is a shared `--evennia-color-*`
+token with its usual colour as the fallback, so the pages look the same
+until your game sets one. Set them on `:root` in your own stylesheet to
+retheme these pages along with the other contribs'. The token list and an
+example are in [evennia-accessibility's README](../../utils/evennia_accessibility/README.md#theme-tokens).
+
 ---
 
 ## License
