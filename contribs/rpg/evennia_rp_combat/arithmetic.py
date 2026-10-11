@@ -119,14 +119,22 @@ def resolve(
     multiplier=1,
     counter_multiplier=1,
     ignore_penetrating=False,
+    rps_shift=(0, 0),
     damage_boost=0,
     surge=0,
 ):
     """Resolve one packet; damage is before remaining-Vitality truncation.
 
     ``penalty`` is nonnegative exposure; ``bonus`` is a signed reaction
-    modifier. Public callers omit RPS; policy callers never receive it.
+    modifier. Public callers omit RPS; policy callers never receive it,
+    except a bet its attacker made public. ``rps_shift`` adds points to the
+    bet's penalty and bonus (the attacker's own rules). The defender's own
+    conditional rules come from ``defense``, so previews and automatic
+    reactions see exactly what manual resolution applies.
     """
+    from .modifiers import rules
+
+    own = rules(defense)
     if reaction not in ("evade", "resist", "overpower") or rps not in RPS:
         raise CombatError("Unknown reaction or RPS bet.")
     if type(roll) is not int or not 1 <= roll <= 100:
@@ -138,7 +146,11 @@ def resolve(
     agility = defense.score("agility")
     defensive = defense.score(f"{move.action}_defense")
     spirit, defender_spirit = F(spirit, 100), F(defender_spirit, 100)
-    rps_bonus = RPS[rps][reaction]
+    rps_bonus = F(RPS[rps][reaction])
+    if rps_bonus < 0:
+        rps_bonus = min(F(0), rps_bonus - F(rps_shift[0]))
+    elif rps_bonus > 0:
+        rps_bonus = max(F(0), rps_bonus + F(rps_shift[1]))
     if ignore_penetrating and rps == "penetrating" and reaction == "resist":
         rps_bonus = 0
     modifier = bonus - penalty + rps_bonus
@@ -164,29 +176,43 @@ def resolve(
             + modifier
         )
     else:
+        gap_penalty = rule("overpower_lower_power_penalty") * max(power - cp, 0)
+        if "finesse" in own:
+            # A more accurate counter recovers part of the Power-gap penalty.
+            gap_penalty = max(F(0), gap_penalty - own["finesse"]["amount"] * max(ca - accuracy, 0))
+        if "desperate_counter" in own:
+            defender_spirit = max(defender_spirit, F(0))
         chance = threshold(
             rule("overpower_base")
             + rule("overpower_accuracy_weight") * (ca - accuracy)
             + defender_spirit
             - spirit
-            - (0 if slip_inside else rule("overpower_lower_power_penalty") * max(power - cp, 0))
+            - (0 if slip_inside else gap_penalty)
             + modifier
         )
     success = roll <= chance
-    glancing = reaction == "evade" and chance < roll <= min(100, chance + 10)
+    band = 10
+    glance_fraction = F(1, 2)
+    if "stoneskin" in own:
+        # Sturdiness turns some clean hits into glancing blows, never into
+        # clean Evades; the domain slice stays nearest a clean hit.
+        band += min(own["stoneskin"]["cap"], max(F(0), own["stoneskin"]["band"] * defensive))
+        glance_fraction -= own["stoneskin"]["mitigation"]
+    glancing = reaction == "evade" and chance < roll <= min(100, chance + band)
     domain = not success
     if reaction == "evade" and glancing:
-        domain = roll > min(100, chance + 10) - 2
+        domain = roll > min(100, chance + band) - 2
     fraction = F(1)
     if reaction == "evade":
-        fraction = F(0) if success else F(1, 2) if glancing else F(1)
+        fraction = F(0) if success else glance_fraction if glancing else F(1)
     elif success and reaction == "resist":
         fraction = clamp(
             rule("resist_min_fraction"),
             rule("resist_max_fraction"),
             rule("resist_fraction")
             - defensive * rule("resist_defense_fraction")
-            + pressure * rule("resist_pressure_fraction"),
+            + pressure * rule("resist_pressure_fraction")
+            - own.get("deflect", {}).get("amount", F(0)) * max(agility, F(0)),
         )
     elif success:
         fraction = clamp(
@@ -249,9 +275,9 @@ def support_values(
     return -rounded(100 * value * (F(1, 4) if repeat else 1)) if success else 0, 0, success
 
 
-def burst_ante(spirit):
-    paid = min(600, spirit + 1000)
-    return spirit - paid, 600 - paid
+def burst_ante(spirit, ante=600):
+    paid = min(ante, spirit + 1000)
+    return spirit - paid, ante - paid
 
 
 def burst_transfer(damage, will, actor_spirit, target_spirit, debt):

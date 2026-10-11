@@ -43,3 +43,17 @@ its modifiers are inactive while absent and status explains that fact.
 Reinstalling applies only already stored inputs to existing declarations,
 and samples new inputs for future declarations. Provider owners must keep
 their upgrade functions pure and idempotent. See [PARTNERS.md](PARTNERS.md).
+
+## Upgrade from 0.1.1 to 0.2.0
+
+No model migration is added. `state.upgrade` advances fights from schema 2
+to 3 on load, giving every participant 0.2's defaults: no pending recovery,
+revival offers asked for rather than accepted, and no Measured Tempo
+charges. Retained fights, including shelved fights and old rollback
+checkpoints, load unchanged otherwise; exchanges recorded before 0.2 simply
+lack the new exchange fields and resolve as before. Stored snapshots and
+FightBuild rows are never rewritten. Hosts using the new conditional
+Abilities register `combat_rule` in `RP_RULES_EFFECT_KINDS` before seeding
+catalog entries that use it; existing `combat_bonus` entries are unchanged.
+Domain Resistance now takes effect in combat for builds that already carry
+it.

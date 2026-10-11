@@ -7,7 +7,11 @@ from copy import deepcopy
 from . import partners
 from .data import CombatError
 
-SCHEMA = 2
+SCHEMA = 3
+
+# Combat 0.2's per-participant fields: a pending recovery action, the
+# standing choice about allies' revivals, and Measured Tempo charges.
+PARTICIPANT_DEFAULTS = {"recovering": False, "revive": "ask", "tempo": 0}
 
 
 def upgrade(value):
@@ -17,6 +21,11 @@ def upgrade(value):
     if state["schema"] == 1:
         state.setdefault("partners", {})
         state["schema"] = 2
+    if state["schema"] == 2:
+        for row in state["participants"].values():
+            for key, default in PARTICIPANT_DEFAULTS.items():
+                row.setdefault(key, default)
+        state["schema"] = 3
     if state["schema"] != SCHEMA:
         raise CombatError(
             "Unsupported combat state version; staff must restore or migrate this fight."

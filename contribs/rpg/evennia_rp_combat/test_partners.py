@@ -13,7 +13,7 @@ from evennia.utils.test_resources import EvenniaCommandTest
 from . import arithmetic, engine, partners, policies, services
 from .commands import CmdCombat
 from .data import CombatError, Move
-from .state import upgrade
+from .state import SCHEMA, upgrade
 from .tests import build, declare, duel
 
 REGISTRY = {
@@ -69,14 +69,26 @@ class TestStateUpgrade(SimpleTestCase):
         original = deepcopy(old)
         upgraded = upgrade(old)
         self.assertEqual(old, original)
-        self.assertEqual(upgraded["schema"], 2)
+        self.assertEqual(upgraded["schema"], SCHEMA)
         self.assertEqual(upgrade(upgraded), upgraded)
         engine.reaction(upgraded, 2, token, "resist")
         engine.reaction(old, 2, token, "resist")
         self.assertEqual(upgraded["participants"], old["participants"])
 
+    def test_combat_0_2_participant_defaults_arrive_on_load(self):
+        old = duel()
+        old["schema"] = 2
+        for row in old["participants"].values():
+            for key in ("recovering", "revive", "tempo"):
+                row.pop(key)
+        upgraded = upgrade(old)
+        self.assertEqual(upgraded["schema"], SCHEMA)
+        for row in upgraded["participants"].values():
+            self.assertEqual((row["recovering"], row["revive"], row["tempo"]), (False, "ask", 0))
+        self.assertNotIn("recovering", old["participants"]["1"])
+
     def test_unknown_and_boolean_versions_fail_visibly(self):
-        for version in (0, 3, 999, True, "1"):
+        for version in (0, SCHEMA + 1, 999, True, "1"):
             with self.subTest(version=version), self.assertRaisesRegex(CombatError, "Unsupported"):
                 upgrade({"schema": version})
 
@@ -319,7 +331,7 @@ class TestPartnerCoordinator(EvenniaCommandTest):
         legacy.pop("partners")
         fight.state = legacy
         fight.save(update_fields=["state"])
-        self.assertEqual(services.state_for(self.char1)["schema"], 2)
+        self.assertEqual(services.state_for(self.char1)["schema"], SCHEMA)
         fight.refresh_from_db()
         self.assertEqual(fight.state, legacy)
         services.storyteller(self.char1, "pause")
@@ -333,7 +345,7 @@ class TestPartnerCoordinator(EvenniaCommandTest):
         old_builds = list(fight.builds.values_list("digest", "build"))
         self.char1.permissions.add("Builder")
         services.rollback(self.char1, entry.sequence, "restore old checkpoint")
-        self.assertEqual(services.state_for(self.char1)["schema"], 2)
+        self.assertEqual(services.state_for(self.char1)["schema"], SCHEMA)
         entry.refresh_from_db()
         self.assertEqual(entry.before, checkpoint)
         self.assertEqual(list(fight.builds.values_list("digest", "build")), old_builds)

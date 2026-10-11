@@ -100,6 +100,32 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         services.control(first, "relock")
         self.assertNotIn("ready-guard", fight_moves())
 
+    def test_combat_abilities_validate_freeze_and_call_a_public_shot(self):
+        from evennia_rp_chargen.catalog import definition_problems
+        from evennia_rp_chargen.models import AbilityDefinition
+        from evennia_rp_combat import services
+        from evennia_rp_combat.modifiers import rules
+        from evennia_rp_combat.sources import snapshot
+
+        from world.ruleset import COMBAT_ABILITIES
+
+        for entry in COMBAT_ABILITIES:
+            row = AbilityDefinition.objects.get(key=entry["key"])
+            self.assertEqual(definition_problems(row), [], entry["key"])
+        first, second = self.samples[:2]
+        self.assertIn("calling_the_shot", rules(snapshot(first)))
+        self.assertIn("bait", rules(snapshot(second)))
+        services.setup(first)
+        services.join(first, "one")
+        services.join(second, "two")
+        exchange_id = services.declare(first, [second], bet="reaching", public=True)
+        state = services.state_for(first)
+        self.assertTrue(state["exchanges"][exchange_id]["public_bet"])
+        self.assertIn("reaching bet publicly", services.odds(second, f"{exchange_id}:1"))
+        services.control(second, "cancel", argument=f"{exchange_id}:1")
+        with self.assertRaisesRegex(ValueError, "Calling the Shot"):
+            services.declare(second, [first], bet="subtle", public=True)
+
     def test_mechanics_system_entries_do_not_create_rp_activity(self):
         if not apps.is_installed("evennia_scenes"):
             self.skipTest("optional scenes partner absent")

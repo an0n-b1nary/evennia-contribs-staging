@@ -27,7 +27,9 @@ Registration is host configuration, never executable player input.
 "data": {...}}`. The owner supplies `upgrade(section)`, accepting `None`
 for its initial state and returning its current envelope. Upgrades must be
 deterministic and idempotent. Core `state.upgrade` detaches its input,
-advances schema 1 to 2, validates every envelope and calls present owners.
+advances the core schema step by step (1 to 2 added partner sections; 2 to 3
+added combat 0.2's participant fields), validates every envelope and calls
+present owners.
 It is used on normal loads and old rollback snapshots. It never writes
 stored historical snapshots or changes frozen-build hashes.
 

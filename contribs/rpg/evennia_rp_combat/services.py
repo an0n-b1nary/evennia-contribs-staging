@@ -390,7 +390,7 @@ def commit(
 
     notes = state.pop("notices", [])
     if notes:
-        summary = f"{summary} {' '.join(notes)}"
+        summary = f"{summary} {' '.join(plain(note, 400) for note in notes)}"
     FightEntry.objects.create(
         fight=fight,
         sequence=sequence,
@@ -461,6 +461,8 @@ def execute(
         for key in touched & state["participants"].keys():
             state["participants"][key].pop("absent", None)
         result = operation(state)
+        # Any change that left someone at zero voids what they can't answer.
+        engine.settle(state)
         for key, row in state["participants"].items():
             if key in touched or row.get("batch_controller") == actor.pk:
                 row["last_activity"] = time.time()
@@ -772,6 +774,8 @@ def declare(
     empower=False,
     domain="",
     improvised=None,
+    waive=False,
+    public=False,
     rng=None,
     operation_id=None,
 ):
@@ -800,6 +804,8 @@ def declare(
             empower=empower,
             domain=domain,
             domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
+            waive=waive,
+            public=public,
         )
         run_automatic(state, subject.location)
         return ex_id
@@ -921,12 +927,16 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
     rng = rng or random.SystemRandom()
 
     def operation(state):
+        if engine.participant(state, subject.pk).get("recovering"):
+            engine.recover(state, subject.pk)
+            return "recovered"
         row = engine.active(state, subject.pk)
         public = []
         for p in state["participants"].values():
             if (
                 p["status"] != "active"
                 or p["hp"] <= 0
+                or p.get("recovering")
                 or p["id"] == row["id"]
                 or p["correction"]
                 or p.get("absent")
@@ -1077,7 +1087,7 @@ def apply_request(state, row, request, *, fight_pk):
         prior_hp = row.get("faded_hp", row["hp"])
         row["exposure"] += value - prior_hp
         row["hp"], row["status"] = value, "active"
-        for key in ("faded_hp", "absent", "return_required"):
+        for key in ("faded_hp", "absent", "return_required", "recovering"):
             row.pop(key, None)
     elif kind == "end":
         proposal = state["end_proposal"]
@@ -1112,6 +1122,25 @@ def pending_request(row, argument):
     raise CombatError("No pending request has that number.")
 
 
+def pending_revival(state, row, argument):
+    offers = [
+        token
+        for token in row["incoming"]
+        if state["exchanges"].get(token.split(":")[0], {}).get("revival")
+    ]
+    if argument:
+        if argument not in offers:
+            raise CombatError("No revival offer matches that token.")
+        return argument
+    if not offers:
+        raise CombatError("You have no pending storyteller requests or revival offers.")
+    if len(offers) > 1:
+        raise CombatError(
+            "Several revival offers are pending; name one: " + ", ".join(offers) + "."
+        )
+    return offers[0]
+
+
 def withdraw_end_proposal(state):
     state["end_proposal"] = None
     for row in state["participants"].values():
@@ -1122,7 +1151,7 @@ def control(
     actor, operation, *, subject=None, argument=None, reason="", rng=None, operation_id=None
 ):
     subject = subject or actor
-    cleanup = operation in ("cancel", "fade", "withdraw", "posed", "decline")
+    cleanup = operation in ("cancel", "fade", "withdraw", "posed", "decline", "retract", "revive")
     authorize(actor, subject, cleanup=cleanup)
     fight_pk = open_fight(actor.location).pk
 
@@ -1170,6 +1199,28 @@ def control(
             run_automatic(state, actor.location)
         elif operation == "cap":
             engine.reduce_cap(state, subject.pk, argument)
+        elif operation in ("accept", "decline") and (
+            ":" in str(argument or "") or (not argument and not row["requests"])
+        ):
+            token = pending_revival(state, row, argument)
+            exchange = engine.get_exchange(state, token)
+            healer = engine.participant(state, exchange["actor"])["name"]
+            if operation == "accept":
+                engine.accept_revival(state, subject.pk, token)
+                notice(state, f"{row['name']} accepted {healer}'s revival.")
+            else:
+                engine.cancel(state, subject.pk, token)
+                notice(state, f"{row['name']} declined {healer}'s revival and stays down.")
+        elif operation == "revive":
+            if argument not in ("accept", "ask"):
+                raise CombatError("Choose +combat/revive accept or ask.")
+            row["revive"] = argument
+        elif operation == "retract":
+            engine.retract(state, subject.pk)
+            notice(state, f"{row['name']} withdrew an unaccepted revival offer.")
+        elif operation == "recover":
+            engine.recover(state, subject.pk)
+            notice(state, f"{row['name']} takes their recovery action and is back in the fight.")
         elif operation in ("accept", "decline"):
             request = pending_request(row, argument)
             row["requests"].remove(request)
@@ -1526,25 +1577,19 @@ def read(actor, token, domain, *, subject=None, operation_id=None):
     authorize(actor, subject)
 
     def operation(state):
-        row = engine.active(state, subject.pk)
         exchange = engine.get_exchange(state, token)
-        if token not in row["incoming"] or row["id"] in exchange["reactions"]:
-            raise CombatError("Read before accepting your incoming reaction.")
-        if conf.get("RP_COMBAT_DOMAIN_EFFECTS").get(domain) != "read" or not engine.has_domain(
-            Build.from_dict(row["build"]), domain
-        ):
-            raise CombatError("Equip the Insight/Read domain first.")
         attacker = ObjectDB.objects.filter(pk=exchange["actor"]).first()
         if attacker is None:
             raise CombatError("The attacker has left; cancel the unaccepted incoming attack.")
         interaction(subject, attacker)
-        readers = exchange.setdefault("readers", [])
-        if row["id"] not in readers:
-            if row["reserves"] < 1:
-                raise CombatError("Read costs 1 Reserve.")
-            row["reserves"] -= 1
-            readers.append(row["id"])
-        return f"Incoming {token}: RPS {exchange['bet'] or 'none'}. No reaction has been accepted."
+        bet = engine.read_bet(
+            state, subject.pk, token, domain, conf.get("RP_COMBAT_DOMAIN_EFFECTS")
+        )
+        if bet is None:
+            return (
+                f"Incoming {token}: the attacker resisted your Read. No reaction has been accepted."
+            )
+        return f"Incoming {token}: RPS {bet or 'none'}. No reaction has been accepted."
 
     return execute(
         actor,
@@ -1575,6 +1620,8 @@ def render_declaration(state, exchange):
         fallbacks.append("Party cover/formation is unavailable; range/Pinpoint has no cover effect")
     if exchange["domain_effect"] == "encore":
         fallbacks.append("Encore uses its single-target fallback without Party")
+    if exchange.get("public_bet"):
+        fallbacks.append(f"Calling the shot: a {exchange['bet']} bet, made public")
     return (
         f"{actor['name']}: {exchange['id']} hit {exchange['hit']}, {move.name} ({move.action}); "
         f"authored Power {move.power}, Accuracy {move.effective_accuracy}; "
@@ -1593,10 +1640,21 @@ def render_outcomes(state, exchange, start=0):
                 f"{target['name']}: {outcome['reaction']} {'succeeded' if outcome['success'] else 'glanced' if outcome['glancing'] else 'failed'}, "
                 f"d100 {outcome['draw']}, threshold {outcome['chance']}; "
                 f"lost {outcome['damage']} Vitality, counter dealt {outcome['counter_damage']}."
+                + (" Domain effect resisted." if outcome.get("domain_resisted") else "")
             )
         else:
             lines.append(
                 f"{target['name']}: Spirit change {outcome['spirit'] / 100:+.2f}; healed {outcome['healing']} Vitality."
+                + (" Domain effect resisted." if outcome.get("domain_resisted") else "")
+                + (
+                    ""
+                    if "revived" not in outcome
+                    else " Revived, with no recovery action (Medicine)."
+                    if outcome.get("recovery_waived")
+                    else " Revived; one recovery action follows."
+                    if outcome["revived"]
+                    else " The Heal restored nothing, so they stay down."
+                )
             )
     if exchange["phase"] == "press":
         lines.append("Burst remains open: actor may +combat/press or +combat/stop.")
@@ -1644,8 +1702,15 @@ def render(actor, *, subject=None):
             f"Your resources: Reserves {own['reserves']}/5; Spirit {own['spirit'] / 100:.2f}; "
             f"Transcendence {own['transcendence']}/100; Resist pressure {own['pressure']}/30; "
             f"Auto-Resolve {'on' if own['auto'] else 'off'}; pose {'owed' if own['pose'] else 'clear'}; "
-            f"build {'unlocked for correction' if own['correction'] else 'frozen'}."
+            f"build {'unlocked for correction' if own['correction'] else 'frozen'}; "
+            f"revival from allies: {'accepted automatically' if own.get('revive') == 'accept' else 'ask me'}."
         )
+        if own.get("recovering"):
+            lines.append(
+                "You are recovering: +combat/recover spends one action and returns you to the fight."
+                if own["turns"] < own["turn_limit"]
+                else "You were revived, but your personal Turn Limit is used up: you cannot recover or act again in this fight."
+            )
         for request in own["requests"]:
             lines.append(
                 f"Request {request['id']}: {describe(request)}. "
@@ -1659,6 +1724,20 @@ def render(actor, *, subject=None):
             )
         for token in own["incoming"]:
             exchange = engine.get_exchange(state, token)
+            if exchange.get("revival"):
+                healer = engine.participant(state, exchange["actor"])["name"]
+                after = (
+                    "you return at once, with no recovery action (Medicine)"
+                    if exchange["waive_recovery"]
+                    else "you take one recovery action before acting again"
+                    if own["turns"] < own["turn_limit"]
+                    else "your Turn Limit is used up, so you won't act again in this fight"
+                )
+                lines.append(
+                    f"Revival offer {token} from {healer}: if the Heal restores Vitality, {after}. "
+                    f"+combat/accept {token} or /decline {token}."
+                )
+                continue
             view = engine.reaction_view(state, own["id"], token)
             lines.append(
                 f"Incoming {token}: {engine.participant(state, exchange['actor'])['name']}, "
@@ -1715,7 +1794,13 @@ def odds(actor, token, *, subject=None):
     incoming = Build(tuple((key, "0") for key, score in view.build.scores))
     move = Move(action=view.action)
     lines = [
-        f"Incoming {plain(token)}: neutral RPS estimates; unseen offensive scores use a neutral damage estimate."
+        f"Incoming {plain(token)}: "
+        + (
+            f"the attacker called a {view.public_bet} bet publicly; "
+            if view.public_bet
+            else "neutral RPS estimates; "
+        )
+        + "unseen offensive scores use a neutral damage estimate."
     ]
     for reaction in view.reactions:
         result = arithmetic.resolve(
@@ -1731,6 +1816,8 @@ def odds(actor, token, *, subject=None):
             pressure=view.pressure,
             penalty=Fraction(dict(view.penalties)[reaction]),
             bonus=Fraction(dict(view.bonuses)[reaction]),
+            rps=view.public_bet,
+            rps_shift=tuple(Fraction(v) for v in view.public_shift),
             damage_boost=Fraction(view.damage_boost),
             surge=Fraction(view.surge),
         )

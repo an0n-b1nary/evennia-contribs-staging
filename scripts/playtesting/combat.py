@@ -70,6 +70,43 @@ class CombatSuite(Suite):
         self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
         self.command("bob", "+combat/accept", "accepted request")
 
+    def revival_and_recovery(self):
+        stats = ",".join(
+            f"{stat}:B"
+            for stat in (
+                "strength",
+                "endurance",
+                "intellect",
+                "intuition",
+                "presence",
+                "resolve",
+                "agility",
+            )
+        )
+        mend = '{"key":"mend","name":"Mend","action":"assist","effects":["heal"]}'
+        self.command("alice", "+npc/create Sparring Post =template", "Created NPC blueprint")
+        self.command("alice", f"+npc/stats Sparring Post ={stats}", "updated")
+        self.command("alice", "+combat/setup Revival rehearsal", "set up combat")
+        self.command("alice", "+combat/join one", "joined")
+        self.command("bob", "+combat/join one", "joined")
+        self.command("alice", "+combatstory/template Sparring Post=two", "Sparring Post")
+        self.command("bob", "+combatstory/vitality pt-alice=0;Agreed knockdown", "vitality")
+        self.command("alice", "+combat/accept", "accepted request")
+        self.command("alice", "+combat/act", "incapacitated")
+        self.command("bob", "+combat/improv pt-alice=" + mend, r"\d+\.\d+")
+        self.command("alice", "+combat", "Revival offer")
+        self.command("alice", "+combat/decline", "declined .*revival")
+        self.command("alice", "+combat", "0/100 Vitality")
+        self.command("alice", "+combat/revive accept", "revive accept")
+        self.command("bob", "+combat/improv pt-alice=" + mend, r"\d+\.\d+")
+        self.command("alice", "+combat", "You are recovering")
+        self.command("alice", "+combat/attack Sparring Post=balanced", "recover")
+        self.command("alice", "+combat/recover", "recovery action")
+        self.command("alice", "+combat/posed", "posed")
+        self.command("bob", "+combat/posed", "posed")
+        self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
+        self.command("bob", "+combat/accept", "accepted request")
+
 
 def run_combat(session):
     suite = CombatSuite(session)
@@ -88,6 +125,10 @@ def run_combat(session):
         (
             "storyteller-requested return with personal refusal and acceptance",
             suite.consensual_return,
+        ),
+        (
+            "consented revival by an ally, standing acceptance and one recovery action",
+            suite.revival_and_recovery,
         ),
     ]
     for name, function in cases:

@@ -78,13 +78,14 @@ def chargen_build(character):
     )
     for move in moves:
         validate_move(move.as_dict())
-    from .modifiers import CombatEffect
+    from .modifiers import CombatEffect, CombatRule
 
+    kinds = {"combat_bonus": CombatEffect, "combat_rule": CombatRule}
     effects = []
     for copy in copies:
         for spec in copy.ability.effects_for(copy.tag):
-            if spec.get("kind") == "combat_bonus":
-                effect = CombatEffect.from_spec(spec, level=copy.level)
+            if spec.get("kind") in kinds:
+                effect = kinds[spec["kind"]].from_spec(spec, level=copy.level)
                 effects.append((copy.modifier_key, json.dumps(effect.frozen())))
     flaws = [
         (copy.ability.key, copy.tag.key if copy.tag else "")
