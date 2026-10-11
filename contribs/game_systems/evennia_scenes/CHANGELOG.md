@@ -1,5 +1,13 @@
 # Changelog — evennia-scenes
 
+## [0.8.0] - 2026-10-10
+
+- **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
+  token with its previous colour as the fallback, so a host stylesheet that
+  sets the tokens on `:root` rethemes this contrib's pages along with the
+  others. Nothing changes until a host sets one. The token list is in
+  evennia-accessibility's README.
+
 ## [0.7.0] - 2026-10-10
 
 - **Added:** every authoring form names the character it writes as ("Posting as
