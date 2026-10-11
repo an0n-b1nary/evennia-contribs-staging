@@ -25,7 +25,7 @@ classifiers = [
 dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-links>=0.5"]
 
 [project.optional-dependencies]
-xp = ["evennia-xp>=0.2,<0.3"]
+xp = ["evennia-xp>=0.2,<0.6"]
 test = ["pytest>=8.0"]
 
 [project.urls]

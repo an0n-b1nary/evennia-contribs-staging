@@ -262,6 +262,11 @@ release is ready.
 Run `python scripts/check_contrib_versions.py` before committing. CI checks
 all contribs without importing their Django apps, then repeats the check with
 `--installed` after editable installation to verify distribution metadata.
+It also checks every pin one contrib puts on another, in `dependencies` and in
+optional extras alike, against the version declared here. CI never installs
+the extras, so a stale extra pin would otherwise surface only for a game that
+asks for it. A bump past a sibling's upper bound needs that pin widened, or the
+bump made smaller.
 Calendar and plots also compare their exported version to installed metadata
 in their own suites, without hard-coding release numbers.
 
