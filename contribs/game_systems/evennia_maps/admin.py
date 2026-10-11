@@ -17,6 +17,7 @@ class MapPlaneAdmin(admin.ModelAdmin):
         "created_at",
         "is_archived",
     ]
+    raw_id_fields = ["visibility_room"]  # noqa: RUF012
     list_filter = ["zstack", "is_archived"]  # noqa: RUF012
     search_fields = ["name", "description"]  # noqa: RUF012
     readonly_fields = ["created_at", "archived_at"]  # noqa: RUF012

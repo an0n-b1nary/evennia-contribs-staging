@@ -7,6 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.10.0] - 2026-10-10
+
+- Added read-only cross-plane transplant previews, collision and adjacency
+  reports, elevation translation, stale-plan checks and atomic application.
+- Added privacy anchors on map planes and uniquely stacked private previews.
+  Auto-created floors inherit their anchor. Deleting the anchor removes its
+  map planes; existing unanchored planes retain their behavior.
+- Added optional viewer-aware room visibility across commands, SVG/live pages,
+  floor navigation, portal markers, API lists/details/tiles and bounds.
+  Legacy room-only callbacks remain supported. Web previews use the selected
+  character, including while disconnected in-game.
+- Room-panel details use the same selected-character visibility rule as tiles,
+  including private previews, and pass that viewer to partner providers.
+- Portal markers now recognize separate interior stacks as well as standalone
+  planes, while excluding ordinary floor transitions within a stack.
+
 ## [0.9.0] - 2026-10-10
 
 - **Added:** a room panel on the live map, replacing the tile popup. Clicking a

@@ -51,6 +51,14 @@ class MapPlane(AbstractArchived):
         db_index=True,
         help_text="Vertical stack label shared by aligned planes. Blank = standalone/interior.",
     )
+    visibility_room = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Optional privacy anchor: this room must be visible to view the plane.",
+    )
     elevation = models.IntegerField(
         default=0,
         help_text="Layer position within the zstack (meaningful only when zstack is set).",

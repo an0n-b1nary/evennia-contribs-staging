@@ -28,6 +28,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
 from world.sandbox.test_jobs import JobsSeams
@@ -481,9 +482,9 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
         ]
         self.assertEqual(mapped_ooc, [])
 
-    def test_the_drafting_room_is_the_only_ooc_tile_anywhere(self):
-        # Pins the exception itself, so a second one cannot appear without
-        # somebody deciding to change this line.
+    def test_only_scratch_and_private_preview_ooc_rooms_are_mapped(self):
+        # Explicit workbench mappings: the public scratch room and the
+        # two off-grid private preview rooms. The rest of the OOC wing is unmapped.
         from evennia_maps.models import RoomTile
 
         mapped_ooc = {
@@ -491,7 +492,9 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
             for tile in RoomTile.objects.select_related("plane")
             if getattr(tile.room, "room_type", None) == "ooc"
         }
-        self.assertEqual(mapped_ooc, {"Drafting Room"})
+        from world.sandbox import content
+
+        self.assertEqual(mapped_ooc, {"Drafting Room", *content.PRIVATE_PREVIEW_ROOMS})
 
 
 class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
@@ -783,7 +786,7 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
 
         self.assertEqual(
             set(MapPlane.all_objects.values_list("name", flat=True)),
-            {*PLANE_NAMES, content.DRAFTING_PLANE_NAME},
+            {*PLANE_NAMES, content.DRAFTING_PLANE_NAME, *content.PRIVATE_PREVIEW_PLANES},
         )
         self.assertEqual(
             RoomTile.objects.filter(plane__name__in=PLANE_NAMES).count(),

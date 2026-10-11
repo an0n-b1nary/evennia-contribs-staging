@@ -6,7 +6,7 @@ Self-contained: explicit pagination/auth/permission/filter classes.
 Does not rely on the consumer's global REST_FRAMEWORK configuration.
 """
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http import Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.authentication import SessionAuthentication
@@ -16,14 +16,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from evennia_links.characters import web_character
+from evennia_links.visibility import request_viewer
 from evennia_maps.api.filters import PlaneFilter
 from evennia_maps.api.pagination import MapsCursorPagination, TilePagination
 from evennia_maps.api.serializers import PlaneSerializer, RoomTileSerializer
 from evennia_maps.detail import build_detail
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays
-from evennia_maps.permissions import is_room_web_visible, is_staff_user
+from evennia_maps.permissions import (
+    is_plane_visible,
+    is_room_web_visible,
+    is_staff_user,
+    visible_planes,
+)
 from evennia_maps.terrain import terrain_style
 from evennia_maps.views import (
     plane_tiles_queryset,
@@ -32,11 +37,12 @@ from evennia_maps.views import (
 )
 
 
-def portal_target_planes_by_room(room_ids, *, exclude_plane_id, staff):
+def portal_target_planes_by_room(room_ids, *, exclude_plane_id, staff, viewer=None):
     """
     room_id -> destination MapPlane id, for rooms with an exit onto a
-    different, standalone (``zstack=""``) plane whose destination room is
-    itself visible to the caller.
+    separate standalone plane or anchored interior stack whose destination
+    room is visible to the caller. Anchored interiors also link back to world
+    stacks. Ordinary floors within the same stack are never portal markers.
 
     Portals are geometry-inferred, not an in-game concept: a tile's own
     exits are the only signal. Two bulk queries (exits, then destination
@@ -63,17 +69,25 @@ def portal_target_planes_by_room(room_ids, *, exclude_plane_id, staff):
     )
     if not exit_rows:
         return {}
+    source_plane = MapPlane.objects.get(pk=exclude_plane_id)
     dest_room_ids = {dest_id for _, dest_id in exit_rows}
     dest_tiles = (
-        RoomTile.objects.filter(
-            room_id__in=dest_room_ids, plane__zstack="", plane__is_archived=False
-        )
+        RoomTile.objects.filter(room_id__in=dest_room_ids, plane__is_archived=False)
         .exclude(plane_id=exclude_plane_id)
-        .select_related("room")
+        .select_related("room", "plane", "plane__visibility_room")
     )
+    if source_plane.visibility_room_id is None:
+        dest_tiles = dest_tiles.filter(
+            Q(plane__zstack="") | Q(plane__visibility_room__isnull=False)
+        )
     dest_plane_by_room = {}
     for tile in dest_tiles:
-        if not staff and not is_room_web_visible(tile.room):
+        # A different stack is a portal; another floor in this stack is not.
+        if tile.plane.zstack and tile.plane.zstack == source_plane.zstack:
+            continue
+        if not is_plane_visible(tile.plane, staff=staff, viewer=viewer):
+            continue
+        if not staff and not is_room_web_visible(tile.room, viewer):
             continue
         dest_plane_by_room[tile.room_id] = tile.plane_id
     if not dest_plane_by_room:
@@ -110,10 +124,12 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         # page would otherwise cost one tile query per plane. Prefetching
         # the canonical tile queryset makes it one query for the whole page;
         # visible_tiles_for_plane() reads the cache when it is populated.
-        return (
+        return visible_planes(
             MapPlane.objects.filter(is_archived=False)
             .prefetch_related(Prefetch("tiles", queryset=plane_tiles_queryset()))
-            .order_by("name")
+            .order_by("name"),
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+            staff=is_staff_user(self.request),
         )
 
     @action(detail=True, methods=["get"], url_path="tiles")
@@ -132,13 +148,17 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         """
         plane = self.get_object()
         staff = is_staff_user(request)
-        tiles = visible_tiles_for_plane(plane, staff=staff)
+        viewer = request_viewer(request, staff=staff)
+        tiles = visible_tiles_for_plane(plane, staff=staff, viewer=viewer)
 
         room_ids = [tile.room_id for tile in tiles]
         portal_by_room = portal_target_planes_by_room(
-            room_ids, exclude_plane_id=plane.pk, staff=staff
+            room_ids,
+            exclude_plane_id=plane.pk,
+            staff=staff,
+            viewer=viewer,
         )
-        overlays = collect_overlays(room_ids, staff=staff, viewer=web_character(request.user))
+        overlays = collect_overlays(room_ids, staff=staff, viewer=viewer)
         primary_region = overlays.get("primary_region", {})
         has_active_scene = overlays.get("has_active_scene", {})
         recent_scene_counts = overlays.get("recent_scene_count", {})
@@ -196,11 +216,12 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         """
         plane = self.get_object()
         staff = is_staff_user(request)
+        viewer = request_viewer(request, staff=staff)
         tile = (
             RoomTile.objects.filter(plane=plane, room_id=int(room_id))
             .select_related("room")
             .first()
         )
-        if tile is None or not (staff or is_room_web_visible(tile.room)):
+        if tile is None or not (staff or is_room_web_visible(tile.room, viewer)):
             raise Http404
-        return Response(build_detail(tile, staff=staff, viewer=web_character(request.user)))
+        return Response(build_detail(tile, staff=staff, viewer=viewer))

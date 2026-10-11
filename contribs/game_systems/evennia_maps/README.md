@@ -500,3 +500,72 @@ one for your game, add a page with the same key to `GUIDES_DIRS`.
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+
+## Private previews and cross-plane transplants
+
+`MAPS_ROOM_VISIBILITY` also accepts `(room, viewer) -> bool` (including a
+keyword-only `viewer`); the original `(room) -> bool` form remains supported.
+The viewer is the selected character on web requests, the caller in-game,
+and `None` for anonymous/public rendering. Errors hide the room. Staff keep
+the existing command/web staff override; the callback need not implement it.
+If regions is installed, set `REGIONS_ROOM_VISIBILITY` to the same callback.
+
+`MapPlane.visibility_room` optionally anchors **plane access** to a room's
+visibility. This guards names, direct URLs, empty planes, floor lists, portal
+markers and API metadata before tiles are filtered. Existing planes with no
+anchor keep their existing behavior. Deleting an anchor cascades to its planes
+and map tiles, so an orphaned draft cannot become public accidentally; other
+rooms are not deleted. Access to a plane never implies permission to edit it.
+
+```python
+from evennia_maps.placement import create_private_stack
+
+# First set entry_room's privacy flags/ACL in your project's service.
+plane = create_private_stack(entry_room, "A private draft", actor=proposer)
+```
+
+Each stack has a unique label and supports vertical layout. Floors created by
+`resolve_stacked_plane` or auto-placement inherit the privacy anchor. Room
+visibility still applies separately, so private floor rooms also need your
+project's flags/ACL. After approval, the project service changes those rules
+deliberately. Keep the entry anchor on an interior stack so portal markers
+continue to recognize it after promotion.
+
+```python
+from evennia_maps.transplant import plan_transplant, apply_transplant
+
+preview = plan_transplant(
+    frontier_rooms, entry_room=entry, anchor_room=anchor, direction_name="north"
+)
+# preview.moves: room, target plane (possibly PendingPlane), x, y
+# preview.conflicts: blockers; preview.adjacency: unconnected room pairs
+if not preview.conflicts:
+    apply_transplant(preview, actor=reviewer)
+```
+
+The planner is read-only, including missing destination floors. It translates
+only the explicit room set, preserves relative coordinates/elevations, checks
+internal compass geometry, and reports pins, collisions, occupied attachment
+directions and archived planes. A standalone target cannot accept multiple
+floors. Adjacency includes configured compass/vertical neighbors, excludes
+already connected pairs and the intended entry/anchor connection, and warns
+without blocking. Source and target coordinate spaces must differ.
+
+Application re-plans under a transaction and rejects changed source tiles,
+anchor coordinates, target occupancy/floors, pins or relevant exits. Every
+selected tile moves or none does; tile primary keys survive. Destination floor
+creation rolls back with the move, and tile notifications run after commit
+(and disappear on an outer rollback). Catch `ValidationError` for conflicts
+or stale previews and `IntegrityError` for concurrent cell claims, then request
+a fresh preview. Database row locks serialize cooperating writers where
+supported. Signals do not promise durable external delivery.
+
+These are trusted service helpers: callers must authorize their actor, choose
+and freeze the submitted room set, and handle project review. They create no
+attaching exits, rooms, ownership or Jobs decisions. Construction commands and
+project lifecycle belong to the consuming building package.
+
+The plan is a full geometry report for trusted callers. A player-facing build
+check must redact hidden neighbor identities before rendering it. The sandbox
+report is Builder-only.

@@ -9,7 +9,7 @@ HTTP staff checks use the shared ``evennia_links.is_staff_user`` policy;
 Settings:
     MAPS_STAFF_LOCK — lock string for place/move/unplace/pin/reflow/check
         operations (default "cmd:perm(Builder)").
-    MAPS_ROOM_VISIBILITY — dotted path to a callable(room) -> bool for
+    MAPS_ROOM_VISIBILITY — dotted path to a callable(room[, viewer]) -> bool for
         games whose room-hiding rules differ from the default. Without an
         override, a room is web-visible unless it is flagged ``room_type
         == "staff"`` or ``allow_teleport == "secret"``.
@@ -34,6 +34,7 @@ from django.conf import settings
 
 from evennia_links import is_staff_user as is_staff_user
 from evennia_links import resolve_dotted
+from evennia_links.visibility import call_room_visibility
 
 _log = logging.getLogger("evennia")
 
@@ -107,10 +108,10 @@ def _default_room_visible(room) -> bool:
     return "staff" not in room_types and "secret" not in teleport_settings
 
 
-def is_room_web_visible(room) -> bool:
+def is_room_web_visible(room, viewer=None) -> bool:
     """Return True if *room* may be named or located on a public web page.
 
-    When MAPS_ROOM_VISIBILITY names a ``callable(room) -> bool``, that
+    When MAPS_ROOM_VISIBILITY names a ``callable(room[, viewer]) -> bool``, that
     callable is the whole answer. Otherwise a room is visible unless it is
     flagged ``room_type == "staff"`` or ``allow_teleport == "secret"``.
 
@@ -148,7 +149,7 @@ def is_room_web_visible(room) -> bool:
         return False
 
     try:
-        return bool(override(room))
+        return call_room_visibility(override, room, viewer)
     except Exception:
         _log.exception(
             "evennia_maps: MAPS_ROOM_VISIBILITY=%r raised for room %r; treating as hidden",
@@ -156,3 +157,39 @@ def is_room_web_visible(room) -> bool:
             getattr(room, "pk", room),
         )
         return False
+
+
+def is_plane_visible(plane, *, viewer=None, staff=False):
+    """Guard plane metadata as well as tiles. Unanchored planes stay public.
+
+    Deleting a privacy anchor cascades to its planes rather than publishing
+    an orphaned private plane. Staff retain the existing maps web override.
+    """
+    if plane.is_archived:
+        return False
+    if staff or plane.visibility_room_id is None:
+        return True
+    return is_room_web_visible(plane.visibility_room, viewer)
+
+
+def visible_planes(queryset, *, viewer=None, staff=False):
+    """A queryset suitable for list pagination, details, and API filtering."""
+    if staff:
+        return queryset
+    from django.db.models import Q
+
+    private = queryset.filter(visibility_room__isnull=False).select_related("visibility_room")
+    allowed = [plane.pk for plane in private if is_plane_visible(plane, viewer=viewer)]
+    return queryset.filter(Q(visibility_room__isnull=True) | Q(pk__in=allowed))
+
+
+def filter_visible_tiles(tiles, *, staff, viewer=None):
+    """Drop staff-only/secret-room tiles from *tiles* unless *staff*."""
+    tiles = list(tiles)
+    if staff:
+        return tiles
+    return [
+        tile
+        for tile in tiles
+        if is_room_web_visible(tile.room, viewer) and is_plane_visible(tile.plane, viewer=viewer)
+    ]

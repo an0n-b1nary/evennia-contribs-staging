@@ -692,6 +692,16 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
 MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 
 ######################################################################
+# Room permissions and private previews (links, maps and regions)
+######################################################################
+# Control access remains the default until an ownership provider is installed.
+LINKS_ROOM_PERMISSION = None
+LINKS_ROOM_OWNER = None
+# One viewer-aware policy on both surfaces, including disconnected web users.
+MAPS_ROOM_VISIBILITY = "world.sandbox.building.room_visible"
+REGIONS_ROOM_VISIBILITY = MAPS_ROOM_VISIBILITY
+
+######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues
 ######################################################################
 RP_COMBAT_REVEALED = True

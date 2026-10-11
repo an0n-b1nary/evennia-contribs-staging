@@ -48,9 +48,16 @@ from django.db.models import Count
 from django.urls import NoReverseMatch, reverse
 from django.views.generic import DetailView, ListView
 
+from evennia_links.visibility import request_viewer
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays, overlay_url_templates
-from evennia_maps.permissions import is_room_web_visible, is_staff_user, read_room_attr
+from evennia_maps.permissions import (
+    filter_visible_tiles,
+    is_plane_visible,
+    is_staff_user,
+    read_room_attr,
+    visible_planes,
+)
 from evennia_maps.terrain import terrain_legend, terrain_style
 
 TILE_SIZE = 32
@@ -70,14 +77,6 @@ DEFAULT_TILE_DETAIL_URL_NAME = "api-plane-tile-detail"
 ``MAPS_TILE_DETAIL_URL_NAME`` alongside ``MAPS_TILES_URL_NAME``."""
 
 
-def filter_visible_tiles(tiles, *, staff):
-    """Drop staff-only/secret-room tiles from *tiles* unless *staff*."""
-    tiles = list(tiles)
-    if staff:
-        return tiles
-    return [tile for tile in tiles if is_room_web_visible(tile.room)]
-
-
 def plane_tiles_queryset():
     """
     The canonical tile queryset for a plane, in render order.
@@ -90,17 +89,23 @@ def plane_tiles_queryset():
     ``prefetch_related()`` and have ``visible_tiles_for_plane()`` pick the
     cache up, instead of paying one tile query per plane.
     """
-    return RoomTile.objects.select_related("room").order_by("-y", "x")
+    return RoomTile.objects.select_related("room", "plane", "plane__visibility_room").order_by(
+        "-y", "x"
+    )
 
 
-def visible_tiles_for_plane(plane, *, staff):
+def visible_tiles_for_plane(plane, *, staff, viewer=None):
     """RoomTile list for *plane*, privacy-filtered unless *staff*."""
+    if not is_plane_visible(plane, staff=staff, viewer=viewer):
+        return []
     cache = getattr(plane, "_prefetched_objects_cache", None) or {}
     if "tiles" in cache:
         tiles = cache["tiles"]
     else:
-        tiles = plane.tiles.select_related("room").order_by("-y", "x")
-    return filter_visible_tiles(tiles, staff=staff)
+        tiles = plane.tiles.select_related("room", "plane", "plane__visibility_room").order_by(
+            "-y", "x"
+        )
+    return filter_visible_tiles(tiles, staff=staff, viewer=viewer)
 
 
 def tile_hangout_type(room):
@@ -229,7 +234,11 @@ class PlaneListView(ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = MapPlane.objects.filter(is_archived=False).order_by("name")
+        queryset = visible_planes(
+            MapPlane.objects.filter(is_archived=False).order_by("name"),
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+            staff=is_staff_user(self.request),
+        )
         if is_staff_user(self.request):
             # Annotated rather than counted per row in the template, which
             # would be one query per plane.
@@ -256,13 +265,21 @@ class PlaneMapView(DetailView):
     context_object_name = "plane"
 
     def get_queryset(self):
-        return MapPlane.objects.filter(is_archived=False)
+        return visible_planes(
+            MapPlane.objects.filter(is_archived=False),
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+            staff=is_staff_user(self.request),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["page_title"] = self.object.name
         staff = is_staff_user(self.request)
-        tiles = visible_tiles_for_plane(self.object, staff=staff)
+        tiles = visible_tiles_for_plane(
+            self.object,
+            staff=staff,
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+        )
         context["svg"] = build_svg_context(tiles, staff=staff)
         context["tile_count"] = len(tiles)
         # No link to a live map the game has not mounted the API for.
@@ -285,7 +302,11 @@ class PlaneLiveMapView(DetailView):
     context_object_name = "plane"
 
     def get_queryset(self):
-        return MapPlane.objects.filter(is_archived=False)
+        return visible_planes(
+            MapPlane.objects.filter(is_archived=False),
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+            staff=is_staff_user(self.request),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -305,6 +326,11 @@ class PlaneLiveMapView(DetailView):
                 "is_current": sibling.pk == plane.pk,
             }
             for sibling in siblings
+            if is_plane_visible(
+                sibling,
+                viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+                staff=is_staff_user(self.request),
+            )
         ]
         context["tiles_url_template"] = tiles_url_template()
         context["tile_detail_url_template"] = tile_detail_url_template()

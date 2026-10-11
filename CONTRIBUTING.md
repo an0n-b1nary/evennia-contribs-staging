@@ -43,6 +43,25 @@ published migration history and verify populated-database upgrades alongside
 fresh installation. Editable installs are for local development; deployment
 and release verification use non-editable public snapshot pins.
 
+### Parallel PRs and release metadata
+
+Before landing parallel work that touches the same contrib, choose a merge
+order and integrate each predecessor into the next branch. Allocate versions
+against that combined tree: two independent feature releases must not reuse
+the same version or replace one another's changelog entries. Keep each release
+under its own heading, and update `pyproject.toml` and `__version__` together.
+
+Recheck sibling dependency ranges in both required dependencies and optional
+extras after every version change. A consumer's upper bound may need updating
+even when its own code did not change. Run `python scripts/check_contrib_versions.py`,
+reinstall the affected packages, then run it with `--installed` and exercise
+the reference-game seams. Rebuild the golden database from the combined
+migrations and seed content rather than choosing either branch's binary file.
+
+Keep the queued branches current if a predecessor changes. Merge each PR only
+after CI passes on its final integrated revision; earlier green runs do not
+validate subsequent conflict resolutions or metadata edits.
+
 ## Maintainer setup (anonymity guards)
 
 This repo ships five coordinated anonymity guards. All read from the same gitignored `.anonymity-patterns` file, so the public repo never reveals what is being blocked.

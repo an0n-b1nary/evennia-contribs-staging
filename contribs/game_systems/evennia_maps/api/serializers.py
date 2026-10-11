@@ -4,6 +4,7 @@
 
 from rest_framework import serializers
 
+from evennia_links.visibility import request_viewer
 from evennia_maps.models import MapPlane
 from evennia_maps.permissions import is_staff_user
 from evennia_maps.views import visible_tiles_for_plane
@@ -22,7 +23,11 @@ class PlaneSerializer(serializers.ModelSerializer):
         # to a player who can never see them. None when nothing is visible,
         # so the frontend can fall back to a default viewport.
         request = self.context.get("request")
-        tiles = visible_tiles_for_plane(obj, staff=is_staff_user(request))
+        tiles = visible_tiles_for_plane(
+            obj,
+            staff=is_staff_user(request),
+            viewer=request_viewer(request, staff=is_staff_user(request)),
+        )
         if not tiles:
             return None
         xs = [tile.x for tile in tiles]

@@ -130,20 +130,35 @@ def _upcoming_events():
     ]
 
 
-def _map_summary():
+def _map_summary(request=None):
     """Plane and tile counts, and the deepest map link that resolves."""
     if not apps.is_installed("evennia_maps"):
         return None
-    from evennia_maps.models import MapPlane, RoomTile
+    from django.db.models import Prefetch
 
-    # MapPlane.objects is an ArchivedManager, so archived planes are already out.
-    planes = MapPlane.objects.order_by("pk")
+    from evennia_links import is_staff_user
+    from evennia_links.visibility import request_viewer
+    from evennia_maps.models import MapPlane
+    from evennia_maps.permissions import visible_planes
+    from evennia_maps.views import plane_tiles_queryset, visible_tiles_for_plane
+
+    staff = is_staff_user(request)
+    viewer = request_viewer(request, staff=staff)
+    planes = visible_planes(
+        MapPlane.objects.order_by("pk").prefetch_related(
+            Prefetch("tiles", queryset=plane_tiles_queryset())
+        ),
+        viewer=viewer,
+        staff=staff,
+    )
     first = planes.first()
     if first is None:
         return None
     return {
         "plane_count": planes.count(),
-        "tile_count": RoomTile.objects.filter(plane__in=planes).count(),
+        "tile_count": sum(
+            len(visible_tiles_for_plane(plane, viewer=viewer, staff=staff)) for plane in planes
+        ),
         "plane_name": first.name,
         "url": (
             _url("evennia_maps:plane-live-map", first.pk)
@@ -328,7 +343,7 @@ class SandboxIndexView(EvenniaIndexView):
                 "scene_archive_url": _url("evennia_scenes:scene-list"),
                 "upcoming_events": _upcoming_events(),
                 "calendar_url": _url("evennia_calendar:calendar-list"),
-                "map_summary": _map_summary(),
+                "map_summary": _map_summary(self.request),
                 "recent_activity": _recent_activity(),
                 "current_arc": _current_arc(),
                 "plot_list_url": _url("evennia_plots:plot-list"),
