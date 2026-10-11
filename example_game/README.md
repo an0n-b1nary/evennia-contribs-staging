@@ -260,6 +260,32 @@ scripts and layout, with a reserved link back to the site, an 80-character
 reading measure, and a smaller default input pane. Existing browser-local
 layout preferences are not rewritten.
 
+### Retheming the contribs' pages
+
+The sandbox deliberately has no theme, so you see each contrib's own pages. Every
+colour in their stylesheets is a shared `--evennia-color-*` token with its usual
+colour as the fallback, and `web/static/website/css/custom.css` reads the same
+tokens. A game sets them on `:root` in its own stylesheet to retheme every
+contrib page at once. The token list is in evennia-accessibility's README, and
+`scripts/check_templates.py` rejects a contrib stylesheet colour that isn't a token.
+
+To see it, add this to `custom.css`, run `evennia collectstatic --noinput`, and
+reload a board, a lore diff, the calendar and the job form:
+
+```css
+:root {
+  --evennia-color-muted: #8a3b12;
+  --evennia-color-border: #8a3b12;
+  --evennia-color-surface-alt: #fbeee0;
+  --evennia-color-success-bg: #fff3c4;
+}
+```
+
+Empty states and table borders turn rust-coloured, past calendar days turn
+cream, and today and added diff lines turn yellow. The rule above each form's
+buttons follows too, through accessibility's own tokens. Remove the block to
+undo it.
+
 ### Which character the website acts as
 
 A visitor doesn't need to be connected in-game to act as their character on the
