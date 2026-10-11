@@ -20,6 +20,7 @@ Screen-reader helpers, accessible Django form base classes, and MXP URL utilitie
   - `_form_actions.html` — submit + optional cancel with sensible defaults; names the `acting_character` when one is given
   - `_acting_as.html` — "Posting as **Name**" for the character a form writes as, which the submit button's `aria-describedby` points at
 - **An accessibility-focused stylesheet** (`accessibility.css`) with `.sr-only` utilities, focus-visible rings, `prefers-reduced-motion` + `prefers-color-scheme: dark` overrides, and the form rules that pair with the partials
+- **The shared theme tokens:** the `--evennia-color-*` list every web contrib's stylesheet reads, so one host stylesheet rethemes all of their pages (see [Theme tokens](#theme-tokens))
 - **A `+screenreader` command** (alias `+sr`) so players can toggle the option without knowing `@option`
 - **Two MXP URL helpers**:
   - `absolute_web_url(path)` — promote site-relative paths to absolute URLs via `SITE_URL`
@@ -162,6 +163,60 @@ href = absolute_web_url(f"/scenes/{scene.pk}/")
 self.caller.msg(f"View scene: {mxp_link(href, '[↗]')}")
 ```
 
+### Theme tokens
+
+Every colour in the web contribs' stylesheets (boards, calendar, guides, jobs,
+lore, maps, plots, regions, scenes, xp) is a CSS custom property whose fallback
+is its usual colour, so with no tokens set the pages look as before. To retheme
+them all, set the tokens on `:root` in your own stylesheet:
+
+```css
+/* web/static/website/css/custom.css */
+:root {
+  --evennia-color-text: #2b2118;
+  --evennia-color-accent: #b5541c;
+}
+
+:root[data-theme="dark"] {
+  --evennia-color-text: #ece4d8;
+  --evennia-color-muted: #a99d8f;
+  --evennia-color-surface: #1d1a17;
+  --evennia-color-surface-alt: rgba(255, 255, 255, .06);
+  --evennia-color-border: #3a332c;
+  /* ...and the status pairs below */
+}
+```
+
+Set only the tokens you want to change. Put them on `:root` (a dark-mode toggle
+can set an attribute on `<html>`, as above), not on `body`: this stylesheet
+resolves its own tokens on `:root`. A status `*-text` token has to read well
+on its `*-bg` and on `surface`.
+
+| Token | Default | Used for |
+|---|---|---|
+| `--evennia-color-text` | `#212529` | body text on `surface` |
+| `--evennia-color-muted` | `#6c757d` | secondary text, empty states, quiet rules |
+| `--evennia-color-surface` | `#ffffff` | a cell or panel that must be opaque |
+| `--evennia-color-surface-alt` | `rgba(108, 117, 125, .1)` | a set-apart panel or a past calendar day |
+| `--evennia-color-border` | `#dee2e6` | borders and dividers |
+| `--evennia-color-accent` | `#4a90d9` | focus outline on scroll regions |
+| `--evennia-color-success-bg` | `#d4edda` | an added diff line, today on the calendar |
+| `--evennia-color-success-text` | `#155724` | text on `success-bg` |
+| `--evennia-color-danger-bg` | `#f8d7da` | a removed diff line |
+| `--evennia-color-danger-text` | `#721c24` | text on `danger-bg`, error text |
+| `--evennia-color-neutral-bg` | `#e2e3e5` | a diff hunk header |
+| `--evennia-color-neutral-text` | `#383d41` | text on `neutral-bg` |
+
+This stylesheet follows the same tokens. When you set them, its text, accent,
+error and fieldset-border colours come from `text`, `accent`, `danger-text` and
+`border`. When you don't, they keep their own values, including the
+`prefers-color-scheme: dark` ones. The focus ring stays high-contrast amber
+unless you set `--evennia-a11y-color-focus-ring` itself.
+
+Some contribs also have their own palette for things that aren't page chrome,
+such as the map's canvas and markers (`--evennia-maps-*`; see that contrib's
+README).
+
 ## Configurability
 
 | Hook | Type | Purpose |
@@ -169,6 +224,7 @@ self.caller.msg(f"View scene: {mxp_link(href, '[↗]')}")
 | `SITE_URL` | Django setting | Base for `absolute_web_url`. Unset → returns the relative path unchanged (works for webclient MXP, fails for external clients/email). |
 | `screenreader_mode` | Account option | Read by `uses_screenreader(caller)`. Add to `OPTIONS_ACCOUNT_DEFAULT` as shown above. |
 | `--evennia-a11y-color-danger` | CSS custom property | Default `#c0392b`. Override in your stylesheet to retheme error messaging. Other `--evennia-a11y-*` tokens follow the same pattern. |
+| `--evennia-color-*` | CSS custom properties | The shared theme tokens; see [Theme tokens](#theme-tokens). The `--evennia-a11y-*` colours default to them. |
 
 ## License
 

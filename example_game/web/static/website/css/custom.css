@@ -19,8 +19,8 @@
 .dropdown-item.active,
 .dropdown-item.active:focus,
 .dropdown-item.active:hover {
-  background-color: #e9ecef;
-  color: #16181b;
+  background-color: var(--evennia-color-surface-alt, rgba(108, 117, 125, .1));
+  color: var(--evennia-color-text, #212529);
   font-weight: 600;
 }
 
@@ -70,7 +70,7 @@
 }
 
 .widget-empty {
-  color: #6c757d;
+  color: var(--evennia-color-muted, #6c757d);
   font-style: italic;
   padding: 1rem;
 }
@@ -91,7 +91,7 @@
   .sandbox-table-stack td,
   .sandbox-table-stack tbody th { display: block; width: 100%; }
   .sandbox-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-  .sandbox-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .sandbox-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid var(--evennia-color-border, #dee2e6); }
   .sandbox-table-stack tbody td,
   .sandbox-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
   .sandbox-table-stack .sandbox-cell-label { display: block; font-size: .8rem; font-weight: 600; }

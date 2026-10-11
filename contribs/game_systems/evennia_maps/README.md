@@ -369,6 +369,41 @@ That last one cannot live in this contrib's own suite, which has no partner cont
 install — its overlay tests connect fakes instead, and deliberately detach whatever the
 host game connected so they keep testing the map rather than the ecosystem.
 
+## Theming
+
+Every colour in this contrib's stylesheet is a shared `--evennia-color-*`
+token with its usual colour as the fallback, so the pages look the same
+until your game sets one. Set them on `:root` in your own stylesheet to
+retheme these pages along with the other contribs'. The token list and an
+example are in [evennia-accessibility's README](../../utils/evennia_accessibility/README.md#theme-tokens).
+
+The map has its own palette as well, as `--evennia-maps-*` properties with
+these defaults. Leaflet draws some live-map cells itself, with colours set from
+script rather than CSS, so the script reads `tile`, `edge`, `hover`, `active`,
+`portal` and `portal-fill` from the same properties when the map loads.
+
+| Property | Default | Used for |
+|---|---|---|
+| `--evennia-maps-canvas` | `#1b1b1b` | the live map's background, hangout marker text |
+| `--evennia-maps-tile` | `#3a3a3a` | a cell whose terrain has neither art nor a colour |
+| `--evennia-maps-edge` | `rgba(255, 255, 255, 0.25)` | cell edges, the terrain key's border |
+| `--evennia-maps-frame` | `rgba(255, 255, 255, 0.15)` | the border around either map |
+| `--evennia-maps-hover` | `#ffffff` | the edge of the cell under the pointer |
+| `--evennia-maps-active` | `#ffce54` | the edge of a cell with a scene running |
+| `--evennia-maps-active-glow` | `rgba(255, 206, 84, 0.8)` | that cell's glow |
+| `--evennia-maps-portal` | `#b39ddb` | a portal cell's edge and arrow |
+| `--evennia-maps-portal-fill` | `#2b2536` | a portal cell's fill (script only) |
+| `--evennia-maps-swatch-edge` | `rgba(255, 255, 255, 0.35)` | legend swatch borders |
+| `--evennia-maps-badge-bg` | `#2d2d2d` | tooltip badges |
+| `--evennia-maps-panel-bg` | `rgba(27, 27, 27, 0.9)` | the terrain key panel |
+| `--evennia-maps-panel-text` | `#f0f0f0` | text on badges and the terrain key |
+| `--evennia-maps-error` | `rgba(255, 128, 128, 0.4)` | the load-error banner's border |
+| `--evennia-maps-heat` | `#ff7043` | the activity heatmap |
+| `--evennia-maps-lore` | `#ffd54f` | lore pins |
+| `--evennia-maps-hangout` | `#80cbc4` | hangout markers |
+
+Terrain colours come from `MAPS_TERRAINS`, not from these.
+
 ---
 
 ## Version history

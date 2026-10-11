@@ -27,6 +27,12 @@ The sweep covers syntax, comment, recursion, and web-markup conventions:
     Bootstrap 4 classes, external stylesheets, scroll wrappers around tables,
     and empty states for content loops. See ``UI_CONVENTIONS.md``.
 
+5.  **Theme tokens.** Every colour in a web contrib's stylesheet is the
+    fallback of a shared ``--evennia-color-*`` token (with that token's one
+    default) or of the contrib's own ``--evennia-<contrib>-*`` property, so a
+    host stylesheet can retheme every contrib page at once. This check needs
+    no Django and runs even when the template sweep is skipped.
+
 Compilation needs Django, but nothing else: no settings module, no database, no
 game directory. If Django is not importable the sweep prints a hint and exits 0,
 matching the anonymity guard's "don't block a bare clone" behaviour; pass
@@ -209,6 +215,40 @@ BOOTSTRAP4_EXACT = {
     "w-100",
     "w-auto",
 }
+
+# The shared colour tokens a web contrib's stylesheet may read, each with the
+# one default every contrib uses as its fallback. A contrib never sets them; the
+# host does, on :root. UI_CONVENTIONS.md and evennia-accessibility's README
+# document the same table, and test_check_templates.py keeps the three in step.
+SHARED_COLOR_TOKENS = {
+    "text": "#212529",
+    "muted": "#6c757d",
+    "surface": "#ffffff",
+    "surface-alt": "rgba(108, 117, 125, .1)",
+    "border": "#dee2e6",
+    "accent": "#4a90d9",
+    "success-bg": "#d4edda",
+    "success-text": "#155724",
+    "danger-bg": "#f8d7da",
+    "danger-text": "#721c24",
+    "neutral-bg": "#e2e3e5",
+    "neutral-text": "#383d41",
+}
+
+CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+# A declaration's property and value. Run over a whole stylesheet this also
+# meets selectors such as "a:focus-visible", whose "value" is a pseudo-class
+# and never a colour, so no selector parsing is needed.
+CSS_DECLARATION = re.compile(r"([-\w]+)\s*:\s*([^;{}]+)")
+# var(--name) or var(--name, fallback); the fallback may hold one level of
+# parentheses, as rgba(...) does.
+CSS_VAR = re.compile(r"var\(\s*(--[\w-]+)\s*(?:,\s*((?:[^()]|\([^()]*\))*?))?\s*\)")
+CSS_COLOR = re.compile(
+    r"#[0-9a-f]{3,8}\b"
+    r"|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\("
+    r"|\b(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple)\b",
+    re.IGNORECASE,
+)
 
 STRUCTURAL_LOOP_CONTEXTS = {
     "form",
@@ -404,6 +444,64 @@ def check_list_loops(path: Path, source: str) -> list[str]:
     return errors
 
 
+def _css_value(value: str) -> str:
+    return re.sub(r"\s+", "", value).lower()
+
+
+def check_stylesheet(path: Path, source: str) -> list[str]:
+    """Require every colour in a web contrib's stylesheet to be a themeable token."""
+    if not is_web_contrib_template(path):
+        return []
+    app_name = next(name.removeprefix("evennia_") for name in WEB_CONTRIBS if name in path.parts)
+    own = f"--evennia-{app_name}-"
+    source = CSS_COMMENT.sub(lambda match: "\n" * match.group().count("\n"), source)
+    errors = []
+    for declaration in CSS_DECLARATION.finditer(source):
+        prop, value = declaration.groups()
+        where = f"{path}:{source.count(chr(10), 0, declaration.start(2)) + 1}"
+        if prop.startswith("--"):
+            if not prop.startswith(own):
+                errors.append(
+                    f"{where}: sets {prop}; a contrib may only set its own {own}* "
+                    "properties (the host owns the shared tokens)"
+                )
+            continue
+        for var in CSS_VAR.finditer(value):
+            name, fallback = var.groups()
+            if name.startswith("--evennia-color-"):
+                default = SHARED_COLOR_TOKENS.get(name.removeprefix("--evennia-color-"))
+                if default is None:
+                    errors.append(f"{where}: {name} is not a shared colour token")
+                elif fallback is None or _css_value(fallback) != _css_value(default):
+                    errors.append(
+                        f"{where}: {name} needs its shared default: var({name}, {default})"
+                    )
+            elif not name.startswith(own):
+                errors.append(
+                    f"{where}: reads {name}; use a shared --evennia-color-* token or "
+                    f"this contrib's own {own}*"
+                )
+            elif fallback is None:
+                errors.append(f"{where}: {name} needs a fallback, since the host may not set it")
+        if CSS_COLOR.search(CSS_VAR.sub(" ", value)):
+            errors.append(
+                f"{where}: hard-coded colour in '{prop}'; use var(--evennia-color-<token>, "
+                f"<default>) or this contrib's own var({own}<name>, <colour>)"
+            )
+    return errors
+
+
+def iter_stylesheets(paths: list[str]) -> list[Path]:
+    """Return the web contribs' .css files, from explicit paths or a full sweep."""
+    if paths:
+        found = [p for raw in paths if (p := Path(raw)).is_file() and p.suffix == ".css"]
+    else:
+        found = [
+            p for p in (REPO_ROOT / "contribs").rglob("*.css") if SKIP_DIRS.isdisjoint(p.parts)
+        ]
+    return sorted(p for p in found if is_web_contrib_template(p))
+
+
 def iter_templates(paths: list[str]) -> list[Path]:
     """Return the .html files to check, from explicit paths or a full sweep."""
     if paths:
@@ -507,7 +605,9 @@ def build_engine():
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="*", help="templates to check (default: all)")
+    parser.add_argument(
+        "paths", nargs="*", help="templates and stylesheets to check (default: all)"
+    )
     parser.add_argument(
         "--require-django",
         action="store_true",
@@ -515,22 +615,31 @@ def main(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv)
 
+    errors = []
+    stylesheets = iter_stylesheets(args.paths)
+    for path in stylesheets:
+        errors.extend(check_stylesheet(path, path.read_text(encoding="utf-8", errors="replace")))
+
+    templates = []
     try:
         engine = build_engine()
     except ImportError:
         message = "check_templates: Django is not importable, skipping template sweep."
         print(message, file=sys.stderr)
-        return 1 if args.require_django else 0
-
-    errors = []
-    templates = iter_templates(args.paths)
-    for path in templates:
-        errors.extend(check_template(path, engine))
+        if args.require_django:
+            return 1
+    else:
+        templates = iter_templates(args.paths)
+        for path in templates:
+            errors.extend(check_template(path, engine))
 
     for error in errors:
         print(error)
     if errors:
-        summary = f"{len(errors)} problem(s) in {len(templates)} template(s)."
+        summary = (
+            f"{len(errors)} problem(s) in {len(templates)} template(s) "
+            f"and {len(stylesheets)} stylesheet(s)."
+        )
         print(f"\ncheck_templates: {summary}", file=sys.stderr)
         return 1
     return 0

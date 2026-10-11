@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.0] - 2026-10-10
+
+- **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
+  token with its previous colour as the fallback, so a host stylesheet that
+  sets the tokens on `:root` rethemes this contrib's pages along with the
+  others. Nothing changes until a host sets one. The token list is in
+  evennia-accessibility's README.
+- **Added:** the map's own palette (canvas, tiles, edges, hover, active scene,
+  portals, badges, the terrain key and overlay markers) is `--evennia-maps-*`
+  properties, and the live map's script reads the same properties for the
+  cells Leaflet draws, so the canvas can be rethemed too. See the README.
+
 ## [0.7.0] - 2026-10-10
 
 - **Added:** a `present` overlay key, `[name, ...]` per room, provided by

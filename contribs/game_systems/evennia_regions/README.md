@@ -232,6 +232,14 @@ wiring — it installs this contrib beside `evennia-maps`, `-scenes`, `-lore` an
 `-calendar`, and `world/sandbox/tests.py::TestMapOverlaySeam` there is the end-to-end
 proof that all four providers answer one collect.
 
+## Theming
+
+Every colour in this contrib's stylesheet is a shared `--evennia-color-*`
+token with its usual colour as the fallback, so the pages look the same
+until your game sets one. Set them on `:root` in your own stylesheet to
+retheme these pages along with the other contribs'. The token list and an
+example are in [evennia-accessibility's README](../../utils/evennia_accessibility/README.md#theme-tokens).
+
 ---
 
 ## Version history

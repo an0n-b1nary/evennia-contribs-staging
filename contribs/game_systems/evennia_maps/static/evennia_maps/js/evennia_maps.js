@@ -55,8 +55,29 @@
   // zoom, which a marker's iconSize (screen pixels) cannot.
   var TILE_PX = 32;
 
-  // Swatch for a tile whose terrain has neither a sprite nor a colour.
-  var FALLBACK_FILL = "#3a3a3a";
+  // Colours for the cells Leaflet draws as SVG paths. A path takes its colours
+  // from Leaflet's inline attributes rather than from CSS, so init() reads the
+  // same --evennia-maps-* custom properties the stylesheet uses; these are the
+  // stylesheet's defaults, kept when a property is unset. "tile" is also the
+  // swatch for a terrain with neither a sprite nor a colour.
+  var palette = {
+    tile: "#3a3a3a",
+    edge: "rgba(255, 255, 255, 0.25)",
+    hover: "#ffffff",
+    active: "#ffce54",
+    portal: "#b39ddb",
+    "portal-fill": "#2b2536",
+  };
+
+  function readPalette(element) {
+    var style = window.getComputedStyle(element);
+    Object.keys(palette).forEach(function (name) {
+      var value = style.getPropertyValue("--evennia-maps-" + name).trim();
+      if (value) {
+        palette[name] = value;
+      }
+    });
+  }
 
   function cellBounds(tile) {
     // Leaflet takes [lat, lng]; under CRS.Simple lat is y and increases upward,
@@ -143,16 +164,21 @@
     // Leaflet's inline attributes.
     return L.rectangle(bounds, {
       className: "evennia-maps-tile-blank",
-      color: tile.has_active_scene ? "#ffce54" : "rgba(255, 255, 255, 0.25)",
+      color: tile.has_active_scene ? palette.active : palette.edge,
       weight: 1,
-      fillColor: tile.terrain_color || FALLBACK_FILL,
+      fillColor: tile.terrain_color || palette.tile,
       fillOpacity: 1,
     });
   }
 
   function lighten(hex, amount) {
     // terrain_color is validated server-side as #rgb, #rgba, #rrggbb or
-    // #rrggbbaa; alpha is dropped, which is fine for a hover fill.
+    // #rrggbbaa; alpha is dropped, which is fine for a hover fill. A themed
+    // fallback fill may be any CSS colour, so a non-hex value is left as is
+    // and the hover shows through the stroke alone.
+    if (!/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) {
+      return hex;
+    }
     var digits = hex.slice(1);
     if (digits.length <= 4) {
       digits = digits
@@ -180,7 +206,7 @@
     var base = layer.options.fillColor;
     var stroke = layer.options.color;
     layer.on("mouseover", function () {
-      layer.setStyle({ fillColor: lighten(base, 0.25), color: "#ffffff", weight: 2 });
+      layer.setStyle({ fillColor: lighten(base, 0.25), color: palette.hover, weight: 2 });
     });
     layer.on("mouseout", function () {
       layer.setStyle({ fillColor: base, color: stroke, weight: 1 });
@@ -236,9 +262,9 @@
     return [
       L.rectangle(cellBounds(tile), {
         className: "evennia-maps-portal-cell",
-        color: "#b39ddb",
+        color: palette.portal,
         weight: 1,
-        fillColor: "#2b2536",
+        fillColor: palette["portal-fill"],
         fillOpacity: 1,
       }),
       L.marker(cellCenter(tile), {
@@ -430,7 +456,7 @@
       node.alt = "";
     } else {
       node = document.createElement("span");
-      node.style.background = tile.terrain_color || FALLBACK_FILL;
+      node.style.background = tile.terrain_color || palette.tile;
     }
     node.className = "evennia-maps-swatch";
     return node;
@@ -550,6 +576,7 @@
       showError(container, "The map library could not be loaded.");
       return;
     }
+    readPalette(container);
 
     var tilesUrlTemplate = container.dataset.tilesUrlTemplate;
     var layers = JSON.parse(container.dataset.layers || "[]");

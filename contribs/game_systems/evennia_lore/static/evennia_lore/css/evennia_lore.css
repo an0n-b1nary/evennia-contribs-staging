@@ -1,18 +1,20 @@
-/* Self-contained styles for evennia_lore. */
+/* Self-contained styles for evennia_lore. Colours are the shared --evennia-color-*
+   tokens, each with its default as the fallback, so a host stylesheet can
+   retheme them and nothing has to be defined. */
 .evennia-lore-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.evennia-lore-table-scroll:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+.evennia-lore-table-scroll:focus-visible { outline: 2px solid var(--evennia-color-accent, #4a90d9); outline-offset: 2px; }
 .evennia-lore-actions { display: flex; flex-wrap: wrap; }
 .evennia-lore-actions > * { margin-right: .5rem; margin-bottom: .5rem; }
 .evennia-lore-gap > * { margin-right: .5rem; margin-bottom: .5rem; }
 .evennia-lore-filter-control { max-width: 200px; }
 .evennia-lore-narrow { max-width: 140px; }
-.evennia-lore-empty { color: #6c757d; font-style: italic; }
+.evennia-lore-empty { color: var(--evennia-color-muted, #6c757d); font-style: italic; }
 .evennia-lore-body { margin-bottom: 1.5rem; }
 .evennia-lore-diff { font-family: monospace; font-size: .85rem; line-height: 1.4; }
-.evennia-lore-diff-add { background-color: #d4edda; color: #155724; }
-.evennia-lore-diff-remove { background-color: #f8d7da; color: #721c24; }
-.evennia-lore-diff-hunk { background-color: #e2e3e5; color: #383d41; }
-.evennia-lore-diff-header, .evennia-lore-diff-context { color: #6c757d; }
+.evennia-lore-diff-add { background-color: var(--evennia-color-success-bg, #d4edda); color: var(--evennia-color-success-text, #155724); }
+.evennia-lore-diff-remove { background-color: var(--evennia-color-danger-bg, #f8d7da); color: var(--evennia-color-danger-text, #721c24); }
+.evennia-lore-diff-hunk { background-color: var(--evennia-color-neutral-bg, #e2e3e5); color: var(--evennia-color-neutral-text, #383d41); }
+.evennia-lore-diff-header, .evennia-lore-diff-context { color: var(--evennia-color-muted, #6c757d); }
 
 /* Preserve table headers for assistive technology while stacking labelled rows. */
 .evennia-lore-cell-label { display: none; }
@@ -23,12 +25,12 @@
   .evennia-lore-table-stack td,
   .evennia-lore-table-stack tbody th { display: block; width: 100%; }
   .evennia-lore-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-  .evennia-lore-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-lore-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid var(--evennia-color-border, #dee2e6); }
   .evennia-lore-table-stack tbody td,
   .evennia-lore-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
   .evennia-lore-table-stack .evennia-lore-cell-label { display: block; font-size: .8rem; font-weight: 600; }
 }
 
 /* The OOC layer reads as a separate, always-true panel beside the IC content. */
-.evennia-lore-ooc { border-left: 4px solid #6c757d; padding-left: 1rem; }
+.evennia-lore-ooc { border-left: 4px solid var(--evennia-color-muted, #6c757d); padding-left: 1rem; }
 .evennia-lore-decline { flex-basis: 100%; max-width: 32rem; }

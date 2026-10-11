@@ -237,3 +237,11 @@ Thread bonus collection uses `evennia_xp.gating.resolve_xp_multiplier`, so a
 host may compose its own XP policy with the plots resolver. Delegate to the
 plots resolver to preserve per-arc scaling. Existing arc pauses still suppress
 thread bonuses before collection.
+
+## Theming
+
+Every colour in this contrib's stylesheet is a shared `--evennia-color-*`
+token with its usual colour as the fallback, so the pages look the same
+until your game sets one. Set them on `:root` in your own stylesheet to
+retheme these pages along with the other contribs'. The token list and an
+example are in [evennia-accessibility's README](../../utils/evennia_accessibility/README.md#theme-tokens).

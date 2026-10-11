@@ -5,7 +5,14 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from check_templates import check_list_loops, check_markup_conventions
+from check_templates import (
+    REPO_ROOT,
+    SHARED_COLOR_TOKENS,
+    check_list_loops,
+    check_markup_conventions,
+    check_stylesheet,
+    iter_stylesheets,
+)
 
 
 class TemplateConventionTests(unittest.TestCase):
@@ -113,6 +120,91 @@ class TemplateConventionTests(unittest.TestCase):
 
     def test_malformed_loop_is_left_for_the_compilation_check(self):
         self.assertEqual(check_list_loops(self.path, "{% for item in %}x{% endfor %}"), [])
+
+
+class StylesheetTokenTests(unittest.TestCase):
+    """Every colour in a web contrib's stylesheet is a themeable token."""
+
+    def setUp(self):
+        self.path = (
+            Path.cwd()
+            / "contribs"
+            / "game_systems"
+            / "evennia_boards"
+            / "static"
+            / "evennia_boards"
+            / "css"
+            / "evennia_boards.css"
+        )
+
+    def check(self, source):
+        return check_stylesheet(self.path, source)
+
+    def test_shared_tokens_with_their_defaults_pass(self):
+        source = (
+            ".evennia-boards-empty { color: var(--evennia-color-muted, #6c757d); }\n"
+            ".evennia-boards-x { background: var(--evennia-color-surface-alt, rgba(108,117,125,.1)); }"
+        )
+        self.assertEqual(self.check(source), [])
+
+    def test_bare_colours_fail(self):
+        for value in ("#6c757d", "#fff", "rgba(0, 0, 0, .5)", "hsl(0 0% 50%)", "white"):
+            with self.subTest(value=value):
+                errors = self.check(f".evennia-boards-x {{ color: {value}; }}")
+                self.assertTrue(any("hard-coded colour" in error for error in errors))
+
+    def test_a_shared_token_needs_its_one_default(self):
+        self.assertTrue(self.check(".x { color: var(--evennia-color-muted, #777777); }"))
+        self.assertTrue(self.check(".x { color: var(--evennia-color-muted); }"))
+
+    def test_unknown_shared_tokens_fail(self):
+        errors = self.check(".x { color: var(--evennia-color-brand, #123456); }")
+        self.assertTrue(any("not a shared colour token" in error for error in errors))
+
+    def test_own_tokens_take_any_fallback_but_need_one(self):
+        self.assertEqual(self.check(".x { color: var(--evennia-boards-pin, #ffd54f); }"), [])
+        self.assertTrue(self.check(".x { color: var(--evennia-boards-pin); }"))
+
+    def test_another_namespace_cannot_be_read(self):
+        self.assertTrue(self.check(".x { color: var(--primary, #007bff); }"))
+        self.assertTrue(self.check(".x { color: var(--evennia-maps-tile, #3a3a3a); }"))
+
+    def test_a_contrib_never_sets_a_shared_token(self):
+        self.assertTrue(self.check(":root { --evennia-color-text: #000; }"))
+        self.assertEqual(self.check(":root { --evennia-boards-pin: #ffd54f; }"), [])
+
+    def test_comments_selectors_and_keywords_are_not_colours(self):
+        source = (
+            "/* was #6c757d */\n"
+            ".evennia-boards-x:focus-visible { white-space: nowrap; background: none; }\n"
+            ".evennia-boards-y { color: inherit; border-color: currentColor; }"
+        )
+        self.assertEqual(self.check(source), [])
+
+    def test_errors_carry_the_line_number(self):
+        errors = self.check("/* one\n   two */\n.x {\n  color: #fff;\n}")
+        self.assertIn(f"{self.path}:4:", errors[0])
+
+    def test_other_stylesheets_are_not_checked(self):
+        path = Path.cwd() / "example_game" / "web" / "static" / "website" / "css" / "custom.css"
+        self.assertEqual(check_stylesheet(path, ".x { color: #fff; }"), [])
+
+    def test_the_sweep_finds_every_web_contrib_stylesheet(self):
+        names = {path.stem for path in iter_stylesheets([])}
+        self.assertIn("evennia_boards", names)
+        self.assertIn("evennia_maps", names)
+        self.assertNotIn("accessibility", names)
+
+    def test_the_token_table_is_documented_where_hosts_and_contributors_look(self):
+        documents = [
+            REPO_ROOT / "UI_CONVENTIONS.md",
+            REPO_ROOT / "contribs" / "utils" / "evennia_accessibility" / "README.md",
+        ]
+        for document in documents:
+            text = document.read_text(encoding="utf-8")
+            for token, default in SHARED_COLOR_TOKENS.items():
+                with self.subTest(document=document.name, token=token):
+                    self.assertIn(f"| `--evennia-color-{token}` | `{default}` |", text)
 
 
 if __name__ == "__main__":
