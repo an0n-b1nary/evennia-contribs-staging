@@ -5,7 +5,8 @@
 A Fight row holds the engine's JSON state and is the row lock every
 mechanical write takes. Each operation appends one FightEntry carrying the
 state before it, so history is written once and never rewritten, and staff
-rollback reads a single row. Character references in the journal are plain
+rollback reads a single row. Frozen builds live once in FightBuild; stored
+state and snapshots carry only their digests. Character references in the journal are plain
 integers: history outlives the characters it mentions.
 """
 
@@ -51,6 +52,25 @@ class Fight(models.Model):
 
     def __str__(self):
         return f"Fight #{self.pk} ({self.status})"
+
+
+class FightBuild(models.Model):
+    """An immutable build frozen for a fight, stored once and content-addressed.
+
+    Stored fight state and journal snapshots reference builds by digest, so
+    neither repeats them. Rows are never changed or deleted while their fight
+    exists, so any checkpoint's references stay valid for rollback.
+    """
+
+    fight = models.ForeignKey(Fight, on_delete=models.CASCADE, related_name="builds")
+    digest = models.CharField(max_length=64)
+    build = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(fields=("fight", "digest"), name="rp_combat_build_digest"),
+        )
 
 
 class FightEntry(models.Model):

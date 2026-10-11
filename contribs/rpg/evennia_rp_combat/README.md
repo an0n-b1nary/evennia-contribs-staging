@@ -71,7 +71,8 @@ rewound; external build differences pause recovery for reconciliation.
 recovers committed public outcomes after reconnect. Each fight is a `Fight`
 row; every mechanical write locks it, saves the new state and appends one
 `FightEntry` (the state before, plus the result) in one transaction. History
-is append-only, so cost per command stays flat however long the fight runs.
+is append-only, so nothing is rewritten however long the fight runs. Frozen
+builds are stored once per fight in `FightBuild` and referenced by digest.
 Service `operation_id` retries reuse the recorded result. Room delivery follows the
 commit and is not a durable chat transport. Inspecting results never reapplies
 damage. Private RPS and draws are excluded from pending policy/UI views.

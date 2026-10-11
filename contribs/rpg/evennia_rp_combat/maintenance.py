@@ -58,7 +58,7 @@ def maintain(fight, *, now=None):
                     )
                 )
             return
-        state = services.clone(fight.state)
+        state = services.load(fight)
         if state["ended"]:
             return
         before = services.clone(state)
