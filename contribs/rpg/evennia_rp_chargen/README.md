@@ -1,6 +1,6 @@
 # evennia-rp-chargen
 
-> **Preview (0.3.0, Pre-Alpha).** This package was written directly as a
+> **Preview (0.4.0, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
 > while the rest of the rp- cluster is built on it. Pin an exact commit.
 
@@ -378,3 +378,16 @@ only to pages this contrib or its required dependencies ship. With
 evennia-guides installed they appear on its web guide; without it they're
 ignored. To restate one for your game, add a page with the same key to
 `GUIDES_DIRS`.
+
+## Signature Moves
+
+`+moves` owns free revisioned Signature authoring independently of combat.
+Enable `RP_CHARGEN_MOVES_REVEALED` to expose the command in `ChargenCmdSet`.
+Use `/create name=JSON`, `/edit key=JSON`, `/equip key`, `/unequip key` and
+`/archive key`. Defaults permit 100 library entries and 10 equipped moves
+(`RP_CHARGEN_MOVE_LIBRARY_LIMIT`, `RP_CHARGEN_MOVE_EQUIPPED_LIMIT`). Equipped
+edits obey scene locks and `SIGNATURE` build-change guards. Unequipped
+library authoring does not change a combat snapshot. Keys are never reused.
+Set `RP_CHARGEN_MOVE_VALIDATOR` to a dotted validator for host content;
+combat provides `evennia_rp_combat.integrations.validate_move`. Without it,
+structural validation still applies. No XP cost or staff approval is added.

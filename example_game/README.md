@@ -654,6 +654,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
+         contribs/rpg/evennia_rp_combat \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -820,6 +821,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_rules \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
+         contribs/rpg/evennia_rp_combat \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -1440,3 +1442,23 @@ the CLI. A source-project adapter is future work.
 On Linux, identity uses `/proc`'s boot-relative start counter so WSL/NTP clock
 adjustments cannot hide an owned process. `evidence/cleanup.json` records the
 verified shutdown.
+
+
+## Combat practice
+
+The Proving Grounds wires `evennia-rp-combat` after rules/chargen/NPCs.
+Seeded sample builds carry an equipped Ready Guard Signature and Balanced
+Tactics; the room has an empty practice coordinator, so no PC is enrolled by
+seeding. `+combat/join side` explicitly accepts. See `/guide/combat/` and
+`help +combat`; `+combatstory` is available to ordinary players. Use the
+Market's permitted NPC templates with `/template blueprint=side,boss,cap`
+for an attributed practice opponent. NPC stat blocks include all combat roles.
+
+No typeclass mixin or new URL/API mount is needed. The package guide is
+loaded by evennia-guides. Combat sends SYSTEM Scene entries without posing
+or RP/XP credit, listens for real poses, and keeps separate NPC/controller
+resources. Optional chargen validation uses `world.sandbox.glue`; removing
+combat leaves the Signature library usable. The sandbox tests include
+`world.sandbox.test_combat` for real partner seams. Run the integration gate
+with `evennia test --settings test_settings.py typeclasses commands world`
+and closed stdin; confirm a positive test count.

@@ -149,6 +149,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdSpend",
             "CmdUpgrade",
             "CmdChargen",
+            "CmdMoves",
         ):
             self.add(command)
         for command in _optional_commands("evennia_rp_contest", "CmdTest"):
@@ -202,6 +203,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # Not something to copy into a real game.
         self.add(CmdSandbox)
 
+        for command in _optional_commands(
+            "evennia_rp_combat", "CmdCombat", "CmdCombatStory", "CmdTactics"
+        ):
+            self.add(command)
         # Last so NPC-aware pose/say/emit and +test replace the normal commands.
         if apps.is_installed("evennia_npcs"):
             from evennia_npcs.commands import NPCCmdSet

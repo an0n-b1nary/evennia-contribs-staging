@@ -5,6 +5,10 @@
 from django.apps import AppConfig
 
 
+def boolean(value):
+    return type(value) is bool
+
+
 class RPChargenConfig(AppConfig):
     """AppConfig for the evennia_rp_chargen contrib."""
 
@@ -14,6 +18,14 @@ class RPChargenConfig(AppConfig):
     verbose_name = "Evennia RP Chargen"
 
     def ready(self):
+        from evennia_links.runtime import register
+
+        register(
+            "RP_CHARGEN_MOVES_REVEALED",
+            False,
+            validator=boolean,
+            description="Expose free Signature libraries and equipped moves.",
+        )
         from django.apps import apps
         from django.core import checks
 

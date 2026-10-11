@@ -332,3 +332,18 @@ rptracker, XP, chargen and equipment together. Only links and rules are hard
 NPC dependencies. Consult the `npc-partners` CI matrix for the exact arguments.
 The standard sandbox gate also exercises NPC MRO, reward exclusion, scene
 privacy, session switching and idempotent seeding under all real partners.
+
+
+### Combat without optional partners
+
+Use a fresh Python 3.12 environment with `evennia==6.0.0`, links, rules and
+combat installed in that order. Initialize a disposable Evennia game and
+append those three contrib app labels to its `INSTALLED_APPS`. Run
+`python scripts/ci_run_combat_tests.py <game> --absent evennia_rp_chargen
+--absent evennia_npcs --absent evennia_scenes --absent evennia_posing
+--absent evennia_social --absent evennia_accessibility`. Absence checks fail
+if any named package remains importable. The CI combat-independent job then
+adds real NPCs and repeats with the other partners still physically absent.
+The full sandbox gate covers the installed-partner configuration and rendered
+guide; `scripts/playtest.py run --suite combat --profile normal --no-browser`
+checks ordinary authenticated player commands, including a Server reload.

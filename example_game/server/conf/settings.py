@@ -81,6 +81,7 @@ INSTALLED_APPS += [
     "evennia_rp_equipment",
     "evennia_rp_contest",
     "evennia_npcs",
+    "evennia_rp_combat",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -191,6 +192,7 @@ RP_CHARGEN_ALLOWANCE_NOUN = "starting allowance"
 RP_CHARGEN_LOCK_SCOPES = ("pips", "loadout")
 RP_CHARGEN_LOCK_TTL = 3 * 60 * 60
 RP_CHARGEN_REQUIRE_APPROVAL = False
+RP_CHARGEN_MOVE_VALIDATOR = "world.sandbox.glue.validate_signature_move"
 RP_CHARGEN_RPTRACKER_APP_LABEL = "evennia_rptracker"
 RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG"
 RP_CHARGEN_STARTING_ALLOWANCE = rp_values.STARTING_ALLOWANCE
@@ -692,6 +694,71 @@ MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 ######################################################################
 # Settings given in secret_settings.py override those in this file.
 ######################################################################
+######################################################################
+# Combat (evennia-rp-combat) - personal turns, consent and reaction queues
+######################################################################
+RP_COMBAT_REVEALED = True
+RP_COMBAT_FROZEN = False
+RP_COMBAT_TACTICS_REVEALED = True
+RP_CHARGEN_MOVES_REVEALED = True
+RP_COMBAT_TURN_LIMIT = 4
+RP_COMBAT_DOMAIN_EFFECTS = dict(
+    zip(
+        (
+            "athletics",
+            "acrobatics",
+            "stealth",
+            "survival",
+            "thievery",
+            "medicine",
+            "alchemy",
+            "ritual",
+            "scholarship",
+            "insight",
+            "perception",
+            "persuasion",
+            "performance",
+            "intimidation",
+            "seduction",
+            "deception",
+        ),
+        (
+            "grapple",
+            "slip_inside",
+            "ambush",
+            "endure",
+            "pilfer",
+            "treat",
+            "envenom",
+            "ward",
+            "analyze",
+            "read",
+            "pinpoint",
+            "exhort",
+            "encore",
+            "provoke",
+            "beguile",
+            "misdirect",
+        ),
+        strict=True,
+    )
+)
+# These are demonstration style traits, owned by the host ruleset. Focus
+# unlocks the trait, while ordinary style tags grant no universal damage bonus.
+RP_COMBAT_ELEMENT_TRAITS = {
+    "blades": ["penetrating_resist"],
+    "blunt": ["op_penalty"],
+    "polearms": ["dispel"],
+    "archery": ["normalize"],
+    "unarmed": ["drain"],
+    "spellcraft": ["spirit_loss"],
+}
+RP_RULES_EFFECT_KINDS = (
+    {"combat_bonus": "evennia_rp_combat.modifiers.CombatEffect"}
+    if "evennia_rp_combat" in INSTALLED_APPS
+    else {}
+)
+
 try:
     from server.conf.secret_settings import *
 except ImportError:
