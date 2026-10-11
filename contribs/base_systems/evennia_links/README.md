@@ -430,3 +430,29 @@ pays everyone when `ids` is None and returns the ids that failed. Only those
 retry, with exponential backoff (5 minutes doubling to 6 hours, 12 attempts);
 a paused queue runs its periods oldest first once unpaused. Persist the
 returned dict on the script. Batches must be idempotent per period.
+
+
+## Room rights and ownership
+
+Import `can` and `owner_of` from `evennia_links.rooms`. Supported actions are
+`describe`, `configure`, `lock`, `admit`, `install`, and `transfer`. Unknown
+actions deny. With no provider, `can` uses `room.access(actor, "control")` and
+`owner_of` returns `None`: control access is not an ownership record.
+
+Configure `LINKS_ROOM_PERMISSION = "my_game.rooms.can"` for an authoritative
+`(actor, room, action) -> bool` callable, and `LINKS_ROOM_OWNER =
+"my_game.rooms.owner_of"` for `(room) -> saved ObjectDB or None`. Import errors,
+non-callables and provider failures deny rights or return no owner; they never
+fall back to control. Staff overrides remain with the consuming command or
+service, under that system's staff policy. No ownership package is imported.
+
+`evennia_links.visibility.call_room_visibility(provider, room, viewer=None)`
+supports `(room)`, `(room, viewer)` and keyword-only `viewer` callbacks. It binds
+the signature before invoking once. Privacy callers must catch errors and hide
+the room, including a `TypeError` raised inside a correctly bound callback.
+
+`visibility.request_viewer(request)` resolves the selected preview character
+once on the request, so map bounds or region lists do not repeat account
+lookups per room. Set `staff=True` when a caller has already established a
+staff bypass; it returns `None` without resolving a character. It grants no
+rights on its own.

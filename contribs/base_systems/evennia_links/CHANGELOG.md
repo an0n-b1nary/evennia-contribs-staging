@@ -1,5 +1,13 @@
 # Changelog — evennia-links
 
+## [0.8.2] - 2026-10-10
+
+- Added `evennia_links.rooms.can(actor, room, action)` and `owner_of(room)`.
+  Configured providers are authoritative and fail closed; without providers,
+  rights use control access and ownership is unknown.
+- Added signature-aware dispatch for legacy and viewer-aware room visibility
+  callbacks. A callback is invoked once; exceptions never trigger a retry.
+
 ## [0.8.1] - 2026-10-10
 
 - Added: `evennia_links.web.WebCharacterMiddleware`. Evennia's website already
