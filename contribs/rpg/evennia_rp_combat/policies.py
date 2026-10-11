@@ -6,7 +6,7 @@ from fractions import Fraction as F
 
 from .arithmetic import resolve
 from .data import REACTIONS, TIERS, Build, CombatError, Move
-from .modifiers import bonus
+from .modifiers import bonus, move_cost
 
 APPETITES = {"cautious": (F(1, 4), 1), "balanced": (F(3, 4), F(1, 2)), "bold": (F(3, 2), F(1, 4))}
 
@@ -29,7 +29,7 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
     counters += [
         move
         for move in view.build.moves
-        if move.action in ("attack", "spell") and move.cost <= view.reserves
+        if move.action in ("attack", "spell") and move_cost(view.build, move) <= view.reserves
     ]
     for reaction in REACTIONS:
         for counter in counters if reaction == "overpower" else [Move()]:
@@ -56,6 +56,9 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
                     + bonus(view.build, "before_resolution", "accuracy", counter.action),
                     penalty=F(dict(view.penalties).get(reaction, "0")),
                     bonus=F(dict(view.bonuses).get(reaction, "0")),
+                    # Only a publicly called bet; a hidden one is never seen.
+                    rps=view.public_bet,
+                    rps_shift=tuple(F(v) for v in view.public_shift),
                 )
                 for roll in range(1, 101)
             ]
@@ -63,7 +66,7 @@ def auto_react(view, *, appetite="balanced", preferred="", preferred_moves=()):
             ko = sum(o.damage >= view.hp - strain_cost for o in outcomes)
             utility = (
                 sum(o.damage - k * o.counter_damage for o in outcomes) / 100
-                + cost * counter.cost
+                + cost * move_cost(view.build, counter)
                 + strain_cost
             )
             candidates.append(
@@ -109,7 +112,7 @@ def auto_act(view, *, rng, appetite="balanced", target_policy="random", weights=
     legal = [
         m
         for m in moves
-        if m.cost <= view.reserves
+        if move_cost(view.build, m) <= view.reserves
         and ("strain" not in m.effects or view.hp > 5)
         and (view.allies if m.action == "assist" else view.targets)
     ]

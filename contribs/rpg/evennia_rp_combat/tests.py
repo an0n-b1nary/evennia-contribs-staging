@@ -21,7 +21,7 @@ from . import arithmetic as math
 from . import engine, policies, services
 from .commands import CmdCombat, CmdCombatStory, CmdTactics
 from .data import TIERS, ActionView, Build, CombatError, Move, ReactionView
-from .modifiers import CombatEffect
+from .modifiers import CombatEffect, CombatRule, EffectSpecError, move_cost
 
 ROLES = ("attack", "attack_defense", "spell", "spell_defense", "dispirit", "will", "agility")
 
@@ -908,6 +908,343 @@ class TestRevival(SimpleTestCase):
             engine.declaration(state, 3, [2], Move(), 50)
 
 
+def ruled(*specs, moves=(), **values):
+    """A build carrying frozen combat_rule entries, as chargen freezes them."""
+    effects = tuple(
+        (f"rule-{i}", json.dumps(CombatRule.from_spec({"kind": "combat_rule", **spec}).frozen()))
+        for i, spec in enumerate(specs)
+    )
+    return Build(build(**values).scores, moves=tuple(moves), effects=effects)
+
+
+def exchange_of(state, token):
+    return state["exchanges"][token.split(":")[0]]
+
+
+def round_trip(state, ident=1, target=2, **kwargs):
+    """One completed standard exchange, its pose acknowledged."""
+    token = declare(state, ident=ident, targets=(target,), **kwargs)
+    engine.reaction(state, target, token, "resist")
+    engine.participant(state, ident)["pose"] = False
+    return token
+
+
+class TestAbilityRules(SimpleTestCase):
+    def test_rules_validate_bounds_levels_and_fields(self):
+        for spec in (
+            {"rule": "unknown"},
+            {"rule": "deflect", "amount": "1/10"},
+            {"rule": "deflect", "amount": "1/200", "per_level": "1/200"},
+            {"rule": "tactician", "discount": 1, "per_level": 1},
+            {"rule": "rps", "bet": "sideways", "penalty": 5},
+            {"rule": "measured_tempo", "amount": "1/4", "cap": "3/2"},
+            {"rule": "bait", "amount": 1},
+            {"rule": "deflect", "amount": "1/200", "visibility": "hidden"},
+        ):
+            with self.assertRaises(EffectSpecError):
+                CombatRule.from_spec(
+                    {"kind": "combat_rule", **spec}, level=3 if "per_level" in spec else 1
+                )
+        rule = CombatRule.from_spec(
+            {"kind": "combat_rule", "rule": "deflect", "amount": "1/400", "per_level": "1/400"},
+            level=2,
+        )
+        self.assertEqual(
+            rule.frozen(), {"kind": "combat_rule", "rule": "deflect", "amount": "1/200"}
+        )
+        self.assertEqual(rule.hooks(), set())
+
+    def test_fixed_bonuses_ignore_rules_and_rules_clamp_when_stacked(self):
+        bonus_spec = CombatEffect.from_spec(
+            {"kind": "combat_bonus", "phase": "build", "field": "agility", "amount": 5}
+        )
+        both = Build(
+            build().scores,
+            effects=(
+                ("bonus", json.dumps(bonus_spec.frozen())),
+                *ruled({"rule": "flowing_guard", "amount": 15}).effects,
+                ("again", ruled({"rule": "flowing_guard", "amount": 15}).effects[0][1]),
+            ),
+        )
+        self.assertEqual(both.score("agility"), 5)
+        from .modifiers import rules
+
+        self.assertEqual(rules(both)["flowing_guard"]["amount"], 20)
+
+    def test_deflect_trades_damage_for_faster_fatigue_on_a_successful_resist(self):
+        plain, deflect = (
+            build(agility=40),
+            ruled({"rule": "deflect", "amount": "1/200"}, agility=40),
+        )
+        for roll in (1, 100):
+            base = math.resolve(build(attack=40), plain, Move(), "resist", roll)
+            better = math.resolve(build(attack=40), deflect, Move(), "resist", roll)
+            if base.success:
+                self.assertLess(better.damage, base.damage)
+                self.assertGreater(better.pressure_gain, base.pressure_gain)
+            else:
+                self.assertEqual(better, base)
+        # The mitigation floor still holds.
+        floor = ruled({"rule": "deflect", "amount": "1/100"}, agility=100)
+        outcome = math.resolve(build(attack=40), floor, Move(), "resist", 1)
+        raw = math.raw_damage(40, 0, 0)
+        self.assertEqual(outcome.damage, math.rounded(raw * math.rule("resist_min_fraction")))
+
+    def test_stoneskin_turns_clean_hits_into_glances_but_never_into_evades(self):
+        plain = build(attack_defense=40)
+        sturdy = ruled(
+            {"rule": "stoneskin", "band": "1/8", "cap": 5, "mitigation": "1/4"}, attack_defense=40
+        )
+        base = math.resolve(build(), plain, Move(), "evade", 1)
+        chance = base.chance
+        for roll in range(1, 101):
+            first = math.resolve(build(), plain, Move(), "evade", roll)
+            second = math.resolve(build(), sturdy, Move(), "evade", roll)
+            self.assertEqual(first.success, second.success)
+            self.assertEqual(first.chance, second.chance)
+        widened = math.resolve(build(), sturdy, Move(), "evade", chance + 14)
+        self.assertTrue(widened.glancing and widened.domain)
+        self.assertFalse(math.resolve(build(), plain, Move(), "evade", chance + 14).glancing)
+        glance = math.resolve(build(), sturdy, Move(), "evade", chance + 1)
+        self.assertFalse(glance.domain)
+        raw = math.raw_damage(0, 40, 0)
+        self.assertEqual(glance.damage, math.rounded(raw / 4))
+        self.assertFalse(math.resolve(build(), sturdy, Move(), "evade", chance + 16).glancing)
+
+    def test_rps_specialists_and_telegraph_change_both_sides_of_one_bet(self):
+        def chances(attacker, bet="reaching"):
+            return {
+                r: math.resolve(
+                    attacker,
+                    build(),
+                    Move(),
+                    r,
+                    1,
+                    rps=bet,
+                    rps_shift=engine.shift(attacker, {"bet": bet}),
+                ).chance
+                for r in ("evade", "overpower")
+            }
+
+        plain = chances(build())
+        specialist = chances(ruled({"rule": "rps", "bet": "reaching", "penalty": 10, "bonus": 10}))
+        self.assertEqual(specialist["evade"], plain["evade"] - 10)
+        self.assertEqual(specialist["overpower"], plain["overpower"] + 10)
+        other = ruled({"rule": "rps", "bet": "subtle", "penalty": 10, "bonus": 10})
+        self.assertEqual(chances(other), plain)
+        telegraph = chances(ruled({"rule": "rps", "penalty": -10, "bonus": -10}))
+        self.assertEqual(telegraph["evade"], plain["evade"] + 10)
+        self.assertEqual(telegraph["overpower"], plain["overpower"] - 10)
+
+    def test_finesse_needs_a_more_accurate_counter_and_adds_nothing_to_slip_inside(self):
+        heavy = Move(key="heavy", power=2, accuracy=-2)
+        finesse = ruled({"rule": "finesse", "amount": 10})
+
+        def chance(defense, counter=None, **kwargs):
+            return math.resolve(
+                build(), defense, heavy, "overpower", 1, counter=counter or Move(), **kwargs
+            ).chance
+
+        self.assertEqual(chance(finesse), chance(build()) + 20)
+        clumsy = Move(key="heavy", power=2, accuracy=-2)
+        self.assertEqual(chance(finesse, clumsy), chance(build(), clumsy))
+        self.assertEqual(chance(finesse, slip_inside=True), chance(build(), slip_inside=True))
+
+    def test_desperate_counter_ignores_only_negative_own_spirit(self):
+        desperate = ruled({"rule": "desperate_counter"})
+        for spirit, gained in ((-1000, 10), (500, 0)):
+            plain = math.resolve(build(), build(), Move(), "overpower", 1, defender_spirit=spirit)
+            better = math.resolve(
+                build(), desperate, Move(), "overpower", 1, defender_spirit=spirit
+            )
+            self.assertEqual(better.chance, plain.chance + gained)
+
+    def test_tactician_discounts_stances_and_costs_transcendence(self):
+        guarded = Move(
+            kind="signature",
+            key="guarded",
+            power=1,
+            accuracy=1,
+            effects=("evade_stance", "resist_stance"),
+        )
+        tactician = ruled(
+            {"rule": "tactician", "discount": 1, "transcendence": 4}, moves=(guarded,)
+        )
+        self.assertEqual((guarded.cost, move_cost(tactician, guarded)), (3, 2))
+        self.assertEqual(move_cost(tactician, Move(kind="improvised", key="x", power=1)), 1)
+        state = duel(attacker=tactician)
+        round_trip(state, move=guarded)
+        actor = engine.participant(state, 1)
+        self.assertEqual((actor["reserves"], actor["transcendence"]), (1, 4))
+
+    def test_measured_tempo_builds_on_completed_exchanges_and_spends_on_a_burst(self):
+        tempo = ruled({"rule": "measured_tempo", "amount": "1/4", "cap": 2})
+        state = duel(attacker=tempo, boss=1)
+        actor = engine.participant(state, 1)
+        actor["turn_limit"] = 10
+        for _ in range(3):
+            round_trip(state)
+        self.assertEqual(actor["tempo"], 2)
+        plain = engine.reaction_view(state, 2, declare(state, burst=True)).accuracy
+        self.assertEqual(actor["tempo"], 0)
+        state2 = duel()
+        baseline = engine.reaction_view(state2, 2, declare(state2, burst=True)).accuracy
+        self.assertEqual(plain, baseline + F(1, 2))
+        engine.cancel(state, 2, f"{actor['outgoing']}:1")
+        self.assertEqual(actor["tempo"], 2)
+        # A completed Burst builds nothing.
+        opener = declare(state, burst=True)
+        engine.reaction(state, 2, opener, "resist")
+        engine.press(state, 1, 50, stop=True)
+        self.assertEqual(actor["tempo"], 0)
+
+    def test_explosive_softens_overextension_without_freeing_the_chain(self):
+        explosive = ruled({"rule": "explosive", "factor": "1/2"})
+        for attacker, added in ((explosive, 3), (build(), 5)):
+            state = duel(attacker=attacker)
+            opener = declare(state, burst=True)
+            engine.reaction(state, 2, opener, "resist")
+            engine.press(state, 1, 100)
+            self.assertEqual(engine.value(engine.participant(state, 1), "overextended"), added)
+
+    def test_catch_breath_uses_support_scoped_pressure_recovery(self):
+        spec = {
+            "kind": "combat_bonus",
+            "phase": "exchange_end",
+            "field": "pressure_recovery",
+            "amount": 4,
+            "actions": ["assist", "dispirit"],
+        }
+        breath = Build(
+            build().scores, effects=(("cb", json.dumps(CombatEffect.from_spec(spec).frozen())),)
+        )
+        state = duel(attacker=breath)
+        engine.join(state, 3, "Ally", "one", build())
+        actor = engine.participant(state, 1)
+        actor["pressure"] = 20
+        engine.declaration(state, 1, [3], Move(action="assist"), 50)
+        self.assertEqual(actor["pressure"], 10)
+        actor["pose"] = False
+        round_trip(state)
+        self.assertEqual(actor["pressure"], 4)
+
+    def test_flowing_guard_rewards_alternating_and_is_spent_by_any_reaction(self):
+        flowing = ruled({"rule": "flowing_guard", "amount": 10}, agility=60)
+        state = duel(defender=flowing)
+        engine.reaction(state, 2, declare(state, roll=1), "evade")
+        defender = engine.participant(state, 2)
+        self.assertEqual(engine.value(defender, "flowing_resist"), 10)
+        engine.participant(state, 1)["pose"] = False
+        token = declare(state, roll=100)
+        bonuses = dict(engine.reaction_view(state, 2, token).bonuses)
+        self.assertEqual((bonuses["resist"], bonuses["evade"]), ("10", "0"))
+        # Evading again (here unsuccessfully) spends it without boosting Evade.
+        engine.reaction(state, 2, token, "evade")
+        self.assertEqual(engine.value(defender, "flowing_resist"), 0)
+        # A failed reaction grants nothing; the defender's own action expires it.
+        state = duel(defender=flowing)
+        engine.reaction(state, 2, declare(state, roll=100), "evade")
+        self.assertFalse(engine.value(engine.participant(state, 2), "flowing_resist"))
+        state = duel(defender=flowing)
+        engine.reaction(state, 2, declare(state, roll=1), "evade")
+        round_trip(state, ident=2, target=1)
+        self.assertNotIn("flowing_resist", engine.participant(state, 2)["conditions"])
+
+    def test_off_balance_flaw_turns_the_alternation_into_a_penalty(self):
+        state = duel(defender=ruled({"rule": "flowing_guard", "amount": -10}, agility=60))
+        engine.reaction(state, 2, declare(state, roll=1), "evade")
+        engine.participant(state, 1)["pose"] = False
+        bonuses = dict(engine.reaction_view(state, 2, declare(state)).bonuses)
+        self.assertEqual(bonuses["resist"], "-10")
+
+    def test_braced_support_spares_resist_and_costs_the_others(self):
+        for defender, expected in (
+            (
+                ruled({"rule": "braced_support", "amount": 5}),
+                {"evade": "25", "resist": "0", "overpower": "25"},
+            ),
+            (build(), {"evade": "20", "resist": "20", "overpower": "20"}),
+        ):
+            state = duel(defender=defender)
+            engine.join(state, 3, "Ally", "two", build())
+            engine.declaration(state, 2, [3], Move(action="assist"), 50)
+            view = engine.reaction_view(state, 2, declare(state))
+            self.assertEqual(dict(view.penalties), expected)
+
+    def test_calling_the_shot_publishes_the_bet_and_sharpens_only_its_penalty(self):
+        caller = ruled({"rule": "calling_the_shot", "amount": 10})
+        with self.assertRaisesRegex(CombatError, "Calling the Shot"):
+            declare(duel(), bet="reaching", public=True)
+        with self.assertRaisesRegex(CombatError, "Calling the Shot"):
+            declare(duel(attacker=caller), public=True)
+        state = duel(attacker=caller)
+        token = declare(state, bet="reaching", public=True)
+        view = engine.reaction_view(state, 2, token)
+        self.assertEqual((view.public_bet, view.public_shift), ("reaching", ("10", "0")))
+        # Automatic reactions may use a public bet: Evade now costs 30.
+        self.assertNotEqual(policies.auto_react(view)[0], "evade")
+        hidden = duel(attacker=caller)
+        view = engine.reaction_view(hidden, 2, declare(hidden, bet="reaching"))
+        self.assertEqual(view.public_bet, "")
+        state = duel(attacker=caller)
+        token = declare(state, bet="reaching", public=True, roll=1)
+        engine.reaction(state, 2, token, "evade")
+        plain = duel()
+        plain_token = declare(plain, bet="reaching", roll=1)
+        engine.reaction(plain, 2, plain_token, "evade")
+        self.assertEqual(
+            exchange_of(state, token)["outcomes"][0]["chance"],
+            exchange_of(plain, plain_token)["outcomes"][0]["chance"] - 10,
+        )
+
+    def test_taunting_opener_lowers_one_burst_ante_after_a_landed_dispirit(self):
+        taunting = ruled({"rule": "taunting_opener", "amount": 300})
+        state = duel(attacker=taunting)
+        actor = engine.participant(state, 1)
+        engine.declaration(state, 1, [2], Move(action="dispirit"), 100)
+        self.assertNotIn("taunting", actor["conditions"])
+        actor["pose"] = False
+        engine.declaration(state, 1, [2], Move(action="dispirit"), 1)
+        self.assertEqual(engine.value(actor, "taunting"), 300)
+        actor["pose"], actor["spirit"] = False, 1000
+        opener = declare(state, burst=True)
+        self.assertEqual((actor["spirit"], engine.value(actor, "taunting")), (700, 0))
+        engine.cancel(state, 2, opener)
+        self.assertEqual((actor["spirit"], engine.value(actor, "taunting")), (1000, 300))
+        # Unused, it lapses after the next own action.
+        round_trip(state)
+        self.assertNotIn("taunting", actor["conditions"])
+
+    def test_bait_pays_once_per_exchange_for_a_failed_counter(self):
+        for attacker, reserves in ((ruled({"rule": "bait"}), 5), (build(), 4)):
+            state = duel(attacker=attacker)
+            actor = engine.participant(state, 1)
+            actor["reserves"] = 0
+            opener = declare(state, burst=True, roll=100)
+            engine.reaction(state, 2, opener, "overpower")
+            self.assertFalse(exchange_of(state, opener)["outcomes"][0]["success"])
+            engine.press(state, 1, 100)
+            engine.reaction(state, 2, f"{opener.split(':')[0]}:2", "overpower")
+            self.assertEqual(actor["reserves"], reserves)
+
+    def test_blood_price_pays_vitality_for_missing_reserves_and_refunds_it(self):
+        jab = Move(kind="improvised", key="jab", power=1)
+        with self.assertRaisesRegex(CombatError, "Insufficient"):
+            state = duel()
+            engine.participant(state, 1)["reserves"] = 0
+            declare(state, move=jab)
+        state = duel(attacker=ruled({"rule": "blood_price", "amount": 5}))
+        actor = engine.participant(state, 1)
+        actor["reserves"] = 0
+        token = declare(state, move=jab)
+        self.assertEqual((actor["hp"], actor["reserves"], actor["transcendence"]), (95, 0, 0))
+        engine.cancel(state, 2, token)
+        self.assertEqual((actor["hp"], actor["reserves"]), (100, 0))
+        actor["hp"] = 5
+        with self.assertRaisesRegex(CombatError, "Insufficient|Blood Price"):
+            declare(state, move=jab)
+
+
 class TestPolicies(SimpleTestCase):
     def test_capability_views_have_no_hidden_information(self):
         state = duel()
@@ -929,8 +1266,12 @@ class TestPolicies(SimpleTestCase):
                 "penalties",
                 "bonuses",
                 "estimates",
+                "public_bet",
+                "public_shift",
             },
         )
+        # Only a bet the attacker called publicly ever appears.
+        self.assertEqual((view.public_bet, view.public_shift), ("", ("0", "0")))
         self.assertNotIn("bet", vars(view))
         self.assertNotIn("draw", vars(view))
         for appetite in ("cautious", "balanced", "bold"):

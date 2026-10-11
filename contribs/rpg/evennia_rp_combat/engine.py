@@ -12,6 +12,7 @@ from fractions import Fraction as F
 from . import arithmetic as math
 from .data import Build, CombatError, Move, ReactionView
 from .modifiers import bonus as passive
+from .modifiers import move_cost, rps_shift, rules
 
 DOMAIN_ACTIONS = {
     "grapple": ("attack", "spell"),
@@ -216,6 +217,45 @@ def value(row, name):
     return row["conditions"].get(name, {}).get("magnitude", 0)
 
 
+def exposure(row, build, reaction):
+    """Vulnerable and Overextended penalties for one reaction.
+
+    Braced Support keeps Vulnerable off Resist and adds to the others.
+    """
+    vulnerable = value(row, "vulnerable")
+    braced = rules(build).get("braced_support")
+    if braced and vulnerable:
+        vulnerable = 0 if reaction == "resist" else vulnerable + math.rounded(braced["amount"])
+    return vulnerable + value(row, "overextended")
+
+
+def extension(build, amount):
+    """Overextended added by pressing or a broken chain (Explosive)."""
+    factor = rules(build).get("explosive", {}).get("factor", F(1))
+    return math.rounded(amount * factor)
+
+
+def shift(build, exchange):
+    """Points the attacker's rules add to this exchange's bet."""
+    penalty, bonus = rps_shift(build, exchange["bet"])
+    if exchange.get("public_bet"):
+        penalty += rules(build).get("calling_the_shot", {}).get("amount", F(0))
+    return penalty, bonus
+
+
+def blood_price(row, build, move, owed):
+    """Reserves and Vitality to pay ``owed``; Blood Price covers a shortfall.
+
+    Returns (reserves, missing units, Vitality). Only special moves may pay
+    in Vitality, and never down to 0; otherwise a shortfall is refused.
+    """
+    missing = max(0, owed - row["reserves"])
+    rate = math.rounded(rules(build).get("blood_price", {}).get("amount", 0))
+    if missing and (not rate or move.kind == "standard"):
+        raise CombatError("Insufficient Reserves for that move.")
+    return owed - missing, missing, missing * rate
+
+
 def harm(row, amount, *, half_transcendence=False):
     actual = min(row["hp"], max(0, amount))
     row["hp"] -= actual
@@ -321,6 +361,7 @@ def declaration(
     domain="",
     domain_effects=None,
     waive=False,
+    public=False,
 ):
     progress(state)
     domain_effects = domain_effects or {}
@@ -357,6 +398,8 @@ def declaration(
     build = Build.from_dict(actor["build"])
     if move.kind == "signature" and move not in build.moves:
         raise CombatError("That Signature is not in your frozen equipped loadout.")
+    if public and (not bet or "calling_the_shot" not in rules(build)):
+        raise CombatError("Only Calling the Shot makes an RPS bet public.")
     builtin = (
         move.domain
         if has_domain(build, move.domain)
@@ -372,13 +415,18 @@ def declaration(
         raise CombatError("That domain effect does not apply to this action.")
     if waive and domain_effects.get(chosen_domain) != "treat":
         raise CombatError("Waiving recovery uses Medicine's Treat on the reviving Heal.")
-    cost = move.cost + (1 if chosen_domain and chosen_domain != move.domain else 0)
-    if actor["reserves"] < cost * len(targets):
-        raise CombatError("Insufficient Reserves for every target.")
+    cost = move_cost(build, move) + (1 if chosen_domain and chosen_domain != move.domain else 0)
+    try:
+        reserves, missing, blood = blood_price(actor, build, move, cost * len(targets))
+    except CombatError:
+        raise CombatError("Insufficient Reserves for every target.") from None
     if empower and actor["transcendence"] < 100:
         raise CombatError("Empower requires 100 Transcendence.")
-    if "strain" in move.effects and actor["hp"] <= 5 * len(targets):
+    strain = 5 * len(targets) if "strain" in move.effects else 0
+    if strain and actor["hp"] <= strain:
         raise CombatError("Strain must leave at least 1 Vitality.")
+    if blood and actor["hp"] - strain - blood < 1:
+        raise CombatError("Blood Price must leave at least 1 Vitality.")
     opening(state)
     ex_id = f"{state['epoch']}.{state['next_exchange']}"
     state["next_exchange"] += 1
@@ -411,16 +459,27 @@ def declaration(
         "actor_conditions": {k: dict(v) for k, v in actor["conditions"].items()},
         "revival": revival,
         "waive_recovery": bool(waive),
+        "public_bet": bool(public),
+        "blood": {"units": missing, "rate": blood // missing if missing else 0},
     }
-    actor["reserves"] -= cost * len(targets)
-    actor["hp"] -= exchange["strain_cost"] * len(targets)
+    actor["reserves"] -= reserves
+    actor["hp"] -= exchange["strain_cost"] * len(targets) + blood
     exchange["strain_paid"] = True
     if empower:
         actor["transcendence"] -= 100
     if burst:
         before = actor["spirit"]
-        actor["spirit"], exchange["debt"] = math.burst_ante(before)
+        # Taunting Opener's charge lowers the ante; Measured Tempo's charges
+        # sharpen every hit of this chain. Both return if it never opens.
+        taunt = actor["conditions"].pop("taunting", None)
+        ante = max(0, 600 - (taunt["magnitude"] if taunt else 0))
+        actor["spirit"], exchange["debt"] = math.burst_ante(before, ante)
         exchange["paid_ante"] = before - actor["spirit"]
+        exchange["taunting"] = taunt
+        exchange["tempo"] = actor.get("tempo", 0)
+        tempo = rules(build).get("measured_tempo", {}).get("amount", F(0))
+        exchange["tempo_accuracy"] = str(tempo * exchange["tempo"])
+        actor["tempo"] = 0
     exchange["attack_spirit"] = actor["spirit"]
     exchange["carry"] = actor["carry"]
     actor["outgoing"] = ex_id
@@ -558,22 +617,30 @@ def reaction(
     ):
         raise CombatError("That equipped domain effect does not apply to this reaction.")
     surcharge = 1 if chosen_domain and chosen_domain != counter.domain else 0
-    if defender["reserves"] < surcharge:
+    if kind != "overpower" and defender["reserves"] < surcharge:
         raise CombatError("Insufficient Reserves for that domain effect.")
     if kind == "overpower":
+        own_build = Build.from_dict(defender["build"])
         if counter.action not in ("attack", "spell"):
             raise CombatError("A counter must be Attack or Spell.")
-        if counter.kind == "signature" and counter not in Build.from_dict(defender["build"]).moves:
+        if counter.kind == "signature" and counter not in own_build.moves:
             raise CombatError("That counter is not in your frozen loadout.")
-        if defender["reserves"] < counter.cost + surcharge or (
-            empower and defender["transcendence"] < 100
-        ):
+        try:
+            reserves, _missing, blood = blood_price(
+                defender, own_build, counter, move_cost(own_build, counter) + surcharge
+            )
+        except CombatError:
+            raise CombatError("Insufficient resources for that counter.") from None
+        if empower and defender["transcendence"] < 100:
             raise CombatError("Insufficient resources for that counter.")
-        if "strain" in counter.effects and defender["hp"] <= 5:
+        strain = 5 if "strain" in counter.effects else 0
+        if strain and defender["hp"] <= strain:
             raise CombatError("Strain must leave at least 1 Vitality.")
-        defender["reserves"] -= counter.cost
-        if "strain" in counter.effects:
-            defender["hp"] -= 5
+        if blood and defender["hp"] - strain - blood < 1:
+            raise CombatError("Blood Price must leave at least 1 Vitality.")
+        defender["reserves"] -= reserves
+        defender["hp"] -= strain + blood
+        surcharge = 0
         if empower:
             defender["transcendence"] -= 100
     defender["reserves"] -= surcharge
@@ -582,6 +649,9 @@ def reaction(
     frozen_conditions = {k: dict(v) for k, v in defender["conditions"].items()}
     defender["conditions"].pop(f"{kind}_stance", None)
     defender["conditions"].pop("misdirected", None)
+    # Flowing Guard is spent by the next reaction attempt, whichever it is.
+    defender["conditions"].pop("flowing_evade", None)
+    defender["conditions"].pop("flowing_resist", None)
     if kind == "overpower":
         defender["conditions"].pop("op_penalty", None)
     exchange["reactions"][defender["id"]] = {
@@ -636,8 +706,15 @@ def cancel(state, ident, token):
     exchange["canceled"].append(defender["id"])
     defender["incoming"].remove(token)
     actor = participant(state, exchange["actor"])
-    actor["reserves"] = min(5, actor["reserves"] + exchange["cost"])
-    actor["hp"] = min(actor["max_hp"], actor["hp"] + exchange["strain_cost"])
+    blood = exchange.get("blood") or {}
+    units = min(blood.get("units", 0), exchange["cost"])
+    if units:
+        blood["units"] -= units
+    actor["reserves"] = min(5, actor["reserves"] + exchange["cost"] - units)
+    actor["hp"] = min(
+        actor["max_hp"],
+        actor["hp"] + exchange["strain_cost"] + units * blood.get("rate", 0),
+    )
     if len(exchange["reactions"]) + len(exchange["canceled"]) == len(exchange["targets"]):
         if exchange["reactions"]:
             resolve_exchange(state, exchange)
@@ -650,6 +727,9 @@ def cancel(state, ident, token):
             finish_exchange(state, exchange)
         else:
             actor["spirit"] = min(2000, actor["spirit"] + exchange["paid_ante"])
+            if exchange.get("taunting"):
+                actor["conditions"]["taunting"] = exchange["taunting"]
+            actor["tempo"] = actor.get("tempo", 0) + exchange.get("tempo", 0)
             actor["outgoing"] = None
             exchange["phase"] = "canceled"
 
@@ -671,6 +751,7 @@ def reaction_view(state, ident, token):
         move.effective_accuracy
         + (2 if empowered else 0)
         - F(max(exchange["debt"], exchange["carry"]), 100)
+        + F(exchange.get("tempo_accuracy", "0"))
     )
     accuracy += passive(attack_build, "declare", "accuracy", move.action) + passive(
         attack_build, "before_resolution", "accuracy", move.action
@@ -685,12 +766,11 @@ def reaction_view(state, ident, token):
         + passive(attack_build, "before_resolution", "power", move.action)
     )
     own_build = Build.from_dict(defender["build"])
-    base_penalty = value(defender, "vulnerable") + value(defender, "overextended")
     penalties = tuple(
         (
             r,
             str(
-                base_penalty
+                exposure(defender, own_build, r)
                 + (
                     value(defender, "grappled")
                     if r == "evade"
@@ -713,6 +793,7 @@ def reaction_view(state, ident, token):
             r,
             str(
                 value(defender, f"{r}_stance")
+                + value(defender, f"flowing_{r}")
                 + passive(own_build, "before_reaction", r, move.action)
                 + passive(own_build, "before_resolution", r, move.action)
             ),
@@ -733,6 +814,11 @@ def reaction_view(state, ident, token):
         penalties,
         bonuses,
         not bool(value(defender, "misdirected")),
+        # Only a bet its attacker called publicly; hidden bets stay hidden.
+        exchange["bet"] if exchange.get("public_bet") else "",
+        tuple(str(v) for v in shift(attack_build, exchange))
+        if exchange.get("public_bet")
+        else ("0", "0"),
     )
 
 
@@ -754,10 +840,10 @@ def resolve_exchange(state, exchange):
         counter = Move.from_dict(choice["counter"])
         reaction_kind = choice["kind"]
         stance = f"{reaction_kind}_stance"
-        bonus = value(frozen_defender, stance)
+        bonus = value(frozen_defender, stance) + value(frozen_defender, f"flowing_{reaction_kind}")
         bonus += passive(defense_build, "before_reaction", reaction_kind, move.action)
         bonus += passive(defense_build, "before_resolution", reaction_kind, move.action)
-        penalty = value(frozen_defender, "vulnerable") + value(frozen_defender, "overextended")
+        penalty = exposure(frozen_defender, defense_build, reaction_kind)
         if reaction_kind == "evade":
             penalty += value(frozen_defender, "grappled")
         ambushed = exchange["domain_effect"] == "ambush"
@@ -781,6 +867,7 @@ def resolve_exchange(state, exchange):
             move.effective_accuracy
             + (2 if empowered else 0)
             - F(max(exchange["carry"], exchange["debt"]), 100)
+            + F(exchange.get("tempo_accuracy", "0"))
         )
         accuracy += passive(attack_build, "declare", "accuracy", move.action) + passive(
             attack_build, "before_resolution", "accuracy", move.action
@@ -817,6 +904,7 @@ def resolve_exchange(state, exchange):
             multiplier=damage_multiplier(defense_build, move.element),
             counter_multiplier=damage_multiplier(attack_build, counter.element),
             ignore_penetrating=bool(value(frozen_defender, "bulwark")),
+            rps_shift=shift(attack_build, exchange),
         )
         incoming = harm(
             defender,
@@ -831,6 +919,24 @@ def resolve_exchange(state, exchange):
         )
         defender["pressure"] = min(30, defender["pressure"] + result.pressure_gain)
         defender["incoming"].remove(token)
+        flowing = rules(defense_build).get("flowing_guard")
+        if flowing and result.success and reaction_kind in ("evade", "resist"):
+            other = "resist" if reaction_kind == "evade" else "evade"
+            # Lasts until the defender's next own action ends; a Flaw's
+            # negative amount works the same way as a penalty.
+            defender["conditions"][f"flowing_{other}"] = {
+                "magnitude": math.rounded(flowing["amount"]),
+                "expires": defender["clock"] + 1,
+                "source": defender["id"],
+            }
+        if (
+            reaction_kind == "overpower"
+            and not result.success
+            and "bait" in rules(attack_build)
+            and not exchange.get("baited")
+        ):
+            actor["reserves"] = min(5, actor["reserves"] + 1)
+            exchange["baited"] = True
         exchange["resolved"] += 1
         exchange["stance_strengths"].append(
             math.rounded(
@@ -870,7 +976,8 @@ def resolve_exchange(state, exchange):
                 condition(
                     actor,
                     "overextended",
-                    value(actor, "overextended") + (10 if reaction_kind == "overpower" else 5),
+                    value(actor, "overextended")
+                    + extension(attack_build, 10 if reaction_kind == "overpower" else 5),
                     2,
                     wardable=False,
                 )
@@ -1129,6 +1236,10 @@ def support_exchange(state, exchange):
             ):
                 exchange["outcomes"][-1]["domain_resisted"] = True
             exchange["domain_used"] = True
+    taunting = rules(actor_build).get("taunting_opener")
+    if taunting and move.action == "dispirit" and any(o["success"] for o in exchange["outcomes"]):
+        # One charge for the next Burst, gone after the next own action.
+        condition(actor, "taunting", math.rounded(taunting["amount"]), 2, wardable=False)
     condition(actor, "vulnerable", 20, 2, wardable=False)
     finish_exchange(state, exchange)
 
@@ -1150,13 +1261,20 @@ def press(state, ident, draw, *, stop=False, empower=False):
     move = Move.from_dict(exchange["move"])
     for target in exchange["targets"]:
         active(state, target)
-    if actor["reserves"] < exchange["cost"] or ("strain" in move.effects and actor["hp"] <= 5):
+    build = Build.from_dict(actor["build"])
+    try:
+        reserves, missing, blood = blood_price(actor, build, move, exchange["cost"])
+    except CombatError:
+        reserves = None
+    if reserves is None or actor["hp"] - exchange["strain_cost"] - blood < 1:
+        # The chain cannot be afforded; it ends as a stop.
         finish_exchange(state, exchange)
         return
     if empower and actor["transcendence"] < 100:
         raise CombatError("Empower requires 100 Transcendence.")
-    actor["reserves"] -= exchange["cost"]
-    actor["hp"] -= exchange["strain_cost"]
+    actor["reserves"] -= reserves
+    actor["hp"] -= exchange["strain_cost"] + blood
+    exchange["blood"] = {"units": missing, "rate": blood // missing if missing else 0}
     if empower:
         actor["transcendence"] -= 100
     exchange["empower"] = empower
@@ -1171,7 +1289,9 @@ def press(state, ident, draw, *, stop=False, empower=False):
         stance_strengths=[],
     )
     exchange["attack_spirit"] = actor["spirit"]
-    condition(actor, "overextended", value(actor, "overextended") + 5, 2, wardable=False)
+    condition(
+        actor, "overextended", value(actor, "overextended") + extension(build, 5), 2, wardable=False
+    )
     for target in exchange["targets"]:
         participant(state, target)["incoming"].append(f"{exchange['id']}:{exchange['hit']}")
 
@@ -1204,8 +1324,13 @@ def finish_exchange(state, exchange):
         100,
         actor["transcendence"]
         + 8
+        - math.rounded(rules(build).get("tactician", {}).get("transcendence", 0))
         + math.rounded(passive(build, "exchange_end", "transcendence", action)),
     )
+    tempo = rules(build).get("measured_tempo")
+    if tempo and not exchange["burst"]:
+        # A real completed exchange, never recovery or a canceled attack.
+        actor["tempo"] = min(math.rounded(tempo["cap"]), actor.get("tempo", 0) + 1)
     actor["clock"] += 1
     if value(actor, "poisoned"):
         harm(actor, value(actor, "poisoned"))

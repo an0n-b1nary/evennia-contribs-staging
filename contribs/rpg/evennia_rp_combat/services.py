@@ -777,6 +777,7 @@ def declare(
     domain="",
     improvised=None,
     waive=False,
+    public=False,
     rng=None,
     operation_id=None,
 ):
@@ -806,6 +807,7 @@ def declare(
             domain=domain,
             domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
             waive=waive,
+            public=public,
         )
         run_automatic(state, subject.location)
         return ex_id
@@ -1617,6 +1619,8 @@ def render_declaration(state, exchange):
         fallbacks.append("Party cover/formation is unavailable; range/Pinpoint has no cover effect")
     if exchange["domain_effect"] == "encore":
         fallbacks.append("Encore uses its single-target fallback without Party")
+    if exchange.get("public_bet"):
+        fallbacks.append(f"Calling the shot: a {exchange['bet']} bet, made public")
     return (
         f"{actor['name']}: {exchange['id']} hit {exchange['hit']}, {move.name} ({move.action}); "
         f"authored Power {move.power}, Accuracy {move.effective_accuracy}; "
@@ -1776,7 +1780,13 @@ def odds(actor, token, *, subject=None):
     incoming = Build(tuple((key, "0") for key, score in view.build.scores))
     move = Move(action=view.action)
     lines = [
-        f"Incoming {plain(token)}: neutral RPS estimates; unseen offensive scores use a neutral damage estimate."
+        f"Incoming {plain(token)}: "
+        + (
+            f"the attacker called a {view.public_bet} bet publicly; "
+            if view.public_bet
+            else "neutral RPS estimates; "
+        )
+        + "unseen offensive scores use a neutral damage estimate."
     ]
     for reaction in ("evade", "resist", "overpower"):
         result = arithmetic.resolve(
@@ -1792,6 +1802,8 @@ def odds(actor, token, *, subject=None):
             pressure=view.pressure,
             penalty=Fraction(dict(view.penalties)[reaction]),
             bonus=Fraction(dict(view.bonuses)[reaction]),
+            rps=view.public_bet,
+            rps_shift=tuple(Fraction(v) for v in view.public_shift),
         )
         lines.append(
             f"{reaction.title()}: {result.chance}% success; successful incoming damage estimate {result.damage}. "
