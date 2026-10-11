@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-social"
-version = "0.5.0"
+version = "0.5.1"
 description = "The social quality-of-life command layer for Evennia games: profiles, discovery, messaging, ignore/mute, consensual teleportation, and OOC chat."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -46,3 +46,6 @@ packages = ["evennia_social", "evennia_social.commands", "evennia_social.integra
 
 [tool.setuptools.package-dir]
 "evennia_social" = "."
+
+[tool.setuptools.package-data]
+evennia_social = ["guides/*.md"]

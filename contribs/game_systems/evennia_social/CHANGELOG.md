@@ -2,6 +2,15 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.5.1 — 2026-10-10
+
+- **Added:** a player guide page for evennia-guides, `social` (finding people,
+  profiles, pages, ignoring, consensual movement and room mood) and the
+  `glossary-hangout` term, in `guides/` and the package data. It describes the
+  system in general terms, without exact numbers, and links only to pages this
+  contrib or its required dependencies ship. Without evennia-guides it's
+  ignored.
+
 ## 0.5.0 — 2026-10-10
 
 - **Added:** who's here on the live map. With evennia-maps installed,

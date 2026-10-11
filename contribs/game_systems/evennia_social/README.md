@@ -271,6 +271,16 @@ Requires [evennia-accessibility](../../utils/evennia_accessibility). Falls
 back to the standard fixed-width table when not installed — this is a soft
 dependency, not a hard requirement.
 
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `social`,
+`glossary-hangout`. They explain the system to players in general terms,
+without exact numbers, and link only to pages this contrib or its required
+dependencies ship. With evennia-guides installed they appear on its web guide;
+without it they're ignored. To restate one for your game, add a page with the
+same key to `GUIDES_DIRS`.
+
 ---
 
 ## Version history
