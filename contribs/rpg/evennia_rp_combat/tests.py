@@ -287,6 +287,18 @@ class TestDomainsAndTraits(SimpleTestCase):
         engine.reaction(state, 2, token, "evade")
         self.assertNotIn("misdirected", target["conditions"])
 
+    def test_read_domain_signature_remains_a_legal_counter(self):
+        counter = Move(kind="signature", key="insightful", power=2, domain="insight")
+        defender = Build(
+            build().scores, moves=(counter,), abilities=(("proficiency", "insight", 1),)
+        )
+        state = duel(defender=defender)
+        token = declare(state)
+        engine.reaction(
+            state, 2, token, "overpower", counter=counter, domain_effects={"insight": "read"}
+        )
+        self.assertEqual(state["exchanges"][token.split(":")[0]]["phase"], "done")
+
     def test_strain_reservation_prevents_negative_hp_and_refunds_cancel(self):
         move = Move(kind="signature", key="strain", power=2, effects=("strain",))
         state = duel(attacker=Build(build().scores, moves=(move,)))
@@ -347,6 +359,36 @@ class TestStateMachine(SimpleTestCase):
             (100, -900, 0, 0),
         )
         self.assertIsNone(actor["outgoing"])
+
+    def test_wholly_canceled_pressed_hit_refunds_its_empower(self):
+        state = duel()
+        actor = engine.participant(state, 1)
+        token = declare(state, burst=True)
+        engine.reaction(state, 2, token, "resist")
+        actor["transcendence"] = 100
+        engine.press(state, 1, 100, empower=True)
+        self.assertEqual(actor["transcendence"], 0)
+        engine.cancel(state, 2, token.replace(":1", ":2"))
+        # The pressed hit never executed, so its Empower is refunded before the
+        # exchange closes and its ordinary +8 is clamped at the cap.
+        self.assertEqual((actor["transcendence"], actor["outgoing"]), (100, None))
+
+    def test_incapacitated_burst_actor_can_still_stop(self):
+        state = duel()
+        engine.join(state, 3, "Third", "two", build())
+        token = declare(state, burst=True)
+        engine.reaction(state, 2, token, "resist")
+        exchange = state["exchanges"][token.split(":")[0]]
+        self.assertEqual(exchange["phase"], "press")
+        actor = engine.participant(state, 1)
+        actor["hp"] = 1
+        incoming = declare(state, ident=3, targets=(1,))
+        engine.reaction(state, 1, incoming, "resist")
+        self.assertEqual(actor["hp"], 0)
+        with self.assertRaisesRegex(CombatError, "incapacitated"):
+            engine.press(state, 1, 50)
+        engine.press(state, 1, 50, stop=True)
+        self.assertEqual((exchange["phase"], actor["outgoing"]), ("done", None))
 
     def test_partial_cancel_refunds_only_unexecuted_special_target(self):
         move = Move(kind="signature", power=2, name="Special", key="special")
@@ -616,6 +658,70 @@ class TestCoordinator(EvenniaCommandTest):
         state = services.state_for(self.char1)
         self.assertEqual(state["exchanges"][ex_id]["phase"], "done")
         self.assertTrue(state["participants"][str(self.char2.pk)]["auto"])
+
+    def character(self, key, side=None, location=None):
+        from evennia.utils.create import create_object
+
+        obj = create_object(
+            "evennia.objects.objects.DefaultCharacter",
+            key=key,
+            location=location or self.char1.location,
+        )
+        if side:
+            services.join(obj, side)
+        return obj
+
+    def test_auto_resolve_waits_through_a_pause_then_resolves_on_resume(self):
+        ex_id = services.declare(self.char1, [self.char2])
+        services.storyteller(self.char1, "pause")
+        services.control(self.char2, "auto", argument="on")
+        self.assertEqual(services.state_for(self.char1)["exchanges"][ex_id]["phase"], "waiting")
+        services.storyteller(self.char1, "resume")
+        self.assertEqual(services.state_for(self.char1)["exchanges"][ex_id]["phase"], "done")
+
+    def test_ineligible_auto_participant_does_not_block_other_players(self):
+        third = self.character("Third", "one")
+        services.declare(self.char1, [self.char2])
+
+        def incapacitate_with_pending_packet(state):
+            row = engine.participant(state, self.char2.pk)
+            row.update(auto=True, hp=0, return_required=True)
+
+        services.execute(self.char1, "test injury", incapacitate_with_pending_packet)
+        services.declare(third, [self.char1], "assist", action="assist")
+        state = services.state_for(third)
+        self.assertEqual(state["participants"][str(third.pk)]["clock"], 1)
+        self.assertEqual(len(state["participants"][str(self.char2.pk)]["incoming"]), 1)
+
+    def test_returning_participant_is_no_longer_absent(self):
+        from .maintenance import maintain
+
+        script = services.coordinator(self.char1.location)
+
+        def mark_absent(state):
+            engine.participant(state, self.char2.pk)["absent"] = True
+
+        services.execute(self.char1, "test absence", mark_absent)
+        maintain(script)
+        self.assertNotIn(
+            "absent", services.state_for(self.char1)["participants"][str(self.char2.pk)]
+        )
+        services.execute(self.char1, "test absence", mark_absent)
+        services.declare(self.char2, [self.char1])
+
+    def test_auto_act_offers_only_present_reachable_targets(self):
+        away = self.character("Away", "two")
+        absent = self.character("Absent", "two")
+        away.location = self.room2
+        services.execute(
+            self.char1,
+            "test absence",
+            lambda state: engine.participant(state, absent.pk).update(absent=True),
+        )
+        with patch.object(services.policies, "auto_act", wraps=policies.auto_act) as policy:
+            services.auto_act(self.char1, rng=random.Random(3))
+        view = policy.call_args.args[0]
+        self.assertEqual([target for target, _hp in view.targets], [self.char2.pk])
 
     def test_staff_rollback_restores_interleaved_costs_and_invalidates_tokens(self):
         ex_id = services.declare(self.char1, [self.char2], operation_id="old-declare")
@@ -938,3 +1044,33 @@ class TestNPCWithoutSheets(RulesetTestMixin, EvenniaCommandTest):
         self.assertEqual(len(state["participants"][str(self.char2.pk)]["incoming"]), 1)
         with override_settings(NPCS_FROZEN=True), self.assertRaisesRegex(CombatError, "paused"):
             services.auto_act(self.char1, subject=npc)
+
+    def test_directing_a_controlled_npc_counts_as_its_activity(self):
+        import time
+
+        from evennia_npcs import services as npcs
+
+        from .maintenance import maintain
+
+        self.char2.location = self.char1.location
+        blueprint = npcs.create_blueprint(
+            self.char1,
+            "Directed partner",
+            "template",
+            stat_block={key: "B" for key in self.ruleset.stats},
+        )
+        npc = npcs.control(self.char1, npcs.spawn(self.char1, blueprint))
+        services.setup(self.char1)
+        with patch("evennia_rp_combat.services.snapshot", return_value=build()):
+            services.join(self.char2, "opposition")
+        services.join(self.char1, "practice", subject=npc)
+        services.execute(
+            self.char2,
+            "test stale activity",
+            lambda state: engine.participant(state, npc.pk).update(last_activity=0),
+        )
+        services.declare(self.char1, [self.char2], subject=npc)
+        with override_settings(RP_COMBAT_IDLE_SECONDS=900):
+            maintain(services.coordinator(self.char1.location), now=time.time())
+        row = services.state_for(self.char1)["participants"][str(npc.pk)]
+        self.assertEqual((row["status"], bool(row["outgoing"])), ("active", True))

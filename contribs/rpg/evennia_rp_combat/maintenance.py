@@ -58,6 +58,8 @@ def maintain(script, *, now=None):
             idle = conf.get("RP_COMBAT_IDLE_SECONDS")
             absent = absent or (idle > 0 and now - last >= idle)
             if not absent:
+                if row.pop("absent", None):
+                    notices.append(f"{row['name']} is present again and may continue.")
                 continue
             # Cleanup only unaccepted packets. Accepted reactions survive and
             # will resolve with their frozen inputs when their peers finish.

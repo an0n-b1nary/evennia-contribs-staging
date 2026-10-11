@@ -263,7 +263,16 @@ def notify_membership(script, before, state, actor_id):
             )
 
 
-def execute(actor, label, operation, *, progressing=True, operation_id=None, storyteller=False):
+def execute(
+    actor,
+    label,
+    operation,
+    *,
+    progressing=True,
+    operation_id=None,
+    storyteller=False,
+    subject=None,
+):
     require(actor, progress=progressing)
     room = actor.location
     script = coordinator(room)
@@ -282,9 +291,16 @@ def execute(actor, label, operation, *, progressing=True, operation_id=None, sto
                 raise CombatError("That operation identifier belongs to a different request.")
             return deepcopy(record["result"])
         before = clone(state)
+        # Acting from this room proves presence for the actor and for the
+        # character it directs, so neither stays marked absent or goes idle.
+        touched = {str(actor.pk)}
+        if subject is not None and subject.location == room:
+            touched.add(str(subject.pk))
+        for key in touched & state["participants"].keys():
+            state["participants"][key].pop("absent", None)
         result = operation(state)
         for key, row in state["participants"].items():
-            if key == str(actor.pk) or row.get("batch_controller") == actor.pk:
+            if key in touched or row.get("batch_controller") == actor.pk:
                 row["last_activity"] = time.time()
         if (
             state["started"]
@@ -569,6 +585,7 @@ def declare(
         f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}",
         operation,
         operation_id=operation_id,
+        subject=subject,
     )
 
 
@@ -611,12 +628,27 @@ def react(
         f"{identity(subject)} accepted {plain(kind)} for {plain(token)}",
         operation,
         operation_id=operation_id,
+        subject=subject,
     )
 
 
 def run_automatic(state, room):
+    """Accept opted-in reactions. Never fails the operation that triggered it.
+
+    A row that could not react by hand is skipped, and a policy choice the
+    engine refuses (it validates before spending) stays queued for its owner.
+    """
+    if state["paused"] or state["ended"]:
+        return
     for row in state["participants"].values():
-        if not row["auto"] or row["status"] != "active":
+        if (
+            not row["auto"]
+            or row["status"] != "active"
+            or row["hp"] <= 0
+            or row.get("return_required")
+            or row["correction"]
+            or row.get("absent")
+        ):
             continue
         subject = ObjectDB.objects.filter(pk=row["id"]).first()
         if subject is None or subject.location != room:
@@ -644,14 +676,17 @@ def run_automatic(state, room):
                 preferred=profile.get("preferred_reaction", ""),
                 preferred_moves=profile.get("preferred_moves", []),
             )
-            engine.reaction(
-                state,
-                row["id"],
-                token,
-                kind,
-                counter=counter if kind == "overpower" else None,
-                domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
-            )
+            try:
+                engine.reaction(
+                    state,
+                    row["id"],
+                    token,
+                    kind,
+                    counter=counter if kind == "overpower" else None,
+                    domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
+                )
+            except CombatError:
+                continue
 
 
 def auto_act(actor, *, subject=None, rng=None, operation_id=None):
@@ -661,14 +696,27 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
 
     def operation(state):
         row = engine.active(state, subject.pk)
-        public = [
-            p
-            for p in state["participants"].values()
-            if p["status"] == "active"
-            and p["hp"] > 0
-            and p["id"] != row["id"]
-            and not p["correction"]
-        ]
+        public = []
+        for p in state["participants"].values():
+            if (
+                p["status"] != "active"
+                or p["hp"] <= 0
+                or p["id"] == row["id"]
+                or p["correction"]
+                or p.get("absent")
+            ):
+                continue
+            # Offer only targets a declaration could reach, so a random pick
+            # never fails or sends an ignore prompt the actor did not choose.
+            obj = ObjectDB.objects.filter(pk=p["id"]).first()
+            if (
+                obj is None
+                or obj.location != actor.location
+                or ignored_by(subject, obj)
+                or ignored_by(obj, subject)
+            ):
+                continue
+            public.append(p)
         candidates = tuple((int(p["id"]), p["hp"]) for p in public if p["side"] != row["side"])
         allies = tuple((int(p["id"]), p["hp"]) for p in public if p["side"] == row["side"])
         profile = row.get("policy", {}) if row["npc"] else tactics.profile(subject)
@@ -711,6 +759,7 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
         f"{identity(subject)} explicitly invoked Auto-Act once",
         operation,
         operation_id=operation_id,
+        subject=subject,
     )
 
 
@@ -793,6 +842,7 @@ def control(
         change,
         progressing=not cleanup,
         operation_id=operation_id,
+        subject=subject,
     )
 
 
@@ -826,6 +876,7 @@ def read(actor, token, domain, *, subject=None, operation_id=None):
         f"{identity(subject)} used Read on {plain(token)}",
         operation,
         operation_id=operation_id,
+        subject=subject,
     )
 
 
@@ -844,6 +895,7 @@ def storyteller(actor, operation, *, target=None, value=None, reason="", operati
             state["paused"] = True
         elif operation == "resume":
             state["paused"] = False
+            run_automatic(state, actor.location)
         elif operation == "end":
             if any(p["incoming"] or p["outgoing"] for p in state["participants"].values()):
                 raise CombatError("Clear pending exchanges before ending combat.")

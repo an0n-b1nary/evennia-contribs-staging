@@ -375,11 +375,14 @@ def reaction(
         raise CombatError("Choose Evade, Resist or Overpower.")
     if kind != "overpower" and (counter != Move() or empower):
         raise CombatError("Only Overpower selects or Empowers a counter.")
+    builtin_effect = (domain_effects or {}).get(counter.domain)
     chosen_domain = domain or (
         counter.domain
         if kind == "overpower"
+        # Read is bought separately before reacting, never built into a counter.
+        and builtin_effect != "read"
         and has_domain(Build.from_dict(defender["build"]), counter.domain)
-        and kind in DOMAIN_ACTIONS.get((domain_effects or {}).get(counter.domain), ())
+        and kind in DOMAIN_ACTIONS.get(builtin_effect, ())
         else ""
     )
     domain_effect = (domain_effects or {}).get(chosen_domain, "")
@@ -450,12 +453,15 @@ def cancel(state, ident, token):
     if len(exchange["reactions"]) + len(exchange["canceled"]) == len(exchange["targets"]):
         if exchange["reactions"]:
             resolve_exchange(state, exchange)
-        elif exchange["resolved"]:
+            return
+        # Nothing in this hit executed, including a pressed Burst hit.
+        if exchange["empower"]:
+            actor["transcendence"] = min(100, actor["transcendence"] + 100)
+            exchange["empower"] = False
+        if exchange["resolved"]:
             finish_exchange(state, exchange)
         else:
             actor["spirit"] = min(2000, actor["spirit"] + exchange["paid_ante"])
-            if exchange["empower"]:
-                actor["transcendence"] = min(100, actor["transcendence"] + 100)
             actor["outgoing"] = None
             exchange["phase"] = "canceled"
 
@@ -901,13 +907,16 @@ def support_exchange(state, exchange):
 
 def press(state, ident, draw, *, stop=False, empower=False):
     progress(state)
-    actor = active(state, ident)
+    actor = participant(state, ident)
     exchange = state["exchanges"].get(actor["outgoing"])
     if exchange is None or exchange["phase"] != "press":
         raise CombatError("No open Burst is waiting for press or stop.")
     if stop:
+        # Closing executed hits is cleanup: an actor incapacitated mid-Burst
+        # must still be able to release the exchange (and the fight's end).
         finish_exchange(state, exchange)
         return
+    active(state, ident)
     if actor["incoming"]:
         raise CombatError("Clear incoming reactions before pressing the Burst.")
     move = Move.from_dict(exchange["move"])
