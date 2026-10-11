@@ -124,8 +124,16 @@ class VersionChecks(unittest.TestCase):
         consumer = self.sibling('evennia-probe<0.2; python_version >= "3.0"')
         self.assertTrue(checker.check_sibling_dependencies([self.package, consumer]))
 
-    def test_optional_dependency_is_outside_default_install(self):
+    def test_incompatible_optional_sibling_is_rejected(self):
+        """CI never installs extras, so a stale extra pin only fails for a game that asks."""
         consumer = self.sibling("evennia-probe<0.2", optional=True)
+        errors = checker.check_sibling_dependencies([self.package, consumer])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("extra 'web' dependency 'evennia-probe<0.2'", errors[0])
+        self.assertIn("rejects sibling version 0.2.0", errors[0])
+
+    def test_compatible_optional_sibling_is_accepted(self):
+        consumer = self.sibling("evennia-probe>=0.2,<0.3", optional=True)
         self.assertEqual(checker.check_sibling_dependencies([self.package, consumer]), [])
 
     def test_invalid_requirement_fails_closed(self):

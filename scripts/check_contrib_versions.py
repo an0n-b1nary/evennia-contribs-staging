@@ -6,8 +6,9 @@ The exported version must match package metadata and the latest released
 changelog heading. A leading Unreleased section is allowed for future work,
 including a new contrib whose first release is still being prepared.
 Use --installed after editable installation to check distribution metadata too.
-Hard sibling dependencies must accept the versions declared in this checkout.
-Requires packaging; optional extras are outside the default CI installation.
+Sibling dependencies, hard or in an optional extra, must accept the versions
+declared in this checkout: CI doesn't install extras, but a game that asks for
+one gets whatever the pin allows. Requires packaging.
 """
 
 from __future__ import annotations
@@ -80,7 +81,7 @@ def check_contrib(path: Path, *, installed: bool = False) -> list[str]:
 
 
 def check_sibling_dependencies(paths: list[Path]) -> list[str]:
-    """Check hard sibling version constraints without importing contrib packages."""
+    """Check sibling version constraints, extras included, without importing packages."""
     errors = []
     projects = {}
     for path in paths:
@@ -95,7 +96,12 @@ def check_sibling_dependencies(paths: list[Path]) -> list[str]:
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(f"{path.name}: {exc}")
     for path, project, _ in projects.values():
-        for raw in project.get("dependencies", []):
+        groups = [("dependency", project.get("dependencies", []))]
+        groups += [
+            (f"extra {extra!r} dependency", requirements)
+            for extra, requirements in project.get("optional-dependencies", {}).items()
+        ]
+        for label, raw in ((label, raw) for label, group in groups for raw in group):
             try:
                 requirement = Requirement(raw)
                 sibling = projects.get(canonicalize_name(requirement.name))
@@ -106,7 +112,7 @@ def check_sibling_dependencies(paths: list[Path]) -> list[str]:
                 declared = sibling[2]
                 if declared not in requirement.specifier:
                     errors.append(
-                        f"{path.name}: dependency {raw!r} rejects sibling version {declared}"
+                        f"{path.name}: {label} {raw!r} rejects sibling version {declared}"
                     )
             except InvalidRequirement as exc:
                 errors.append(f"{path.name}: {exc}")
