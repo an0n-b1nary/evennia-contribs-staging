@@ -696,6 +696,11 @@ RP_SAMPLE_BUILDS = (
         "abilities": (("combat-focus", "blades"), ("style-vulnerability", "spellcraft")),
     },
 )
+# Combat Abilities the same demo characters carry when combat is installed.
+RP_SAMPLE_COMBAT_ABILITIES = (
+    ("flowing-guard", "calling-the-shot"),
+    ("deflect", "bait"),
+)
 # Keys an earlier seed created and later vocabulary renamed or retired. A
 # reseed archives them: off the public catalog, still readable on old sheets.
 RP_RETIRED_TAGS = ("tinkering", "fire", "water", "air", "earth", "light", "darkness")
