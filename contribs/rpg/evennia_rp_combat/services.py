@@ -14,6 +14,7 @@ attributed; a change to another player's character is a request that player
 accepts or declines, and ending a fight needs the present players' agreement.
 """
 
+import hashlib
 import json
 import random
 import time
@@ -94,9 +95,51 @@ def current_fight(room):
 
 def state_for(actor):
     require(actor)
-    state = clone(current_fight(actor.location).state)
-    validate_state(state)
+    return load(current_fight(actor.location))
+
+
+def digest(build):
+    canonical = json.dumps(build, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def hydrate(fight, state):
+    """Replace each participant's build digest with its frozen build, in place."""
+    from .models import FightBuild
+
+    rows = [row for row in state["participants"].values() if "build_id" in row]
+    builds = dict(
+        FightBuild.objects.filter(
+            fight=fight, digest__in={row["build_id"] for row in rows}
+        ).values_list("digest", "build")
+    )
+    for row in rows:
+        row["build"] = builds[row.pop("build_id")]
     return state
+
+
+def stored(fight, state):
+    """A copy for storage: builds become digests of rows saved once per fight."""
+    from .models import FightBuild
+
+    out = dict(state, participants={})
+    for key, row in state["participants"].items():
+        row = dict(row)
+        if "build" in row:
+            build = row.pop("build")
+            row["build_id"] = digest(build)
+            FightBuild.objects.get_or_create(
+                fight=fight, digest=row["build_id"], defaults={"build": build}
+            )
+        out["participants"][key] = row
+    return out
+
+
+def load(fight):
+    """The fight's validated state with builds in place, detached from the row."""
+    state = clone(fight.state)
+    validate_state(state)
+    return hydrate(fight, state)
 
 
 def validate_state(state):
@@ -357,12 +400,12 @@ def commit(
         actor_id=getattr(actor, "pk", None),
         label=plain(label, 500),
         summary=summary,
-        before=before,
+        before=stored(fight, before),
         result=result,
     )
     if state["ended"] and fight.status == fight.OPEN:
         fight.status, fight.closed_at = fight.ENDED, timezone.now()
-    fight.state = state
+    fight.state = stored(fight, state)
     fight.save()
     synchronize_locks(fight, state, release=release)
     notify_membership(fight, before, state, getattr(actor, "pk", None))
@@ -409,8 +452,7 @@ def execute(
             return deepcopy(prior.result)
         if fight.status != Fight.OPEN or fight.room_id != room.pk:
             raise CombatError("That fight is no longer open in this room.")
-        state = clone(fight.state)
-        validate_state(state)
+        state = load(fight)
         before = clone(state)
         # Acting from this room proves presence for the actor and for the
         # character it directs, so neither stays marked absent or goes idle.
@@ -487,7 +529,10 @@ def setup(actor, *, reason="", operation_id=None):
 
 
 def quietly(fight, mutate):
-    """A small locked write that is not a mechanical transition or journaled."""
+    """A small locked write that is not a mechanical transition or journaled.
+
+    It works on stored state (builds as digests) and must not touch builds.
+    """
     Fight = _fights()
     with transaction.atomic():
         fight = Fight.objects.select_for_update().get(pk=fight.pk)
@@ -1404,8 +1449,8 @@ def rollback(actor, sequence, reason):
         checkpoint = fight.entries.filter(sequence=sequence, superseded=False).first()
         if checkpoint is None or checkpoint.before is None:
             raise CombatError("Choose a retained, unsuperseded sequence.")
-        current = clone(fight.state)
-        restored = clone(checkpoint.before)
+        current = load(fight)
+        restored = hydrate(fight, clone(checkpoint.before))
         restored["epoch"] = current["epoch"] + 1
         # Re-key pending exchange tokens. Old commands cannot act on restored
         # state, even if their original exchange number still exists.

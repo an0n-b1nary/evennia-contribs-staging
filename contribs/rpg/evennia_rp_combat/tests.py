@@ -863,6 +863,33 @@ class TestCoordinator(EvenniaCommandTest):
         self.assertNotIn("attack_build", exchange)
         self.assertNotIn("build", exchange["reactions"][str(self.char2.pk)])
 
+    def test_builds_are_stored_once_and_referenced_by_digest(self):
+        fight = services.open_fight(self.char1.location)
+
+        def stored_rows():
+            fight.refresh_from_db()
+            rows = list(fight.state["participants"].values())
+            for entry in fight.entries.all():
+                rows.extend(entry.before["participants"].values())
+            return rows
+
+        self.assertTrue(all("build" not in r and "build_id" in r for r in stored_rows()))
+        self.assertEqual(fight.builds.count(), 1)  # Identical builds share one row.
+        services.control(self.char2, "unlock")
+        sequence = services.next_sequence(fight)
+        with patch("evennia_rp_combat.services.snapshot", return_value=build(agility=30)):
+            services.control(self.char2, "relock")
+        self.assertEqual(fight.builds.count(), 2)
+        self.assertTrue(all("build" not in r for r in stored_rows()))
+        row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
+        self.assertEqual(Build.from_dict(row["build"]).score("agility"), 30)
+        with patch("evennia_rp_combat.services.staff", return_value=True):
+            services.rollback(self.char1, sequence, "Undo the relock")
+        state = services.state_for(self.char2)
+        row = state["participants"][str(self.char2.pk)]
+        self.assertEqual(Build.from_dict(row["build"]).score("agility"), 0)
+        self.assertFalse(state["paused"])
+
     def test_connected_players_waiting_quietly_are_not_idle(self):
         from .maintenance import maintain
 
