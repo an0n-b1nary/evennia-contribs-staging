@@ -67,6 +67,9 @@ def check_contrib(path: Path, *, installed: bool = False) -> list[str]:
         elif "Unreleased" in headings[1:]:
             errors.append("Unreleased must appear once, before all released versions")
         releases = [heading for heading in headings if heading != "Unreleased"]
+        duplicates = sorted({release for release in releases if releases.count(release) > 1})
+        if duplicates:
+            errors.append(f"changelog releases {', '.join(duplicates)} more than once")
         if releases and releases[0] != declared:
             errors.append(
                 f"latest changelog release {releases[0]!r} != project version {declared!r}"
