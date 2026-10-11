@@ -60,7 +60,7 @@ Integration contract — IMPORTANT:
     started). See README for details.
 """
 
-__version__ = "0.3.3"
+__version__ = "0.4.0"
 
 from evennia_calendar.signals import (
     cluster_drawn,

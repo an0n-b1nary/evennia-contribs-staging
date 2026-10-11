@@ -1,0 +1,18 @@
+{% comment %}
+  Name the character a form acts as, just above its submit button.
+
+  Usage:
+    {% include "evennia_accessibility/_acting_as.html" %}
+
+  Variables:
+    acting_character — the character the submit writes as. Renders nothing
+                       when unset.
+
+  The text has id "form-acting-as". Give the submit button
+  aria-describedby="form-acting-as" when acting_character is set, so a screen
+  reader names the character when focus reaches the button.
+  _form_actions.html does both.
+{% endcomment %}
+{% if acting_character %}
+<p class="form-acting-as mt-4 mb-2" id="form-acting-as">Posting as <strong>{{ acting_character.key }}</strong></p>
+{% endif %}

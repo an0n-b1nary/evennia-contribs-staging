@@ -12,9 +12,15 @@ so a sweep never loads every account's typeclass and Attribute cache, and a
 change written outside this process's identity cache is seen at once.
 """
 
+from contextvars import ContextVar
+
 from evennia.accounts.models import AccountDB
 
 PLAYABLE_ATTRIBUTE = "_playable_characters"  # Evennia's CharactersHandler storage
+
+# (account pk, character pk) the current web request chose; set per request by
+# `evennia_links.web.WebCharacterMiddleware` from Evennia's own session choice.
+_web_choice = ContextVar("evennia_links_web_choice", default=None)
 
 
 def playable_accounts():
@@ -64,15 +70,33 @@ def is_playable(character, predicate=None):
     return bool(account_ids(character)) and (predicate is None or bool(predicate(character)))
 
 
+def _web_account(user):
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+    return getattr(user, "account", None) or user
+
+
+def web_roster(user):
+    """The characters `user` (`request.user`) may act as on the web, in roster order."""
+    account = _web_account(user)
+    try:
+        return [obj for obj in account.characters.all() if obj and obj.pk]
+    except AttributeError:
+        return []
+
+
 def web_character(user, roster_only=False):
     """
     The character a web request acts as, or None.
 
-    A website visitor need not be connected in-game, so a live puppet is
-    a preference, not a requirement. In order: a live puppet on the
-    account's playable list, then any other live puppet (staff playing an
-    NPC) unless `roster_only`, then the last puppet if it is on the list,
-    then the first character on the list.
+    A character chosen on the website (Evennia's "puppet" link, which
+    `WebCharacterMiddleware` passes on) wins while it is still on the
+    account's playable list. Otherwise a website visitor need not be
+    connected in-game, so a live puppet is a preference, not a
+    requirement. In order: a live puppet on the account's playable list,
+    then any other live puppet (staff playing an NPC) unless
+    `roster_only`, then the last puppet if it is on the list, then the
+    first character on the list.
 
     Args:
         user: `request.user`; anonymous users and accounts with nothing to
@@ -80,13 +104,15 @@ def web_character(user, roster_only=False):
         roster_only: ignore live puppets that are not on the playable list,
             for packages that pay or record the character.
     """
-    if user is None or not getattr(user, "is_authenticated", False):
+    account = _web_account(user)
+    if account is None:
         return None
-    account = getattr(user, "account", None) or user
-    try:
-        roster = [obj for obj in account.characters.all() if obj and obj.pk]
-    except AttributeError:
-        roster = []
+    roster = web_roster(account)
+    choice = _web_choice.get()
+    if choice and choice[0] == account.pk:
+        for character in roster:
+            if character.pk == choice[1]:
+                return character
     try:
         live = [obj for obj in account.get_all_puppets() if obj and obj.pk]
     except AttributeError:

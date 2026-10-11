@@ -1,5 +1,19 @@
 # Changelog — evennia-links
 
+## [0.8.1] - 2026-10-10
+
+- Added: `evennia_links.web.WebCharacterMiddleware`. Evennia's website already
+  lets an account pick a character (the `character-puppet` link, stored in the
+  session as `"puppet"`), but contribs resolve their character from
+  `request.user` alone and ignored it, so the menu could name one character
+  while a post went out as another. The middleware passes the choice to
+  `web_character` for one request; a chosen character on the account's playable
+  list now wins over live and last puppets. Without the middleware nothing
+  changes.
+- Added: `evennia_links.web.web_character_context`, a context processor giving
+  templates `web_character` and `web_roster`, and
+  `evennia_links.characters.web_roster(user)`.
+
 ## [0.8.0] - 2026-10-09
 
 - Added: `evennia_links.characters.web_character(user, roster_only=False)`, the

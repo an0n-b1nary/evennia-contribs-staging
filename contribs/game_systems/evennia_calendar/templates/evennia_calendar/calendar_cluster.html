@@ -138,12 +138,13 @@
     {% endfor %}
   </fieldset>
 
+  {% include "evennia_accessibility/_acting_as.html" %}
   <div class="evennia-calendar-actions mt-3">
-    <button type="submit" class="btn btn-primary">Submit preferences</button>
+    <button type="submit" class="btn btn-primary"{% if acting_character %} aria-describedby="form-acting-as"{% endif %}>Submit preferences</button>
   </div>
 </form>
 {% else %}
-<p>Log in with an active character to RSVP.</p>
+<p>Log in with a character to RSVP.</p>
 {% endif %}
 
 {% elif cluster.has_run %}

@@ -10,6 +10,7 @@ Objects available from EvenniaTest:
     self.account, self.account2 — linked to char1/char2 respectively
 """
 
+from types import SimpleNamespace
 from unittest import mock
 
 from django import forms
@@ -348,6 +349,27 @@ class TestFormPartialsRender(EvenniaTest):
         # which assigns "" rather than raising when the route is not mounted.
         html = render_to_string("evennia_accessibility/_form_actions.html", {"cancel_url": ""})
         self.assertNotIn("<a href", html)
+
+    def test_form_actions_names_the_acting_character(self):
+        character = SimpleNamespace(key="Avella")
+        html = render_to_string(
+            "evennia_accessibility/_form_actions.html", {"acting_character": character}
+        )
+        self.assertIn("Posting as <strong>Avella</strong>", html)
+        self.assertIn('id="form-acting-as"', html)
+        self.assertIn('aria-describedby="form-acting-as"', html)
+
+    def test_form_actions_without_a_character_has_no_dangling_reference(self):
+        html = render_to_string("evennia_accessibility/_form_actions.html", {})
+        self.assertNotIn("Posting as", html)
+        self.assertNotIn("form-acting-as", html)
+
+    def test_acting_as_escapes_the_name(self):
+        character = SimpleNamespace(key="<b>Avella</b>")
+        html = render_to_string(
+            "evennia_accessibility/_acting_as.html", {"acting_character": character}
+        )
+        self.assertIn("&lt;b&gt;Avella&lt;/b&gt;", html)
 
 
 # The option registration the README asks adopting games to add. The command

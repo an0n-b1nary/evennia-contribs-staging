@@ -33,7 +33,7 @@ from .accessibility import (
 from .forms import AccessibleForm, AccessibleModelForm
 from .mxp import absolute_web_url, mxp_link
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "AccessibleForm",

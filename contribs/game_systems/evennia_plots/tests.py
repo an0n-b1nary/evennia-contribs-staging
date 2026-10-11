@@ -1555,3 +1555,25 @@ class TestWebCharacterWithoutLiveSession(EvenniaTest):
 
         request = SimpleNamespace(user=self.account2)
         self.assertEqual(require_character(request), self.char2.pk)
+
+
+class TestAuthoringNamesTheActingCharacter(EvenniaTest):
+    """Authoring pages get ``acting_character``, which the form names as "Posting as"."""
+
+    def test_context_carries_the_character_the_write_will_use(self):
+        from django.test import RequestFactory
+        from django.views.generic import TemplateView
+
+        from evennia_plots.authoring import AuthoringMixin
+
+        class Probe(AuthoringMixin, TemplateView):
+            template_name = "unused.html"
+
+        self.account2.characters.add(self.char2)
+        request = RequestFactory().get("/")
+        request.user = self.account2
+        view = Probe()
+        view.setup(request)
+        context = view.get_context_data()
+        self.assertEqual(context["acting_character"], self.char2)
+        self.assertEqual(context["acting_character"].pk, view.get_character())

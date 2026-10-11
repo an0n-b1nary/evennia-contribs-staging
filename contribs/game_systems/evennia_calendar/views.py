@@ -58,6 +58,7 @@ from evennia_calendar.models import (
     EventTag,
 )
 from evennia_calendar.permissions import get_character_id, is_staff_user
+from evennia_links.characters import web_character
 
 
 class CalendarMonthView(TemplateView):
@@ -224,7 +225,7 @@ class ClusterDetailView(TemplateView):
     Cluster detail page with ranked-choice RSVP form.
 
     GET:  Display cluster metadata, member events, and ranked-choice form.
-    POST: Submit or replace ranked preferences (logged-in puppeted characters).
+    POST: Submit or replace ranked preferences (as the acting character).
           Validation errors are rendered in-place; success uses PRG.
     """
 
@@ -234,12 +235,8 @@ class ClusterDetailView(TemplateView):
         return get_object_or_404(EventCluster, pk=self.kwargs["pk"])
 
     def _get_active_character(self, request):
-        """Return the puppeted Character object for the current session, or None."""
-        if not request.user.is_authenticated:
-            return None
-        account = getattr(request.user, "account", None) or request.user
-        puppets = account.get_all_puppets() if hasattr(account, "get_all_puppets") else []
-        return puppets[0] if puppets else None
+        """Return the Character this request acts as (see ``get_character_id``), or None."""
+        return web_character(request.user)
 
     def get(self, request, *args, **kwargs):
         cluster = self._get_cluster()
@@ -273,7 +270,7 @@ class ClusterDetailView(TemplateView):
 
         if not character:
             form = ClusterRSVPForm(cluster=cluster, character_id=None)
-            form.add_error(None, "You must be logged in with an active character to RSVP.")
+            form.add_error(None, "You need a character to RSVP.")
             context = self._build_context(cluster, character, None, [], member_events, form)
             return self.render_to_response(context)
 
@@ -352,6 +349,7 @@ class ClusterDetailView(TemplateView):
             "cluster": cluster,
             "member_events": member_events,
             "character": character,
+            "acting_character": character,
             "existing_crsvp": existing_crsvp,
             "existing_prefs": existing_prefs,
             "existing_ranked_ids": existing_ranked_ids,
