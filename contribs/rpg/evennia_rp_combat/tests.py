@@ -548,6 +548,212 @@ class TestStateMachine(SimpleTestCase):
         self.assertEqual(engine.reaction_view(state, 2, token).accuracy, -6)
 
 
+def resistant(domain, **values):
+    return Build(build(**values).scores, abilities=(("domain-resistance", domain, 1),))
+
+
+def expert(domain, **values):
+    return Build(build(**values).scores, abilities=(("proficiency", domain, 1),))
+
+
+class TestZeroVitality(SimpleTestCase):
+    def trio(self):
+        state = duel()
+        engine.join(state, 3, "Third", "one", build())
+        return state
+
+    def test_reaching_zero_voids_unanswered_packets_with_refunds(self):
+        special = Move(kind="improvised", key="jab", power=1)
+        state = self.trio()
+        waiting = declare(state, ident=3, move=special)
+        third = engine.participant(state, 3)
+        self.assertEqual(third["reserves"], 2)
+        defender = engine.participant(state, 2)
+        defender["hp"] = 1
+        engine.reaction(state, 2, declare(state), "resist")
+        self.assertEqual(defender["hp"], 0)
+        exchange = state["exchanges"][waiting.split(":")[0]]
+        self.assertEqual((defender["incoming"], exchange["phase"]), ([], "canceled"))
+        # Refunded and not spent: the attacker may choose another target.
+        self.assertEqual((third["reserves"], third["outgoing"], third["clock"]), (3, None, 0))
+        self.assertTrue(any("voided" in note for note in state.get("notices", ())))
+
+    def test_accepted_reactions_still_resolve_after_zero(self):
+        state = self.trio()
+        engine.join(state, 4, "Fourth", "two", build())
+        third = engine.participant(state, 3)
+        third["allowance"] = third["actions_left"] = 2
+        shared = declare(state, ident=3, targets=(2, 4))
+        engine.reaction(state, 2, shared, "resist")
+        defender = engine.participant(state, 2)
+        defender["hp"] = 1
+        # The accepted shared reaction waits on its peer while another lands.
+        engine.reaction(state, 2, declare(state), "resist")
+        self.assertEqual(defender["hp"], 0)
+        engine.reaction(state, 4, shared, "resist")
+        exchange = state["exchanges"][shared.split(":")[0]]
+        self.assertEqual((exchange["phase"], exchange["resolved"]), ("done", 2))
+
+    def test_voided_burst_opener_refunds_the_ante_and_spends_no_turn(self):
+        state = self.trio()
+        third = engine.participant(state, 3)
+        third["spirit"] = 1000
+        opener = declare(state, ident=3, burst=True)
+        self.assertEqual(third["spirit"], 400)
+        engine.participant(state, 2)["hp"] = 1
+        engine.reaction(state, 2, declare(state), "resist")
+        self.assertEqual(state["exchanges"][opener.split(":")[0]]["phase"], "canceled")
+        self.assertEqual(
+            (third["spirit"], third["actions_left"], third["outgoing"]), (1000, 1, None)
+        )
+
+    def test_voided_later_burst_hit_closes_the_chain_as_a_stop(self):
+        state = self.trio()
+        third = engine.participant(state, 3)
+        opener = declare(state, ident=3, burst=True)
+        engine.reaction(state, 2, opener, "resist")
+        engine.press(state, 3, 100)
+        overextended = engine.value(third, "overextended")
+        engine.participant(state, 2)["hp"] = 1
+        engine.reaction(state, 2, declare(state), "resist")
+        exchange = state["exchanges"][opener.split(":")[0]]
+        self.assertEqual((exchange["phase"], third["outgoing"], third["turns"]), ("done", None, 1))
+        self.assertEqual(engine.value(third, "overextended"), overextended)
+
+    def test_overkill_neither_deepens_loss_nor_grants_extra_transcendence(self):
+        state = duel(attacker=build(attack=80))
+        defender = engine.participant(state, 2)
+        defender["hp"] = 3
+        heavy = Move(key="heavy", power=2, accuracy=-2)
+        engine.reaction(state, 2, declare(state, move=heavy), "resist")
+        self.assertEqual(defender["hp"], 0)
+        self.assertEqual(defender["transcendence"], math.rounded(F(5, 4) * 3))
+        self.assertEqual(engine.assessment(state)["two"], "0")
+
+
+class TestDomainResistance(SimpleTestCase):
+    def hit(self, domain, effect, *, defender=None):
+        state = duel(attacker=expert(domain), defender=defender or resistant(domain))
+        token = declare(state, domain=domain, domain_effects={domain: effect})
+        engine.reaction(state, 2, token, "resist")
+        return state, state["exchanges"][token.split(":")[0]]
+
+    def test_hostile_hit_effects_are_blocked_but_still_spend_the_use(self):
+        for domain, effect, condition in (
+            ("athletics", "grapple", "grappled"),
+            ("alchemy", "envenom", "poisoned"),
+        ):
+            state, exchange = self.hit(domain, effect)
+            defender, actor = engine.participant(state, 2), engine.participant(state, 1)
+            self.assertNotIn(condition, defender["conditions"])
+            self.assertTrue(exchange["domain_used"])
+            self.assertTrue(exchange["outcomes"][0]["domain_resisted"])
+            self.assertEqual(actor["reserves"], 4)  # surcharge kept, standard gain
+            # The attack's ordinary damage is untouched.
+            self.assertLess(defender["hp"], 100)
+        state, _exchange = self.hit("athletics", "grapple", defender=build())
+        self.assertIn("grappled", engine.participant(state, 2)["conditions"])
+
+    def test_pilfer_is_blocked_by_the_targets_resistance(self):
+        state, _exchange = self.hit("thievery", "pilfer")
+        self.assertEqual(engine.participant(state, 2)["reserves"], 3)
+
+    def test_resistance_is_checked_before_ward_is_spent(self):
+        state = duel(attacker=expert("athletics"), defender=resistant("athletics"))
+        engine.condition(engine.participant(state, 2), "warded", 1, 2)
+        token = declare(state, domain="athletics", domain_effects={"athletics": "grapple"})
+        engine.reaction(state, 2, token, "resist")
+        self.assertIn("warded", engine.participant(state, 2)["conditions"])
+
+    def test_dispirit_riders_are_blocked_by_the_targets_resistance(self):
+        for domain, effect in (("intimidation", "provoke"), ("seduction", "beguile")):
+            for defender, blocked in ((resistant(domain), True), (build(), False)):
+                state = duel(attacker=expert(domain), defender=defender)
+                engine.declaration(
+                    state,
+                    1,
+                    [2],
+                    Move(action="dispirit"),
+                    1,
+                    domain=domain,
+                    domain_effects={domain: effect},
+                )
+                actor, target = engine.participant(state, 1), engine.participant(state, 2)
+                self.assertLess(target["spirit"], 0)
+                if effect == "provoke":
+                    self.assertEqual("provoked" in target["conditions"], not blocked)
+                else:
+                    self.assertEqual(actor["spirit"] > 0, not blocked)
+
+    def test_analyze_keeps_a_resistant_targets_traits_hidden(self):
+        state, _exchange = self.hit("scholarship", "analyze")
+        self.assertNotIn("2", engine.participant(state, 1).get("information", {}))
+
+    def test_ambush_penalty_is_removed_for_a_resistant_defender(self):
+        for defender, penalty in ((resistant("stealth"), "0"), (build(), "15")):
+            state = duel(attacker=expert("stealth"), defender=defender)
+            token = declare(state, domain="stealth", domain_effects={"stealth": "ambush"})
+            view = engine.reaction_view(state, 2, token)
+            self.assertEqual(dict(view.penalties)["overpower"], penalty)
+
+    def test_slip_inside_is_blocked_by_the_countered_attackers_resistance(self):
+        heavy = Move(key="heavy", power=2, accuracy=-2)
+        chances = {}
+        for attacker in (resistant("acrobatics"), build()):
+            state = duel(attacker=attacker, defender=expert("acrobatics"))
+            token = declare(state, move=heavy)
+            engine.reaction(
+                state,
+                2,
+                token,
+                "overpower",
+                domain="acrobatics",
+                domain_effects={"acrobatics": "slip_inside"},
+            )
+            outcome = state["exchanges"][token.split(":")[0]]["outcomes"][0]
+            resisted = bool(attacker.abilities)
+            self.assertEqual(outcome.get("domain_resisted", False), resisted)
+            chances[resisted] = outcome["chance"]
+        self.assertLess(chances[True], chances[False])
+
+    def test_read_is_paid_but_blocked_by_the_attackers_resistance(self):
+        for attacker, shown in ((resistant("insight"), None), (build(), "reaching")):
+            state = duel(attacker=attacker, defender=expert("insight"))
+            token = declare(state, bet="reaching")
+            bet = engine.read_bet(state, 2, token, "insight", {"insight": "read"})
+            self.assertEqual(bet, shown)
+            self.assertEqual(engine.participant(state, 2)["reserves"], 2)
+
+    def test_helpful_effects_are_never_blocked(self):
+        for domain, effect in (
+            ("ritual", "ward"),
+            ("persuasion", "exhort"),
+            ("performance", "encore"),
+        ):
+            state = duel(attacker=expert(domain))
+            engine.join(state, 3, "Ally", "one", resistant(domain))
+            engine.declaration(
+                state,
+                1,
+                [3],
+                Move(action="assist"),
+                50,
+                domain=domain,
+                domain_effects={domain: effect},
+            )
+            exchange = next(iter(state["exchanges"].values()))
+            self.assertFalse(exchange["outcomes"][0].get("domain_resisted", False))
+            self.assertTrue(exchange["domain_used"])
+
+    def test_endure_is_never_blocked(self):
+        state = duel(attacker=resistant("survival"), defender=expert("survival"))
+        token = declare(state, roll=1)
+        engine.reaction(
+            state, 2, token, "resist", domain="survival", domain_effects={"survival": "endure"}
+        )
+        self.assertEqual(engine.participant(state, 2)["pressure"], 0)
+
+
 class TestPolicies(SimpleTestCase):
     def test_capability_views_have_no_hidden_information(self):
         state = duel()
@@ -708,7 +914,9 @@ class TestCoordinator(EvenniaCommandTest):
         services.declare(third, [self.char1], "assist", action="assist")
         state = services.state_for(third)
         self.assertEqual(state["participants"][str(third.pk)]["clock"], 1)
-        self.assertEqual(len(state["participants"][str(self.char2.pk)]["incoming"]), 1)
+        # The packet they can no longer answer was voided, freeing its attacker.
+        self.assertEqual(state["participants"][str(self.char2.pk)]["incoming"], [])
+        self.assertIsNone(state["participants"][str(self.char1.pk)]["outgoing"])
 
     def test_returning_participant_is_no_longer_absent(self):
         from .maintenance import maintain

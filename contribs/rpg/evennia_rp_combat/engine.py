@@ -256,6 +256,53 @@ def has_domain(build, domain):
     )
 
 
+# Effects that only help their user or an ally. Domain Resistance blocks a
+# domain effect working against its owner, never one that helps them.
+HELPFUL_EFFECTS = ("treat", "ward", "exhort", "encore", "endure")
+
+
+def resists(build, domain):
+    """Whether this frozen build carries Domain Resistance to ``domain``."""
+    return bool(domain) and any(
+        key == "domain-resistance" and tag == domain for key, tag, _level in build.abilities
+    )
+
+
+def blocks(row, domain, effect):
+    return effect not in HELPFUL_EFFECTS and resists(Build.from_dict(row["build"]), domain)
+
+
+def settle(state):
+    """Void unanswered packets against anyone at zero Vitality.
+
+    They can no longer react, so each attacker gets their unexecuted
+    reservations back, as when a target Fades. Accepted reactions stay
+    committed and resolve with their peers. A voided Burst hit ends the chain
+    as though the attacker had stopped.
+    """
+    voided = True
+    while voided:
+        voided = False
+        for row in list(state["participants"].values()):
+            if row["hp"] > 0:
+                continue
+            for token in list(row["incoming"]):
+                exchange = state["exchanges"].get(token.split(":")[0])
+                if (
+                    token in row["incoming"]
+                    and exchange is not None
+                    and exchange["phase"] == "waiting"
+                    and row["id"] not in exchange["reactions"]
+                ):
+                    attacker = participant(state, exchange["actor"])
+                    cancel(state, row["id"], token)
+                    state.setdefault("notices", []).append(
+                        f"{attacker['name']}'s unanswered attack on {row['name']} was voided "
+                        "with a refund: they are incapacitated."
+                    )
+                    voided = True
+
+
 def declaration(
     state,
     ident,
@@ -449,6 +496,7 @@ def reaction(
         "counter": counter.as_dict(),
         "empower": empower,
         "domain_effect": domain_effect,
+        "domain": chosen_domain,
         "spirit": defender["spirit"],
         "pressure": defender["pressure"],
         "conditions": frozen_conditions,
@@ -456,6 +504,32 @@ def reaction(
     # Keep the token until the shared result commits; acceptance closes cancel.
     if len(exchange["reactions"]) + len(exchange["canceled"]) == len(exchange["targets"]):
         resolve_exchange(state, exchange)
+
+
+def read_bet(state, ident, token, domain, domain_effects):
+    """Insight's Read: pay 1 Reserve once to see an incoming RPS bet.
+
+    Returns the bet ("" for none), or None when the attacker's Domain
+    Resistance blocked it. The Reserve is spent either way.
+    """
+    progress(state)
+    row = active(state, ident)
+    exchange = get_exchange(state, token)
+    if token not in row["incoming"] or row["id"] in exchange["reactions"]:
+        raise CombatError("Read before accepting your incoming reaction.")
+    if (domain_effects or {}).get(domain) != "read" or not has_domain(
+        Build.from_dict(row["build"]), domain
+    ):
+        raise CombatError("Equip the Insight/Read domain first.")
+    readers = exchange.setdefault("readers", [])
+    if row["id"] not in readers:
+        if row["reserves"] < 1:
+            raise CombatError("Read costs 1 Reserve.")
+        row["reserves"] -= 1
+        readers.append(row["id"])
+    if blocks(participant(state, exchange["actor"]), domain, "read"):
+        return None
+    return exchange["bet"]
 
 
 def cancel(state, ident, token):
@@ -528,7 +602,12 @@ def reaction_view(state, ident, token):
                     value(defender, "grappled")
                     if r == "evade"
                     else value(defender, "op_penalty")
-                    + (15 if exchange["domain_effect"] == "ambush" else 0)
+                    + (
+                        15
+                        if exchange["domain_effect"] == "ambush"
+                        and not blocks(defender, exchange["domain"], "ambush")
+                        else 0
+                    )
                     if r == "overpower"
                     else 0
                 )
@@ -588,10 +667,15 @@ def resolve_exchange(state, exchange):
         penalty = value(frozen_defender, "vulnerable") + value(frozen_defender, "overextended")
         if reaction_kind == "evade":
             penalty += value(frozen_defender, "grappled")
+        ambushed = exchange["domain_effect"] == "ambush"
+        ambush_resisted = ambushed and blocks(defender, exchange["domain"], "ambush")
         if reaction_kind == "overpower":
             penalty += value(frozen_defender, "op_penalty") + (
-                15 if exchange["domain_effect"] == "ambush" else 0
+                15 if ambushed and not ambush_resisted else 0
             )
+        # A reaction's own domain effect working against the attacker.
+        slip_inside = choice.get("domain_effect") == "slip_inside"
+        slip_resisted = slip_inside and blocks(actor, choice.get("domain", ""), "slip_inside")
         empowered = exchange["empower"] and not exchange["empower_used"]
         exchange["empower_used"] = exchange["empower_used"] or empowered
         power = (
@@ -634,7 +718,7 @@ def resolve_exchange(state, exchange):
             + (2 if choice["empower"] else 0)
             + passive(defense_build, "declare", "accuracy", counter.action)
             + passive(defense_build, "before_resolution", "accuracy", counter.action),
-            slip_inside=choice.get("domain_effect") == "slip_inside",
+            slip_inside=slip_inside and not slip_resisted,
             endure=choice.get("domain_effect") == "endure",
             strain="strain" in move.effects,
             multiplier=damage_multiplier(defense_build, move.element),
@@ -675,6 +759,8 @@ def resolve_exchange(state, exchange):
             "pressure_gain": result.pressure_gain,
             "domain": result.domain,
         }
+        if slip_resisted or (ambush_resisted and reaction_kind == "overpower"):
+            details["domain_resisted"] = True
         if exchange["burst"]:
             actor["spirit"], defender["spirit"], exchange["debt"], requested, transferred = (
                 math.burst_transfer(
@@ -713,7 +799,10 @@ def resolve_exchange(state, exchange):
                 ),
             )
         if result.domain and exchange["domain"] and not exchange["domain_used"]:
-            apply_domain(state, actor, defender, exchange["domain_effect"])
+            if not apply_domain(
+                state, actor, defender, exchange["domain_effect"], exchange["domain"]
+            ):
+                details["domain_resisted"] = True
             exchange["domain_used"] = True
         if reaction_kind == "overpower":
             for effect in counter.effects:
@@ -757,6 +846,7 @@ def resolve_exchange(state, exchange):
         exchange["phase"] = "press"
     else:
         finish_exchange(state, exchange)
+    settle(state)
 
 
 def element_traits(element):
@@ -812,8 +902,14 @@ def apply_element(state, actor, defender, element, damage):
                     break
 
 
-def apply_domain(state, actor, target, effect):
-    """Host maps domain identities to these distinct, bounded behaviors."""
+def apply_domain(state, actor, target, effect, domain=""):
+    """Host maps domain identities to these distinct, bounded behaviors.
+
+    Returns False when the target's Domain Resistance to ``domain`` blocked
+    the effect. It is checked first, so a Ward is not spent on it.
+    """
+    if blocks(target, domain, effect):
+        return False
     if effect == "grapple":
         condition(target, "grappled", 10, 1, actor["id"])
     elif effect == "slip_inside":
@@ -865,6 +961,7 @@ def apply_domain(state, actor, target, effect):
     elif effect == "misdirect":
         condition(target, "misdirected", 1, 1, actor["id"])
     # Ambush modifies this attack before the roll; it has no persistent copy.
+    return True
 
 
 def support_exchange(state, exchange):
@@ -907,7 +1004,8 @@ def support_exchange(state, exchange):
             spirit = math.rounded(F(9, 10) * spirit)
             healing = math.rounded(F(9, 10) * healing)
         actual_spirit = change_spirit(target, spirit)
-        if exchange["domain_effect"] == "beguile" and success:
+        resisted = blocks(target, exchange["domain"], exchange["domain_effect"])
+        if exchange["domain_effect"] == "beguile" and success and not resisted:
             change_spirit(actor, -actual_spirit)
         restored = heal(target, healing) if "heal" in move.effects else 0
         actor["support_history"][key] = actor["clock"]
@@ -923,7 +1021,10 @@ def support_exchange(state, exchange):
         )
         exchange["resolved"] += 1
         if exchange["domain"] and success and not exchange["domain_used"]:
-            apply_domain(state, actor, target, exchange["domain_effect"])
+            if not apply_domain(
+                state, actor, target, exchange["domain_effect"], exchange["domain"]
+            ):
+                exchange["outcomes"][-1]["domain_resisted"] = True
             exchange["domain_used"] = True
     condition(actor, "vulnerable", 20, 2, wardable=False)
     finish_exchange(state, exchange)
@@ -1016,6 +1117,8 @@ def finish_exchange(state, exchange):
     actor["outgoing"] = None
     actor["pose"] = not actor["auto"]
     exchange["phase"] = "done"
+    # Poison at the end of an own action can incapacitate the actor.
+    settle(state)
 
 
 def fade(state, ident, *, withdraw=False):

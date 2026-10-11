@@ -392,7 +392,7 @@ def commit(
 
     notes = state.pop("notices", [])
     if notes:
-        summary = f"{summary} {' '.join(notes)}"
+        summary = f"{summary} {' '.join(plain(note, 400) for note in notes)}"
     FightEntry.objects.create(
         fight=fight,
         sequence=sequence,
@@ -462,6 +462,8 @@ def execute(
         for key in touched & state["participants"].keys():
             state["participants"][key].pop("absent", None)
         result = operation(state)
+        # Any change that left someone at zero voids what they can't answer.
+        engine.settle(state)
         for key, row in state["participants"].items():
             if key in touched or row.get("batch_controller") == actor.pk:
                 row["last_activity"] = time.time()
@@ -1526,25 +1528,19 @@ def read(actor, token, domain, *, subject=None, operation_id=None):
     authorize(actor, subject)
 
     def operation(state):
-        row = engine.active(state, subject.pk)
         exchange = engine.get_exchange(state, token)
-        if token not in row["incoming"] or row["id"] in exchange["reactions"]:
-            raise CombatError("Read before accepting your incoming reaction.")
-        if conf.get("RP_COMBAT_DOMAIN_EFFECTS").get(domain) != "read" or not engine.has_domain(
-            Build.from_dict(row["build"]), domain
-        ):
-            raise CombatError("Equip the Insight/Read domain first.")
         attacker = ObjectDB.objects.filter(pk=exchange["actor"]).first()
         if attacker is None:
             raise CombatError("The attacker has left; cancel the unaccepted incoming attack.")
         interaction(subject, attacker)
-        readers = exchange.setdefault("readers", [])
-        if row["id"] not in readers:
-            if row["reserves"] < 1:
-                raise CombatError("Read costs 1 Reserve.")
-            row["reserves"] -= 1
-            readers.append(row["id"])
-        return f"Incoming {token}: RPS {exchange['bet'] or 'none'}. No reaction has been accepted."
+        bet = engine.read_bet(
+            state, subject.pk, token, domain, conf.get("RP_COMBAT_DOMAIN_EFFECTS")
+        )
+        if bet is None:
+            return (
+                f"Incoming {token}: the attacker resisted your Read. No reaction has been accepted."
+            )
+        return f"Incoming {token}: RPS {bet or 'none'}. No reaction has been accepted."
 
     return execute(
         actor,
@@ -1593,10 +1589,12 @@ def render_outcomes(state, exchange, start=0):
                 f"{target['name']}: {outcome['reaction']} {'succeeded' if outcome['success'] else 'glanced' if outcome['glancing'] else 'failed'}, "
                 f"d100 {outcome['draw']}, threshold {outcome['chance']}; "
                 f"lost {outcome['damage']} Vitality, counter dealt {outcome['counter_damage']}."
+                + (" Domain effect resisted." if outcome.get("domain_resisted") else "")
             )
         else:
             lines.append(
                 f"{target['name']}: Spirit change {outcome['spirit'] / 100:+.2f}; healed {outcome['healing']} Vitality."
+                + (" Domain effect resisted." if outcome.get("domain_resisted") else "")
             )
     if exchange["phase"] == "press":
         lines.append("Burst remains open: actor may +combat/press or +combat/stop.")
