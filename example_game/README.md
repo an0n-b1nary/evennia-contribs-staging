@@ -1485,9 +1485,14 @@ command and Social's room-permission seam under the actual partners.
 ## Combat practice
 
 The Proving Grounds wires `evennia-rp-combat` after rules/chargen/NPCs.
-Seeded sample builds carry an equipped Ready Guard Signature and Balanced
-Tactics; the room has an empty open practice fight, so no PC is enrolled by
-seeding. `+combat/join side` explicitly accepts. See `/guide/combat/` and
+Seeded sample builds carry an equipped Ready Guard Signature, Balanced
+Tactics and combat Abilities (Flowing Guard and Calling the Shot, or Deflect
+and Bait); the room has an empty open practice fight, so no PC is enrolled by
+seeding. `world.ruleset.COMBAT_ABILITIES` holds neutral demonstration entries
+for every combat 0.2 Ability and two Flaws (Telegraph, Off-Balance), seeded
+only when combat is installed; `RP_RULES_EFFECT_KINDS` registers
+`combat_rule` beside `combat_bonus`. Revive an incapacitated ally with a Heal
+Assist they accept, then `+combat/recover`. `+combat/join side` explicitly accepts. See `/guide/combat/` and
 `help +combat`; `+combatstory` is available to ordinary players, and its
 changes to another player's character wait for that player's
 `+combat/accept`. Use the Market's permitted NPC templates with

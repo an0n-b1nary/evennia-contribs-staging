@@ -92,11 +92,31 @@ the room or your connection is idle or disconnected for
 connected is not idleness. It never acts or reacts for an unwilling player.
 When nobody is left active the fight pauses, and joining a paused fight says
 so; anyone may then `+combatstory/resume`.
-An incapacitated or withdrawn character returns only after a visible
-`+combatstory/requestreturn name=Vitality;reason` and their own
-`+combat/accept` (or `/decline`). Restored Vitality adds exposure;
-turns, resources, conditions and the frozen build are retained. Ordinary
-healing and Fade/rejoin cannot bypass this consent step.
+Vitality never drops below 0, and overkill neither deepens assessment loss
+nor grants extra Transcendence. At 0 a participant is incapacitated: they
+cannot act or accept a new reaction, and every attack they hadn't answered is
+voided with a refund (a voided Burst opener refunds its ante; a later hit
+ends the chain as a stop). Accepted reactions still resolve.
+
+An ally may revive them with a Heal (`+combat/assist name=move`, one
+incapacitated target). The offer waits in their queue until they
+`+combat/accept` or `/decline` it; `+combat/revive accept` accepts allies'
+revivals automatically, and `+combat/retract` withdraws an unaccepted offer.
+Unresolved offers refund the healer. A Heal that restores nothing doesn't
+revive. Revival is earned healing in the assessment, with the usual costs and
+taper. The revived participant then takes `+combat/recover`: one action from
+their allowance that ticks Poison and expires conditions once, with no
+action rewards. Until then they can neither act nor be targeted. Medicine's
+Treat on the reviving Heal may instead waive recovery (`;domain=medicine;waive`),
+without cleansing. Someone revived after using their whole Turn Limit gets the
+healing but cannot recover or act again, and is told so before accepting.
+
+A withdrawn character, or anyone the table agrees to bring back OOC, returns
+only after a visible `+combatstory/requestreturn name=Vitality;reason` and
+their own `+combat/accept` (or `/decline`). That restored Vitality adds
+exposure, so it never erases a side's earlier loss; turns, resources,
+conditions and the frozen build are retained. A Faded participant at 0 may
+rejoin, still incapacitated.
 
 `+combatstory/shelve reason` sets a whole fight aside: unaccepted packets are
 canceled with refunds, everyone Fades with their place retained, sheets
@@ -164,6 +184,14 @@ matching equipped Elemental Focus/combat-focus. Resistance/vulnerability
 and ordinary domain/style tags never become a generic check bonus.
 Pinpoint is dormant and Encore uses a single-target fallback without Party.
 
+An equipped `domain-resistance` Ability blocks its domain's effect when it
+works against its owner: riders on a hit or Dispirit target (Grapple, Pilfer,
+Envenom, Provoke, Beguile, Misdirect, Analyze), Ambush for the defender, and
+Slip Inside or Read against the countered or read attacker. It is checked
+before Ward, so a Ward isn't spent on a blocked effect. Helpful effects
+(Treat, Ward, Exhort, Encore, Endure) are never blocked. A blocked effect
+still spends the exchange's single domain use and its surcharge.
+
 Register `combat_bonus` as `evennia_rp_combat.modifiers.CombatEffect` in
 `RP_RULES_EFFECT_KINDS` for validated, open, frozen passive specs. Fields are
 restricted by phase: build (stat roles), declare (Power/Accuracy),
@@ -171,6 +199,20 @@ before_reaction (reaction bonus), before_resolution (tiers/reactions),
 after_resolution (Spirit), exchange_end (recovery/Reserves/Transcendence).
 Optional action filters and stack keys apply. These effects have no ordinary
 check hooks and never receive a live opponent or hidden result.
+
+Register `combat_rule` as `evennia_rp_combat.modifiers.CombatRule` for
+conditional Abilities and Flaws: `{"kind": "combat_rule", "rule": "deflect",
+"amount": "1/400", "per_level": "1/800"}`. Each rule's fields and bounds are
+in `modifiers.RULES`, checked at every level; several entries for one rule
+add up and are clamped again. Rules that change a defender's chances or
+mitigation (`deflect`, `stoneskin`, `finesse`, `desperate_counter`) apply
+inside `arithmetic.resolve`, so odds previews and Auto-Resolve use exactly
+what resolution does. The engine applies `rps` (by bet, or every bet; negative
+values make a Flaw), `calling_the_shot` (the `;public` option; only a public
+bet ever reaches a reaction view), `tactician`, `measured_tempo`, `explosive`,
+`flowing_guard`, `braced_support`, `taunting_opener`, `bait` and
+`blood_price`. Charges return when a Burst never opens. Names, coefficients
+and loadout costs belong to the host catalog.
 
 Settings default to hidden: `RP_COMBAT_REVEALED`, `RP_COMBAT_FROZEN`,
 `RP_COMBAT_TACTICS_REVEALED` are independent runtime switches. Other defaults:

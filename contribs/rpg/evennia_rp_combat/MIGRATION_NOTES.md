@@ -23,6 +23,14 @@ cannot undo authored prose or external XP, ignore or catalog edits. Review
 its reconciliation notice before resuming. Future schema changes must migrate
 retained (including shelved) fights explicitly.
 
+Combat 0.2 adds no migration. Fights retained from 0.1, including shelved
+fights and journal snapshots, load unchanged: the new per-participant fields
+(recovery, revival preference, Measured Tempo charges) and exchange fields
+default when absent. Hosts using the new conditional Abilities register
+`combat_rule` in `RP_RULES_EFFECT_KINDS` before seeding catalog entries
+that use it; existing `combat_bonus` entries are unchanged. Domain
+Resistance now takes effect in combat for builds that already carry it.
+
 Pre-release sandboxes that ran an earlier 0.1 build kept fight state on a
 `rp_combat_coordinator` room Script. That state is not carried over: end
 those practice fights, or reset to the golden database, and delete leftover
