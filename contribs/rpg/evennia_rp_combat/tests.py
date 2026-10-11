@@ -895,6 +895,19 @@ class TestRevival(SimpleTestCase):
         self.assertEqual(F(engine.assessment(state)["one"]), before + F(ally["hp"], 200))
         self.assertEqual(ally["exposure"], exposure)
 
+    def test_revival_offers_are_not_attacks_and_recovery_is_not_participation(self):
+        state, ally, _healer = self.party()
+        engine.join(state, 4, "Guard", "one", build())
+        token = self.offer(state)
+        with self.assertRaisesRegex(CombatError, "revival offer|cannot be intercepted"):
+            engine.redirect(state, token, 3, 4, "resist")
+        self.assertEqual(ally["incoming"], [token])
+        self.assertFalse(engine.participating(ally))
+        engine.accept_revival(state, 3, token)
+        self.assertFalse(engine.participating(ally))
+        engine.recover(state, 3)
+        self.assertTrue(engine.participating(ally))
+
     def test_fights_saved_by_0_1_resolve_without_the_new_fields(self):
         new_exchange = ("revival", "waive_recovery", "public_bet", "blood", "tempo", "taunting")
         new_row = ("recovering", "revive", "tempo")
