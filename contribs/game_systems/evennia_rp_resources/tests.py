@@ -426,3 +426,76 @@ class ResourceCommandTests(BaseEvenniaCommandTest):
         self.assertEqual(runtime.get("RP_RESOURCES_BASE_CAP"), 40)
         self.call(CmdRuntime(), "/reset RP_RESOURCES_BASE_CAP")
         self.assertEqual(runtime.get("RP_RESOURCES_BASE_CAP"), 30)
+
+
+def room_terrain(room):
+    """RP_RESOURCES_TERRAIN_PROVIDER for the panel tests: a plain attribute."""
+    return room.attributes.get("test_terrain", default="")
+
+
+@override_settings(
+    RP_RESOURCES_CATALOG="evennia_rp_resources.tests.catalog",
+    RP_RESOURCES_CATEGORIES=[
+        ("materials", "Materials"),
+        ("provisions", "Provisions"),
+        ("essences", "Essences"),
+    ],
+    RP_RESOURCES_OPEN_TERRAINS=["forest"],
+    RP_RESOURCES_TERRAIN_PROVIDER="evennia_rp_resources.tests.room_terrain",
+    RP_RESOURCES_REVEALED=True,
+)
+class MapPanelTests(EvenniaTest):
+    """The live map's room panel: what gathering in this terrain can find."""
+
+    def setUp(self):
+        super().setUp()
+        seed_catalog(update=True)
+        self.room1.attributes.add("test_terrain", "forest")
+        self.room2.attributes.add("test_terrain", "mine")
+
+    def section(self, room=None, *, staff=False, viewer=None):
+        from .map_panel import provide_detail
+
+        room = room or self.room1
+        answer = provide_detail(sender=None, room_id=room.pk, room=room, staff=staff, viewer=viewer)
+        return answer.get("resources")
+
+    def test_an_open_terrain_lists_its_resources_by_category(self):
+        section = self.section()
+        self.assertEqual((section["title"], section["order"]), ("Gathering here", 60))
+        self.assertEqual(section["items"], [{"label": "Materials", "note": "Wood"}])
+        self.assertEqual(section["summary"], "Gathering in this terrain can turn up:")
+
+    def test_the_common_pool_and_payout_only_resources_are_left_out(self):
+        notes = " ".join(
+            item["note"] for item in self.section(staff=True, room=self.room2)["items"]
+        )
+        self.assertNotIn("Grain", notes)
+        self.assertNotIn("Rare crystal", notes)
+
+    def test_a_closed_terrain_shows_players_nothing_and_staff_a_preview(self):
+        self.assertIsNone(self.section(self.room2))
+        section = self.section(self.room2, staff=True)
+        self.assertTrue(section["summary"].startswith("This terrain isn't open to gathering yet."))
+        self.assertEqual(section["items"], [{"label": "Materials", "note": "Ore"}])
+
+    @override_settings(RP_RESOURCES_OPEN_TERRAINS=None)
+    def test_with_no_open_list_every_terrain_is_open(self):
+        self.assertEqual(self.section(self.room2)["items"], [{"label": "Materials", "note": "Ore"}])
+
+    @override_settings(RP_RESOURCES_REVEALED=False)
+    def test_nothing_for_players_until_revealed(self):
+        self.assertIsNone(self.section())
+        self.assertIsNotNone(self.section(staff=True))
+
+    def test_a_room_without_terrain_has_no_section(self):
+        self.room1.attributes.remove("test_terrain")
+        self.assertIsNone(self.section(staff=True))
+
+    def test_a_matching_lean_is_mentioned(self):
+        gathering.set_lean(self.char2, "wood")
+        self.assertIn(
+            "your gathering lean finds something here", self.section(viewer=self.char2)["summary"]
+        )
+        gathering.set_lean(self.char2, "provisions")
+        self.assertNotIn("lean", self.section(viewer=self.char2)["summary"])

@@ -44,8 +44,9 @@ Key                  Owner         Value
 ``has_lore``         lore          ``True`` where lore is attached
 ``upcoming_events``  calendar      ``[{"id": int, "title": str}, ...]``
 ``present``          social        ``[str, ...]`` — names of connected characters
-                                   in the room, findable ones only for players
-                                   (live map only, see below)
+                                   in the room, findable ones only for players,
+                                   plus anyone in the viewer's own room when the
+                                   viewer is connected (live map only, see below)
 ===================  ============  ===============================================
 
 ``present`` reaches only the live map's tile API, which requires a login.
@@ -142,7 +143,7 @@ def overlay_url_templates():
     return templates
 
 
-def collect_overlays(room_ids, *, staff):
+def collect_overlays(room_ids, *, staff, viewer=None):
     """
     Merge every connected provider's answer into one
     ``{overlay_key: {room_id: value}}`` dict.
@@ -150,9 +151,18 @@ def collect_overlays(room_ids, *, staff):
     sender is ``MapPlane`` rather than the calling view: the signal belongs
     to the models layer, and a provider that ever wants to filter on sender
     should be able to import it without reaching into the web layer.
+
+    *viewer* is the web character the live map renders for, or None (the
+    SVG map, which may be public, never passes one). A provider whose
+    privacy rule depends on who is looking reads it; the rest ignore it.
+    Social uses it so that standing in a room shows who else is there.
     """
     if not room_ids:
         return {}
     return collect_dicts(
-        collect_tile_overlays, sender=MapPlane, room_ids=list(room_ids), staff=staff
+        collect_tile_overlays,
+        sender=MapPlane,
+        room_ids=list(room_ids),
+        staff=staff,
+        viewer=viewer,
     )

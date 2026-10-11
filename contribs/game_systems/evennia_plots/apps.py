@@ -56,3 +56,17 @@ class PlotsConfig(AppConfig):
                 connect_soft_ref_cleanup(CalendarEvent, PlotCalendarLink, "event_id")
             except Exception:
                 pass
+
+        # --- maps: the room panel's "Plots here" section ---
+        maps_label = getattr(settings, "PLOTS_MAPS_APP_LABEL", "evennia_maps")
+        if _app_present(maps_label):
+            from evennia_maps import signals as maps_signals
+
+            # The seam arrived in evennia-maps 0.9; an older map has no panel.
+            collect_tile_detail = getattr(maps_signals, "collect_tile_detail", None)
+            if collect_tile_detail is not None:
+                from evennia_plots.integrations import maps as maps_detail
+
+                collect_tile_detail.connect(
+                    maps_detail.provide_detail, dispatch_uid="evennia_plots.tile_detail"
+                )

@@ -40,8 +40,10 @@ from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 from rest_framework.test import APIClient
 
+from evennia_links.characters import web_character
 from evennia_maps import direction, layout, placement
 from evennia_maps.commands import CmdMap
+from evennia_maps.detail import MAX_ITEMS, clean_item, clean_section
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import (
     DEFAULT_OVERLAY_URL_NAMES,
@@ -50,13 +52,14 @@ from evennia_maps.overlays import (
     overlay_url_templates,
 )
 from evennia_maps.permissions import is_room_web_visible, is_staff
-from evennia_maps.signals import collect_tile_overlays, tile_placed
+from evennia_maps.signals import collect_tile_detail, collect_tile_overlays, tile_placed
 from evennia_maps.typeclasses import MapsRoomMixin
 from evennia_maps.views import (
     PlaneListView,
     PlaneLiveMapView,
     PlaneMapView,
     build_svg_context,
+    tile_detail_url_template,
     tile_hangout_type,
     tiles_url_template,
     visible_tiles_for_plane,
@@ -2244,6 +2247,12 @@ class TestWebPagesRender(MapsWebTestCase):
         self.assertIn('aria-controls="evennia-maps-list"', html)
         self.assertLess(html.index("leaflet.css"), html.index("evennia_maps/css/evennia_maps.css"))
 
+    def test_live_map_renders_the_room_panel(self):
+        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        self.assertIn('id="evennia-maps-panel"', html)
+        self.assertIn('aria-labelledby="evennia-maps-panel-title"', html)
+        self.assertIn('data-tile-detail-url-template="/api/v1/planes/0/tiles/0/detail/"', html)
+
     @override_settings(MAPS_TILES_URL_NAME="")
     def test_live_map_explains_itself_when_the_api_is_off(self):
         html = self._render(PlaneLiveMapView, pk=self.plane.pk)
@@ -2517,3 +2526,243 @@ class TestPlaneTilesPortals(MapsApiTestCase):
         self.room2.db.allow_teleport = "secret"
         self._make_exit("in", self.room1, self.room2)
         self.assertIsNone(self._tile_for(self.room1, client=self.client2)["portal_plane_id"])
+
+
+# ---------------------------------------------------------------------------
+# Room panel: the collect_tile_detail seam and the room-detail route
+# ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _detail_provider(*fns):
+    """``_provider()`` for collect_tile_detail: exactly ``fns`` connected."""
+    saved = collect_tile_detail.receivers
+    collect_tile_detail.receivers = []
+    collect_tile_detail.sender_receivers_cache.clear()
+    try:
+        for fn in fns:
+            collect_tile_detail.connect(fn, dispatch_uid=f"evennia_maps.tests.detail.{fn.__name__}")
+        yield
+    finally:
+        collect_tile_detail.receivers = saved
+        collect_tile_detail.sender_receivers_cache.clear()
+
+
+def _sections_provider(sender, room_id, room, staff, viewer=None, **kwargs):
+    """Two sections, returned out of display order."""
+    return {
+        "later": {"title": "Later", "order": 90, "items": [{"label": "Second"}]},
+        "sooner": {
+            "title": "Sooner",
+            "order": 10,
+            "summary": "Two things.",
+            "items": [
+                {"label": "Linked", "url": "/somewhere/3/", "note": "a note"},
+                {"label": "Locked", "locked": True},
+            ],
+        },
+    }
+
+
+def _exploding_detail_provider(sender, **kwargs):
+    raise RuntimeError("detail provider blew up")
+
+
+_SEEN = []
+"""Keyword arguments the capturing providers below were sent."""
+
+
+def _capturing_overlay_provider(sender, **kwargs):
+    _SEEN.append(("overlay", kwargs))
+    return {}
+
+
+def _capturing_detail_provider(sender, **kwargs):
+    _SEEN.append(("detail", kwargs))
+    return {}
+
+
+class TestCleanSection(MapsTestCase):
+    """Maps validates partner sections rather than trusting them."""
+
+    def test_a_section_needs_a_title(self):
+        self.assertIsNone(clean_section("x", {"items": [{"label": "A"}]}))
+        self.assertIsNone(clean_section("x", "not a dict"))
+
+    def test_an_item_needs_a_label(self):
+        self.assertIsNone(clean_item({"url": "/a/"}))
+        self.assertIsNone(clean_item("not a dict"))
+
+    def test_only_site_relative_urls_survive(self):
+        for url in (
+            "javascript:alert(1)",
+            "//elsewhere.example/x",
+            "https://elsewhere.example/",
+            "/\\elsewhere.example/x",
+            "/\t/elsewhere.example/x",
+            "/\n/elsewhere.example/x",
+            "/\r/elsewhere.example/x",
+            5,
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(clean_item({"label": "A", "url": url})["url"], "")
+        self.assertEqual(clean_item({"label": "A", "url": "/lore/3/"})["url"], "/lore/3/")
+
+    def test_a_section_with_nothing_to_show_is_dropped(self):
+        self.assertIsNone(clean_section("x", {"title": "Empty", "items": [{"note": "no label"}]}))
+        kept = clean_section("x", {"title": "Summary only", "summary": "Something."})
+        self.assertEqual(kept["items"], [])
+
+    def test_order_defaults_and_items_are_capped(self):
+        section = clean_section(
+            "x",
+            {
+                "title": "Many",
+                "order": "first",
+                "items": [{"label": f"Item {i}"} for i in range(MAX_ITEMS + 5)],
+            },
+        )
+        self.assertEqual(section["order"], 100)
+        self.assertEqual(len(section["items"]), MAX_ITEMS)
+
+
+class TestTileDetailUrlTemplate(MapsTestCase):
+    @override_settings(ROOT_URLCONF="evennia_maps.urls")
+    def test_absent_when_the_api_is_not_mounted(self):
+        self.assertEqual(tile_detail_url_template(), "")
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_resolves_with_two_placeholders(self):
+        self.assertEqual(tile_detail_url_template(), "/api/v1/planes/0/tiles/0/detail/")
+
+    @override_settings(ROOT_URLCONF=__name__, MAPS_TILE_DETAIL_URL_NAME="")
+    def test_blank_setting_turns_the_panel_route_off(self):
+        self.assertEqual(tile_detail_url_template(), "")
+
+
+class TestTileDetailApi(MapsApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.plane = _make_plane("Overworld")
+        placement.place_tile(self.room1, self.plane, 0, 0)
+        # The website acts as a character on the account's roster; EvenniaTest
+        # leaves account2's empty, which would make the viewer None and the
+        # viewer tests below pass without proving anything.
+        self.account2.characters.add(self.char2)
+        _SEEN.clear()
+
+    def _url(self, room=None, plane=None):
+        plane = plane or self.plane
+        room = room or self.room1
+        return f"{self.base}/planes/{plane.pk}/tiles/{room.id}/detail/"
+
+    def _detail(self, client=None):
+        r = (client or self.client).get(self._url(), format="json")
+        self.assertEqual(r.status_code, 200)
+        return r.data
+
+    def test_unauthenticated_is_refused(self):
+        self.assertIn(self.anon.get(self._url(), format="json").status_code, [401, 403])
+
+    def test_shape_with_no_partners(self):
+        with _provider(), _detail_provider():
+            detail = self._detail()
+        self.assertEqual(detail["room_id"], self.room1.id)
+        self.assertEqual(detail["room_name"], self.room1.key)
+        self.assertIsNone(detail["region"])
+        for key in ("present", "active_scenes", "recent_scenes", "upcoming_events", "sections"):
+            self.assertEqual(detail[key], [], key)
+
+    def test_a_room_not_on_this_plane_is_404(self):
+        r = self.client.get(self._url(room=self.room2), format="json")
+        self.assertEqual(r.status_code, 404)
+
+    def test_a_secret_room_is_404_for_players_only(self):
+        self.room1.db.allow_teleport = "secret"
+        self.assertEqual(self.client2.get(self._url(), format="json").status_code, 404)
+        self.assertEqual(self.client.get(self._url(), format="json").status_code, 200)
+
+    def test_an_archived_plane_is_404(self):
+        self.plane.archive()
+        self.assertEqual(self.client.get(self._url(), format="json").status_code, 404)
+
+    @override_settings(MAPS_OVERLAY_URL_NAMES=_STUB_URL_NAMES)
+    def test_overlays_arrive_with_their_links(self):
+        with _provider(_full_provider), _detail_provider():
+            detail = self._detail()
+        self.assertEqual(detail["room_url"], f"/rooms/{self.room1.id}/")
+        self.assertEqual(detail["region"], {"id": 7, "name": "Testlands", "url": "/regions/7/"})
+        self.assertEqual(detail["present"], ["Ashwren", "Brannoc"])
+        self.assertEqual(
+            detail["active_scenes"], [{"id": 12, "title": "Live rehearsal", "url": "/scenes/12/"}]
+        )
+        self.assertEqual(detail["recent_scenes"][0]["url"], "/scenes/11/")
+        self.assertEqual(detail["upcoming_events"][0]["url"], "/events/22/")
+
+    @override_settings(MAPS_OVERLAY_URL_NAMES=_UNMOUNTED_URL_NAMES)
+    def test_unmounted_partner_pages_leave_links_empty(self):
+        with _provider(_full_provider), _detail_provider():
+            detail = self._detail()
+        self.assertEqual(detail["room_url"], "")
+        self.assertEqual(detail["region"]["url"], "")
+        self.assertEqual(detail["active_scenes"][0]["url"], "")
+
+    def test_sections_are_validated_and_ordered(self):
+        with _provider(), _detail_provider(_sections_provider):
+            sections = self._detail()["sections"]
+        self.assertEqual([section["key"] for section in sections], ["sooner", "later"])
+        self.assertEqual(
+            sections[0]["items"],
+            [
+                {"label": "Linked", "url": "/somewhere/3/", "note": "a note", "locked": False},
+                {"label": "Locked", "url": "", "note": "", "locked": True},
+            ],
+        )
+
+    def test_a_broken_section_provider_does_not_break_the_panel(self):
+        with _provider(), _detail_provider(_exploding_detail_provider, _sections_provider):
+            sections = self._detail()["sections"]
+        self.assertEqual(len(sections), 2)
+
+    def test_the_viewer_reaches_both_seams(self):
+        with _provider(_capturing_overlay_provider), _detail_provider(_capturing_detail_provider):
+            self._detail(self.client2)
+        seen = dict(_SEEN)
+        self.assertEqual(web_character(self.account2), self.char2)
+        self.assertEqual(seen["overlay"]["room_ids"], [self.room1.id])
+        self.assertEqual(seen["overlay"]["viewer"], self.char2)
+        self.assertFalse(seen["overlay"]["staff"])
+        self.assertEqual(seen["detail"]["room_id"], self.room1.id)
+        self.assertEqual(seen["detail"]["room"], self.room1)
+        self.assertEqual(seen["detail"]["viewer"], self.char2)
+
+    def test_a_visitor_with_no_character_is_no_viewer(self):
+        self.account2.characters.remove(self.char2)
+        with _provider(_capturing_overlay_provider), _detail_provider(_capturing_detail_provider):
+            self._detail(self.client2)
+        self.assertIsNone(dict(_SEEN)["detail"]["viewer"])
+
+    def test_the_tile_feed_passes_the_viewer_too(self):
+        with _provider(_capturing_overlay_provider):
+            self.client2.get(f"{self.base}/planes/{self.plane.pk}/tiles/", format="json")
+        self.assertEqual(dict(_SEEN)["overlay"]["viewer"], self.char2)
+
+    def test_the_description_is_a_plain_text_excerpt(self):
+        self.room1.db.desc = "|rRed|n stone.\n\n" + "word " * 100
+        with _provider(), _detail_provider():
+            description = self._detail()["description"]
+        self.assertTrue(description.startswith("Red stone. word"))
+        self.assertNotIn("|r", description)
+        self.assertLessEqual(len(description), 280)
+
+    def test_cost_does_not_grow_with_the_plane(self):
+        url = self._url()
+        with _provider(_full_provider), _detail_provider(_sections_provider):
+            self.client.get(url, format="json")  # warm session/account lookups
+            with CaptureQueriesContext(connection) as small:
+                self.client.get(url, format="json")
+            for i in range(5):
+                placement.place_tile(_make_room(f"Panel room {i}"), self.plane, i + 1, 0)
+            with CaptureQueriesContext(connection) as large:
+                self.client.get(url, format="json")
+        self.assertEqual(len(small), len(large))

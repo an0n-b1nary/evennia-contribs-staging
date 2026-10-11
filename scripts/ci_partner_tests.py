@@ -212,6 +212,26 @@ class TestPartnerIntegration(EvenniaTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["results"][0]["present"], [])
 
+    def test_room_panel_gathers_real_partner_data(self):
+        """The room-detail route: real overlays, real sections, real links."""
+        self.client.force_login(self.account2)
+        response = self.client.get(
+            reverse("api-plane-tile-detail", kwargs={"pk": self.plane.pk, "room_id": self.room1.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()
+        self.assertEqual(detail["region"]["url"], f"/regions/{self.region.pk}/")
+        self.assertEqual(detail["active_scenes"][0]["id"], self.live.pk)
+        self.assertTrue(detail["active_scenes"][0]["url"])
+        self.assertEqual(detail["present"], [self.char1.key])
+        lore = next(section for section in detail["sections"] if section["key"] == "lore")
+        self.assertEqual(lore["items"][0]["label"], "Partner lore")
+        self.assertTrue(lore["items"][0]["locked"])
+        if settings.PARTNER_TEST_CALENDAR:
+            self.assertEqual(detail["upcoming_events"][0]["url"], f"/calendar/{self.event.pk}/")
+        else:
+            self.assertEqual(detail["upcoming_events"], [])
+
     def test_browsable_api_override_works_with_evennias_api_disabled(self):
         """Exercise the game-level override described in both install guides."""
         self.assertFalse(settings.REST_API_ENABLED)

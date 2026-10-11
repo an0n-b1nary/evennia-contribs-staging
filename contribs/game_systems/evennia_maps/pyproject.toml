@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-maps"
-version = "0.8.1"
+version = "0.9.0"
 description = "A 2D coordinate map of your game's rooms, auto-grown from canonical exits, for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,8 +22,9 @@ classifiers = [
 # Core: models, geometry, command, listeners, room mixin.
 # evennia-links is HARD: MapPlane inherits AbstractArchived, apps.py wires
 # terrain_changed through connect_on_ready, and the overlay seam merges
-# provider responses with collect_dicts().
-dependencies = ["evennia>=6.0", "evennia-links>=0.5"]
+# provider responses with collect_dicts(). 0.8 for web_character(), which
+# the live map's tile and room-panel routes pass to providers as the viewer.
+dependencies = ["evennia>=6.0", "evennia-links>=0.8"]
 
 [project.optional-dependencies]
 # [web] enables the website views (SVG + Leaflet) and the DRF API.

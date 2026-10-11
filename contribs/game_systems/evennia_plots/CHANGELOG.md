@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.0] - 2026-10-10
+
+- **Added:** a "Plots here" section in evennia-maps' room panel (0.9+): active
+  and concluded threads with a scene in the room, newest first, each noting its
+  arc. Needs evennia-scenes. Players count only scenes the web may show and never
+  see private threads; staff see private threads noted and unlinked.
+  `PLOTS_MAPS_APP_LABEL` names the map app.
+
 ## [0.5.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `plots` (threads, privacy,

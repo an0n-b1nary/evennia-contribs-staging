@@ -233,10 +233,19 @@ end-to-end proof, and it can only live here: no contrib's own suite installs
 the others.
 
 Who's here shows only on the live map, which requires a login: "N here" in the
-tooltip and room list, and the names in the popup. It honors `+unfindable`.
-Players never see unfindable or dark characters there; staff see them with a
-marker. Browser check: connect two characters to one room, set one
-`+unfindable`, and compare the live map as a player and as staff.
+tooltip and room list, and the names in the room panel. It honors `+unfindable`.
+Players don't see unfindable or dark characters there unless their own
+connected character is in the same room; staff see them with a marker. Browser
+check: connect two characters to one room, set one `+unfindable`, and compare
+the live map as a player in that room, a player elsewhere, and staff.
+
+Clicking a tile opens its **room panel**: beside the map on a wide screen, a
+bottom sheet on a phone. Market Row shows every section the sandbox has: lore
+tied to the Commons (what your character knows, linked, and the rest locked),
+The Founding Storm through its market-day scene, and the scrap its urban terrain
+yields. `world/sandbox/test_map_panel.py` checks each section from the real
+partners, including that learning an entry unlocks it and that gathering waits
+for `RP_RESOURCES_REVEALED`.
 
 ### Native website pages and client shell
 
@@ -1260,9 +1269,12 @@ Three mechanisms, for three different needs:
     event, the Archive shows the heaviest heat (three closed scenes against
     Market Row's one) and recent logs, three rooms show different hangout
     letters, and tiles are labelled `The Commons` *or* `The Waterfront` rather
-    than all the same. Click through a tile popup to the region, the scene log
-    and the event page. Then click the **portal marker** on Consulate Hall and
-    confirm it navigates to the `Consulate Interior` plane.
+    than all the same. Click a tile to open its room panel, and click through
+    to the region, the scene log and the event page. Open Market Row's panel
+    and check its lore, plot and gathering sections, then narrow the window
+    below 768px and confirm the panel becomes a bottom sheet that Escape
+    closes. Then click the **portal marker** on Consulate Hall and confirm it
+    navigates to the `Consulate Interior` plane.
 12. **Staff-room privacy and public lottery mode** — as the fresh account
     from step 4, confirm the Warren is absent from the map, from `/regions/`
     and from `+where`. Market Row still shows the Staff Briefing event for
