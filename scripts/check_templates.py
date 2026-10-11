@@ -48,7 +48,19 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", ".venv_sandbox", "ci_game"}
+SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    ".venv_sandbox",
+    "ci_game",
+    # Local, gitignored artifacts: setuptools build/ copies of contrib
+    # packages and disposable playtest hosts with their own virtualenvs.
+    "build",
+    ".playtest-runs",
+    ".downstream-runs",
+}
 
 # Libraries a contrib template may {% load %}. Only the importable ones are
 # installed, so a missing optional dependency degrades to "that {% load %}
@@ -491,14 +503,21 @@ def check_stylesheet(path: Path, source: str) -> list[str]:
     return errors
 
 
+def iter_source_files(root: Path, suffix: str):
+    """Walk source directories, pruning artifacts within this checkout only."""
+    for directory, subdirs, filenames in root.walk():
+        subdirs[:] = [name for name in subdirs if name not in SKIP_DIRS]
+        for name in filenames:
+            if name.endswith(suffix):
+                yield directory / name
+
+
 def iter_stylesheets(paths: list[str]) -> list[Path]:
     """Return the web contribs' .css files, from explicit paths or a full sweep."""
     if paths:
         found = [p for raw in paths if (p := Path(raw)).is_file() and p.suffix == ".css"]
     else:
-        found = [
-            p for p in (REPO_ROOT / "contribs").rglob("*.css") if SKIP_DIRS.isdisjoint(p.parts)
-        ]
+        found = iter_source_files(REPO_ROOT / "contribs", ".css")
     return sorted(p for p in found if is_web_contrib_template(p))
 
 
@@ -506,11 +525,7 @@ def iter_templates(paths: list[str]) -> list[Path]:
     """Return the .html files to check, from explicit paths or a full sweep."""
     if paths:
         return [p for raw in paths if (p := Path(raw)).is_file() and p.suffix == ".html"]
-    found = []
-    for path in REPO_ROOT.rglob("*.html"):
-        if SKIP_DIRS.isdisjoint(path.parts):
-            found.append(path)
-    return sorted(found)
+    return sorted(iter_source_files(REPO_ROOT, ".html"))
 
 
 def template_name(path: Path) -> str | None:
