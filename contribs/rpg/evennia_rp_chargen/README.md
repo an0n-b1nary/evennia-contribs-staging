@@ -368,3 +368,13 @@ doesn't fit the ruleset) and `E002` (a pip setting isn't a whole number).
 XP spending is available through the optional `evennia-xp>=0.2` ledger.
 Combat will add its abilities as catalog entries using
 new effect kinds, rather than defining an ability model of its own.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `character-sheet`. They
+explain the system to players in general terms, without exact numbers, and link
+only to pages this contrib or its required dependencies ship. With
+evennia-guides installed they appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.

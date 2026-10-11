@@ -7,7 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.3.1] - 2026-10-10
+
+- **Added:** a player guide page for evennia-guides, `character-sheet`
+  (drafting, pips, abilities and flaws, and build locks), in `guides/` and the
+  package data. It describes the system in general terms, without exact numbers,
+  and links only to pages this contrib or its required dependencies ship.
+  Without evennia-guides it's ignored.
 
 ## [0.3.0] - 2026-10-08
 
