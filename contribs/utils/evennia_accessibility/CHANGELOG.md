@@ -2,6 +2,14 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
+## [0.3.2] - 2026-10-10
+
+- **Added:** the shared `--evennia-color-*` theme tokens, documented in the
+  README with their defaults. The web contribs' stylesheets read them, and this
+  stylesheet's `--evennia-a11y-*` text, accent, danger and border colours now
+  default to them, so one host stylesheet rethemes every contrib page. Unset,
+  every colour is as before, in both colour schemes.
+
 ## [0.3.1] - 2026-10-10
 
 - **Added:** `_acting_as.html`, which names the character a form writes as

@@ -11,6 +11,13 @@
  * CSS custom properties under --evennia-a11y-* — override in your own
  * stylesheet to retheme. All have sensible fallbacks so the styles work
  * without any token configuration on the host site.
+ *
+ * The colour tokens default to the shared --evennia-color-* tokens the web
+ * contribs read (see the README), so a host that sets those on :root
+ * rethemes this stylesheet too, in both colour schemes. Unset, each keeps
+ * its own default.
+ * The focus ring has no shared counterpart: it stays high-contrast amber
+ * unless --evennia-a11y-color-focus-ring itself is set.
  */
 
 
@@ -19,10 +26,10 @@
    ========================================================= */
 
 :root {
-  --evennia-a11y-color-danger:       #c0392b;
-  --evennia-a11y-color-accent:       #3d5c7a;
-  --evennia-a11y-color-surface-alt:  #e8e6e0;
-  --evennia-a11y-color-text:         #212529;
+  --evennia-a11y-color-danger:       var(--evennia-color-danger-text, #c0392b);
+  --evennia-a11y-color-accent:       var(--evennia-color-accent, #3d5c7a);
+  --evennia-a11y-color-surface-alt:  var(--evennia-color-border, #e8e6e0);
+  --evennia-a11y-color-text:         var(--evennia-color-text, #212529);
   --evennia-a11y-color-focus-ring:   #ffb700;  /* high-contrast amber, never colour-only */
   --evennia-a11y-radius-sm: 0.2rem;
   --evennia-a11y-radius-md: 0.375rem;
@@ -35,10 +42,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --evennia-a11y-color-danger:       #e57373;
-    --evennia-a11y-color-accent:       #5a82a6;
-    --evennia-a11y-color-surface-alt:  #242628;
-    --evennia-a11y-color-text:         #e8e6e0;
+    --evennia-a11y-color-danger:       var(--evennia-color-danger-text, #e57373);
+    --evennia-a11y-color-accent:       var(--evennia-color-accent, #5a82a6);
+    --evennia-a11y-color-surface-alt:  var(--evennia-color-border, #242628);
+    --evennia-a11y-color-text:         var(--evennia-color-text, #e8e6e0);
     --evennia-a11y-color-focus-ring:   #ffb700;
   }
 }
