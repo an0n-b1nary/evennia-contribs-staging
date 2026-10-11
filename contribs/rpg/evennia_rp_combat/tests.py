@@ -754,6 +754,160 @@ class TestDomainResistance(SimpleTestCase):
         self.assertEqual(engine.participant(state, 2)["pressure"], 0)
 
 
+MEND = Move(kind="improvised", key="mend", name="Mend", action="assist", effects=("heal",))
+MEDICINE = {"medicine": "treat"}
+
+
+class TestRevival(SimpleTestCase):
+    def party(self, *, healer=None, boss=1, healer_boss=1):
+        state = duel(attacker=healer, boss=healer_boss)
+        engine.join(state, 3, "Ally", "one", build(), boss=boss)
+        ally = engine.participant(state, 3)
+        engine.harm(ally, ally["hp"])
+        return state, ally, engine.participant(state, 1)
+
+    def offer(self, state, targets=(3,), **kwargs):
+        ex_id = engine.declaration(
+            state, 1, list(targets), MEND, 50, domain_effects=MEDICINE, **kwargs
+        )
+        return f"{ex_id}:1"
+
+    def test_a_heal_offers_revival_and_recovery_follows_acceptance(self):
+        state, ally, healer = self.party()
+        token = self.offer(state)
+        self.assertEqual((ally["hp"], ally["incoming"], healer["reserves"]), (0, [token], 1))
+        # An offer waits for the incapacitated ally rather than being voided.
+        engine.settle(state)
+        self.assertEqual(ally["incoming"], [token])
+        engine.accept_revival(state, 3, token)
+        self.assertGreater(ally["hp"], 0)
+        self.assertNotIn("return_required", ally)
+        self.assertTrue(ally["recovering"])
+        self.assertEqual((healer["clock"], healer["outgoing"]), (1, None))
+        self.assertIn("vulnerable", healer["conditions"])
+        outcome = state["exchanges"][token.split(":")[0]]["outcomes"][0]
+        self.assertTrue(outcome["revived"])
+        # Until recovery they can neither act nor be targeted.
+        with self.assertRaisesRegex(CombatError, "recover"):
+            engine.declaration(state, 3, [2], Move(), 50)
+        with self.assertRaisesRegex(CombatError, "recover"):
+            engine.declaration(state, 2, [3], Move(), 50)
+        resources = {k: ally[k] for k in ("reserves", "spirit", "transcendence", "pressure")}
+        engine.recover(state, 3)
+        self.assertFalse(ally["recovering"])
+        self.assertEqual((ally["clock"], ally["turns"], ally["pose"]), (1, 1, True))
+        self.assertEqual({k: ally[k] for k in resources}, resources)
+        with self.assertRaisesRegex(CombatError, "Only a revived"):
+            engine.recover(state, 3)
+
+    def test_declining_or_retracting_refunds_and_leaves_them_down(self):
+        state, ally, healer = self.party()
+        engine.cancel(state, 3, self.offer(state))
+        self.assertEqual((ally["hp"], healer["reserves"], healer["outgoing"]), (0, 3, None))
+        self.offer(state)
+        engine.retract(state, 1)
+        self.assertEqual((ally["incoming"], healer["reserves"], healer["clock"]), ([], 3, 0))
+        self.assertTrue(ally["return_required"])
+        with self.assertRaisesRegex(CombatError, "no unaccepted revival"):
+            engine.retract(state, 1)
+
+    def test_a_standing_choice_to_accept_revives_at_once(self):
+        state, ally, _healer = self.party()
+        ally["revive"] = "accept"
+        self.offer(state)
+        self.assertGreater(ally["hp"], 0)
+        self.assertEqual(ally["incoming"], [])
+
+    def test_revival_needs_a_heal_one_ally_and_an_enrolled_present_participant(self):
+        state, _ally, _healer = self.party(healer_boss=2)
+        with self.assertRaisesRegex(CombatError, "incapacitated"):
+            engine.declaration(state, 1, [3], Move(action="assist"), 50)
+        engine.join(state, 4, "Fourth", "one", build())
+        with self.assertRaisesRegex(CombatError, "one incapacitated ally"):
+            self.offer(state, targets=(3, 4))
+        with self.assertRaisesRegex(CombatError, "Only a Heal reviving"):
+            self.offer(state, targets=(4,), waive=True)
+        engine.harm(engine.participant(state, 2), 100)
+        with self.assertRaisesRegex(CombatError, "Assist another ally"):
+            self.offer(state, targets=(2,))
+        engine.fade(state, 3, withdraw=True)
+        with self.assertRaisesRegex(CombatError, "withdrawn"):
+            self.offer(state)
+
+    def test_a_heal_that_restores_nothing_does_not_revive(self):
+        state, ally, healer = self.party()
+        ally["heals"] = 40
+        engine.accept_revival(state, 3, self.offer(state))
+        self.assertEqual((ally["hp"], ally["return_required"]), (0, True))
+        self.assertNotIn("recovering", ally)
+        self.assertEqual(healer["clock"], 1)
+
+    def test_poison_keeps_its_clock_and_ticks_once_at_recovery(self):
+        state, ally, _healer = self.party()
+        engine.condition(ally, "poisoned", 3, 2)
+        engine.accept_revival(state, 3, self.offer(state))
+        revived = ally["hp"]
+        engine.recover(state, 3)
+        self.assertEqual(ally["hp"], revived - 3)
+        self.assertEqual(ally["conditions"]["poisoned"]["expires"], 2)
+        # Strong enough Poison undoes a weak revival.
+        state, ally, _healer = self.party()
+        engine.condition(ally, "poisoned", 90, 2)
+        engine.accept_revival(state, 3, self.offer(state))
+        engine.recover(state, 3)
+        self.assertEqual(
+            (ally["hp"], ally["return_required"], ally["recovering"]), (0, True, False)
+        )
+
+    def test_recovery_spends_one_action_and_needs_a_turn_left(self):
+        state, ally, _healer = self.party(boss=3)
+        engine.accept_revival(state, 3, self.offer(state))
+        engine.recover(state, 3)
+        self.assertEqual((ally["actions_left"], ally["turns"]), (2, 0))
+        state, ally, _healer = self.party()
+        ally["turns"] = ally["turn_limit"]
+        engine.accept_revival(state, 3, self.offer(state))
+        self.assertGreater(ally["hp"], 0)
+        with self.assertRaisesRegex(CombatError, "Turn Limit is exhausted"):
+            engine.recover(state, 3)
+
+    def test_medicine_chooses_between_treating_and_waiving_recovery(self):
+        for waive in (True, False):
+            state, ally, healer = self.party(healer=expert("medicine"))
+            engine.condition(ally, "poisoned", 3, 2)
+            token = self.offer(state, domain="medicine", waive=waive)
+            self.assertEqual(healer["reserves"], 0)  # Heal 2 plus the surcharge
+            engine.accept_revival(state, 3, token)
+            self.assertEqual(ally["recovering"], not waive)
+            self.assertEqual("poisoned" in ally["conditions"], waive)
+            outcome = state["exchanges"][token.split(":")[0]]["outcomes"][0]
+            self.assertEqual(outcome.get("recovery_waived", False), waive)
+        state, ally, _healer = self.party()
+        with self.assertRaisesRegex(CombatError, "Medicine"):
+            self.offer(state, waive=True)
+
+    def test_revival_is_earned_healing_in_the_assessment(self):
+        state, ally, _healer = self.party()
+        token = self.offer(state)
+        before = F(engine.assessment(state)["one"])
+        exposure = ally["exposure"]
+        engine.accept_revival(state, 3, token)
+        self.assertEqual(F(engine.assessment(state)["one"]), before + F(ally["hp"], 200))
+        self.assertEqual(ally["exposure"], exposure)
+
+    def test_fade_and_rejoin_keep_incapacitation_and_recovery(self):
+        state, ally, _healer = self.party()
+        engine.fade(state, 3)
+        engine.join(state, 3, "Ally", "one", None)
+        self.assertEqual((ally["status"], ally["hp"], ally["return_required"]), ("active", 0, True))
+        engine.accept_revival(state, 3, self.offer(state))
+        engine.fade(state, 3)
+        engine.join(state, 3, "Ally", "one", None)
+        self.assertTrue(ally["recovering"])
+        with self.assertRaisesRegex(CombatError, "recover"):
+            engine.declaration(state, 3, [2], Move(), 50)
+
+
 class TestPolicies(SimpleTestCase):
     def test_capability_views_have_no_hidden_information(self):
         state = duel()
@@ -1282,12 +1436,43 @@ class TestCoordinator(EvenniaCommandTest):
         with self.assertRaisesRegex(CombatError, "return"):
             services.storyteller(self.char1, "vitality", target=self.char2, value=20)
         services.control(self.char2, "fade")
-        with self.assertRaisesRegex(CombatError, "return"):
-            services.join(self.char2, "two")
+        # Rejoining restores their place, still incapacitated, so an ally
+        # could offer a revival; it never brings them back by itself.
+        services.join(self.char2, "two")
+        with self.assertRaisesRegex(CombatError, "incapacitated"):
+            services.declare(self.char2, [self.char1])
         services.storyteller(self.char1, "requestreturn", target=self.char2, value=20)
         services.control(self.char2, "accept")
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         self.assertEqual((row["hp"], row["status"]), (20, "active"))
+
+    def test_revival_offers_are_answered_by_the_ally_and_recovery_is_announced(self):
+        ally = self.character("Ally", "one")
+        mend = {"key": "mend", "name": "Mend", "action": "assist", "effects": ["heal"]}
+
+        def incapacitate(state):
+            engine.harm(engine.participant(state, ally.pk), 100)
+
+        def row():
+            return services.state_for(ally)["participants"][str(ally.pk)]
+
+        services.execute(self.char1, "test injury", incapacitate)
+        services.declare(self.char1, [ally], "mend", action="assist", improvised=mend)
+        self.assertIn("Revival offer", services.render(ally))
+        self.call(CmdCombat(), "/decline", "", caller=ally)
+        self.assertEqual((row()["hp"], row()["incoming"]), (0, []))
+        services.declare(self.char1, [ally], "mend", action="assist", improvised=mend)
+        self.call(CmdCombat(), "/retract", "", caller=self.char1)
+        self.assertEqual(row()["incoming"], [])
+        self.call(CmdCombat(), "/revive accept", "", caller=ally)
+        services.declare(self.char1, [ally], "mend", action="assist", improvised=mend)
+        revived = row()
+        self.assertTrue(revived["hp"] > 0 and revived["recovering"])
+        self.assertIn("you are recovering", services.render(ally).lower())
+        self.call(CmdCombat(), "/recover", "", caller=ally)
+        self.assertFalse(row()["recovering"])
+        journal = services.journal(self.char1)
+        self.assertIn("recovery action", journal)
 
     def test_ignore_removal_is_explicit_account_wide_and_mutual(self):
         if not apps.is_installed("evennia_social"):

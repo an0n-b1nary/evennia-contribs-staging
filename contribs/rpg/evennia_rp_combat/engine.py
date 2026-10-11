@@ -66,6 +66,10 @@ def active(state, ident):
     row = participant(state, ident)
     if row["status"] != "active" or row["hp"] <= 0 or row.get("return_required"):
         raise CombatError("That participant is Faded, withdrawn or incapacitated.")
+    if row.get("recovering"):
+        raise CombatError(
+            f"{row['name']} is recovering: they take +combat/recover before anything else."
+        )
     if row["correction"]:
         raise CombatError("Relock the corrected build before combat progress.")
     if row.get("absent"):
@@ -93,7 +97,7 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
     key = str(ident)
     if key in state["participants"]:
         row = participant(state, key)
-        if row["hp"] <= 0 or row.get("return_required") or row["status"] == "withdrawn":
+        if row["status"] == "withdrawn":
             raise CombatError("A storyteller must request your return; accept it explicitly.")
         if row["status"] != "faded":
             raise CombatError("You already joined; withdrawn participants cannot rejoin.")
@@ -292,6 +296,7 @@ def settle(state):
                     token in row["incoming"]
                     and exchange is not None
                     and exchange["phase"] == "waiting"
+                    and not exchange.get("revival")
                     and row["id"] not in exchange["reactions"]
                 ):
                     attacker = participant(state, exchange["actor"])
@@ -315,8 +320,10 @@ def declaration(
     empower=False,
     domain="",
     domain_effects=None,
+    waive=False,
 ):
     progress(state)
+    domain_effects = domain_effects or {}
     actor = active(state, ident)
     if actor["incoming"]:
         raise CombatError("Resolve or cancel every incoming attack before acting.")
@@ -333,8 +340,14 @@ def declaration(
         raise CombatError("Burst is a single-target Attack or Spell exchange.")
     if bet not in math.RPS or (bet and move.action not in ("attack", "spell")):
         raise CombatError("RPS bets apply only to Attack or Spell.")
+    heals = move.action == "assist" and "heal" in move.effects
+    revival = heals and any(revivable(participant(state, t)) for t in targets)
+    if revival and len(targets) != 1:
+        raise CombatError("A revival Heal names one incapacitated ally.")
+    if waive and not revival:
+        raise CombatError("Only a Heal reviving an incapacitated ally can waive recovery.")
     for target_id in targets:
-        target = active(state, target_id)
+        target = participant(state, target_id) if revival else active(state, target_id)
         if (
             target_id == actor["id"]
             or (target["side"] == actor["side"] and move.action != "assist")
@@ -357,6 +370,8 @@ def declaration(
         raise CombatError("Equip the matching domain expertise before using its combat effect.")
     if chosen_domain and move.action not in DOMAIN_ACTIONS.get(domain_effects[chosen_domain], ()):
         raise CombatError("That domain effect does not apply to this action.")
+    if waive and domain_effects.get(chosen_domain) != "treat":
+        raise CombatError("Waiving recovery uses Medicine's Treat on the reviving Heal.")
     cost = move.cost + (1 if chosen_domain and chosen_domain != move.domain else 0)
     if actor["reserves"] < cost * len(targets):
         raise CombatError("Insufficient Reserves for every target.")
@@ -394,6 +409,8 @@ def declaration(
         "empower_used": False,
         "strain_cost": 5 if "strain" in move.effects else 0,
         "actor_conditions": {k: dict(v) for k, v in actor["conditions"].items()},
+        "revival": revival,
+        "waive_recovery": bool(waive),
     }
     actor["reserves"] -= cost * len(targets)
     actor["hp"] -= exchange["strain_cost"] * len(targets)
@@ -411,9 +428,85 @@ def declaration(
     if move.action in ("attack", "spell"):
         for target_id in targets:
             participant(state, target_id)["incoming"].append(f"{ex_id}:1")
+    elif revival:
+        # Returning is the ally's choice: the offer waits in their queue
+        # unless they already chose to accept revival from allies.
+        target = participant(state, targets[0])
+        target["incoming"].append(f"{ex_id}:1")
+        if target.get("revive") == "accept":
+            accept_revival(state, target["id"], f"{ex_id}:1")
     else:
         support_exchange(state, exchange)
     return ex_id
+
+
+def revivable(row):
+    """An enrolled ally at 0 Vitality who is present to accept a revival."""
+    return (
+        row["status"] == "active"
+        and row["hp"] <= 0
+        and not row["correction"]
+        and not row.get("absent")
+    )
+
+
+def accept_revival(state, ident, token):
+    """The incapacitated ally accepts a pending revival Heal; it resolves now."""
+    progress(state)
+    row = participant(state, ident)
+    exchange = get_exchange(state, token)
+    if not exchange.get("revival") or token not in row["incoming"]:
+        raise CombatError("No revival offer matches that token.")
+    if not revivable(row):
+        raise CombatError("Only a present, incapacitated participant can accept a revival.")
+    row["incoming"].remove(token)
+    support_exchange(state, exchange)
+
+
+def retract(state, ident):
+    """A healer withdraws an unaccepted revival offer, with a full refund."""
+    actor = participant(state, ident)
+    exchange = state["exchanges"].get(actor["outgoing"])
+    if exchange is None or not exchange.get("revival") or exchange["phase"] != "waiting":
+        raise CombatError("You have no unaccepted revival offer to withdraw.")
+    cancel(state, exchange["targets"][0], f"{exchange['id']}:{exchange['hit']}")
+
+
+def recover(state, ident):
+    """The revived participant's one action of recovery.
+
+    It advances the condition clock once, ticking Poison and expiring
+    conditions as any own action would, and spends one action of the
+    personal allowance. It grants no Reserves, Spirit, Transcendence or
+    Resist recovery, and has no outgoing packet.
+    """
+    progress(state)
+    row = participant(state, ident)
+    if not row.get("recovering"):
+        raise CombatError("Only a revived participant takes a recovery action.")
+    if row["status"] != "active" or row["hp"] <= 0:
+        raise CombatError("That participant is Faded, withdrawn or incapacitated.")
+    if row["correction"] or row.get("absent"):
+        raise CombatError("Relock your build and be present before recovering.")
+    if row["outgoing"] or row["pose"]:
+        raise CombatError(
+            "Finish your outgoing exchange and acknowledge its RP with +combat/posed."
+        )
+    if row["turns"] >= row["turn_limit"]:
+        raise CombatError(
+            "Your personal Turn Limit is exhausted, so you cannot recover in this fight."
+        )
+    row["recovering"] = False
+    row["clock"] += 1
+    if value(row, "poisoned"):
+        harm(row, value(row, "poisoned"))
+    row["conditions"] = {k: v for k, v in row["conditions"].items() if v["expires"] > row["clock"]}
+    row["actions_left"] -= 1
+    if row["actions_left"] <= 0:
+        row["turns"] += 1
+        row["actions_left"] = row["allowance"]
+    row["pose"] = not row["auto"]
+    settle(state)
 
 
 def get_exchange(state, token):
@@ -1008,6 +1101,11 @@ def support_exchange(state, exchange):
         if exchange["domain_effect"] == "beguile" and success and not resisted:
             change_spirit(actor, -actual_spirit)
         restored = heal(target, healing) if "heal" in move.effects else 0
+        revived = exchange.get("revival") and restored > 0
+        if revived:
+            # A zero-effective Heal leaves them incapacitated.
+            target.pop("return_required", None)
+            target["recovering"] = not exchange["waive_recovery"]
         actor["support_history"][key] = actor["clock"]
         exchange["outcomes"].append(
             {
@@ -1019,9 +1117,14 @@ def support_exchange(state, exchange):
                 "healing": restored,
             }
         )
+        if exchange.get("revival"):
+            exchange["outcomes"][-1]["revived"] = bool(revived)
         exchange["resolved"] += 1
         if exchange["domain"] and success and not exchange["domain_used"]:
-            if not apply_domain(
+            if exchange.get("waive_recovery"):
+                # Medicine's alternative: no cleansing, no recovery action.
+                exchange["outcomes"][-1]["recovery_waived"] = bool(revived)
+            elif not apply_domain(
                 state, actor, target, exchange["domain_effect"], exchange["domain"]
             ):
                 exchange["outcomes"][-1]["domain_resisted"] = True
