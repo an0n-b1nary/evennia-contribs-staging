@@ -139,6 +139,13 @@ class CmdMap(MuxCommand):
             y__gte=tile.y - radius,
             y__lte=tile.y + radius,
         )
+        from evennia_maps.permissions import filter_visible_tiles, is_plane_visible
+
+        staff = is_staff(self.caller)
+        if not is_plane_visible(tile.plane, viewer=self.caller, staff=staff):
+            self.caller.msg("You cannot preview this plane.")
+            return
+        tiles = filter_visible_tiles(tiles, staff=staff, viewer=self.caller)
         by_coord = {(t.x, t.y): t for t in tiles}
 
         xs = [c[0] for c in by_coord] or [tile.x]

@@ -54,6 +54,7 @@ class PendingPlane:
 
     zstack: str
     elevation: int
+    visibility_room_id: int | None = None
 
     @property
     def name(self):
@@ -92,7 +93,7 @@ def materialise_plane(plane):
     obj, _ = MapPlane.all_objects.get_or_create(
         zstack=plane.zstack,
         elevation=plane.elevation,
-        defaults={"name": plane.name},
+        defaults={"name": plane.name, "visibility_room_id": plane.visibility_room_id},
     )
     return obj
 
@@ -137,11 +138,16 @@ def resolve_stacked_plane(source_plane, d_elevation, *, create=True):
         existing = MapPlane.all_objects.filter(
             zstack=source_plane.zstack, elevation=target_elevation
         ).first()
-        return existing or PendingPlane(source_plane.zstack, target_elevation)
+        return existing or PendingPlane(
+            source_plane.zstack, target_elevation, source_plane.visibility_room_id
+        )
     plane, _ = MapPlane.all_objects.get_or_create(
         zstack=source_plane.zstack,
         elevation=target_elevation,
-        defaults={"name": f"{source_plane.zstack} ({target_elevation})"},
+        defaults={
+            "name": f"{source_plane.zstack} ({target_elevation})",
+            "visibility_room_id": source_plane.visibility_room_id,
+        },
     )
     return plane
 
@@ -281,7 +287,7 @@ def place_relative(source_room, exit_obj, *, actor=None):
     return place_tile(dest_room, materialise_plane(target_plane), target_x, target_y, actor=actor)
 
 
-def move_tile(room, x, y, *, plane=None, actor=None):
+def move_tile(room, x, y, *, plane=None, actor=None, notify=True):
     """
     Explicitly reposition a room's existing tile.
 
@@ -291,6 +297,8 @@ def move_tile(room, x, y, *, plane=None, actor=None):
         plane (MapPlane or None): new plane; defaults to the tile's
             current plane (a same-plane move).
         actor: ObjectDB/Character responsible, for signal payloads.
+        notify: send tile_placed immediately (default True). Transactional
+            batch callers may suppress it and schedule notifications on commit.
 
     Returns:
         RoomTile: the moved tile, or
@@ -317,7 +325,8 @@ def move_tile(room, x, y, *, plane=None, actor=None):
     tile.room_name = _room_label(room)
     tile.terrain = resolve_terrain(room)
     tile.save()
-    signals.tile_placed.send(sender=RoomTile, tile=tile, actor=actor, created=False)
+    if notify:
+        signals.tile_placed.send(sender=RoomTile, tile=tile, actor=actor, created=False)
     return tile
 
 
@@ -431,3 +440,26 @@ def apply_plan(plan, *, actor=None):
             written += 1
 
     return written
+
+
+@transaction.atomic
+def create_private_stack(entry_room, name, *, actor=None):
+    """Create a uniquely stacked draft plane, anchored to entry_room's privacy.
+
+    The caller sets the room's visibility flags/ACL before calling. This
+    service grants no editing or travel rights. Additional floors inherit
+    the same privacy anchor through resolve_stacked_plane().
+    """
+    from uuid import uuid4
+
+    if RoomTile.objects.filter(room=entry_room).exists():
+        raise ValueError("The entry room is already mapped")
+    plane = MapPlane.objects.create(
+        name=name,
+        zstack=f"private-{uuid4().hex}",
+        visibility_room=entry_room,
+        created_by=actor,
+        created_by_name=getattr(actor, "key", ""),
+    )
+    place_tile(entry_room, plane, 0, 0, actor=actor)
+    return plane

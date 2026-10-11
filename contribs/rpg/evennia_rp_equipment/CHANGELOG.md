@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Accept chargen 0.4 while retaining compatibility with chargen 0.3.
+
 ## [0.1.2] - 2026-10-09
 
 ### Added

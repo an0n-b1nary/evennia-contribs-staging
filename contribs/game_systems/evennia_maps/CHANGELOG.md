@@ -7,6 +7,47 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.10.0] - 2026-10-10
+
+- Added read-only cross-plane transplant previews, collision and adjacency
+  reports, elevation translation, stale-plan checks and atomic application.
+- Added privacy anchors on map planes and uniquely stacked private previews.
+  Auto-created floors inherit their anchor. Deleting the anchor removes its
+  map planes; existing unanchored planes retain their behavior.
+- Added optional viewer-aware room visibility across commands, SVG/live pages,
+  floor navigation, portal markers, API lists/details/tiles and bounds.
+  Legacy room-only callbacks remain supported. Web previews use the selected
+  character, including while disconnected in-game.
+- Room-panel details use the same selected-character visibility rule as tiles,
+  including private previews, and pass that viewer to partner providers.
+- Portal markers now recognize separate interior stacks as well as standalone
+  planes, while excluding ordinary floor transitions within a stack.
+
+## [0.9.0] - 2026-10-10
+
+- **Added:** a room panel on the live map, replacing the tile popup. Clicking a
+  tile, or its button in the room list, opens it beside the map, or as a bottom
+  sheet on a narrow screen. It shows the room's description excerpt, terrain,
+  region, who's here, live scenes, recent logs and upcoming events, then any
+  sections partner contribs add. It closes with its button or Escape, and focus
+  returns to the room-list button that opened it.
+- **Added:** the `planes/<id>/tiles/<room_id>/detail/` route (`api-plane-tile-detail`,
+  `MAPS_TILE_DETAIL_URL_NAME`) and the `collect_tile_detail` seam. Partners return
+  whole sections (title, order, summary, items); the map drops any section without
+  a title, any item without a label and any URL that isn't site-relative, keeps 25
+  items per section, and sets every string as text. The route 404s for a room
+  that isn't on the plane or is hidden from the caller. Without the route the
+  panel shows what the tile feed carries.
+- **Added:** the live map's tile feed and room panel pass `viewer`, the web
+  character from `evennia_links.characters.web_character()`, to
+  `collect_tile_overlays` providers. Requires evennia-links 0.8.
+- **Changed:** a game that overrides `plane_live_map.html` needs the new
+  `<aside id="evennia-maps-panel">` block for the panel; without it a tile opens
+  a plain popup naming the room.
+- The `map` guide page describes the panel.
+- **Fixed:** room-panel links reject backslashes and ASCII controls, which
+  browsers can otherwise normalize into an external destination.
+
 ## [0.8.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `map` (the in-game and web

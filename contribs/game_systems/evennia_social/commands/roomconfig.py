@@ -15,6 +15,7 @@ behind (see MIGRATION_NOTES.md).
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.rooms import can
 from evennia_social.social import is_staff
 from evennia_social.typeclasses import HANGOUT_TYPES
 
@@ -24,7 +25,7 @@ def _can_configure_room(character, room):
 
     Returns True for room owners (control access) and Builder+ staff.
     """
-    return room.access(character, "control") or is_staff(character)
+    return can(character, room, "configure") or is_staff(character)
 
 
 class CmdRoomConfig(MuxCommand):

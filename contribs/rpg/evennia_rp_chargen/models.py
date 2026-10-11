@@ -32,6 +32,71 @@ from evennia_links import AbstractArchived
 TEMPLATE_TAG = "@tag"
 
 
+class SignatureMove(models.Model):
+    """A durable, revisioned library move; its stable key is never reused."""
+
+    character = models.ForeignKey(
+        "objects.ObjectDB", on_delete=models.CASCADE, related_name="rp_signatures"
+    )
+    key = models.SlugField(max_length=64)
+    name = models.CharField(max_length=80)
+    action = models.CharField(
+        max_length=8,
+        choices=[(value, value.title()) for value in ("attack", "spell", "assist", "dispirit")],
+        default="attack",
+    )
+    wording = models.CharField(max_length=240, blank=True)
+    power = models.SmallIntegerField(default=2)
+    accuracy = models.SmallIntegerField(default=0)
+    element = models.SlugField(max_length=64, blank=True)
+    effects = models.JSONField(default=list, blank=True)
+    domain = models.SlugField(max_length=64, blank=True)
+    domain_mode = models.CharField(max_length=16, default="waive")
+    assist_stat = models.SlugField(max_length=64, blank=True)
+    equipped_order = models.PositiveSmallIntegerField(null=True, blank=True)
+    revision = models.PositiveIntegerField(default=1)
+    archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(fields=("character", "key"), name="rp_signature_owner_key"),
+        )
+        ordering = ("equipped_order", "name", "pk")
+
+    def definition(self):
+        return {
+            name: getattr(self, name)
+            for name in (
+                "action",
+                "wording",
+                "power",
+                "accuracy",
+                "element",
+                "effects",
+                "domain",
+                "domain_mode",
+                "assist_stat",
+            )
+        }
+
+    def snapshot(self):
+        return {"key": self.key, "name": self.name, "revision": self.revision, **self.definition()}
+
+    def clean(self):
+        from evennia_rp_chargen.moves import validate_definition
+        from evennia_rp_chargen.services import ChargenError
+
+        try:
+            validate_definition(self.definition())
+        except ChargenError as exc:
+            raise ValidationError(str(exc)) from None
+
+    def __str__(self):
+        return self.name
+
+
 class CharacterBuild(models.Model):
     """A character's sheet: its status and review trail.
 

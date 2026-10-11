@@ -22,7 +22,7 @@ classifiers = [
 # evennia-rp-chargen supplies the build that requirements are checked against,
 # its lock, and (from 0.3) the change guard that keeps worn gear's requirements
 # met. evennia-rp-rules supplies the ruleset that stat requirements name.
-dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-chargen>=0.3,<0.4"]
+dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-chargen>=0.3,<0.5"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

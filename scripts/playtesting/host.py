@@ -235,6 +235,18 @@ class Host:
         }
         text = "from server.conf.settings import *  # noqa: F403\n"
         text += "\n".join(f"{key} = {value!r}" for key, value in overrides.items()) + "\n"
+        # The Server and Django web worker both write on browser disconnect.
+        # A deferred read transaction cannot always upgrade its SQLite lock,
+        # regardless of timeout. Acquire the writer lock at transaction entry.
+        # These settings belong only to the disposable playtest host.
+        text += (
+            "\nfrom copy import deepcopy\n"
+            "DATABASES = deepcopy(DATABASES)\n"
+            "if DATABASES['default']['ENGINE'] == 'django.db.backends.sqlite3':\n"
+            "    DATABASES['default'].setdefault('OPTIONS', {}).update(\n"
+            "        timeout=20, transaction_mode='IMMEDIATE'\n"
+            "    )\n"
+        )
         (self.game / "server/conf/playtest_settings.py").write_text(text, encoding="utf-8")
 
     def discover(self):

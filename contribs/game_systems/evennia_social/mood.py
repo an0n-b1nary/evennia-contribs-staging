@@ -23,6 +23,7 @@ only owners and staff can set a mood.
 from django.apps import apps
 from django.conf import settings
 
+from evennia_links.rooms import can
 from evennia_social.social import is_staff
 
 #: Longest mood accepted, in characters. A mood is one line of atmosphere,
@@ -59,7 +60,7 @@ def live_scene(room):
 
 def can_set_mood(character, room):
     """True if *character* may set or clear *room*'s mood. See module docstring."""
-    if room.access(character, "control") or is_staff(character):
+    if can(character, room, "configure") or is_staff(character):
         return True
     scene = live_scene(room)
     if scene is None:

@@ -234,10 +234,14 @@ different label.
 
 The map follows the table above. Players see only findable characters, in
 both the names and the "N here" count. Staff see everyone, with the
-`(unfindable)` / `(dark)` marker. The map has no in-game viewer, so standing in
-the same room doesn't reveal anyone there. Names appear only on the live map,
-which requires a login, never on the public SVG map. The provider makes one
-pass over live sessions per render, with no query per tile.
+`(unfindable)` / `(dark)` marker. From evennia-maps 0.9 the live map passes
+the viewer, the character the visitor plays on the website, and the same-room
+rule applies too: if that character is connected and standing in the room, the
+names and count there include unfindable characters, as `look` would. A
+character that isn't connected in-game doesn't count as being there, even if
+your game leaves offline characters in rooms. Names appear only on the live
+map, which requires a login, never on the public SVG map. The provider makes
+one pass over live sessions per render, with no query per tile.
 
 ## The severed `+ooc` scene-log coupling
 
@@ -295,3 +299,11 @@ owns its visibility policy. Missing or failing providers are logged and skipped.
 For gathering leans, install resources and add
 `"evennia_rp_resources.profile.gathering_field"`. Leave the list empty when no
 extra fields are needed; social acquires no new dependencies.
+
+
+Room-owner rights in `+roomconfig` and `+mood` use
+`evennia_links.rooms.can(character, room, "configure")`. Without a provider this
+is the existing control-lock check. A configured provider can grant rights to
+owners/residents/stewards without granting general Evennia control. Staff and
+mood's scene-host/participant permissions remain independent. See Links' room
+provider settings; Social never imports an ownership package.

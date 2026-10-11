@@ -10,7 +10,7 @@ policy.
 Settings:
     REGIONS_STAFF_LOCK — lock string for create/edit/membership operations
         (default "cmd:perm(Builder)").
-    REGIONS_ROOM_VISIBILITY — dotted path to a callable(room) -> bool for
+    REGIONS_ROOM_VISIBILITY — dotted path to a callable(room[, viewer]) -> bool for
         games whose room-hiding rules differ from the default. Without an
         override, a room is web-visible unless it is flagged ``room_type
         == "staff"`` or ``allow_teleport == "secret"``.
@@ -25,6 +25,7 @@ from django.conf import settings
 
 from evennia_links import is_staff_user as is_staff_user
 from evennia_links import resolve_dotted
+from evennia_links.visibility import call_room_visibility
 
 _log = logging.getLogger("evennia")
 
@@ -83,10 +84,10 @@ def _default_room_visible(room) -> bool:
     return "staff" not in room_types and "secret" not in teleport_settings
 
 
-def is_room_web_visible(room) -> bool:
+def is_room_web_visible(room, viewer=None) -> bool:
     """Return True if *room* may be named or located on a public web page.
 
-    When REGIONS_ROOM_VISIBILITY names a ``callable(room) -> bool``, that
+    When REGIONS_ROOM_VISIBILITY names a ``callable(room[, viewer]) -> bool``, that
     callable is the whole answer. Otherwise a room is visible unless it is
     flagged ``room_type == "staff"`` or ``allow_teleport == "secret"``.
 
@@ -124,7 +125,7 @@ def is_room_web_visible(room) -> bool:
         return False
 
     try:
-        return bool(override(room))
+        return call_room_visibility(override, room, viewer)
     except Exception:
         _log.exception(
             "evennia_regions: REGIONS_ROOM_VISIBILITY=%r raised for room %r; treating as hidden",

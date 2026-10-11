@@ -9,11 +9,16 @@ presence. Install both contribs and the live map shows who's here; uninstall
 either and the map renders without it.
 
 A web map is a remote presence surface, so it follows ``+where``: a character
-appears only if they are findable (``evennia_social.presence``). The map has
-no in-game viewer standing in a room, so for players the rule is
-``is_publicly_findable``, and unfindable or dark characters are left out of
-both the names and the count. Staff renders list everyone, with the same
-" (unfindable)" / " (dark)" marker ``+where`` shows staff.
+appears only if they are findable (``evennia_social.presence``). The live map
+passes the viewer, the character the visitor is playing on the website, and
+the rule is ``is_findable(character, viewer)``: someone unfindable still
+shows to a viewer who is connected and standing in the same room in-game, as
+they would through ``look``. With no viewer, or one not connected in-game
+(the public SVG map, a visitor with no character or browsing offline, or an
+older evennia-maps), the rule is ``is_publicly_findable``, and
+unfindable or dark characters are left out of both the names and the count.
+Staff renders list everyone, with the same " (unfindable)" / " (dark)"
+marker ``+where`` shows staff.
 
 Overlay key
 -----------
@@ -26,7 +31,7 @@ installed.
 """
 
 
-def provide(sender, room_ids, staff, **kwargs):
+def provide(sender, room_ids, staff, viewer=None, **kwargs):
     """
     ``collect_tile_overlays`` receiver: see the module docstring for the key.
 
@@ -46,6 +51,12 @@ def provide(sender, room_ids, staff, **kwargs):
     from evennia_social import presence
     from evennia_social.social import get_connected_characters
 
+    # The same-room exception is for someone who is there. Evennia moves a
+    # character out of the world when it goes offline, but a game may leave
+    # offline characters standing in rooms; browsing the website as one of
+    # those is not being there.
+    if viewer is not None and not viewer.sessions.count():
+        viewer = None
     present = {}
     seen = set()
     for character in get_connected_characters():
@@ -58,7 +69,8 @@ def provide(sender, room_ids, staff, **kwargs):
             continue
         if staff:
             name = character.key + presence.staff_marker(character)
-        elif presence.is_publicly_findable(character):
+        elif presence.is_findable(character, viewer):
+            # With no viewer this is is_publicly_findable.
             name = character.key
         else:
             continue

@@ -27,11 +27,11 @@ class TestWhosHereOverlay(SocialTestCase):
             SocialTestCharacter, key="Ashwren", location=self.room2, home=self.room2
         )
 
-    def _provide(self, connected, *, staff=False, room_ids=None):
+    def _provide(self, connected, *, staff=False, room_ids=None, **kwargs):
         if room_ids is None:
             room_ids = [self.room1.pk, self.room2.pk]
         with patch(_CONNECTED, return_value=list(connected)):
-            return provide(sender=None, room_ids=room_ids, staff=staff)
+            return provide(sender=None, room_ids=room_ids, staff=staff, **kwargs)
 
     def test_connected_characters_by_room_sorted(self):
         overlay = self._provide([self.char2, self.char1, self.char3])
@@ -66,6 +66,35 @@ class TestWhosHereOverlay(SocialTestCase):
     def test_several_sessions_count_once(self):
         overlay = self._provide([self.char3, self.char3])
         self.assertEqual(overlay["present"][self.room2.pk], ["Ashwren"])
+
+    def _connected(self, character):
+        """Pretend *character* has a live session, as a player in-game would."""
+        return patch.object(character.sessions, "count", return_value=1)
+
+    def test_a_connected_viewer_in_the_same_room_sees_the_unfindable(self):
+        """Unfindable hides you from afar, not from someone standing there."""
+        presence.set_visibility(self.char2, presence.UNFINDABLE)
+        self.char3.location = self.room1
+        with self._connected(self.char3):
+            overlay = self._provide([self.char2, self.char3], viewer=self.char3)
+        self.assertEqual(
+            overlay["present"][self.room1.pk], sorted([self.char2.key, self.char3.key])
+        )
+
+    def test_a_viewer_elsewhere_does_not(self):
+        presence.set_visibility(self.char2, presence.UNFINDABLE)
+        presence.set_visibility(self.char1, presence.DARK)
+        with self._connected(self.char3):
+            overlay = self._provide([self.char1, self.char2, self.char3], viewer=self.char3)
+        self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})
+
+    def test_an_offline_viewer_left_standing_in_the_room_does_not(self):
+        # Evennia moves an offline character out of the world, but a game may
+        # leave it in place; browsing the website as it is not being there.
+        presence.set_visibility(self.char2, presence.UNFINDABLE)
+        self.char3.location = self.room1
+        overlay = self._provide([self.char2], viewer=self.char3)
+        self.assertEqual(overlay, {})
 
     def test_nobody_to_show_answers_nothing(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)

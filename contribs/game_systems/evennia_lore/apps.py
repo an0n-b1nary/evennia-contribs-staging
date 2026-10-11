@@ -99,8 +99,15 @@ class LoreConfig(AppConfig):
             # own README documents for providers, and it keeps a reloaded
             # module from registering the receiver twice.
             from evennia_lore.integrations import maps as maps_overlays
-            from evennia_maps.signals import collect_tile_overlays
+            from evennia_maps import signals as maps_signals
 
-            collect_tile_overlays.connect(
+            maps_signals.collect_tile_overlays.connect(
                 maps_overlays.provide, dispatch_uid="evennia_lore.tile_overlays"
             )
+            # The room panel's seam arrived in evennia-maps 0.9; an older map
+            # simply has no panel to fill.
+            collect_tile_detail = getattr(maps_signals, "collect_tile_detail", None)
+            if collect_tile_detail is not None:
+                collect_tile_detail.connect(
+                    maps_overlays.provide_detail, dispatch_uid="evennia_lore.tile_detail"
+                )

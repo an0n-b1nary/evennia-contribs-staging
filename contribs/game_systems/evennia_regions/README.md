@@ -255,3 +255,14 @@ they're ignored. To restate one for your game, add a page with the same key to
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+
+### Viewer-aware private room previews
+
+`REGIONS_ROOM_VISIBILITY` may be `(room, viewer) -> bool`, with positional or
+keyword-only `viewer`. Original `(room) -> bool` callbacks keep working. The
+viewer is the website's selected character (including offline characters), or
+`None` for anonymous visits. Member-room lists and room detail use the same
+rule; uncertain answers hide the room. Staff retain their existing override.
+When maps is installed, room-detail map links also honor its plane privacy
+anchor. Set both contribs' visibility settings to the same callback.

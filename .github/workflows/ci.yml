@@ -365,6 +365,8 @@ jobs:
         run: |
           python scripts/playtest.py run --suite rp < /dev/null
           python scripts/playtest.py run --suite rp < /dev/null
+      - name: Combat consent, reload and ordinary-player commands
+        run: python scripts/playtest.py run --suite combat --profile normal --no-browser < /dev/null
       - name: Persistent exploratory JSONL session
         run: python scripts/test_playtest_interactive.py < /dev/null
       - name: Sanitized live evidence
@@ -376,3 +378,32 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
+
+
+  combat-independent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install combat with only its hard partners
+        run: |
+          pip install evennia==6.0.0
+          pip install -e contribs/base_systems/evennia_links
+          pip install -e contribs/rpg/evennia_rp_rules
+          pip install -e contribs/rpg/evennia_rp_combat
+          evennia --init ci_game < /dev/null
+          printf "\nINSTALLED_APPS += ['evennia_links', 'evennia_rp_rules', 'evennia_rp_combat']\n" >> ci_game/server/conf/settings.py
+      - name: Independent combat with verified physical absence
+        run: >-
+          python scripts/ci_run_combat_tests.py ci_game
+          --absent evennia_rp_chargen --absent evennia_npcs
+          --absent evennia_scenes --absent evennia_posing
+          --absent evennia_social --absent evennia_accessibility
+      - name: Add real NPCs without sheets, Scenes or posing
+        run: |
+          pip install -e contribs/game_systems/evennia_npcs
+          printf "\nINSTALLED_APPS += ['evennia_npcs']\n" >> ci_game/server/conf/settings.py
+          python scripts/ci_run_combat_tests.py ci_game --absent evennia_rp_chargen --absent evennia_scenes --absent evennia_posing --absent evennia_social --absent evennia_accessibility

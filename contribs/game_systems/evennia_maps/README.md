@@ -25,8 +25,9 @@ reconciling drift (`+map/check`, `+map/reflow`).
 | Exit-creation listener | Auto-places a newly-dug exit's destination when its source room is already mapped |
 | `MapsRoomMixin` | Optional Room mixin providing `terrain_tags`/`set_terrain()`/`has_terrain()`, keeping a placed tile's terrain snapshot in sync |
 | Website views | `/map/` plane list, `/map/<pk>/` static SVG grid, `/map/<pk>/live/` interactive Leaflet map |
-| REST API | `PlaneViewSet` (`planes/`, `planes/<id>/tiles/`) — the tile feed the live map reads |
+| REST API | `PlaneViewSet` (`planes/`, `planes/<id>/tiles/`, `planes/<id>/tiles/<room_id>/detail/`) — the tile feed and room panel the live map reads |
 | `collect_tile_overlays` | The signal seam other contribs light map overlays through, with no import in either direction |
+| `collect_tile_detail` | The seam other contribs add sections to the live map's room panel through |
 
 ---
 
@@ -94,6 +95,7 @@ doesn't matter — `MapsRoomMixin` doesn't override `msg()` or any hook they tou
 | `MAPS_ROOM_VISIBILITY` | unset | Dotted path to a `callable(room) -> bool` replacing the default room-hiding rule. **Fails closed** — see below |
 | `MAPS_OVERLAY_URL_NAMES` | see below | Route names the map links out to, merged over the defaults |
 | `MAPS_TILES_URL_NAME` | `"api-plane-tiles"` | Route name of the tile feed. Set to `""` to turn the live map off |
+| `MAPS_TILE_DETAIL_URL_NAME` | `"api-plane-tile-detail"` | Route name of the room panel's detail route. Set to `""` and the panel shows only what the tile feed carries |
 
 ---
 
@@ -163,6 +165,7 @@ rather than an empty canvas when it does not resolve.
 | `/map/<pk>/live/` | `evennia_maps:plane-live-map` | Leaflet map with elevation and overlay controls |
 | `/api/v1/planes/` | `api-plane-list` | Plane list, with a visible-tile bounding box |
 | `/api/v1/planes/<id>/tiles/` | `api-plane-tiles` | Paginated tile feed |
+| `/api/v1/planes/<id>/tiles/<room_id>/detail/` | `api-plane-tile-detail` | One room's panel, for the requesting viewer. See [The room panel](#the-room-panel) |
 
 The API viewsets carry their own authentication, permission, pagination and filter
 classes, so they do not depend on your project's global `REST_FRAMEWORK` settings.
@@ -196,7 +199,7 @@ Both maps show a terrain key for the terrains present on the plane. The live map
 a hover highlight that keeps the terrain's hue, a tooltip with the room, terrain,
 region and activity badges ("Scene now", "Event soon", "Lore here", hangout type),
 and a **Room list** button beneath the map. The list shows every visible room grouped
-by region, each a button that opens the tile's popup, which is the keyboard and
+by region, each a button that opens the room's panel, which is the keyboard and
 screen-reader route to everything the map shows.
 
 ### Browsable API with Evennia's API disabled
@@ -285,19 +288,24 @@ rules.
 |---|---|---|
 | `primary_region` | `evennia-regions` | Tile label and link to the region page |
 | `has_active_scene` | `evennia-scenes` | Highlighted tile border |
-| `active_scenes` | `evennia-scenes` | Live log links in the popup and static map |
+| `active_scenes` | `evennia-scenes` | Live log links in the room panel and static map |
 | `recent_scene_count` | `evennia-scenes` | Activity heatmap layer |
-| `recent_scenes` | `evennia-scenes` | Log links in the tile popup |
+| `recent_scenes` | `evennia-scenes` | Log links in the room panel |
 | `has_lore` | `evennia-lore` | Lore pin layer |
-| `upcoming_events` | `evennia-calendar` | Event links in the tile popup |
-| `present` | `evennia-social` | "N here" in the tooltip and names in the popup (live map only) |
+| `upcoming_events` | `evennia-calendar` | Event links in the room panel |
+| `present` | `evennia-social` | "N here" in the tooltip and names in the room panel (live map only) |
 | `hangout_type` | *(read locally)* | Hangout marker layer |
 
+The live map also sends `viewer`: the character the visitor is playing on the
+website (`evennia_links.characters.web_character`), or `None`. The SVG map never
+sends one. Providers that don't need it ignore it through `**kwargs`.
+
 `present` lists the connected characters in a room. The provider has already applied
-its presence rule (players see only characters who are findable, staff see everyone
-with a marker), so the map shows what it's given. It appears only on the live map,
-whose tile API requires a login. The SVG map can be served to logged-out visitors, so
-it never shows who is where.
+its presence rule (players see only characters who are findable, or who are in the
+same room as the viewer's connected character; staff see everyone with a marker), so
+the map shows what it's given. It appears only on the live map, whose tile API
+requires a login. The SVG map can be served to logged-out visitors, so it never shows
+who is where.
 
 `hangout_type` is the exception: a bare room attribute with no table and no privacy
 rule, read duck-typed exactly as `terrain_tags` is. It happens to be an
@@ -351,6 +359,79 @@ error anywhere to explain it. If you want the links, mount the pages.
 
 ---
 
+## The room panel
+
+Clicking a tile on the live map, or its button in the room list, opens a panel for that
+room: beside the map on a wide screen, a bottom sheet on a narrow one. It closes with
+its button or Escape, and focus goes back to the room-list button that opened it.
+
+The tile feed stays small, enough for tooltips and pins. The panel asks the detail
+route about **one room**, which is where content that depends on who is looking can
+live. The route 404s for a room that isn't on the plane or that the caller may not see,
+using the same visibility rule as the tiles.
+
+The panel has two sources:
+
+- **Overlays, for one room.** The route collects `collect_tile_overlays` for the one
+  room, with the viewer, and shows the room's description excerpt, terrain, region,
+  who's here, live scenes, recent logs and upcoming events, each linked where the
+  partner's pages are mounted.
+- **Sections, from `collect_tile_detail`.** A partner returns whole blocks the map
+  renders without knowing what they mean, so a new partner adds one without a maps
+  release.
+
+```python
+# yourcontrib/integrations/maps.py
+def provide_detail(sender, room_id, room, staff, viewer=None, **kwargs):
+    return {
+        "yours": {
+            "title": "Notices",                # required
+            "order": 70,                       # lower sorts first; default 100
+            "summary": "Two notices here.",    # optional line under the title
+            "items": [                         # optional
+                {"label": "Gate closed", "url": "/notices/4/", "note": "until dusk"},
+                {"label": "Sealed order", "locked": True},
+            ],
+        }
+    }
+```
+
+Connect it the same way as an overlay provider, and look the signal up with `getattr`
+so your contrib still loads beside an evennia-maps older than 0.9:
+
+```python
+from evennia_maps import signals as maps_signals
+
+collect_tile_detail = getattr(maps_signals, "collect_tile_detail", None)
+if collect_tile_detail is not None:
+    collect_tile_detail.connect(maps_detail.provide_detail, dispatch_uid="yourcontrib.tile_detail")
+```
+
+The map validates sections rather than trusting them:
+
+- a section without a title, or an item without a label, is dropped;
+- a URL that isn't a site-relative path (`/...`) is dropped;
+- each section keeps at most 25 items;
+- every string is set as text, never as markup.
+
+As with overlays, a provider that raises is logged and skipped, and its privacy rule
+is its own. One collect costs the same however big the plane is.
+
+Shipped sections, in display order:
+
+| Section | Provided by | Shows |
+|---|---|---|
+| `lore` (40) | `evennia-lore` | Entries tied to the room's region; the ones the viewer's character knows are linked, public ones it doesn't are listed locked, restricted ones it doesn't are only counted |
+| `plots` (50) | `evennia-plots` | Plot threads with a scene in this room, under scenes' and plots' privacy rules |
+| `resources` (60) | `evennia-rp-resources` | What gathering in this terrain can turn up, once resources are revealed |
+
+Without the detail route (`MAPS_TILE_DETAIL_URL_NAME = ""`), or if the request fails,
+the panel shows what the tile feed already carries and no sections. A game template
+from before the panel, with no `<aside id="evennia-maps-panel">`, gets a plain popup
+naming the room.
+
+---
+
 ## A worked example
 
 `example_game/` in this repo is the reference wiring, and the only place the whole seam
@@ -364,6 +445,7 @@ can be shown working: it installs this contrib together with `evennia-regions`,
 | `MapsRoomMixin` on the game's Room typeclass | `typeclasses/rooms.py` |
 | A seeded plane: one hand-placed origin tile, five more derived by `layout.plan()` | `world/sandbox/management/commands/seed_sandbox.py` |
 | Proof that one collect returns all eight overlay keys, from five different contribs | `world/sandbox/tests.py::TestMapOverlaySeam` |
+| The room panel for a seeded room, with lore, plots and resources sections from real partners | `world/sandbox/test_map_panel.py` |
 
 That last one cannot live in this contrib's own suite, which has no partner contribs to
 install — its overlay tests connect fakes instead, and deliberately detach whatever the
@@ -418,3 +500,72 @@ one for your game, add a page with the same key to `GUIDES_DIRS`.
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+
+## Private previews and cross-plane transplants
+
+`MAPS_ROOM_VISIBILITY` also accepts `(room, viewer) -> bool` (including a
+keyword-only `viewer`); the original `(room) -> bool` form remains supported.
+The viewer is the selected character on web requests, the caller in-game,
+and `None` for anonymous/public rendering. Errors hide the room. Staff keep
+the existing command/web staff override; the callback need not implement it.
+If regions is installed, set `REGIONS_ROOM_VISIBILITY` to the same callback.
+
+`MapPlane.visibility_room` optionally anchors **plane access** to a room's
+visibility. This guards names, direct URLs, empty planes, floor lists, portal
+markers and API metadata before tiles are filtered. Existing planes with no
+anchor keep their existing behavior. Deleting an anchor cascades to its planes
+and map tiles, so an orphaned draft cannot become public accidentally; other
+rooms are not deleted. Access to a plane never implies permission to edit it.
+
+```python
+from evennia_maps.placement import create_private_stack
+
+# First set entry_room's privacy flags/ACL in your project's service.
+plane = create_private_stack(entry_room, "A private draft", actor=proposer)
+```
+
+Each stack has a unique label and supports vertical layout. Floors created by
+`resolve_stacked_plane` or auto-placement inherit the privacy anchor. Room
+visibility still applies separately, so private floor rooms also need your
+project's flags/ACL. After approval, the project service changes those rules
+deliberately. Keep the entry anchor on an interior stack so portal markers
+continue to recognize it after promotion.
+
+```python
+from evennia_maps.transplant import plan_transplant, apply_transplant
+
+preview = plan_transplant(
+    frontier_rooms, entry_room=entry, anchor_room=anchor, direction_name="north"
+)
+# preview.moves: room, target plane (possibly PendingPlane), x, y
+# preview.conflicts: blockers; preview.adjacency: unconnected room pairs
+if not preview.conflicts:
+    apply_transplant(preview, actor=reviewer)
+```
+
+The planner is read-only, including missing destination floors. It translates
+only the explicit room set, preserves relative coordinates/elevations, checks
+internal compass geometry, and reports pins, collisions, occupied attachment
+directions and archived planes. A standalone target cannot accept multiple
+floors. Adjacency includes configured compass/vertical neighbors, excludes
+already connected pairs and the intended entry/anchor connection, and warns
+without blocking. Source and target coordinate spaces must differ.
+
+Application re-plans under a transaction and rejects changed source tiles,
+anchor coordinates, target occupancy/floors, pins or relevant exits. Every
+selected tile moves or none does; tile primary keys survive. Destination floor
+creation rolls back with the move, and tile notifications run after commit
+(and disappear on an outer rollback). Catch `ValidationError` for conflicts
+or stale previews and `IntegrityError` for concurrent cell claims, then request
+a fresh preview. Database row locks serialize cooperating writers where
+supported. Signals do not promise durable external delivery.
+
+These are trusted service helpers: callers must authorize their actor, choose
+and freeze the submitted room set, and handle project review. They create no
+attaching exits, rooms, ownership or Jobs decisions. Construction commands and
+project lifecycle belong to the consuming building package.
+
+The plan is a full geometry report for trusted callers. A player-facing build
+check must redact hidden neighbor identities before rendering it. The sandbox
+report is Builder-only.

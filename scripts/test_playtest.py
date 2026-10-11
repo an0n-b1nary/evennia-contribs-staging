@@ -4,6 +4,7 @@ import errno
 import io
 import json
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -133,6 +134,71 @@ class ProtocolTests(unittest.TestCase):
 
 
 class HostTests(unittest.TestCase):
+    def test_sqlite_web_and_server_writers_do_not_deadlock_after_reading(self):
+        # The browser and Server can both read before writing during logout.
+        # Deferred transactions then fail immediately when upgrading a lock,
+        # even with a busy timeout. Exercise the generated host settings.
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
+            host = Host.__new__(Host)
+            host.game = Path(directory)
+            host.run_id, host.profile = "contention-test", "deterministic"
+            host.ports = dict.fromkeys(("telnet", "http", "internal", "websocket", "amp"), 1234)
+            (host.game / "server/conf").mkdir(parents=True)
+            host.write_settings()
+            database = host.game / "test.db3"
+            baseline = {
+                "default": {
+                    "ENGINE": "django.db.backends.sqlite3",
+                    "NAME": str(database),
+                    "OPTIONS": {},
+                }
+            }
+            namespace = {"DATABASES": baseline}
+            path = host.game / "server/conf/playtest_settings.py"
+            # Supply the scaffold's DATABASES without importing game settings.
+            exec(compile(path.read_text().partition("\n")[2], str(path), "exec"), namespace)
+            options = namespace["DATABASES"]["default"]["OPTIONS"]
+            begin = "BEGIN " + options.get("transaction_mode", "DEFERRED")
+            connection = sqlite3.connect(database, timeout=1, isolation_level=None)
+            self.addCleanup(connection.close)
+            connection.execute("CREATE TABLE counter (value INTEGER)")
+            connection.execute("INSERT INTO counter VALUES (0)")
+            connection.execute(begin)
+            connection.execute("SELECT value FROM counter").fetchone()
+            started, read = threading.Event(), threading.Event()
+            errors = []
+
+            def web_writer():
+                other = sqlite3.connect(database, timeout=2, isolation_level=None)
+                try:
+                    started.set()
+                    other.execute(begin)
+                    other.execute("SELECT value FROM counter").fetchone()
+                    read.set()
+                    other.execute("UPDATE counter SET value=value+1")
+                    other.commit()
+                except sqlite3.OperationalError as error:
+                    errors.append(error)
+                finally:
+                    other.close()
+
+            worker = threading.Thread(target=web_writer)
+            worker.start()
+            try:
+                self.assertTrue(started.wait(2))
+                read.wait(0.1)
+                connection.execute("UPDATE counter SET value=value+1")
+                connection.commit()
+            finally:
+                connection.rollback()
+                worker.join(3)
+                value = connection.execute("SELECT value FROM counter").fetchone()
+                connection.close()
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(value, (2,))
+            self.assertEqual(baseline["default"]["OPTIONS"], {})
+
     def test_host_constructor_failure_has_environment_exit_code(self):
         args = SimpleNamespace(startup_timeout=1, action_timeout=1, shutdown_timeout=1)
         with (

@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0] - 2026-10-10
+
+- Added optional viewer-aware room visibility to member lists and room detail.
+  Web requests pass their selected character; legacy callbacks remain valid
+  and errors still hide rooms. Room map links honor map-plane privacy when
+  the maps partner is installed.
+
 ## [0.4.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `regions` (regions, primary

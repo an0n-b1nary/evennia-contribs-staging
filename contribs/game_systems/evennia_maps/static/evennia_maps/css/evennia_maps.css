@@ -203,19 +203,134 @@
   font-size: 0.9rem;
 }
 
-.evennia-maps-popup h3 {
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
+/* ---------------------------------------------------------------
+   Room panel: beside the map on wide screens, a bottom sheet on
+   narrow ones. It is page content, so it reads the shared page tokens
+   rather than the map palette.
+   --------------------------------------------------------------- */
+
+.evennia-maps-panel {
+  padding: 0.75rem 1rem;
+  background: var(--evennia-color-surface, #ffffff);
+  color: var(--evennia-color-text, #212529);
+  border: 1px solid var(--evennia-color-border, #dee2e6);
+  border-radius: 2px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
-.evennia-maps-popup a {
-  display: block;
-  margin-top: 0.25rem;
+/* An author display rule would otherwise beat the hidden attribute. */
+.evennia-maps-panel[hidden] {
+  display: none;
 }
 
-.evennia-maps-popup ul {
-  margin: 0.25rem 0 0;
+.evennia-maps-panel:focus-visible {
+  outline: 2px solid var(--evennia-color-accent, #4a90d9);
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .evennia-maps-live-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .evennia-maps-live-wrap .evennia-maps-live {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .evennia-maps-panel {
+    flex: 0 0 20rem;
+    max-height: 70vh;
+  }
+}
+
+@media (max-width: 767.98px) {
+  /* Above Leaflet's controls (z-index 1000), so the sheet is never under
+     the layer switcher or the terrain key. */
+  .evennia-maps-panel {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1100;
+    max-height: 60vh;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    border-width: 2px 0 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+}
+
+.evennia-maps-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.evennia-maps-panel-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.evennia-maps-panel-close {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -0.5rem -0.75rem 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.evennia-maps-panel-close:focus-visible {
+  outline: 2px solid var(--evennia-color-accent, #4a90d9);
+}
+
+.evennia-maps-panel-meta,
+.evennia-maps-panel-summary,
+.evennia-maps-panel-empty {
+  margin-bottom: 0.5rem;
+  color: var(--evennia-color-muted, #6c757d);
+  font-size: 0.9rem;
+}
+
+.evennia-maps-panel-desc {
+  margin-bottom: 0.5rem;
+}
+
+.evennia-maps-panel-section h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.evennia-maps-panel-section ul {
+  margin: 0;
   padding-left: 1.1rem;
+}
+
+.evennia-maps-panel-locked {
+  color: var(--evennia-color-muted, #6c757d);
+  font-style: italic;
+}
+
+.evennia-maps-panel-note {
+  margin-left: 0.35rem;
+  color: var(--evennia-color-muted, #6c757d);
+  font-size: 0.85em;
+}
+
+.evennia-maps-panel-error {
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--evennia-color-danger-bg, #f8d7da);
+  color: var(--evennia-color-danger-text, #721c24);
+  border-radius: 2px;
+  font-size: 0.9rem;
 }
 
 /* ---------------------------------------------------------------

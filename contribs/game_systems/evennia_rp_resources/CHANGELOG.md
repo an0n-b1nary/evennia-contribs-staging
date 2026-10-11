@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.4 — 2026-10-10
+
+- **Added:** a "Gathering here" section in evennia-maps' room panel (0.9+): the
+  resource categories and names tied to the room's terrain, with no weights or
+  quantities, and a note when the viewer's lean matches. Players see nothing until
+  `RP_RESOURCES_REVEALED` and nothing for a terrain outside
+  `RP_RESOURCES_OPEN_TERRAINS`; staff see a closed terrain's list, marked not open
+  yet. The common pool isn't listed. A patch release because evennia-rp-crafting
+  accepts `<0.2`.
+
 ## 0.1.3 — 2026-10-09
 
 - Fixed: returning reserved stall stock can restore archived resources, without

@@ -24,6 +24,7 @@ from django.views.generic import DetailView, ListView
 from evennia.objects.models import ObjectDB
 from evennia.objects.objects import DefaultRoom
 
+from evennia_links.visibility import request_viewer
 from evennia_regions.models import Region, RegionMembership
 from evennia_regions.permissions import is_room_web_visible, is_staff_user
 
@@ -62,7 +63,13 @@ class RegionDetailView(DetailView):
         staff = is_staff_user(self.request)
         memberships = self.object.memberships.select_related("room").order_by("room_name")
         if not staff:
-            memberships = [m for m in memberships if is_room_web_visible(m.room)]
+            memberships = [
+                m
+                for m in memberships
+                if is_room_web_visible(
+                    m.room, request_viewer(self.request, staff=is_staff_user(self.request))
+                )
+            ]
         for membership in memberships:
             try:
                 membership.room_url = reverse(
@@ -112,7 +119,10 @@ class RoomDetailView(DetailView):
     def get_object(self, queryset=None):
         room = super().get_object(queryset)
         if not room.is_typeclass(DefaultRoom, exact=False) or (
-            not is_staff_user(self.request) and not is_room_web_visible(room)
+            not is_staff_user(self.request)
+            and not is_room_web_visible(
+                room, request_viewer(self.request, staff=is_staff_user(self.request))
+            )
         ):
             raise Http404
         return room
@@ -128,11 +138,15 @@ class RoomDetailView(DetailView):
                 "region"
             )
         )
-        context["tiles"] = _room_tiles(room)
+        context["tiles"] = _room_tiles(
+            room,
+            viewer=request_viewer(self.request, staff=is_staff_user(self.request)),
+            staff=is_staff_user(self.request),
+        )
         return context
 
 
-def _room_tiles(room):
+def _room_tiles(room, *, viewer=None, staff=False):
     """Return map placements without making maps a hard dependency."""
     try:
         tile_model = apps.get_model(
@@ -143,6 +157,10 @@ def _room_tiles(room):
     tiles = list(
         tile_model.objects.filter(room=room, plane__is_archived=False).select_related("plane")
     )
+    if tile_model._meta.app_label == "evennia_maps":
+        from evennia_maps.permissions import is_plane_visible
+
+        tiles = [tile for tile in tiles if is_plane_visible(tile.plane, viewer=viewer, staff=staff)]
     for tile in tiles:
         try:
             tile.map_url = reverse("evennia_maps:plane-detail", kwargs={"pk": tile.plane_id})

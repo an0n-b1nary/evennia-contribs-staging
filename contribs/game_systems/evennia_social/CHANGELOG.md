@@ -2,6 +2,20 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## [0.7.0] - 2026-10-10
+
+- Room configuration and the owner/control branch of mood permissions now
+  ask the Links room-permission provider for `configure`. Existing staff and
+  scene-participant/host rules remain in place. Added a direct Links dependency.
+
+## 0.6.0 — 2026-10-10
+
+- **Changed:** the live map's who's-here overlay uses the viewer evennia-maps 0.9
+  passes. An unfindable character shows, in the names and the count, to a viewer
+  whose character is connected and in the same room, as `look` would. A character
+  that isn't connected in-game doesn't count as being there. With no viewer the
+  rule is unchanged.
+
 ## 0.5.1 — 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `social` (finding people,
