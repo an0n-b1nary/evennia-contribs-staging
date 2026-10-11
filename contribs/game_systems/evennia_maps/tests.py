@@ -2409,6 +2409,7 @@ class TestPlaneTilesApi(MapsApiTestCase):
     @override_settings(
         MAPS_TERRAINS={"forest": {"label": "Old wood", "color": "#2e5d34"}},
         MAPS_TERRAIN_PRECEDENCE=["forest"],
+        MAPS_TERRAIN_TILESET={},
     )
     def test_terrain_display_reaches_the_payload(self):
         self.room1.set_terrain({"forest"})
