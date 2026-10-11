@@ -116,6 +116,7 @@ class TestPartnerIntegration(EvenniaTest):
             "recent_scene_count",
             "recent_scenes",
             "has_lore",
+            "present",
         }
         if settings.PARTNER_TEST_CALENDAR:
             expected.add("upcoming_events")
@@ -127,6 +128,9 @@ class TestPartnerIntegration(EvenniaTest):
                 self.assertEqual(overlays["active_scenes"][self.room1.pk][0]["id"], self.live.pk)
                 self.assertTrue(overlays["has_lore"][self.room1.pk])
                 self.assertEqual(overlays["recent_scene_count"][self.room1.pk], 1)
+                # EvenniaTest logs in and puppets char1 through the real session
+                # handler. Keep this seam free of mocked character discovery.
+                self.assertEqual(overlays["present"], {self.room1.pk: [self.char1.key]})
                 if settings.PARTNER_TEST_CALENDAR:
                     self.assertEqual(
                         overlays["upcoming_events"][self.room1.pk][0]["id"], self.event.pk
@@ -178,10 +182,35 @@ class TestPartnerIntegration(EvenniaTest):
         self.assertTrue(tile["has_active_scene"])
         self.assertTrue(tile["has_lore"])
         self.assertEqual(tile["recent_scene_count"], 1)
+        self.assertEqual(tile["present"], [self.char1.key])
         if settings.PARTNER_TEST_CALENDAR:
             self.assertEqual(tile["upcoming_events"][0]["id"], self.event.pk)
         else:
             self.assertEqual(tile["upcoming_events"], [])
+
+    def test_live_presence_privacy_and_disconnect_use_real_sessions(self):
+        """Refresh the feed after visibility changes and after unpuppeting."""
+        from evennia_social import presence
+
+        url = reverse("api-plane-tiles", args=[self.plane.pk])
+        self.assertEqual(self.session.get_puppet(), self.char1)
+        for visibility, public_names, staff_names in (
+            (presence.FINDABLE, [self.char1.key], [self.char1.key]),
+            (presence.UNFINDABLE, [], [f"{self.char1.key} (unfindable)"]),
+            (presence.DARK, [], [f"{self.char1.key} (dark)"]),
+        ):
+            presence.set_visibility(self.char1, visibility)
+            for account, expected in ((self.account2, public_names), (self.account, staff_names)):
+                with self.subTest(visibility=visibility, account=account.key):
+                    self.client.force_login(account)
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.json()["results"][0]["present"], expected)
+        self.account.unpuppet_object(self.session)
+        self.assertIsNone(self.session.get_puppet())
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"][0]["present"], [])
 
     def test_browsable_api_override_works_with_evennias_api_disabled(self):
         """Exercise the game-level override described in both install guides."""

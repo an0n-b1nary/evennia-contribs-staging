@@ -889,6 +889,32 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(present[market.pk], [self.char2.key])
         self.assertEqual(present[self.tile_by_name["The Archive"].room_id], [])
 
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_real_session_presence_honors_the_web_viewers_permissions(self):
+        from django.urls import reverse
+
+        from evennia_social import presence
+
+        market = self._room("Market Row")
+        self.char1.location = market
+        self.assertEqual(self.session.get_puppet(), self.char1)
+        url = reverse("api-plane-tiles", args=[self.plane.pk])
+        for visibility, public_names, staff_names in (
+            (presence.FINDABLE, [self.char1.key], [self.char1.key]),
+            (presence.UNFINDABLE, [], [f"{self.char1.key} (unfindable)"]),
+            (presence.DARK, [], [f"{self.char1.key} (dark)"]),
+        ):
+            presence.set_visibility(self.char1, visibility)
+            for account, expected in ((self.account2, public_names), (self.account, staff_names)):
+                with self.subTest(visibility=visibility, account=account.key):
+                    self.client.force_login(account)
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    present = {
+                        tile["room_id"]: tile["present"] for tile in response.json()["results"]
+                    }
+                    self.assertEqual(present[market.pk], expected)
+
     def test_regions_names_every_tile(self):
         from world.sandbox import content
 
