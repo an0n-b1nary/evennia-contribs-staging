@@ -7,7 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-10-10
+
+- **Added:** every colour in the stylesheet is a shared `--evennia-color-*` theme
+  token with its previous colour as the fallback, so a host stylesheet that
+  sets the tokens on `:root` rethemes this contrib's pages along with the
+  others. Nothing changes until a host sets one. The token list is in
+  evennia-accessibility's README.
+- **Changed:** the design-insight panel's background is `surface-alt`
+  (`rgba(108, 117, 125, .1)`, was `.08`).
 
 ## [0.1.1] - 2026-10-10
 

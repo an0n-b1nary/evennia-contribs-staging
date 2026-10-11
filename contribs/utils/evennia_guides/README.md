@@ -171,3 +171,11 @@ a deploy.
 
 `evennia>=6.0` and `markdown-it-py` (CommonMark, raw HTML off). Front matter
 is read with PyYAML, which Evennia already requires.
+
+## Theming
+
+Every colour in this contrib's stylesheet is a shared `--evennia-color-*`
+token with its usual colour as the fallback, so the pages look the same
+until your game sets one. Set them on `:root` in your own stylesheet to
+retheme these pages along with the other contribs'. The token list and an
+example are in [evennia-accessibility's README](../evennia_accessibility/README.md#theme-tokens).
