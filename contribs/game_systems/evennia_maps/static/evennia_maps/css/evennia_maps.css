@@ -1,10 +1,12 @@
 /*
  * evennia_maps — styles for the static SVG map and the live Leaflet map.
  *
- * Self-contained: no CSS custom properties from a host game's stylesheet,
- * since a contrib cannot assume any exist. Colours are plain values chosen
- * to sit on Evennia's default dark website theme; override any rule from
- * your own stylesheet, which loads after this one.
+ * Self-contained: every colour is a custom property with this stylesheet's
+ * own default as the fallback, so the host doesn't have to define anything.
+ * Page colours read the shared --evennia-color-* tokens; the map's own
+ * palette (canvas, tiles, markers) reads --evennia-maps-*, and the live map's
+ * script reads the same properties for the cells Leaflet draws. The defaults
+ * are chosen to sit on Evennia's default dark website theme.
  */
 
 /* ---------------------------------------------------------------
@@ -15,7 +17,7 @@
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   max-height: 70vh;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--evennia-maps-frame, rgba(255, 255, 255, 0.15));
 }
 
 .evennia-maps-table-scroll {
@@ -24,12 +26,12 @@
 }
 
 .evennia-maps-table-scroll:focus-visible {
-  outline: 2px solid #4a90d9;
+  outline: 2px solid var(--evennia-color-accent, #4a90d9);
   outline-offset: 2px;
 }
 
 .evennia-maps-scroll:focus-visible {
-  outline: 2px solid #4a90d9;
+  outline: 2px solid var(--evennia-color-accent, #4a90d9);
   outline-offset: 2px;
 }
 
@@ -40,11 +42,11 @@
 /* A terrain colour arrives as the rect's fill attribute; CSS outranks a
    presentation attribute, so the default grey applies only when it is absent. */
 .evennia-maps-fallback:not([fill]) {
-  fill: #6c757d;
+  fill: var(--evennia-color-muted, #6c757d);
 }
 
 .evennia-maps-fallback {
-  stroke: rgba(255, 255, 255, 0.25);
+  stroke: var(--evennia-maps-edge, rgba(255, 255, 255, 0.25));
   stroke-width: 1;
 }
 
@@ -53,7 +55,7 @@
 .evennia-maps-tile:hover .evennia-maps-fallback,
 .evennia-maps-tile:hover image {
   filter: brightness(1.25);
-  stroke: #ffffff;
+  stroke: var(--evennia-maps-hover, #ffffff);
 }
 
 .evennia-maps-terrain-legend-item {
@@ -68,9 +70,9 @@
   width: 1rem;
   height: 1rem;
   margin-right: 0.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--evennia-maps-swatch-edge, rgba(255, 255, 255, 0.35));
   border-radius: 2px;
-  background: #6c757d;
+  background: var(--evennia-color-muted, #6c757d);
   vertical-align: middle;
   object-fit: cover;
 }
@@ -88,8 +90,8 @@
   width: 100%;
   height: 70vh;
   min-height: 420px;
-  background: #1b1b1b;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--evennia-maps-canvas, #1b1b1b);
+  border: 1px solid var(--evennia-maps-frame, rgba(255, 255, 255, 0.15));
 }
 
 /* A tile with terrain art is an L.imageOverlay, so this class lands on the
@@ -97,8 +99,8 @@
    cell's map-unit bounds, which is what makes the cell scale with zoom - so
    width/height must not be set here. */
 .evennia-maps-tile {
-  background: #3a3a3a;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--evennia-maps-tile, #3a3a3a);
+  border: 1px solid var(--evennia-maps-edge, rgba(255, 255, 255, 0.25));
   border-radius: 2px;
   box-sizing: border-box;
   object-fit: cover;
@@ -106,12 +108,12 @@
 
 .evennia-maps-tile:hover {
   filter: brightness(1.2);
-  border-color: #ffffff;
+  border-color: var(--evennia-maps-hover, #ffffff);
 }
 
 .evennia-maps-tile.evennia-maps-tile-active {
-  border-color: #ffce54;
-  box-shadow: 0 0 4px 1px rgba(255, 206, 84, 0.8);
+  border-color: var(--evennia-maps-active, #ffce54);
+  box-shadow: 0 0 4px 1px var(--evennia-maps-active-glow, rgba(255, 206, 84, 0.8));
 }
 
 /* A tile with no terrain art is an L.rectangle - an SVG path, whose stroke and
@@ -137,7 +139,7 @@
   width: 100%;
   height: 100%;
   font-size: 1.1em;
-  color: #b39ddb;
+  color: var(--evennia-maps-portal, #b39ddb);
 }
 
 .evennia-maps-tooltip .evennia-maps-badges {
@@ -148,8 +150,8 @@
   display: inline-block;
   padding: 0 0.35rem;
   border-radius: 2px;
-  background: #2d2d2d;
-  color: #f0f0f0;
+  background: var(--evennia-maps-badge-bg, #2d2d2d);
+  color: var(--evennia-maps-panel-text, #f0f0f0);
   font-size: 0.8em;
 }
 
@@ -157,9 +159,9 @@
   max-height: 40vh;
   overflow: auto;
   padding: 0.35rem 0.6rem;
-  background: rgba(27, 27, 27, 0.9);
-  color: #f0f0f0;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--evennia-maps-panel-bg, rgba(27, 27, 27, 0.9));
+  color: var(--evennia-maps-panel-text, #f0f0f0);
+  border: 1px solid var(--evennia-maps-edge, rgba(255, 255, 255, 0.25));
   border-radius: 2px;
   font-size: 0.85rem;
 }
@@ -196,7 +198,7 @@
 .evennia-maps-error {
   margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(255, 128, 128, 0.4);
+  border: 1px solid var(--evennia-maps-error, rgba(255, 128, 128, 0.4));
   border-radius: 2px;
   font-size: 0.9rem;
 }
@@ -221,9 +223,9 @@
    --------------------------------------------------------------- */
 
 .evennia-maps-heatmap-marker {
-  fill: #ff7043;
+  fill: var(--evennia-maps-heat, #ff7043);
   fill-opacity: 0.45;
-  stroke: #ff7043;
+  stroke: var(--evennia-maps-heat, #ff7043);
   stroke-width: 1;
 }
 
@@ -234,7 +236,7 @@
   width: 100%;
   height: 100%;
   font-size: 1.1em;
-  color: #ffd54f;
+  color: var(--evennia-maps-lore, #ffd54f);
 }
 
 .evennia-maps-hangout-marker {
@@ -245,8 +247,8 @@
   height: 100%;
   font-size: 0.85em;
   font-weight: bold;
-  color: #1b1b1b;
-  background: #80cbc4;
+  color: var(--evennia-maps-canvas, #1b1b1b);
+  background: var(--evennia-maps-hangout, #80cbc4);
   border-radius: 50%;
   box-sizing: border-box;
 }
@@ -260,7 +262,7 @@
   .evennia-maps-table-stack td,
   .evennia-maps-table-stack tbody th { display: block; width: 100%; }
   .evennia-maps-table-stack thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-  .evennia-maps-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid #dee2e6; }
+  .evennia-maps-table-stack tbody tr { margin-bottom: 1rem; border: 1px solid var(--evennia-color-border, #dee2e6); }
   .evennia-maps-table-stack tbody td,
   .evennia-maps-table-stack tbody th { border: 0; padding: .375rem .75rem; text-align: left !important; overflow-wrap: anywhere; }
   .evennia-maps-table-stack .evennia-maps-cell-label { display: block; font-size: .8rem; font-weight: 600; }
