@@ -2,6 +2,12 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## [0.6.0] - 2026-10-10
+
+- Room configuration and the owner/control branch of mood permissions now
+  ask the Links room-permission provider for `configure`. Existing staff and
+  scene-participant/host rules remain in place. Added a direct Links dependency.
+
 ## 0.5.1 — 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `social` (finding people,

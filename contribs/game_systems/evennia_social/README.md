@@ -295,3 +295,11 @@ owns its visibility policy. Missing or failing providers are logged and skipped.
 For gathering leans, install resources and add
 `"evennia_rp_resources.profile.gathering_field"`. Leave the list empty when no
 extra fields are needed; social acquires no new dependencies.
+
+
+Room-owner rights in `+roomconfig` and `+mood` use
+`evennia_links.rooms.can(character, room, "configure")`. Without a provider this
+is the existing control-lock check. A configured provider can grant rights to
+owners/residents/stewards without granting general Evennia control. Staff and
+mood's scene-host/participant permissions remain independent. See Links' room
+provider settings; Social never imports an ownership package.
