@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-accessibility"
-version = "0.3.2"
+version = "0.3.3"
 description = "Screen-reader-aware helpers, accessible Django form base classes, and MXP URL utilities for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -43,4 +43,5 @@ packages = ["evennia_accessibility"]
 evennia_accessibility = [
     "templates/evennia_accessibility/*.html",
     "static/evennia_accessibility/css/*.css",
+    "guides/*.md",
 ]
