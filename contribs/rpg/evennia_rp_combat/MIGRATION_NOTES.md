@@ -12,11 +12,12 @@ apply migrations, compare preserved rows, then rehearse through the real
 command path. Do not replace a live database with the demonstration snapshot.
 The reference golden database is rebuilt from fresh synthetic content.
 
-Fights live in two tables (migration 0002): `Fight` holds each fight's JSON
+Fights live in three tables (migration 0002): `Fight` holds each fight's JSON
 state (schema version 1) and status (open, shelved or ended, with at most one
 open fight per room); `FightEntry` is its append-only journal, one row per
-operation with the state before it. Back up both together with Character
-rows. Restore a complete consistent backup; never restore only a
+operation with the state before it; `FightBuild` stores each frozen build
+once, which stored state and snapshots reference by digest. Back up all three
+together with Character rows. Restore a complete consistent backup; never restore only a
 participant's resources. Staff rollback restores combat checkpoints but
 cannot undo authored prose or external XP, ignore or catalog edits. Review
 its reconciliation notice before resuming. Future schema changes must migrate
