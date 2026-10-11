@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.1] - 2026-10-10
+
+- **Added:** a player guide page for evennia-guides, `rp-sessions` (how RP
+  sessions are noticed and counted) and the `rp-never-a-quota` principle, in
+  `guides/` and the package data. It describes the system in general terms,
+  without exact numbers, and links only to pages this contrib or its required
+  dependencies ship. Without evennia-guides it's ignored.
+
 ## [0.2.0] - 2026-10-09
 
 - Added independent IC-channel sessions, character-attributed channel typeclass,

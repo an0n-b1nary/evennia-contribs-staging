@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rptracker"
-version = "0.2.0"
+version = "0.2.1"
 description = "Passive RP session detection and tracking for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -40,3 +40,6 @@ packages = ["evennia_rptracker", "evennia_rptracker.migrations", "evennia_rptrac
 "evennia_rptracker" = "."
 "evennia_rptracker.migrations" = "migrations"
 "evennia_rptracker.integrations" = "integrations"
+
+[tool.setuptools.package-data]
+evennia_rptracker = ["guides/*.md"]
