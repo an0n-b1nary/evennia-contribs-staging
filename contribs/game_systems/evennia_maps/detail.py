@@ -70,7 +70,15 @@ def _text(value):
 
 def _safe_url(value):
     """A site-relative path, or "" for anything else."""
-    if isinstance(value, str) and value.startswith("/") and not value.startswith("//"):
+    # Browsers normalize backslashes and remove ASCII controls before
+    # resolving URLs, which can turn an apparently relative path into //host.
+    if (
+        isinstance(value, str)
+        and value.startswith("/")
+        and not value.startswith("//")
+        and "\\" not in value
+        and not any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
         return value
     return ""
 

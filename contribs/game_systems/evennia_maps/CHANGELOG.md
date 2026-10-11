@@ -29,6 +29,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `<aside id="evennia-maps-panel">` block for the panel; without it a tile opens
   a plain popup naming the room.
 - The `map` guide page describes the panel.
+- **Fixed:** room-panel links reject backslashes and ASCII controls, which
+  browsers can otherwise normalize into an external destination.
 
 ## [0.8.1] - 2026-10-10
 

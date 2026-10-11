@@ -2598,6 +2598,10 @@ class TestCleanSection(MapsTestCase):
             "javascript:alert(1)",
             "//elsewhere.example/x",
             "https://elsewhere.example/",
+            "/\\elsewhere.example/x",
+            "/\t/elsewhere.example/x",
+            "/\n/elsewhere.example/x",
+            "/\r/elsewhere.example/x",
             5,
         ):
             with self.subTest(url=url):
