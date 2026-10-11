@@ -857,8 +857,16 @@ class Command(BaseCommand):
                 author=author,
                 body=spec["body"],
                 privacy=LoreEntry.Privacy.PUBLIC,
+                kind=spec.get("kind"),
+                accuracy=spec.get("accuracy"),
+                ooc_notes=spec.get("ooc_notes", ""),
             )
             entry.tags.set([tags[name] for name in spec.get("tags", ())])
+            if spec.get("sealed_notes"):
+                entry.seal(spec["sealed_notes"])
+            if spec.get("affirmed"):
+                # Seeded, not decided by anyone: no notice to the author.
+                entry.affirm(notify=False)
             entries[spec["slug"]] = entry
         return entries
 
@@ -1151,7 +1159,7 @@ class Command(BaseCommand):
         everywhere is indistinguishable from one that is broken.
         """
         from evennia_calendar.models import SceneCalendarLink
-        from evennia_lore.models import LoreRegionLink, LoreSceneLink
+        from evennia_lore.models import LoreRegionLink, LoreSceneLink, PlotLoreLink
         from evennia_plots.models import PlotThread, ScenePlotLink
 
         count = 0
@@ -1170,6 +1178,9 @@ class Command(BaseCommand):
 
         thread = PlotThread.objects.get(name=content.PLOT_THREAD["name"])
         thread.activate()
+        for entry_slug in content.LORE_PLOT_LINKS:
+            PlotLoreLink.objects.create(thread_id=thread.pk, entry=entries[entry_slug])
+            count += 1
         for scene_slug in content.PLOT_SCENE_SLUGS:
             if scene_slug not in scenes:
                 continue

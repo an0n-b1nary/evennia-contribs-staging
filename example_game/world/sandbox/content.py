@@ -768,22 +768,43 @@ LORE_TAGS = (
     {"name": "Rumor", "is_major": False},
 )
 
+# One entry per lore layer feature: an affirmed Fact, a false Rumor whose OOC
+# notes say so, and a Legend whose truth staff keep sealed until the seeded
+# plot thread settles it (concluding the thread reminds whoever concludes it).
 LORE_ENTRIES = (
     {
         "slug": "founding",
         "title": "The Founding of the Sandbox",
+        "kind": "fact",
         "body": "[Placeholder] A short in-world origin story for this place.",
+        "affirmed": True,
         "tags": ("History",),
     },
     {
         "slug": "rumors",
         "title": "Rumors from the Archive",
+        "kind": "rumor",
+        "accuracy": "inaccurate",
         "body": "[Placeholder] A short rumor entry, the kind +investigate would turn up.",
+        "ooc_notes": (
+            "[Placeholder] What's actually true, and how the rumor started. "
+            "The IC claim is false; these notes never are."
+        ),
         "tags": ("Rumor",),
+    },
+    {
+        "slug": "exile",
+        "title": "The Exiled Founders",
+        "kind": "legend",
+        "body": "[Placeholder] An old story about who was here first, told everywhere.",
+        "ooc_notes": "[Placeholder] Told in every camp; nobody living can check it.",
+        "sealed_notes": "[Placeholder] What staff know, kept until the story settles it.",
+        "tags": ("History",),
     },
 )
 
 LORE_SCENE_LINKS = (("founding", "rehearsal"), ("rumors", "market-day"))
+LORE_PLOT_LINKS = ("exile",)
 PLOT_SCENE_SLUGS = ("rehearsal", "market-day")
 
 PLOT_ARC = {

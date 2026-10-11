@@ -539,6 +539,16 @@ LORE_REGIONS_APP_LABEL = "evennia_regions"
 # label settings above (an absent partner just drops its part).
 LORE_SESSION_CONTEXT_PROVIDER = "evennia_lore.integrations.session_context.get_session_context"
 
+# Kinds say how the world treats an entry's IC content. These are lore's
+# defaults, spelled out so the sandbox shows where a game would change them.
+# A Fact is always accurate; a new Rumor or Legend starts with accuracy "open".
+LORE_KINDS = {"fact": "Fact", "rumor": "Rumor", "legend": "Legend"}
+LORE_ACCURATE_KINDS = ("fact",)
+LORE_DEFAULT_KIND = "fact"
+# Affirmation requests, and sealed lore left on a thread a player concluded,
+# become +discuss tickets. Without the hook they wait in +lore/queue.
+LORE_STAFF_REVIEW_HOOK = "evennia_jobs.integrations.staff_review.file_review_job"
+
 ######################################################################
 # Regions configuration
 ######################################################################

@@ -31,12 +31,18 @@
   <fieldset class="mb-3">
     <legend class="h6">Entry details</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.title %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.kind %}
     {% include "evennia_accessibility/_form_field.html" with field=form.summary %}
     {% include "evennia_accessibility/_form_field.html" with field=form.privacy %}
   </fieldset>
   <fieldset class="mb-3 mt-3">
-    <legend class="h6">Body</legend>
+    <legend class="h6">In character</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.body %}
+  </fieldset>
+  <fieldset class="mb-3 mt-3 evennia-lore-ooc">
+    <legend class="h6">Out of character (never false)</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.accuracy %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.ooc_notes %}
   </fieldset>
   {% if is_edit %}
   {% include "evennia_accessibility/_form_actions.html" with submit_label="Save Changes" cancel_url=request.META.HTTP_REFERER|default:"/lore/" %}

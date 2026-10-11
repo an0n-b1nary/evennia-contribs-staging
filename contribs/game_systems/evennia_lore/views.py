@@ -15,6 +15,8 @@ Views:
     LoreLeanView           — /lore/lean/  set/clear +investigate lean
     LoreApproveView        — /lore/<pk>/approve/  POST; staff only
     LoreRejectView         — /lore/<pk>/reject/   POST; staff only
+    LoreAffirmView         — /lore/<pk>/affirm/   POST; author requests, staff affirm
+    LoreDeclineView        — /lore/<pk>/decline/  POST; staff only, with a note
 
 Wire into your URL config::
 
@@ -24,6 +26,7 @@ Wire into your URL config::
 
 import difflib
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
@@ -33,8 +36,15 @@ from django.urls import reverse
 from django.views.generic import DetailView, FormView, ListView, TemplateView, View
 from evennia.objects.models import ObjectDB
 
+from evennia_lore import layers
 from evennia_lore.authoring import AuthoringMixin
-from evennia_lore.forms import LoreEntryCreateForm, LoreEntryEditForm, LoreLeanForm
+from evennia_lore.forms import (
+    LoreAffirmationDeclineForm,
+    LoreEntryCreateForm,
+    LoreEntryEditForm,
+    LoreLeanForm,
+)
+from evennia_lore.layers import LoreLayerError
 from evennia_lore.models import (
     LoreAcquisition,
     LoreEntry,
@@ -93,6 +103,15 @@ class LoreListView(ListView):
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(body__icontains=search)).distinct()
 
+        kind = self.request.GET.get("kind", "").strip()
+        if kind:
+            qs = qs.filter(kind=kind)
+
+        # Only the states everyone can see: a decline is the author's business.
+        affirmation = self.request.GET.get("affirmation", "").strip()
+        if affirmation in (LoreEntry.Affirmation.AFFIRMED, LoreEntry.Affirmation.REQUESTED):
+            qs = qs.filter(affirmation=affirmation)
+
         return qs
 
     def get_context_data(self, **kwargs):
@@ -102,6 +121,9 @@ class LoreListView(ListView):
         context["theme_filter"] = self.request.GET.get("theme", "")
         context["region_filter"] = self.request.GET.get("region", "")
         context["search_filter"] = self.request.GET.get("search", "")
+        context["kind_filter"] = self.request.GET.get("kind", "")
+        context["affirmation_filter"] = self.request.GET.get("affirmation", "")
+        context["kind_choices"] = list(layers.kinds().items())
         # Filters have to survive paging. The template used to try to build this
         # inline with nested {% with %} blocks, which cannot work: a {% with %}
         # assignment dies at its own {% endwith %}, so every page-2 link dropped
@@ -194,6 +216,33 @@ class LoreDetailView(DetailView):
             pass
         context["region_list"] = region_list
         context["versions"] = entry.versions.order_by("-version_number")[:5]
+
+        # The two layers and affirmation. A decline shows only to the author and staff.
+        staff = context["is_staff"]
+        is_author = bool(character_id and entry.author_id == character_id)
+        published = entry.status == LoreEntry.Status.PUBLISHED
+        context["is_author"] = is_author
+        context["show_decline"] = staff or is_author
+        context["affirmation_label"] = entry.affirmation_label(show_decline=staff or is_author)
+        context["accuracy_label"] = layers.accuracy_label(entry.accuracy)
+        context["can_request_affirmation"] = (
+            published
+            and is_author
+            and not staff
+            and (
+                entry.affirmation in (LoreEntry.Affirmation.NONE, LoreEntry.Affirmation.DECLINED)
+                or entry.edited_since_affirmation
+            )
+        )
+        context["can_review_affirmation"] = published and staff
+        if staff:
+            context["decline_form"] = LoreAffirmationDeclineForm()
+        affirmed_body_version = None
+        if staff and entry.edited_since_affirmation and entry.affirmed_version is not None:
+            candidate = entry.affirmed_version + 1
+            if entry.versions.filter(version_number=candidate).exists():
+                affirmed_body_version = candidate
+        context["affirmed_body_version"] = affirmed_body_version
         return context
 
 
@@ -238,6 +287,9 @@ class LoreApprovalQueueView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Lore Approval Queue"
         context["is_staff"] = True
+        context["affirmation_requests"] = LoreEntry.objects.filter(
+            status=LoreEntry.Status.PUBLISHED, affirmation=LoreEntry.Affirmation.REQUESTED
+        ).order_by("entry_number")
         return context
 
 
@@ -266,6 +318,9 @@ class LoreCreateView(AuthoringMixin, FormView):
             body=form.cleaned_data.get("body", ""),
             summary=form.cleaned_data.get("summary", ""),
             privacy=form.cleaned_data.get("privacy", LoreEntry.Privacy.PUBLIC),
+            kind=form.cleaned_data["kind"],
+            accuracy=form.cleaned_data["accuracy"],
+            ooc_notes=form.cleaned_data.get("ooc_notes", ""),
         )
         return HttpResponseRedirect(reverse("lore-detail", kwargs={"pk": entry.pk}))
 
@@ -321,8 +376,22 @@ class LoreEditView(AuthoringMixin, FormView):
         entry.title = form.cleaned_data["title"]
         entry.summary = form.cleaned_data.get("summary", entry.summary)
         entry.privacy = form.cleaned_data.get("privacy", entry.privacy)
+        entry.kind = form.cleaned_data["kind"]
+        entry.accuracy = form.cleaned_data["accuracy"]
+        entry.ooc_notes = form.cleaned_data.get("ooc_notes", "")
         entry.updated_at = timezone.now()
-        entry.save(update_fields=["body", "title", "summary", "privacy", "updated_at"])
+        entry.save(
+            update_fields=[
+                "body",
+                "title",
+                "summary",
+                "privacy",
+                "kind",
+                "accuracy",
+                "ooc_notes",
+                "updated_at",
+            ]
+        )
         return HttpResponseRedirect(reverse("lore-detail", kwargs={"pk": entry.pk}))
 
     def form_invalid(self, form):
@@ -464,3 +533,59 @@ class LoreRejectView(LoginRequiredMixin, View):
         character = ObjectDB.objects.filter(pk=character_id).first() if character_id else None
         entry.reject(reviewed_by=character, editor=character)
         return HttpResponseRedirect(reverse("lore-queue"))
+
+
+class LoreAffirmView(LoginRequiredMixin, View):
+    """POST-only: the author asks for affirmation; staff affirm the entry as it stands."""
+
+    login_url = "/accounts/login/"
+
+    def post(self, request, pk):
+        entry = get_object_or_404(LoreEntry, pk=pk)
+        character_id = get_character_id(request.user)
+        character = ObjectDB.objects.filter(pk=character_id).first() if character_id else None
+        try:
+            if is_staff_user(request):
+                entry.affirm(affirmed_by=character)
+                messages.success(
+                    request, f"#{entry.entry_number} affirmed as it stands.", fail_silently=True
+                )
+            elif character is not None and entry.author_id == character.pk:
+                entry.request_affirmation(requested_by=character)
+                messages.success(
+                    request,
+                    "Affirmation requested. Staff will affirm it or reply.",
+                    fail_silently=True,
+                )
+            else:
+                raise PermissionDenied
+        except LoreLayerError as err:
+            messages.error(request, str(err), fail_silently=True)
+        return HttpResponseRedirect(reverse("lore-detail", kwargs={"pk": entry.pk}))
+
+
+class LoreDeclineView(LoginRequiredMixin, View):
+    """POST-only: decline to affirm, with a note for the author. Staff only."""
+
+    login_url = "/accounts/login/"
+
+    def post(self, request, pk):
+        if not is_staff_user(request):
+            raise PermissionDenied
+        entry = get_object_or_404(LoreEntry, pk=pk)
+        form = LoreAffirmationDeclineForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "A decline needs a note to the author.", fail_silently=True)
+            return HttpResponseRedirect(reverse("lore-detail", kwargs={"pk": entry.pk}))
+        character_id = get_character_id(request.user)
+        character = ObjectDB.objects.filter(pk=character_id).first() if character_id else None
+        try:
+            entry.decline(declined_by=character, note=form.cleaned_data["note"])
+            messages.success(
+                request,
+                f"#{entry.entry_number} declined. Only its author sees it.",
+                fail_silently=True,
+            )
+        except LoreLayerError as err:
+            messages.error(request, str(err), fail_silently=True)
+        return HttpResponseRedirect(reverse("lore-detail", kwargs={"pk": entry.pk}))

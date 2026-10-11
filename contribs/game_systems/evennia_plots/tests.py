@@ -408,6 +408,15 @@ class TestPlotThreadLifecycle(EvenniaTest):
             self.thread.conclude()
         self.assertEqual(len(received), 1)
         self.assertIn("bonus_xp", received[0])
+        self.assertIsNone(received[0]["concluded_by"])
+
+    def test_conclude_signal_names_who_concluded(self):
+        from evennia_plots.signals import plot_thread_concluded
+
+        with catch_signal(plot_thread_concluded) as received:
+            self.thread.activate()
+            self.thread.conclude(concluded_by=self.char1)
+        self.assertEqual(received[0]["concluded_by"], self.char1)
 
     def test_archive_transitions_to_archived(self):
         self.thread.archive()

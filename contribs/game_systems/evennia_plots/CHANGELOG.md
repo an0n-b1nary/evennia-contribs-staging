@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] - 2026-10-10
+
+- **Added:** `plot_thread_concluded` now also sends `concluded_by`, the character
+  passed to `PlotThread.conclude()` (`None` when nobody was named). Receivers that
+  take `**kwargs` are unaffected. evennia-lore 0.5 uses it to remind whoever
+  concluded a thread that its linked lore still has sealed notes.
+
 ## [0.3.3] - 2026-10-10
 
 - Add `collect_thread_content`, an optional collector for creative-content
