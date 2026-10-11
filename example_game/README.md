@@ -1448,11 +1448,14 @@ verified shutdown.
 
 The Proving Grounds wires `evennia-rp-combat` after rules/chargen/NPCs.
 Seeded sample builds carry an equipped Ready Guard Signature and Balanced
-Tactics; the room has an empty practice coordinator, so no PC is enrolled by
+Tactics; the room has an empty open practice fight, so no PC is enrolled by
 seeding. `+combat/join side` explicitly accepts. See `/guide/combat/` and
-`help +combat`; `+combatstory` is available to ordinary players. Use the
-Market's permitted NPC templates with `/template blueprint=side,boss,cap`
-for an attributed practice opponent. NPC stat blocks include all combat roles.
+`help +combat`; `+combatstory` is available to ordinary players, and its
+changes to another player's character wait for that player's
+`+combat/accept`. Use the Market's permitted NPC templates with
+`/template blueprint=side,boss,cap` for an attributed practice opponent. NPC
+stat blocks include all combat roles. `+combatstory/shelve` sets a fight aside
+so the room and everyone's sheets are free; `/unshelve number` brings it back.
 
 No typeclass mixin or new URL/API mount is needed. The package guide is
 loaded by evennia-guides. Combat sends SYSTEM Scene entries without posing

@@ -44,13 +44,14 @@ class CombatSuite(Suite):
         self.command("alice", "+combat/act", "Auto-Act")
         self.command("alice", "+combat", "turns 2/4")
         self.command("bob", "+combatstory/requestcap pt-alice=3;OOC agreement", "requestcap")
-        self.command("alice", "+combat/acceptcap", "acceptcap")
+        self.command("alice", "+combat/accept", "accepted request")
         self.command("alice", "+combat/fade", "fade")
         self.command("alice", "+combat/join one", "joined")
         self.command("alice", "+combat", "turns 2/3")
         self.command("alice", "+combatstory/pause Discuss outcome", "pause")
         self.command("alice", "+combat/act", "paused")
-        self.command("bob", "+combatstory/end Agreed outcome", "end")
+        self.command("bob", "+combatstory/end Agreed outcome", "Ending needs agreement")
+        self.command("alice", "+combat/accept", "accepted request")
         self.command("alice", "+combat", "ended")
 
     def consensual_return(self):
@@ -60,13 +61,14 @@ class CombatSuite(Suite):
         self.command("bob", "+combat/withdraw", "withdraw")
         self.command("bob", "+combat/join two", "request your return")
         self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
-        self.command("bob", "+combat", "Requested return at 25")
-        self.command("bob", "+combat/refusereturn", "refusereturn")
-        self.command("bob", "+combat/acceptreturn", "No pending return")
+        self.command("bob", "+combat", "return you to the fight at 25 Vitality")
+        self.command("bob", "+combat/decline", "declined request")
+        self.command("bob", "+combat/accept", "no pending storyteller requests")
         self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
-        self.command("bob", "+combat/acceptreturn", "acceptreturn")
+        self.command("bob", "+combat/accept", "accepted request")
         self.command("bob", "+combat", "25/100 Vitality; turns 0/4")
-        self.command("alice", "+combatstory/end Agreed outcome", "end")
+        self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
+        self.command("bob", "+combat/accept", "accepted request")
 
 
 def run_combat(session):
@@ -80,7 +82,7 @@ def run_combat(session):
             suite.reaction_build_lock_and_reload,
         ),
         (
-            "opt-in automation, player storyteller, reduced cap and retained Fade",
+            "opt-in automation, consented storyteller requests, reduced cap and retained Fade",
             suite.automation_storytelling_and_fade,
         ),
         (

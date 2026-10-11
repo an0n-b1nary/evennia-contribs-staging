@@ -27,33 +27,37 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         keys = {cmd.key for cmd in cmdset.commands}
         self.assertTrue({"+combat", "+combatstory", "+tactics", "+moves"} <= keys)
 
-    def test_frozen_sheet_guards_survive_unlock_and_fade(self):
+    def test_active_sheets_freeze_and_fade_releases_without_changing_the_fight(self):
         from evennia_rp_chargen import locks, moves
         from evennia_rp_chargen import services as chargen
         from evennia_rp_chargen.services import ChargenError
         from evennia_rp_combat import services
 
         first, second = self.samples[:2]
+
+        def fight_moves():
+            row = services.state_for(first)["participants"][str(first.pk)]
+            return {m["key"] for m in row["build"]["moves"]}
+
         services.setup(first)
         services.join(first, "one")
         services.join(second, "two")
         locks.unlock(first)
         with self.assertRaisesRegex(ChargenError, "combat build is frozen"):
             chargen.set_edge(first, "strength", 1)
+        # Fading releases the real sheet (e.g. for another fight) ...
         services.control(first, "fade")
+        moves.equip(first, "ready-guard", equipped=False)
+        # ... and rejoining restores the build frozen for this fight.
+        services.join(first)
+        self.assertIn("ready-guard", fight_moves())
         with self.assertRaisesRegex(ChargenError, "combat build is frozen"):
-            moves.equip(first, "ready-guard", equipped=False)
-        services.join(first, "one")
+            moves.equip(first, "ready-guard")
+        # An announced correction adopts the current sheet.
         services.control(first, "unlock")
         locks.unlock(first)
-        moves.equip(first, "ready-guard", equipped=False)
         services.control(first, "relock")
-        self.assertFalse(
-            any(
-                m["key"] == "ready-guard"
-                for m in services.state_for(first)["participants"][str(first.pk)]["build"]["moves"]
-            )
-        )
+        self.assertNotIn("ready-guard", fight_moves())
 
     def test_mechanics_system_entries_do_not_create_rp_activity(self):
         if not apps.is_installed("evennia_scenes"):
