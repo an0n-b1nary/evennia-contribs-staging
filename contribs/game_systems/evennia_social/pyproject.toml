@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-social"
-version = "0.4.0"
+version = "0.5.0"
 description = "The social quality-of-life command layer for Evennia games: profiles, discovery, messaging, ignore/mute, consensual teleportation, and OOC chat."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -42,7 +42,7 @@ Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 # mirrors Evennia upstream's flat per-contrib structure so the `git mv` into
 # `evennia/contrib/...` for upstream submission is a path-only change.
 [tool.setuptools]
-packages = ["evennia_social", "evennia_social.commands"]
+packages = ["evennia_social", "evennia_social.commands", "evennia_social.integrations"]
 
 [tool.setuptools.package-dir]
 "evennia_social" = "."

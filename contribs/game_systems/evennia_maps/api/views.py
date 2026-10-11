@@ -141,6 +141,7 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         recent_scenes_by_room = overlays.get("recent_scenes", {})
         has_lore = overlays.get("has_lore", {})
         upcoming_events_by_room = overlays.get("upcoming_events", {})
+        present_by_room = overlays.get("present", {})
         styles = {terrain: terrain_style(terrain) for terrain in {tile.terrain for tile in tiles}}
 
         data = [
@@ -163,6 +164,7 @@ class PlaneViewSet(ReadOnlyModelViewSet):
                 "has_lore": bool(has_lore.get(tile.room_id, False)),
                 "recent_scenes": recent_scenes_by_room.get(tile.room_id, []),
                 "upcoming_events": upcoming_events_by_room.get(tile.room_id, []),
+                "present": present_by_room.get(tile.room_id, []),
             }
             for tile in tiles
         ]

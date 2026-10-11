@@ -290,7 +290,14 @@ rules.
 | `recent_scenes` | `evennia-scenes` | Log links in the tile popup |
 | `has_lore` | `evennia-lore` | Lore pin layer |
 | `upcoming_events` | `evennia-calendar` | Event links in the tile popup |
+| `present` | `evennia-social` | "N here" in the tooltip and names in the popup (live map only) |
 | `hangout_type` | *(read locally)* | Hangout marker layer |
+
+`present` lists the connected characters in a room. The provider has already applied
+its presence rule (players see only characters who are findable, staff see everyone
+with a marker), so the map shows what it's given. It appears only on the live map,
+whose tile API requires a login. The SVG map can be served to logged-out visitors, so
+it never shows who is where.
 
 `hangout_type` is the exception: a bare room attribute with no table and no privacy
 rule, read duck-typed exactly as `terrain_tags` is. It happens to be an
@@ -348,7 +355,7 @@ error anywhere to explain it. If you want the links, mount the pages.
 
 `example_game/` in this repo is the reference wiring, and the only place the whole seam
 can be shown working: it installs this contrib together with `evennia-regions`,
-`-scenes`, `-lore` and `-calendar`, so all four overlay providers are present at once.
+`-scenes`, `-lore`, `-calendar` and `-social`, so all five overlay providers are present at once.
 
 | What | Where |
 |---|---|
@@ -356,7 +363,7 @@ can be shown working: it installs this contrib together with `evennia-regions`,
 | The four website includes and the two DRF routers | `web/website/urls.py`, `web/urls.py` |
 | `MapsRoomMixin` on the game's Room typeclass | `typeclasses/rooms.py` |
 | A seeded plane: one hand-placed origin tile, five more derived by `layout.plan()` | `world/sandbox/management/commands/seed_sandbox.py` |
-| Proof that one collect returns all six overlay keys, from four different contribs | `world/sandbox/tests.py::TestMapOverlaySeam` |
+| Proof that one collect returns all eight overlay keys, from five different contribs | `world/sandbox/tests.py::TestMapOverlaySeam` |
 
 That last one cannot live in this contrib's own suite, which has no partner contribs to
 install — its overlay tests connect fakes instead, and deliberately detach whatever the
