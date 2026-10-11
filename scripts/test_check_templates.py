@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from check_templates import (
     REPO_ROOT,
@@ -12,6 +14,7 @@ from check_templates import (
     check_markup_conventions,
     check_stylesheet,
     iter_stylesheets,
+    iter_templates,
 )
 
 
@@ -205,6 +208,41 @@ class StylesheetTokenTests(unittest.TestCase):
             for token, default in SHARED_COLOR_TOKENS.items():
                 with self.subTest(document=document.name, token=token):
                     self.assertIn(f"| `--evennia-color-{token}` | `{default}` |", text)
+
+
+class TemplateDiscoveryTests(unittest.TestCase):
+    def test_checkout_beneath_a_build_directory_still_checks_source(self):
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch) / "build" / "checkout"
+            template = root / "contribs/game_systems/evennia_maps/templates/room.html"
+            stylesheet = root / "contribs/game_systems/evennia_maps/static/map.css"
+            for source in (template, stylesheet):
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text("", encoding="utf-8")
+            with patch("check_templates.REPO_ROOT", root):
+                self.assertEqual(iter_templates([]), [template])
+                self.assertEqual(iter_stylesheets([]), [stylesheet])
+
+    def test_local_artifacts_are_excluded_but_explicit_paths_can_be_checked(self):
+        with TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            contrib = root / "contribs/game_systems/evennia_maps"
+            source = contrib / "templates/room.html"
+            css = contrib / "static/map.css"
+            artifacts = [
+                contrib / "build/lib/evennia_maps/templates/room.html",
+                contrib / "build/lib/evennia_maps/static/map.css",
+                root / ".playtest-runs/host/templates/room.html",
+                root / ".downstream-runs/host/templates/room.html",
+            ]
+            for path in (source, css, *artifacts):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+            with patch("check_templates.REPO_ROOT", root):
+                self.assertEqual(iter_templates([]), [source])
+                self.assertEqual(iter_stylesheets([]), [css])
+                self.assertEqual(iter_templates([str(artifacts[0])]), [artifacts[0]])
+                self.assertEqual(iter_stylesheets([str(artifacts[1])]), [artifacts[1]])
 
 
 if __name__ == "__main__":
