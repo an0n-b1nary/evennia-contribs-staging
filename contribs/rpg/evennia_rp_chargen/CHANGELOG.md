@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+## [0.4.0] - 2026-10-10
+
+### Added
+
+- Free revisioned SignatureMove libraries with separate equipped loadouts,
+  stable keys, author/edit/equip/archive commands and optional host validation.
+- Independent move reveal control, scene locks and equipped Signature change
+  guards for fight-long combat snapshots. Migration 0004 preserves existing
+  sheet/catalog history; authoring unequipped moves stays available in combat.
+
 ## [0.3.2] - 2026-10-10
 
 ### Fixed
