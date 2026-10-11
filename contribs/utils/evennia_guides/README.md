@@ -88,6 +88,12 @@ floats beside the text; on narrow ones it sits inline.
    A contrib that ships pages lists `guides/*.md` in its package data.
 2. Each directory in `GUIDES_DIRS`, in order.
 
+A contrib's own pages should link to, and tag principles from, only pages that
+it or its required dependencies ship. A link to an optional partner's page
+works in a game that installs the partner and is an error in `guides_check`
+everywhere else. Name an optional partner in prose instead, and leave the
+links between systems to the game's own pages.
+
 A later page with a key that's already loaded replaces the earlier one. Pages
 are read once per process, so new or edited pages appear after a reload. A
 file that fails to load is logged and skipped rather than taking the guide

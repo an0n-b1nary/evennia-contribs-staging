@@ -42,7 +42,7 @@ is discovered during that phase). ``highlight_names``/``format_pose_time``/
 from evennia_posing.highlighting import format_pose_time, highlight_names
 from evennia_posing.signals import pose_recorded
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 _LAZY = {
     "PosingCharacterMixin": "typeclasses",

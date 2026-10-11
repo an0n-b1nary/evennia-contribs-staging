@@ -235,6 +235,15 @@ Account options (register in `OPTIONS_ACCOUNT_DEFAULT` — see step 3 above):
 No `settings.py` constants — this contrib has no configuration beyond the
 account options above.
 
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `posing`. They explain
+the system to players in general terms, without exact numbers, and link only to
+pages this contrib or its required dependencies ship. With evennia-guides
+installed they appear on its web guide; without it they're ignored. To restate
+one for your game, add a page with the same key to `GUIDES_DIRS`.
+
 ---
 
 ## Version history

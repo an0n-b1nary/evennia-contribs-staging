@@ -307,15 +307,20 @@ name the same character, and that a filed job lists it as the author.
 
 ### The guide
 
-`/guide/` serves the Markdown pages in `world/guides/`, along with any pages
-the installed contribs ship (`evennia_guides` itself ships a staff page,
-`writing-guides`). A page here with the same key as a contrib's page replaces
-it. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
+`/guide/` serves the Markdown pages in `world/guides/`, along with the pages
+the installed contribs ship: a player page for each system (`checks`,
+`character-sheet`, `tests`, `posing`, `scenes`, `social`, `rp-sessions`, `xp`,
+`lore`, `plots`, `calendar`, `map`, `regions`, `boards`, `requests`,
+`accessibility`, `npcs`), a few principles and glossary terms, and guides' own
+staff page, `writing-guides`. A page here with the same key as a contrib's page
+replaces it. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
 turn it off with `+runtime RP_ECONOMY_REVEALED=false` and the page, and the
 links to it, disappear without a reload. Every page's "Ask about this page"
 opens the jobs request form, prefilled. The guide is web-only and separate from in-game `help`. Run
 `evennia guides_check` after editing pages. `world/sandbox/test_guides.py` is
-the seam test.
+the seam test. It renders every system page through the site, and checks that
+each contrib's pages link only to pages its required dependencies ship, so they
+still validate in a game without the optional partners.
 
 ### The seeded world: an OOC wing and an IC grid
 

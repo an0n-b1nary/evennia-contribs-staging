@@ -2,6 +2,14 @@
 
 All notable changes to `evennia_posing` are documented here.
 
+## 0.1.1 — 2026-10-10
+
+- **Added:** a player guide page for evennia-guides, `posing` (pose, emit,
+  semipose, `+pot` and the display settings), in `guides/` and the package data.
+  It describes the system in general terms, without exact numbers, and links
+  only to pages this contrib or its required dependencies ship. Without
+  evennia-guides it's ignored.
+
 ## 0.1.0 — 2026-07-12
 
 Initial extraction from a source MUSH project's roleplay

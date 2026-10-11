@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-posing"
-version = "0.1.0"
+version = "0.1.1"
 description = "The pose pipeline for Evennia games: pose/emit/say/semipose capture, pose order tracking, pose headers, and name highlighting."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -44,3 +44,6 @@ packages = ["evennia_posing"]
 
 [tool.setuptools.package-dir]
 "evennia_posing" = "."
+
+[tool.setuptools.package-data]
+evennia_posing = ["guides/*.md"]

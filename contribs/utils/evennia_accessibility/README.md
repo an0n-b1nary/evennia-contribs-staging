@@ -226,6 +226,15 @@ README).
 | `--evennia-a11y-color-danger` | CSS custom property | Default `#c0392b`. Override in your stylesheet to retheme error messaging. Other `--evennia-a11y-*` tokens follow the same pattern. |
 | `--evennia-color-*` | CSS custom properties | The shared theme tokens; see [Theme tokens](#theme-tokens). The `--evennia-a11y-*` colours default to them. |
 
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../evennia_guides/README.md): `accessibility`. They explain
+the system to players in general terms, without exact numbers, and link only to
+pages this contrib or its required dependencies ship. With evennia-guides
+installed they appear on its web guide; without it they're ignored. To restate
+one for your game, add a page with the same key to `GUIDES_DIRS`.
+
 ## License
 
 [BSD 3-Clause](../../../LICENSE) — matches Evennia upstream.

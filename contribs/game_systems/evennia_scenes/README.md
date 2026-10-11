@@ -275,6 +275,15 @@ until your game sets one. Set them on `:root` in your own stylesheet to
 retheme these pages along with the other contribs'. The token list and an
 example are in [evennia-accessibility's README](../../utils/evennia_accessibility/README.md#theme-tokens).
 
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `scenes`. They explain
+the system to players in general terms, without exact numbers, and link only to
+pages this contrib or its required dependencies ship. With evennia-guides
+installed they appear on its web guide; without it they're ignored. To restate
+one for your game, add a page with the same key to `GUIDES_DIRS`.
+
 ## License
 
 BSD-3-Clause. See `LICENSE`.

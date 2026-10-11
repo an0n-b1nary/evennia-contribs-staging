@@ -1,6 +1,14 @@
 # Changelog — evennia-rp-contest
 
-## [Unreleased]
+## [0.1.2] - 2026-10-10
+
+### Added
+
+- A player guide page for evennia-guides, `tests` (`+test` and room
+  challenges) and the `defaults-with-override` principle, in `guides/` and the
+  package data. It describes the system in general terms, without exact numbers,
+  and links only to pages this contrib or its required dependencies ship.
+  Without evennia-guides it's ignored.
 
 ### Documentation
 
