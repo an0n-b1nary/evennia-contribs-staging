@@ -7,16 +7,20 @@ Does not rely on the consumer's global REST_FRAMEWORK configuration.
 """
 
 from django.db.models import Prefetch
+from django.http import Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
+from evennia_links.characters import web_character
 from evennia_maps.api.filters import PlaneFilter
 from evennia_maps.api.pagination import MapsCursorPagination, TilePagination
 from evennia_maps.api.serializers import PlaneSerializer, RoomTileSerializer
+from evennia_maps.detail import build_detail
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays
 from evennia_maps.permissions import is_room_web_visible, is_staff_user
@@ -134,7 +138,7 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         portal_by_room = portal_target_planes_by_room(
             room_ids, exclude_plane_id=plane.pk, staff=staff
         )
-        overlays = collect_overlays(room_ids, staff=staff)
+        overlays = collect_overlays(room_ids, staff=staff, viewer=web_character(request.user))
         primary_region = overlays.get("primary_region", {})
         has_active_scene = overlays.get("has_active_scene", {})
         recent_scene_counts = overlays.get("recent_scene_count", {})
@@ -173,3 +177,30 @@ class PlaneViewSet(ReadOnlyModelViewSet):
         page = paginator.paginate_queryset(data, request)
         serializer = RoomTileSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"tiles/(?P<room_id>\d+)/detail",
+        url_name="tile-detail",
+    )
+    def tile_detail(self, request, pk=None, room_id=None):
+        """
+        The room panel for one tile: everything tied to that room, for this
+        viewer. See evennia_maps/detail.py for the payload and the sections
+        seam.
+
+        404s, never 403s, for a room that isn't placed on this plane or that
+        the caller may not see: a different status would confirm that a
+        hidden room exists.
+        """
+        plane = self.get_object()
+        staff = is_staff_user(request)
+        tile = (
+            RoomTile.objects.filter(plane=plane, room_id=int(room_id))
+            .select_related("room")
+            .first()
+        )
+        if tile is None or not (staff or is_room_web_visible(tile.room)):
+            raise Http404
+        return Response(build_detail(tile, staff=staff, viewer=web_character(request.user)))

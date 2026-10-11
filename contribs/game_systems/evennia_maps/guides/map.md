@@ -20,15 +20,22 @@ The live map shows what's happening as of when you opened it. Reload the page fo
 - **"3 here":** characters in the room right now.
 - **A hangout type**, such as Bar or Market: the room is marked as a place to find people.
 
-Click a room for more: who's there, scenes happening now, recent logs and upcoming events, with links to each, and to the room's region. Some notes only appear when your game runs the system behind them. Rooms on other planes are reached through **portals**, marked with an arrow.
+Click a room to open its panel: a short description, who's there, scenes happening now, recent logs and upcoming events, with links to each and to the room's region. Depending on what your game runs, the panel can also show:
 
-The **Room list** button under the map lists every room you can see, grouped by region. Each entry opens the same details as clicking the map, so you can use the live map from a keyboard or with a screen reader.
+- **Lore** tied to the room's region: what your character already knows, linked, and what it hasn't learned yet, listed but locked.
+- **Plots** that have had a scene in the room.
+- **Gathering:** what gathering in the room's terrain can turn up.
+
+On a wide screen the panel sits beside the map; on a phone it slides up from the bottom. Close it with its × button or Escape. Rooms on other planes are reached through **portals**, marked with an arrow.
+
+The **Room list** button under the map lists every room you can see, grouped by region. Each entry opens the same panel as clicking the map, so you can use the live map from a keyboard or with a screen reader.
 
 ## What the map doesn't show
 
 - **Hidden rooms**, such as staff areas and secret places, are left off for players. The map doesn't hint at how many rooms are hidden, either.
 - **Private scenes** are left out of the scene notes.
-- **Unfindable characters** aren't counted or named, even if you're in the same room. Staff see everyone.
+- **Unfindable characters** aren't counted or named, unless your character is in the same room in game, where you'd see them anyway. Staff see everyone.
+- **Lore your character hasn't learned** is listed without a link, and lore that can only be shared with you is counted, not named.
 
 :::insight[A map is a way of finding people]
 The map shows where the game is happening. That makes it the quickest way to find a scene, but it also shows where people are. So anything someone has chosen to keep private stays off it, and the live map is only for logged-in players.

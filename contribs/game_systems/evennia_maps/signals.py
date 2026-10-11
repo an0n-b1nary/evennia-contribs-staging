@@ -24,6 +24,17 @@ collect_tile_overlays — the web tile-overlay seam. Sent once per map
                   keys. Sent from evennia_maps.overlays.collect_overlays();
                   see that module for the full key contract and for why
                   these cannot simply be read off the partner models.
+                  The live map also passes viewer (the web character, or
+                  None); providers that don't need it ignore it via
+                  **kwargs.
+
+collect_tile_detail — the room-panel seam. Sent once per click on the live
+                  map, for one room, with kwargs room_id (int), room (the
+                  room object), viewer (the web character, or None) and
+                  staff (bool), sender=MapPlane. Each partner returns
+                  {section_key: section} for the panel sections it owns,
+                  merged the same way. See evennia_maps.detail for the
+                  section shape.
 """
 
 from django.dispatch import Signal
@@ -32,3 +43,4 @@ tile_placed = Signal()
 tile_conflicted = Signal()
 terrain_changed = Signal()
 collect_tile_overlays = Signal()
+collect_tile_detail = Signal()

@@ -65,6 +65,10 @@ namespace; set it to ``""`` to turn the live map off. When it does not
 resolve, the live page says so instead of rendering an empty canvas.
 """
 
+DEFAULT_TILE_DETAIL_URL_NAME = "api-plane-tile-detail"
+"""Route name for the room-panel action. Override with
+``MAPS_TILE_DETAIL_URL_NAME`` alongside ``MAPS_TILES_URL_NAME``."""
+
 
 def filter_visible_tiles(tiles, *, staff):
     """Drop staff-only/secret-room tiles from *tiles* unless *staff*."""
@@ -124,6 +128,24 @@ def tiles_url_template():
         return ""
     try:
         return reverse(name, args=[0])
+    except NoReverseMatch:
+        return ""
+
+
+def tile_detail_url_template():
+    """
+    The room-panel endpoint reversed with placeholder plane and room pks,
+    ``/.../planes/0/tiles/0/detail/``, or "" if unmounted.
+
+    The JS fills the plane first, then the room: each replaces the first
+    ``/0/`` left in the string. Without the route the live map still draws
+    and its tiles simply don't open a panel.
+    """
+    name = getattr(settings, "MAPS_TILE_DETAIL_URL_NAME", DEFAULT_TILE_DETAIL_URL_NAME)
+    if not name:
+        return ""
+    try:
+        return reverse(name, kwargs={"pk": 0, "room_id": 0})
     except NoReverseMatch:
         return ""
 
@@ -285,7 +307,8 @@ class PlaneLiveMapView(DetailView):
             for sibling in siblings
         ]
         context["tiles_url_template"] = tiles_url_template()
-        # Outbound links for popups. An absent role renders no link at all —
+        context["tile_detail_url_template"] = tile_detail_url_template()
+        # Outbound links for tooltips and the room list. An absent role renders no link at all —
         # the partner contrib that owns that page is not installed.
         urls = overlay_url_templates()
         context["room_url_template"] = urls.get("room", "")

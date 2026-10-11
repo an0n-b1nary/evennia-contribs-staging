@@ -20,19 +20,25 @@
  * Overlays: the activity heatmap, lore pins, and hangout markers are
  * toggleable Leaflet overlay layers built from fields already present on
  * each tile (recent_scene_count, has_lore, hangout_type) — no extra fetch.
- * Recent logs and upcoming events render into the ordinary tile popup
- * instead of a separate layer, since they're per-tile detail rather than a
- * map-wide pattern. Every overlay is privacy-filtered server-side exactly
- * like the base tile data; this file never re-derives visibility.
+ * Every overlay is privacy-filtered server-side exactly like the base tile
+ * data; this file never re-derives visibility.
+ *
+ * The room panel: clicking a tile (or its room-list button) asks the
+ * room-detail route about that one room and shows the answer beside the
+ * map, or as a bottom sheet on a narrow screen. That is where per-viewer
+ * content lives — lore your character knows, who is in the room with you —
+ * plus whatever sections partner contribs add (see evennia_maps/detail.py).
+ * Without the route, or if it fails, the panel shows what the tile feed
+ * already carries.
  *
  * Terrain display (label, colour, sprite) comes from MAPS_TERRAINS on the
  * server (terrain.terrain_style), so this file never needs the vocabulary.
  * Tiles brighten on hover and carry a tooltip; a terrain legend sits in the
  * corner, and a room list beneath the map gives keyboard and screen-reader
- * users every tile, each with a button that opens the same popup.
+ * users every tile, each with a button that opens the same panel.
  *
  * Who's here (tile.present, from evennia_social) is a "N here" badge and a
- * list of names in the popup. The server has already left out characters
+ * list of names in the panel. The server has already left out characters
  * who chose not to be found, so this file shows what it is given.
  *
  * Overlay data arrives only from whichever partner contribs the game has
@@ -278,50 +284,240 @@
     ];
   }
 
-  function linkList(heading, items, urlTemplate) {
-    if (!items || !items.length || !urlTemplate) {
-      return "";
-    }
-    // Titles are player-authored, so they are escaped here even though the
-    // server resolved the fallback.
-    var html = "<div>" + heading + ":<ul>";
-    items.forEach(function (item) {
-      html +=
-        '<li><a href="' +
-        urlFor(urlTemplate, item.id) +
-        '">' +
-        escapeHtml(item.title) +
-        "</a></li>";
+  function fillTemplate(template, ids) {
+    // Each id replaces the first "/0/" left, so a template reversed with two
+    // placeholder pks takes the plane and then the room.
+    var url = template;
+    ids.forEach(function (id) {
+      url = url.replace("/0/", "/" + id + "/");
     });
-    return html + "</ul></div>";
+    return url;
   }
 
-  function popupContent(tile, urls) {
-    var roomLabel = escapeHtml(tile.room_name);
-    if (urls.room) {
-      roomLabel = '<a href="' + urlFor(urls.room, tile.room_id) + '">' + roomLabel + "</a>";
+  function detailFromTile(tile, urls) {
+    // The panel without the room-detail route, or when it fails: what the
+    // tile feed already carries, and no partner sections.
+    function linked(items, template) {
+      return (items || []).map(function (item) {
+        return { id: item.id, title: item.title, url: urlFor(template, item.id) };
+      });
     }
-    var html = '<div class="evennia-maps-popup"><h3>' + roomLabel + "</h3>";
-    if (tile.has_active_scene) {
-      html += "<div>A scene is active here.</div>";
+    return {
+      room_name: tile.room_name,
+      room_url: urlFor(urls.room, tile.room_id),
+      description: "",
+      terrain_label: tile.terrain_label,
+      hangout_type: tile.hangout_type,
+      region: tile.primary_region_id
+        ? {
+            name: tile.primary_region_name,
+            url: urlFor(urls.region, tile.primary_region_id),
+          }
+        : null,
+      present: tile.present || [],
+      active_scenes: linked(tile.active_scenes, urls.scene),
+      recent_scenes: linked(tile.recent_scenes, urls.scene),
+      upcoming_events: linked(tile.upcoming_events, urls.event),
+      sections: [],
+    };
+  }
+
+  function el(tag, className, text) {
+    // The panel is built from DOM nodes and textContent only: room names,
+    // descriptions, titles and partner sections are all player- or
+    // staff-authored, so none of it ever passes through markup.
+    var node = document.createElement(tag);
+    if (className) {
+      node.className = className;
     }
-    if (tile.hangout_type) {
-      html += "<div>" + escapeHtml(hangoutLabel(tile.hangout_type)) + "</div>";
+    if (text !== undefined && text !== null) {
+      node.textContent = text;
     }
-    if (tile.primary_region_id && urls.region) {
-      html += '<a href="' + urlFor(urls.region, tile.primary_region_id) + '">View region</a>';
+    return node;
+  }
+
+  function linkOrText(label, url) {
+    // URLs come from the server: reversed route templates, or section links
+    // the room-detail route has already limited to site-relative paths.
+    if (!url) {
+      return document.createTextNode(label);
     }
-    if (tile.present && tile.present.length) {
-      // Character names are player-chosen, so they are escaped.
-      html +=
-        "<div>Here now: " +
-        tile.present.map(escapeHtml).join(", ") +
-        "</div>";
+    var link = el("a", "", label);
+    link.href = url;
+    return link;
+  }
+
+  function panelSection(title, summary, items) {
+    var wrap = el("section", "evennia-maps-panel-section");
+    wrap.appendChild(el("h3", "", title));
+    if (summary) {
+      wrap.appendChild(el("p", "evennia-maps-panel-summary", summary));
     }
-    html += linkList("Happening now", tile.active_scenes, urls.scene);
-    html += linkList("Recent logs", tile.recent_scenes, urls.scene);
-    html += linkList("Upcoming events", tile.upcoming_events, urls.event);
-    return html + "</div>";
+    if (items && items.length) {
+      var list = el("ul");
+      items.forEach(function (item) {
+        var row = el("li", item.locked ? "evennia-maps-panel-locked" : "");
+        row.appendChild(linkOrText(item.label, item.url));
+        if (item.note) {
+          row.appendChild(el("span", "evennia-maps-panel-note", item.note));
+        } else if (item.locked) {
+          // Locked is styled, but never only styled: say it too.
+          row.appendChild(el("span", "evennia-maps-panel-note", "not yet known"));
+        }
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
+    return wrap;
+  }
+
+  function renderPanel(titleEl, body, detail) {
+    titleEl.textContent = "";
+    titleEl.appendChild(linkOrText(detail.room_name, detail.room_url));
+    body.textContent = "";
+
+    var meta = [];
+    if (detail.terrain_label) {
+      meta.push(document.createTextNode(detail.terrain_label));
+    }
+    if (detail.region && detail.region.name) {
+      meta.push(linkOrText(detail.region.name, detail.region.url));
+    }
+    if (detail.hangout_type) {
+      meta.push(document.createTextNode(hangoutLabel(detail.hangout_type)));
+    }
+    if (meta.length) {
+      var line = el("p", "evennia-maps-panel-meta");
+      meta.forEach(function (node, index) {
+        if (index) {
+          line.appendChild(document.createTextNode(" · "));
+        }
+        line.appendChild(node);
+      });
+      body.appendChild(line);
+    }
+    if (detail.description) {
+      body.appendChild(el("p", "evennia-maps-panel-desc", detail.description));
+    }
+    if (detail.present && detail.present.length) {
+      body.appendChild(
+        panelSection(
+          "Here now",
+          "",
+          detail.present.map(function (name) {
+            return { label: name };
+          })
+        )
+      );
+    }
+    [
+      ["Happening now", detail.active_scenes],
+      ["Recent logs", detail.recent_scenes],
+      ["Upcoming events", detail.upcoming_events],
+    ].forEach(function (pair) {
+      if (pair[1] && pair[1].length) {
+        body.appendChild(
+          panelSection(
+            pair[0],
+            "",
+            pair[1].map(function (item) {
+              return { label: item.title, url: item.url };
+            })
+          )
+        );
+      }
+    });
+    (detail.sections || []).forEach(function (section) {
+      body.appendChild(panelSection(section.title, section.summary, section.items));
+    });
+    if (!body.childNodes.length) {
+      body.appendChild(el("p", "evennia-maps-panel-empty", "Nothing else is known about this place yet."));
+    }
+  }
+
+  function makePanel(map, detailUrlTemplate, urls) {
+    // One panel per page, reused for every room. A request token drops a
+    // slow answer for a room the player has already clicked away from.
+    var panel = document.getElementById("evennia-maps-panel");
+    if (!panel) {
+      return null;
+    }
+    var titleEl = panel.querySelector(".evennia-maps-panel-title");
+    var body = panel.querySelector(".evennia-maps-panel-body");
+    var closeButton = panel.querySelector(".evennia-maps-panel-close");
+    var request = 0;
+    var trigger = null;
+
+    function setOpen(open) {
+      panel.hidden = !open;
+      // Beside the map the panel takes width from it, so Leaflet re-measures.
+      map.invalidateSize();
+    }
+
+    function close() {
+      request += 1;
+      setOpen(false);
+      if (trigger && document.body.contains(trigger)) {
+        trigger.focus();
+      }
+      trigger = null;
+    }
+
+    closeButton.addEventListener("click", close);
+    panel.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
+    });
+
+    function open(tile, planeId, from) {
+      var mine = (request += 1);
+      trigger = from || null;
+      var fallback = detailFromTile(tile, urls);
+      setOpen(true);
+      if (!detailUrlTemplate) {
+        renderPanel(titleEl, body, fallback);
+        panel.focus();
+        return;
+      }
+      titleEl.textContent = tile.room_name;
+      body.textContent = "";
+      body.appendChild(el("p", "evennia-maps-panel-empty", "Loading…"));
+      panel.setAttribute("aria-busy", "true");
+      panel.focus();
+      fetch(fillTemplate(detailUrlTemplate, [planeId, tile.room_id]), {
+        headers: { Accept: "application/json" },
+      })
+        .then(function (resp) {
+          if (!resp.ok) {
+            throw new Error("room detail fetch failed: " + resp.status);
+          }
+          return resp.json();
+        })
+        .then(function (detail) {
+          if (mine === request) {
+            renderPanel(titleEl, body, detail);
+          }
+        })
+        .catch(function () {
+          if (mine !== request) {
+            return;
+          }
+          renderPanel(titleEl, body, fallback);
+          body.insertBefore(
+            el("p", "evennia-maps-panel-error", "Some details about this place couldn't be loaded."),
+            body.firstChild
+          );
+        })
+        .then(function () {
+          if (mine === request) {
+            panel.removeAttribute("aria-busy");
+          }
+        });
+    }
+
+    return { open: open, close: close };
   }
 
   function heatmapMarker(tile) {
@@ -368,13 +564,7 @@
     }).bindTooltip(escapeHtml(label));
   }
 
-  function populateLayer(groups, tiles, container) {
-    var urls = {
-      room: container.dataset.roomUrlTemplate,
-      region: container.dataset.regionUrlTemplate,
-      scene: container.dataset.sceneUrlTemplate,
-      event: container.dataset.eventUrlTemplate,
-    };
+  function populateLayer(groups, tiles, container, onSelect) {
     var liveMapUrlTemplate = container.dataset.liveMapUrlTemplate;
 
     groups.tiles.clearLayers();
@@ -397,17 +587,15 @@
           groups.tiles.addLayer(layer);
         });
       } else {
-        var layer = tileLayer(tile)
-          .bindPopup(popupContent(tile, urls))
-          .bindTooltip(tooltipContent(tile), {
-            sticky: true,
-            direction: "top",
-            className: "evennia-maps-tooltip",
-          });
+        var layer = tileLayer(tile).bindTooltip(tooltipContent(tile), {
+          sticky: true,
+          direction: "top",
+          className: "evennia-maps-tooltip",
+        });
+        layer.on("click", function () {
+          onSelect(tile, null);
+        });
         addHover(layer, tile);
-        if (groups.byRoom) {
-          groups.byRoom[tile.room_id] = layer;
-        }
         groups.tiles.addLayer(layer);
       }
 
@@ -500,9 +688,10 @@
     box.appendChild(details);
   }
 
-  function renderRoomList(listEl, tiles, byRoom, map, liveMapUrlTemplate) {
+  function renderRoomList(listEl, tiles, map, liveMapUrlTemplate, onSelect) {
     // The keyboard and screen-reader route to every tile: rooms grouped by
-    // region, each a button that opens the tile's popup on the map.
+    // region, each a button that centres the map on the room and opens its
+    // panel, returning focus to the button when the panel closes.
     listEl.textContent = "";
     var groups = {};
     tiles.forEach(function (tile) {
@@ -534,12 +723,8 @@
                 window.location.href = urlFor(liveMapUrlTemplate, tile.portal_plane_id);
                 return;
               }
-              var layer = byRoom[tile.room_id];
-              if (layer) {
-                var centre = cellCenter(tile);
-                map.setView(centre, Math.max(map.getZoom(), 1));
-                layer.openPopup(centre);
-              }
+              map.setView(cellCenter(tile), Math.max(map.getZoom(), 1));
+              onSelect(tile, button);
             });
             item.appendChild(button);
             var detail = [tile.terrain_label].concat(badges(tile)).filter(Boolean);
@@ -604,7 +789,29 @@
       lore: L.layerGroup(),
       hangouts: L.layerGroup(),
     };
-    var byRoomById = {};
+
+    var urls = {
+      room: container.dataset.roomUrlTemplate,
+      region: container.dataset.regionUrlTemplate,
+      scene: container.dataset.sceneUrlTemplate,
+      event: container.dataset.eventUrlTemplate,
+    };
+    var panel = makePanel(map, container.dataset.tileDetailUrlTemplate, urls);
+
+    function selectFor(planeId) {
+      return function (tile, from) {
+        if (panel) {
+          panel.open(tile, planeId, from);
+          return;
+        }
+        // A game template from before the room panel has no <aside> for it:
+        // name the room in a plain popup rather than doing nothing.
+        L.popup()
+          .setLatLng(cellCenter(tile))
+          .setContent("<strong>" + escapeHtml(tile.room_name) + "</strong>")
+          .openOn(map);
+      };
+    }
 
     var legend = L.control({ position: "bottomright" });
     legend.onAdd = function () {
@@ -632,26 +839,26 @@
       }
       return loading[planeId]
         .then(function (tiles) {
-          byRoomById[planeId] = {};
+          var onSelect = selectFor(planeId);
           populateLayer(
             {
               tiles: groupsById[planeId],
               heatmap: overlayGroups.heatmap,
               lore: overlayGroups.lore,
               hangouts: overlayGroups.hangouts,
-              byRoom: byRoomById[planeId],
             },
             tiles,
-            container
+            container,
+            onSelect
           );
           renderLegend(legend.getContainer(), tiles);
           if (listToggle && listEl) {
             renderRoomList(
               listEl,
               tiles,
-              byRoomById[planeId],
               map,
-              container.dataset.liveMapUrlTemplate
+              container.dataset.liveMapUrlTemplate,
+              onSelect
             );
             listToggle.hidden = !tiles.length;
           }
