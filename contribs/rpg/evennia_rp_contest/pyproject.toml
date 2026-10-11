@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-contest"
-version = "0.1.1"
+version = "0.1.2"
 description = "Player-led RP tests, room challenges and private resolution audits for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -30,3 +30,6 @@ packages = ["evennia_rp_contest", "evennia_rp_contest.integrations", "evennia_rp
 "evennia_rp_contest" = "."
 "evennia_rp_contest.integrations" = "integrations"
 "evennia_rp_contest.migrations" = "migrations"
+
+[tool.setuptools.package-data]
+evennia_rp_contest = ["guides/*.md"]

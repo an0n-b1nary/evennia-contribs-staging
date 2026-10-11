@@ -94,3 +94,13 @@ without all three. In a fresh venv, use `scripts/ci_install_contribs.py` with
 `python scripts/ci_run_rp_contest_tests.py <game> --absent <app_label>`.
 The runner refuses an allegedly absent partner that is still importable and
 an Evennia launcher that exits without a positive test count.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `tests`,
+`defaults-with-override` (a principle). They explain the system to players in
+general terms, without exact numbers, and link only to pages this contrib or
+its required dependencies ship. With evennia-guides installed they appear on
+its web guide; without it they're ignored. To restate one for your game, add a
+page with the same key to `GUIDES_DIRS`.
