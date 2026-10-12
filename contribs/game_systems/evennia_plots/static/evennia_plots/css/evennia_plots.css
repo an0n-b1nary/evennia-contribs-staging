@@ -16,6 +16,7 @@
 .evennia-plots-diff .evennia-plots-diff-meta { color: var(--evennia-color-muted, #6c757d); }
 .evennia-plots-pre-wrap { white-space: pre-wrap; }
 .evennia-plots-empty { color: var(--evennia-color-muted, #6c757d); font-style: italic; }
+.evennia-plots-thread { margin-bottom: .75rem; }
 
 /* Preserve table headers for assistive technology while stacking labelled rows. */
 .evennia-plots-cell-label { display: none; }

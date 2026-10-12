@@ -3,13 +3,13 @@
 """
 Plot thread and plot arc management commands for evennia_plots.
 
-Commands for creating, linking, and following plot threads and arcs.
+Commands for creating, linking, and following plots and arcs.
 Includes a staff nudge command for connecting players to storylines.
 
 Commands:
-    CmdPlot  (+plot) — create, manage, view, and follow plot threads
+    CmdPlot  (+plot) — create, manage, view, and follow plots
     CmdArc   (+arc)  — manage plot arcs (PLOTS_STAFF_LOCK)
-    CmdHook  (+hook) — nudge a player toward a plot thread (PLOTS_STAFF_LOCK)
+    CmdHook  (+hook) — nudge a player toward a plot (PLOTS_STAFF_LOCK)
 
 **Accessibility shim:** If the ``evennia-accessibility`` package is installed,
 ``uses_screenreader(caller)`` is imported from it; otherwise it is a no-op
@@ -62,7 +62,7 @@ _MAX_PLOT_FOLLOWS = 20
 
 
 def _plot_web_path(pk):
-    """Return a web path for a plot thread. Absolute if SITE_URL is set."""
+    """Return a web path for a plot. Absolute if SITE_URL is set."""
     from django.conf import settings
 
     base = getattr(settings, "SITE_URL", "").rstrip("/")
@@ -172,13 +172,13 @@ def _resolve_thread(arg, caller):
     if arg.startswith("#"):
         num_str = arg[1:]
         if not num_str.isdigit():
-            return None, f"'{arg}' is not a valid thread ID. Use #N (e.g. #5)."
+            return None, f"'{arg}' is not a valid plot ID. Use #N (e.g. #5)."
         try:
             t = PlotThread.objects.get(plot_number=int(num_str))
         except PlotThread.DoesNotExist:
-            return None, f"No plot thread #{num_str} found."
+            return None, f"No plot #{num_str} found."
         if not staff and not t.can_view(caller):
-            return None, f"No plot thread #{num_str} found."
+            return None, f"No plot #{num_str} found."
         return t, None
 
     # Partial name match — build candidate pool
@@ -191,14 +191,15 @@ def _resolve_thread(arg, caller):
     )
     threads = list(qs)
 
-    # For non-staff, also include threads the caller created or is invited to
+    # For non-staff, also include plots the caller owns or is invited to
     if not staff:
         extra = (
             PlotThread.objects.filter(
                 status__in=[PlotThread.Status.PROPOSED, PlotThread.Status.ACTIVE]
             )
-            .filter(Q(creator=caller) | Q(invited_characters=caller))
+            .filter(Q(owners__character=caller) | Q(invited_characters=caller))
             .exclude(id__in=[t.id for t in threads])
+            .distinct()
         )
         threads.extend(extra)
 
@@ -211,12 +212,12 @@ def _resolve_thread(arg, caller):
         return matches[0], None
     if len(matches) > 1:
         names = ", ".join(f"#{t.plot_number} {t.name}" for t in matches[:5])
-        return None, f"Multiple threads match '{arg}': {names}. Use #N to be specific."
+        return None, f"Multiple plots match '{arg}': {names}. Use #N to be specific."
     close = difflib.get_close_matches(arg, name_map.keys(), n=3, cutoff=0.5)
     if close:
         suggestions = ", ".join(f"#{name_map[n].plot_number} {n}" for n in close)
-        return None, f"No thread '{arg}' found. Did you mean: {suggestions}?"
-    return None, f"No plot thread matching '{arg}' found."
+        return None, f"No plot '{arg}' found. Did you mean: {suggestions}?"
+    return None, f"No plot matching '{arg}' found."
 
 
 def _resolve_arc(arg, caller):
@@ -256,8 +257,13 @@ def _resolve_arc(arg, caller):
     return None, f"No plot arc matching '{arg}' found."
 
 
+def _owner_names(plot):
+    names = [o.character_name for o in plot.owners.all() if o.character_name]
+    return ", ".join(names) or "none (staff manage it)"
+
+
 def _format_thread_header(thread, caller):
-    """Return a formatted header line for a plot thread."""
+    """Return a formatted header line for a plot."""
     tags = " ".join(f"|c[{t.name}]|n" for t in thread.tags.all()) or "|x(no tags)|n"
     status_color = {
         "proposed": "|y",
@@ -267,24 +273,159 @@ def _format_thread_header(thread, caller):
     }.get(thread.status, "")
     arc_str = f" | Arc: {thread.arc}" if thread.arc else ""
     web_link = f" |lu{_plot_web_path(thread.pk)}|lt[↗]|le"
+    led = " |y[Owner-led]|n" if thread.is_owner_led else ""
     return (
-        f"|w== Plot Thread #{thread.plot_number}: {thread.name} ==|n{web_link}\n"
+        f"|w== Plot #{thread.plot_number}: {thread.name} ==|n{web_link}{led}\n"
         f"Tags: {tags}\n"
         f"Status: {status_color}{thread.get_status_display()}|n"
         f" | Privacy: {thread.get_privacy_display()}"
-        f" | Creator: {thread.creator_name}{arc_str}"
+        f" | Owners: {_owner_names(thread)}{arc_str}"
+    )
+
+
+def _thread_counts(plot, caller):
+    """List suffix: open threads, Owner-led, and (for managers) waiting requests."""
+    from evennia_plots.models import StoryThread
+
+    counts = []
+    open_count = plot.story_threads.filter(status=StoryThread.Status.OPEN).count()
+    if open_count:
+        counts.append(f"{open_count} open thread{'s' if open_count != 1 else ''}")
+    if plot.is_owner_led:
+        counts.append("Owner-led")
+    if plot.can_manage(caller):
+        waiting = plot.story_threads.filter(status=StoryThread.Status.REQUESTED).count()
+        if waiting:
+            counts.append(f"{waiting} request{'s' if waiting != 1 else ''} waiting")
+    return "".join(f", {c}" for c in counts)
+
+
+def _owner_characters(plot, skip=None):
+    """The plot's owner characters, optionally leaving one out."""
+    return [
+        o.character
+        for o in plot.owners.select_related("character")
+        if o.character is not None and (skip is None or o.character.pk != skip.pk)
+    ]
+
+
+def _loose_end_note(plot):
+    """After conclude/archive: name the threads left as loose ends, if any."""
+    from evennia_plots.models import StoryThread
+
+    loose = list(plot.story_threads.filter(status=StoryThread.Status.LOOSE_END))
+    if not loose:
+        return ""
+    refs = ", ".join(t.ref for t in loose)
+    return (
+        f"\nLoose ends: {refs}. Leaving threads open is fine. To pick one up in a sequel, "
+        f"use |w+plot/thread/carry <#N.T>=<#sequel>|n."
+    )
+
+
+def _seal_note(thread):
+    """After resolve/drop: say what happened to a sealed answer."""
+    if not thread.has_sealed_answer:
+        return ""
+    if thread.sealed_answer_revealed:
+        return "\nThe planned answer is now revealed."
+    return (
+        f"\nThe sealed answer stays sealed. Reveal it later with "
+        f"|w+plot/thread/reveal {thread.ref}|n."
     )
 
 
 def _can_edit_thread(thread, caller):
-    """Return True if caller is the thread creator or staff."""
-    if is_plot_staff(caller):
-        return True
-    return thread.creator_id and caller.id == thread.creator_id
+    """Return True if caller is one of the plot's owners, or staff."""
+    return thread.can_manage(caller)
+
+
+def _resolve_story_thread(arg, caller):
+    """Resolve a thread from ``#N.T`` (plot number, thread number).
+
+    Returns:
+        (StoryThread, None) on success, (None, error_str) otherwise.
+    """
+    from evennia_plots.models import StoryThread
+    from evennia_plots.threads import visible_threads
+
+    ref = arg.strip().lstrip("#")
+    plot_part, dot, thread_part = ref.partition(".")
+    if not dot or not plot_part.isdigit() or not thread_part.isdigit():
+        return None, f"'{arg.strip()}' is not a thread reference. Use #<plot>.<thread>, e.g. #12.3."
+    plot, err = _resolve_thread(f"#{plot_part}", caller)
+    if err:
+        return None, err
+    thread = StoryThread.objects.filter(plot=plot, number=int(thread_part)).first()
+    if thread is None or thread not in visible_threads(plot, caller):
+        return None, f"No thread #{plot.plot_number}.{thread_part} found."
+    return thread, None
+
+
+def _thread_line(thread, screenreader=False):
+    """One line describing a thread for +plot <#N>."""
+    from evennia_plots.models import StoryThread
+
+    status = thread.status
+    interests = list(thread.interests.all())
+    leads = [i.character_name for i in interests if i.is_lead]
+    others = sum(1 for i in interests if not i.is_lead)
+    extras = []
+    if leads:
+        extras.append(f"led by {', '.join(leads)}")
+    if others:
+        extras.append(f"{others} interested")
+    if status == StoryThread.Status.REQUESTED:
+        extras.append(f"requested by {thread.created_by_name}")
+    if status == StoryThread.Status.DECLINED and thread.decline_reason:
+        extras.append(f"declined: {thread.decline_reason}")
+    if status == StoryThread.Status.CARRIED and thread.carried_to_id:
+        extras.append(f"carried to {thread.carried_to.ref}")
+    tail = f" ({'; '.join(extras)})" if extras else ""
+    if screenreader:
+        held = ", held" if thread.is_held else ""
+        return f"  {thread.ref} {thread.title} - {thread.get_status_display()}{held}{tail}"
+    held = " |y[Held]|n" if thread.is_held else ""
+    label = "" if status == StoryThread.Status.OPEN else f" |x[{thread.get_status_display()}]|n"
+    return f"  |w{thread.ref}|n {thread.title}{held}{label}{tail}"
+
+
+def _thread_section(plot, caller, screenreader=False):
+    """Lines for the Threads section of +plot <#N>; empty when there are none.
+
+    Open threads come first, held ones leading, then requests; finished
+    threads follow with their resolutions. A sealed answer appears only once
+    it has been revealed.
+    """
+    from evennia_plots.models import StoryThread
+    from evennia_plots.threads import visible_threads
+
+    threads = visible_threads(plot, caller)
+    if not threads:
+        return []
+    live = (StoryThread.Status.OPEN, StoryThread.Status.REQUESTED)
+    current = sorted(
+        (t for t in threads if t.status in live),
+        key=lambda t: (t.status != StoryThread.Status.OPEN, not t.is_held, t.number),
+    )
+    finished = [t for t in threads if t.status not in live]
+    policy = plot.get_thread_policy_display().lower()
+    lines = [f"Threads ({policy}):" if screenreader else f"\n|w--- Threads ({policy}) ---|n"]
+    for thread in current:
+        lines.append(_thread_line(thread, screenreader))
+        if thread.detail:
+            lines.append(f"      {thread.detail}")
+    for thread in finished:
+        lines.append(_thread_line(thread, screenreader))
+        if thread.status == StoryThread.Status.RESOLVED and thread.resolution:
+            lines.append(f"      Resolved: {thread.resolution}")
+        if thread.sealed_answer_revealed and thread.has_sealed_answer:
+            lines.append(f"      The planned answer: {thread.sealed_answer}")
+    return lines
 
 
 def _display_thread(thread, caller):
-    """Return full thread detail text for +plot <#N>."""
+    """Return full plot detail text for +plot <#N>."""
     is_participant = thread.is_participant(caller)
     show_ooc = is_participant or is_plot_staff(caller)
     updates = thread.updates.all()
@@ -293,14 +434,17 @@ def _display_thread(thread, caller):
         tags_str = ", ".join(tag.name for tag in thread.tags.all()) or "none"
         arc_str = f", Arc #{thread.arc.arc_number} {thread.arc.name}" if thread.arc else ""
         lines = [
-            f"Plot Thread #{thread.plot_number}: {thread.name}",
+            f"Plot #{thread.plot_number}: {thread.name}",
             f"  Status: {thread.get_status_display()}"
             f" | Privacy: {thread.get_privacy_display()}"
-            f" | Creator: {thread.creator_name}{arc_str}",
+            f" | Owners: {_owner_names(thread)}{arc_str}",
             f"  Tags: {tags_str}",
         ]
+        if thread.is_owner_led:
+            lines.append("  Owner-led: its owners hold the answer to an open thread.")
         if thread.description:
             lines.append(f"  Tagline: {thread.description}")
+        lines.extend(_thread_section(thread, caller, screenreader=True))
 
         if updates:
             lines.append("Updates:")
@@ -348,6 +492,8 @@ def _display_thread(thread, caller):
 
     if thread.description:
         lines.append(f"\n|wTagline:|n {thread.description}")
+
+    lines.extend(_thread_section(thread, caller))
 
     if updates:
         lines.append("\n|w--- Updates ---")
@@ -403,6 +549,12 @@ def _display_thread(thread, caller):
         for entry in thread.hook_log[-5:]:
             lines.append(f"  {entry['at'][:10]}: {entry['staff']} → {entry['target']}")
 
+    if thread.staff_log and _can_edit_thread(thread, caller):
+        lines.append("\n|w[Staff actions]|n")
+        for entry in thread.staff_log[-5:]:
+            detail = f": {entry['detail']}" if entry.get("detail") else ""
+            lines.append(f"  {entry['at'][:10]}: {entry['staff']} {entry['action']}{detail}")
+
     lines.append("|w" + "=" * 50 + "|n")
     return "\n".join(lines)
 
@@ -414,43 +566,66 @@ def _display_thread(thread, caller):
 
 class CmdPlot(MuxCommand):
     """
-    Manage plot threads.
+    Manage plots and their threads.
 
     Usage:
-        +plot                              List active public plot threads
-        +plot <#N|name>                    View a plot thread's details
+        +plot                              List active public plots
+        +plot <#N|name>                    View a plot's details and threads
         +plot/list[/active|proposed|concluded|tag <tag>]
-        +plot/create <name>[=<tagline>]    Create a new thread (proposed)
+        +plot/create <name>[=<tagline>]    Create a new plot (proposed)
         +plot/activate <#N>               Proposed → active
         +plot/desc <#N>=<tagline>          Edit the brief tagline
         +plot/update <#N>[=<text>]         Append an IC narrative update
         +plot/update/ooc <#N>[=<text>]     Append an OOC note (participants only)
         +plot/update/edit <#N>/<block#>    Edit an existing update block
-        +plot/tag <#N>=<tag>               Add a tag to the thread
+        +plot/tag <#N>=<tag>               Add a tag to the plot
         +plot/tag/major <#N>=<tag>         Add a major tag (staff only)
         +plot/untag <#N>=<tag>             Remove a tag
         +plot/tags                         List all plot tags
         +plot/privacy <#N>=<public|private|invite>
         +plot/invite <#N>=<character>      Add to invite list
+        +plot/owner <#N>=<character>       Add an owner
+        +plot/owner/remove <#N>=<character>  Remove an owner
         +plot/follow <#N>[=<detail>]       Follow for updates
         +plot/unfollow <#N>               Stop following
         +plot/public <#N>                 Toggle follow visibility
-        +plot/link/scene <#N>=<scene#>     Link a scene to this thread
+        +plot/link/scene <#N>=<scene#>     Link a scene to this plot
         +plot/link/post <#N>=<board>/<post>  Link a board post
         +plot/link/event <#N>=<event#>     Link a calendar event
         +plot/sequel <#N>=<#M>            Declare #N as sequel to #M
         +plot/relate <#N>=<#M>            Propose a related link (requires acceptance)
         +plot/relate/accept <#N>=<#M>     Accept a pending related link from #M
-        +plot/conclude <#N>               Conclude a thread (computes bonus XP)
-        +plot/request-conclude <#N>       Request staff conclude an archived thread
-        +plot/archive <#N>               Archive a thread (staff only)
+        +plot/conclude <#N>               Conclude a plot (computes bonus XP)
+        +plot/request-conclude <#N>       Ask staff to conclude or archive a plot
+        +plot/archive <#N>               Archive a plot (staff only)
 
-    Plot threads link Scenes, Board posts, and Calendar events into a storyline.
-    Concluding a thread awards up to 5 bonus XP to all participants.
+    Threads (open questions, problems or leads inside a plot, as #N.T):
+        +plot/threads <#N>=<owners|request|open>  Who may add threads
+        +plot/thread <#N>=<title>          Add a thread (or request one)
+        +plot/thread/detail <#N.T>=<text>  Set a thread's OOC detail
+        +plot/thread/accept <#N.T>         Accept a requested thread
+        +plot/thread/decline <#N.T>[=<reason>]  Decline a request
+        +plot/thread/withdraw <#N.T>       Withdraw your own request
+        +plot/thread/hold <#N.T>           Toggle held: the owners know the answer
+        +plot/thread/seal <#N.T>=<answer>  Seal the intended answer (empty clears it)
+        +plot/thread/answer <#N.T>         Read a sealed answer and its history
+        +plot/thread/resolve[/reveal] <#N.T>=<summary>  Resolve a thread
+        +plot/thread/drop[/reveal] <#N.T>  Drop a thread
+        +plot/thread/reveal <#N.T>         Reveal the sealed answer later
+        +plot/thread/reopen <#N.T>         Reopen a resolved or dropped thread
+        +plot/thread/lead <#N.T>           Toggle yourself as a lead
+        +plot/thread/interest <#N.T>       Toggle your interest
+        +plot/thread/carry <#N.T>=<#M>     Carry a loose end into sequel plot #M
+
+    A plot links scenes, board posts and calendar events into a storyline.
+    Concluding a plot awards up to 5 bonus XP to all participants. Threads are
+    a tool for running a plot together; they never affect XP. A held thread is
+    one whose answer the owners already know; its sealed answer stays sealed
+    until an owner reveals it.
     """
 
     key = "+plot"
-    aliases = ["+thread"]  # noqa: RUF012
+    aliases = []  # noqa: RUF012
     help_category = "Storytelling"
     locks = "cmd:all()"
 
@@ -470,6 +645,23 @@ class CmdPlot(MuxCommand):
                 return
             caller.msg(_display_thread(thread, caller))
             return
+
+        # Threads and owners come first: their sub-switches (accept, remove…)
+        # would otherwise be caught by older switches below.
+        if "thread" in sw:
+            return self._do_story_thread(sw, lhs, rhs, args)
+
+        if "threads" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+plot/threads <#N>=<owners|request|open>|n")
+                return
+            return self._do_thread_policy(lhs, rhs)
+
+        if "owner" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+plot/owner[/remove] <#N>=<character>|n")
+                return
+            return self._do_owner(lhs, rhs, remove="remove" in sw)
 
         if "list" in sw and "scene" not in sw and "post" not in sw and "event" not in sw:
             status_filter = None
@@ -494,7 +686,7 @@ class CmdPlot(MuxCommand):
 
             thread = PlotThread.create_thread(name=lhs, creator=caller, description=rhs)
             caller.msg(
-                f"|gCreated plot thread #{thread.plot_number}: {thread.name}|n (proposed)\n"
+                f"|gCreated plot #{thread.plot_number}: {thread.name}|n (proposed)\n"
                 f"Use |w+plot/activate #{thread.plot_number}|n to open it for contributions."
             )
             return
@@ -505,13 +697,13 @@ class CmdPlot(MuxCommand):
                 caller.msg(err)
                 return
             if not _can_edit_thread(thread, caller):
-                caller.msg("Only the thread creator (or staff) can activate it.")
+                caller.msg("Only the plot's owners (or staff) can activate it.")
                 return
             if thread.status != "proposed":
-                caller.msg(f"Thread is already {thread.get_status_display()}.")
+                caller.msg(f"Plot is already {thread.get_status_display()}.")
                 return
             thread.activate()
-            caller.msg(f"|gThread #{thread.plot_number} '{thread.name}' is now active.|n")
+            caller.msg(f"|gPlot #{thread.plot_number} '{thread.name}' is now active.|n")
             return
 
         if "desc" in sw:
@@ -520,7 +712,7 @@ class CmdPlot(MuxCommand):
                 caller.msg(err)
                 return
             if not _can_edit_thread(thread, caller):
-                caller.msg("Only the thread creator (or staff) can edit the tagline.")
+                caller.msg("Only the plot's owners (or staff) can edit the tagline.")
                 return
             if not rhs:
                 caller.msg("Usage: |w+plot/desc <#N>=<tagline>|n")
@@ -639,7 +831,7 @@ class CmdPlot(MuxCommand):
 
         if "archive" in sw:
             if not is_plot_staff(caller):
-                caller.msg("Only staff can archive plot threads.")
+                caller.msg("Only staff can archive plots.")
                 return
             if not lhs and not args:
                 caller.msg("Usage: |w+plot/archive <#N>|n")
@@ -682,14 +874,14 @@ class CmdPlot(MuxCommand):
             filter_desc = ""
             if tag_filter:
                 filter_desc = f" with tag '{tag_filter}'"
-            self.caller.msg(f"No plot threads found{filter_desc}.")
+            self.caller.msg(f"No plots found{filter_desc}.")
             return
 
         if uses_screenreader(caller):
             filter_label = f" (status: {status_filter})" if status_filter else ""
             filter_label += f" (tag: {tag_filter})" if tag_filter else ""
             count = len(threads)
-            lines = [f"Plot Threads{filter_label}: {count} thread{'s' if count != 1 else ''}"]
+            lines = [f"Plots{filter_label}: {count} plot{'s' if count != 1 else ''}"]
             for t in threads:
                 tags_str = ", ".join(tag.name for tag in t.tags.all()) or "none"
                 arc_str = f", Arc #{t.arc.arc_number} {t.arc.name}" if t.arc else ""
@@ -697,15 +889,16 @@ class CmdPlot(MuxCommand):
                 lines.append(
                     f"  #{t.plot_number} {t.name}"
                     f" |lu{_plot_web_path(t.pk)}|lt[↗]|le"
-                    f" — {t.get_status_display()}, Creator: {t.creator_name}"
+                    f" — {t.get_status_display()}, Owners: {_owner_names(t)}"
                     f", Tags: {tags_str}{arc_str}, {scene_count} scene(s)"
+                    f"{_thread_counts(t, caller)}"
                 )
                 if t.description:
                     lines.append(f"    {t.description}")
             caller.msg("\n".join(lines))
             return
 
-        lines = ["|w== Plot Threads ==|n"]
+        lines = ["|w== Plots ==|n"]
         for t in threads:
             tags_str = " ".join(f"|c[{tag.name}]|n" for tag in t.tags.all())
             status_color = {
@@ -720,7 +913,8 @@ class CmdPlot(MuxCommand):
                 f"  |w#{t.plot_number}|n {t.name}"
                 f" |lu{_plot_web_path(t.pk)}|lt[↗]|le {tags_str}\n"
                 f"       {status_color}{t.get_status_display()}|n"
-                f" | {t.creator_name}{arc_str} | {scene_count} scene(s)"
+                f" | {_owner_names(t)}{arc_str} | {scene_count} scene(s)"
+                f"{_thread_counts(t, caller)}"
             )
             if t.description:
                 lines.append(f"       {t.description}")
@@ -737,10 +931,10 @@ class CmdPlot(MuxCommand):
         if not thread.can_update(caller):
             if thread.status != "active":
                 caller.msg(
-                    f"Thread #{thread.plot_number} is {thread.get_status_display()} and not accepting updates."
+                    f"Plot #{thread.plot_number} is {thread.get_status_display()} and not accepting updates."
                 )
             else:
-                caller.msg("You must be a participant or the creator to post updates.")
+                caller.msg("You must be a participant or an owner to post updates.")
             return
         if update_type == "ooc" and not thread.is_participant(caller) and not is_plot_staff(caller):
             caller.msg("Only participants and staff can post OOC notes.")
@@ -798,7 +992,7 @@ class CmdPlot(MuxCommand):
         try:
             block = PlotUpdate.objects.get(thread=thread, block_number=int(block_str))
         except PlotUpdate.DoesNotExist:
-            caller.msg(f"Block {block_str} not found on thread #{thread.plot_number}.")
+            caller.msg(f"Block {block_str} not found on plot #{thread.plot_number}.")
             return
         if not is_plot_staff(caller) and (block.author_id is None or block.author_id != caller.id):
             caller.msg("You can only edit your own update blocks.")
@@ -857,7 +1051,7 @@ class CmdPlot(MuxCommand):
         if major:
             for t in major:
                 count = t.threads.count() + t.arcs.count()
-                lines.append(f"  |w{t.name}|n ({count} thread/arc(s))")
+                lines.append(f"  |w{t.name}|n ({count} plot/arc(s))")
         else:
             lines.append("  (none)")
         lines.append("|wMinor tags:|n")
@@ -876,7 +1070,7 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can remove tags.")
+            caller.msg("Only the plot's owners (or staff) can remove tags.")
             return
         from evennia_plots.models import PlotTag
 
@@ -895,7 +1089,7 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can change privacy.")
+            caller.msg("Only the plot's owners (or staff) can change privacy.")
             return
         from evennia_plots.models import PlotThread
 
@@ -911,7 +1105,7 @@ class CmdPlot(MuxCommand):
             return
         thread.privacy = choice
         thread.save(update_fields=["privacy"])
-        caller.msg(f"Thread #{thread.plot_number} privacy set to {thread.get_privacy_display()}.")
+        caller.msg(f"Plot #{thread.plot_number} privacy set to {thread.get_privacy_display()}.")
 
     def _do_invite(self, thread_arg, char_name):
         caller = self.caller
@@ -920,7 +1114,7 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can manage invitations.")
+            caller.msg("Only the plot's owners (or staff) can manage invitations.")
             return
         target = caller.search(char_name, global_search=True)
         if not target:
@@ -928,7 +1122,7 @@ class CmdPlot(MuxCommand):
         thread.invited_characters.add(target)
         caller.msg(f"|g{target.key} invited to #{thread.plot_number}.|n")
         target.msg(
-            f"|y[Plot Thread]|n {caller.key} has invited you to contribute to: "
+            f"|y[Plot]|n {caller.key} has invited you to contribute to: "
             f"|w{thread.name}|n (#{thread.plot_number})"
         )
 
@@ -940,7 +1134,7 @@ class CmdPlot(MuxCommand):
             return
         follows = caller.db.plot_follows or {}
         if thread.plot_number not in follows and len(follows) >= _MAX_PLOT_FOLLOWS:
-            caller.msg(f"You can follow at most {_MAX_PLOT_FOLLOWS} plot threads.")
+            caller.msg(f"You can follow at most {_MAX_PLOT_FOLLOWS} plots.")
             return
         existing = follows.get(thread.plot_number, {})
         follows[thread.plot_number] = {
@@ -1008,7 +1202,7 @@ class CmdPlot(MuxCommand):
 
         _, created = ScenePlotLink.create_link(scene=scene, thread=thread, linked_by=caller)
         if created:
-            caller.msg(f"|gLinked scene #{scene_arg} to thread #{thread.plot_number}.|n")
+            caller.msg(f"|gLinked scene #{scene_arg} to plot #{thread.plot_number}.|n")
         else:
             caller.msg(f"Scene #{scene_arg} is already linked to #{thread.plot_number}.")
 
@@ -1096,10 +1290,10 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if thread == target:
-            caller.msg("A thread cannot be a sequel to itself.")
+            caller.msg("A plot cannot be a sequel to itself.")
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can add sequel links.")
+            caller.msg("Only the plot's owners (or staff) can add sequel links.")
             return
         from evennia_plots.models import ThreadLink
 
@@ -1119,7 +1313,7 @@ class CmdPlot(MuxCommand):
                 f"#{target.plot_number} '{target.name}'.|n"
             )
         else:
-            caller.msg("A link between those threads already exists.")
+            caller.msg("A link between those plots already exists.")
 
     def _do_relate(self, thread_arg, target_arg):
         caller = self.caller
@@ -1132,10 +1326,10 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if thread == target:
-            caller.msg("A thread cannot be related to itself.")
+            caller.msg("A plot cannot be related to itself.")
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can propose related links.")
+            caller.msg("Only the plot's owners (or staff) can propose related links.")
             return
         from evennia_plots.models import ThreadLink
 
@@ -1152,18 +1346,18 @@ class CmdPlot(MuxCommand):
         if created:
             caller.msg(
                 f"|gProposed a related link: #{thread.plot_number} ↔ #{target.plot_number}.|n\n"
-                f"The creator of '{target.name}' must accept with "
+                f"An owner of '{target.name}' must accept with "
                 f"|w+plot/relate/accept #{target.plot_number}=#{thread.plot_number}|n."
             )
-            if target.creator:
-                target.creator.msg(
-                    f"|y[Plot Thread]|n {caller.key} has proposed a 'related' link between "
-                    f"#{thread.plot_number} '{thread.name}' and your thread "
+            for owner in _owner_characters(target, skip=caller):
+                owner.msg(
+                    f"|y[Plot]|n {caller.key} has proposed a 'related' link between "
+                    f"#{thread.plot_number} '{thread.name}' and your plot "
                     f"#{target.plot_number} '{target.name}'.\n"
                     f"Accept with: |w+plot/relate/accept #{target.plot_number}=#{thread.plot_number}|n"
                 )
         else:
-            caller.msg("A link between those threads already exists (or is pending).")
+            caller.msg("A link between those plots already exists (or is pending).")
 
     def _do_relate_accept(self, thread_arg, from_arg):
         caller = self.caller
@@ -1176,7 +1370,7 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can accept related links.")
+            caller.msg("Only the plot's owners (or staff) can accept related links.")
             return
         from evennia_plots.models import ThreadLink
 
@@ -1196,9 +1390,9 @@ class CmdPlot(MuxCommand):
         caller.msg(
             f"|gAccepted related link: #{thread.plot_number} ↔ #{from_thread.plot_number}.|n"
         )
-        if from_thread.creator:
-            from_thread.creator.msg(
-                f"|y[Plot Thread]|n {caller.key} accepted the related link between "
+        for owner in _owner_characters(from_thread, skip=caller):
+            owner.msg(
+                f"|y[Plot]|n {caller.key} accepted the related link between "
                 f"#{from_thread.plot_number} '{from_thread.name}' and "
                 f"#{thread.plot_number} '{thread.name}'."
             )
@@ -1210,10 +1404,10 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_thread(thread, caller):
-            caller.msg("Only the thread creator (or staff) can conclude a thread.")
+            caller.msg("Only the plot's owners (or staff) can conclude it.")
             return
         if thread.status not in ("active", "proposed"):
-            caller.msg(f"Thread #{thread.plot_number} is already {thread.get_status_display()}.")
+            caller.msg(f"Plot #{thread.plot_number} is already {thread.get_status_display()}.")
             return
         bonus = thread.conclude(concluded_by=caller)
         bonus_desc = []
@@ -1225,10 +1419,11 @@ class CmdPlot(MuxCommand):
             bonus_desc.append("+1 XP: linked cutscene post")
         checklist = "\n  ".join(bonus_desc) if bonus_desc else "(none)"
         caller.msg(
-            f"|gThread #{thread.plot_number} '{thread.name}' concluded.|n\n"
+            f"|gPlot #{thread.plot_number} '{thread.name}' concluded.|n\n"
             f"Bonus XP computed: |w{bonus}/5|n\n"
             f"Checklist:\n  {checklist}\n"
             f"|xBonus will be distributed in the next XP batch.|n"
+            f"{_loose_end_note(thread)}"
         )
 
     def _do_request_conclude(self, thread_arg):
@@ -1245,9 +1440,9 @@ class CmdPlot(MuxCommand):
         job = Job.create_job(
             job_type=JobType.REQUEST,
             author=caller,
-            title=f"Conclude/Archive Plot Thread #{thread.plot_number}",
+            title=f"Conclude/Archive Plot #{thread.plot_number}",
             description=(
-                f"Requesting that staff conclude or archive plot thread "
+                f"Requesting that staff conclude or archive plot "
                 f"#{thread.plot_number}: '{thread.name}'.\n\n"
                 f"Current status: {thread.get_status_display()}\n"
                 f"Creator: {thread.creator_name}"
@@ -1255,7 +1450,7 @@ class CmdPlot(MuxCommand):
         )
         caller.msg(
             f"|gRequest submitted as job #{job.job_number}.|n\n"
-            f"Staff will review thread #{thread.plot_number} for conclusion or archival."
+            f"Staff will review plot #{thread.plot_number} for conclusion or archival."
         )
 
     def _do_archive(self, thread_arg):
@@ -1265,10 +1460,227 @@ class CmdPlot(MuxCommand):
             caller.msg(err)
             return
         if thread.status == "archived":
-            caller.msg(f"Thread #{thread.plot_number} is already archived.")
+            caller.msg(f"Plot #{thread.plot_number} is already archived.")
             return
         thread.archive()
-        caller.msg(f"|yThread #{thread.plot_number} '{thread.name}' archived.|n")
+        caller.msg(
+            f"|yPlot #{thread.plot_number} '{thread.name}' archived.|n{_loose_end_note(thread)}"
+        )
+
+    # ------------------------------------------------------------------
+    # Owners, thread policy and threads
+    # ------------------------------------------------------------------
+
+    def _do_owner(self, plot_arg, char_name, remove=False):
+        from evennia_plots.threads import ThreadError, add_owner, remove_owner
+
+        caller = self.caller
+        plot, err = _resolve_thread(plot_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        target = caller.search(char_name, global_search=True)
+        if not target:
+            return
+        try:
+            if remove:
+                remove_owner(plot, caller, target)
+                caller.msg(f"{target.key} no longer owns plot #{plot.plot_number}.")
+            else:
+                add_owner(plot, caller, target)
+                caller.msg(f"|g{target.key} now owns plot #{plot.plot_number}.|n")
+        except ThreadError as exc:
+            caller.msg(str(exc))
+
+    def _do_thread_policy(self, plot_arg, policy):
+        from evennia_plots.threads import ThreadError, set_policy
+
+        caller = self.caller
+        plot, err = _resolve_thread(plot_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        try:
+            set_policy(plot, caller, policy.strip().lower())
+        except ThreadError as exc:
+            caller.msg(str(exc))
+            return
+        caller.msg(
+            f"Threads on plot #{plot.plot_number}: |w{plot.get_thread_policy_display().lower()}|n."
+        )
+
+    _THREAD_ACTIONS = (
+        "detail",
+        "accept",
+        "decline",
+        "withdraw",
+        "hold",
+        "seal",
+        "answer",
+        "resolve",
+        "drop",
+        "reveal",
+        "reopen",
+        "lead",
+        "interest",
+        "carry",
+    )
+
+    def _do_story_thread(self, sw, lhs, rhs, args):
+        """Dispatch +plot/thread[/<action>]."""
+        from evennia_plots import threads as svc
+
+        caller = self.caller
+        actions = [s for s in sw if s != "thread"]
+        action = next((a for a in self._THREAD_ACTIONS if a in actions), None)
+        if action is None:
+            if actions:
+                caller.msg("Unknown thread switch. See |w+help +plot|n for options.")
+                return
+            return self._do_thread_add(lhs, rhs)
+
+        target = lhs or args
+        if not target:
+            caller.msg(f"Usage: |w+plot/thread/{action} <#N.T>|n")
+            return
+        thread, err = _resolve_story_thread(target, caller)
+        if err:
+            caller.msg(err)
+            return
+        reveal = "reveal" in actions and action in ("resolve", "drop")
+        try:
+            if action == "detail":
+                svc.set_detail(thread, caller, rhs)
+                caller.msg(f"Detail updated for {thread.ref}.")
+            elif action == "accept":
+                svc.accept(thread, caller)
+                caller.msg(f"|gThread {thread.ref} is open: {thread.title}|n")
+            elif action == "decline":
+                svc.decline(thread, caller, rhs)
+                caller.msg(f"Declined thread request {thread.ref}.")
+            elif action == "withdraw":
+                ref = svc.withdraw(thread, caller)
+                caller.msg(f"Withdrew your request {ref}.")
+            elif action == "hold":
+                svc.set_held(thread, caller, not thread.is_held)
+                state = "held: its owners know the answer" if thread.is_held else "no longer held"
+                caller.msg(f"Thread {thread.ref} is {state}.")
+            elif action == "seal":
+                svc.seal(thread, caller, rhs)
+                if thread.has_sealed_answer:
+                    caller.msg(
+                        f"|gSealed the answer to {thread.ref}.|n Only owners and staff can read "
+                        f"it until it's revealed. The thread is now held."
+                    )
+                else:
+                    caller.msg(f"Cleared the sealed answer to {thread.ref}.")
+            elif action == "answer":
+                self._show_answer(thread)
+            elif action == "resolve":
+                if not rhs:
+                    caller.msg("Usage: |w+plot/thread/resolve[/reveal] <#N.T>=<summary>|n")
+                    return
+                svc.resolve(thread, caller, rhs, reveal_answer=reveal)
+                caller.msg(f"|gResolved {thread.ref}: {thread.title}|n{_seal_note(thread)}")
+            elif action == "drop":
+                svc.drop(thread, caller, reveal_answer=reveal)
+                caller.msg(f"Dropped {thread.ref}: {thread.title}{_seal_note(thread)}")
+            elif action == "reveal":
+                svc.reveal(thread, caller)
+                caller.msg(f"|gRevealed the planned answer to {thread.ref}.|n")
+            elif action == "reopen":
+                svc.reopen(thread, caller)
+                caller.msg(f"Reopened {thread.ref}: {thread.title}")
+            elif action == "lead":
+                leading = svc.toggle_lead(thread, caller)
+                caller.msg(
+                    f"You're now leading {thread.ref}."
+                    if leading
+                    else f"You're no longer leading {thread.ref}."
+                )
+            elif action == "interest":
+                interested = svc.toggle_interest(thread, caller)
+                caller.msg(
+                    f"Marked your interest in {thread.ref}."
+                    if interested
+                    else f"Removed your interest in {thread.ref}."
+                )
+            elif action == "carry":
+                self._do_thread_carry(thread, rhs)
+        except svc.ThreadError as exc:
+            caller.msg(str(exc))
+
+    def _do_thread_add(self, plot_arg, title):
+        from evennia_plots.models import StoryThread
+        from evennia_plots.threads import ThreadError, add_thread
+
+        caller = self.caller
+        if not plot_arg or not title:
+            caller.msg("Usage: |w+plot/thread <#N>=<title>|n")
+            return
+        plot, err = _resolve_thread(plot_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        try:
+            thread = add_thread(plot, caller, title)
+        except ThreadError as exc:
+            caller.msg(str(exc))
+            return
+        if thread.status == StoryThread.Status.REQUESTED:
+            caller.msg(
+                f"|gRequested thread {thread.ref}: {thread.title}|n\n"
+                f"The plot's owners decide whether to open it."
+            )
+        else:
+            caller.msg(f"|gAdded thread {thread.ref}: {thread.title}|n")
+
+    def _do_thread_carry(self, thread, target_arg):
+        from evennia_plots.threads import carry, carry_targets
+
+        caller = self.caller
+        if not target_arg:
+            options = ", ".join(f"#{p.plot_number} {p.name}" for p in carry_targets(thread, caller))
+            caller.msg(
+                "Usage: |w+plot/thread/carry <#N.T>=<#sequel>|n"
+                + (f"\nSequels you could carry it into: {options}" if options else "")
+            )
+            return
+        target, err = _resolve_thread(target_arg, caller)
+        if err:
+            caller.msg(err)
+            return
+        new, answer_carried = carry(thread, caller, target)
+        note = ""
+        if thread.has_sealed_answer and not answer_carried:
+            note = (
+                "\nThe sealed answer stayed behind: the sequel has owners who don't own "
+                f"#{thread.plot.plot_number}."
+            )
+        caller.msg(f"|gCarried {thread.ref} into plot #{target.plot_number} as {new.ref}.|n{note}")
+
+    def _show_answer(self, thread):
+        from evennia_plots.threads import can_read_answer
+
+        caller = self.caller
+        if not can_read_answer(thread, caller):
+            caller.msg(f"There's no answer to {thread.ref} you can read.")
+            return
+        state = "revealed" if thread.sealed_answer_revealed else "sealed"
+        sealed_on = f", first sealed {thread.sealed_at:%Y-%m-%d}" if thread.sealed_at else ""
+        lines = [
+            f"|wAnswer to {thread.ref} {thread.title}|n ({state}{sealed_on})",
+            thread.sealed_answer,
+        ]
+        versions = list(thread.answer_versions.order_by("-version_number"))
+        if versions:
+            lines.append("|wEarlier wordings:|n")
+            for version in versions:
+                lines.append(
+                    f"  v{version.version_number} ({version.created_at:%Y-%m-%d}, "
+                    f"replaced by {version.editor_name}): {version.content}"
+                )
+        caller.msg("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
@@ -1296,13 +1708,13 @@ class CmdArc(MuxCommand):
         +arc/update/edit <#N>/<block#> Edit an existing block
         +arc/tag <#N>=<tag>            Add a tag to the arc
         +arc/untag <#N>=<tag>          Remove a tag
-        +arc/link <#N>=<thread#>       Add a thread to this arc
-        +arc/unlink <#N>=<thread#>     Remove a thread from this arc
+        +arc/link <#N>=<plot#>         Add a plot to this arc
+        +arc/unlink <#N>=<plot#>       Remove a plot from this arc
         +arc/conclude <#N>             Conclude the arc
         +arc/award <#N>=<amt>[:<reason>]  Distribute manual XP to all arc participants
         +arc/list[/tag <tag>]          List arcs, optional tag filter
 
-    Plot arcs group multiple plot threads into a higher-level storyline.
+    Plot arcs group multiple plots into a higher-level storyline.
     A Downtime arc pauses XP gain while it is active (all sources 0.0x by
     default). Use +arc/xp to override any source per arc.
     XP sources: rp_session, cutscene, lore, thread_bonus.
@@ -1562,7 +1974,7 @@ class CmdArc(MuxCommand):
 
         if "link" in sw and "unlink" not in sw:
             if not lhs or not rhs:
-                caller.msg("Usage: |w+arc/link <arc#>=<thread#>|n")
+                caller.msg("Usage: |w+arc/link <arc#>=<plot#>|n")
                 return
             arc, err = _resolve_arc(lhs, caller)
             if err:
@@ -1574,12 +1986,12 @@ class CmdArc(MuxCommand):
                 return
             thread.arc = arc
             thread.save(update_fields=["arc"])
-            caller.msg(f"|gThread #{thread.plot_number} added to arc #{arc.arc_number}.|n")
+            caller.msg(f"|gPlot #{thread.plot_number} added to arc #{arc.arc_number}.|n")
             return
 
         if "unlink" in sw:
             if not lhs or not rhs:
-                caller.msg("Usage: |w+arc/unlink <arc#>=<thread#>|n")
+                caller.msg("Usage: |w+arc/unlink <arc#>=<plot#>|n")
                 return
             arc, err = _resolve_arc(lhs, caller)
             if err:
@@ -1590,11 +2002,11 @@ class CmdArc(MuxCommand):
                 caller.msg(err)
                 return
             if thread.arc_id != arc.id:
-                caller.msg(f"Thread #{thread.plot_number} is not in arc #{arc.arc_number}.")
+                caller.msg(f"Plot #{thread.plot_number} is not in arc #{arc.arc_number}.")
                 return
             thread.arc = None
             thread.save(update_fields=["arc"])
-            caller.msg(f"Thread #{thread.plot_number} removed from arc #{arc.arc_number}.")
+            caller.msg(f"Plot #{thread.plot_number} removed from arc #{arc.arc_number}.")
             return
 
         if "conclude" in sw:
@@ -1661,7 +2073,7 @@ class CmdArc(MuxCommand):
 
         thread_ids = list(arc.threads.values_list("pk", flat=True))
         if not thread_ids:
-            caller.msg(f"Arc #{arc.arc_number} has no threads — nothing to award.")
+            caller.msg(f"Arc #{arc.arc_number} has no plots — nothing to award.")
             return
 
         recipient_ids = sorted(
@@ -1721,7 +2133,7 @@ class CmdArc(MuxCommand):
             type_badge = f"|m{a.get_arc_type_display()}|n"
             lines.append(
                 f"  |w#{a.arc_number}|n {a.name} {type_badge}{current_marker} {tags_str} "
-                f"[{a.get_status_display()}] {thread_count} thread(s)"
+                f"[{a.get_status_display()}] {thread_count} plot(s)"
             )
             if a.description:
                 lines.append(f"       {a.description}")
@@ -1768,7 +2180,7 @@ class CmdArc(MuxCommand):
                 lines.append(u.content)
 
         threads = list(arc.threads.order_by("status", "-created_at"))
-        lines.append(f"\n|wThreads ({len(threads)}):|n")
+        lines.append(f"\n|wPlots ({len(threads)}):|n")
         for t in threads:
             lines.append(f"  #{t.plot_number} {t.name} [{t.get_status_display()}]")
         if not threads:
@@ -1850,15 +2262,15 @@ class CmdArc(MuxCommand):
 
 class CmdHook(MuxCommand):
     """
-    Nudge a player toward a plot thread (staff only).
+    Nudge a player toward a plot (staff only).
 
     Usage:
         +hook <character>=<#N|name>
 
     Sends a suggestion to a specific player encouraging them to look into
-    an existing plot thread. Cannot be used for private threads.
+    an existing plot. Cannot be used for private plots.
 
-    A staff-visible record is kept in the thread's hook_log to prevent
+    A staff-visible record is kept in the plot's hook_log to prevent
     favoritism tracking (visible via +plot <#N> when logged in as staff).
     """
 
@@ -1886,7 +2298,7 @@ class CmdHook(MuxCommand):
             return
 
         if thread.privacy == "private":
-            caller.msg("You cannot hook players toward a private thread.")
+            caller.msg("You cannot hook players toward a private plot.")
             return
 
         target.msg(
@@ -1906,4 +2318,4 @@ class CmdHook(MuxCommand):
         thread.hook_log = log[-50:]
         thread.save(update_fields=["hook_log"])
 
-        caller.msg(f"|gHook sent to {target.key} for thread #{thread.plot_number}.|n")
+        caller.msg(f"|gHook sent to {target.key} for plot #{thread.plot_number}.|n")

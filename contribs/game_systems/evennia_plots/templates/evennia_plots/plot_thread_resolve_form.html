@@ -1,0 +1,46 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Resolve {{ story_thread.ref }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+{% if story_thread.detail %}<p class="text-muted">{{ story_thread.detail }}</p>{% endif %}
+
+{% if offer_reveal %}
+<div class="card mb-3">
+  <div class="card-header">The sealed answer (owners and staff only)</div>
+  <div class="card-body"><p class="card-text evennia-plots-pre-wrap">{{ story_thread.sealed_answer }}</p></div>
+</div>
+{% endif %}
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">Resolution</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.summary %}
+    {% if offer_reveal %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.reveal %}
+    {% endif %}
+  </fieldset>
+  {% url 'evennia_plots:plot-detail' thread.pk as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Resolve Thread" %}
+</form>
+{% endblock %}

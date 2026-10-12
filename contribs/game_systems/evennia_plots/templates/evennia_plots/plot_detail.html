@@ -5,12 +5,12 @@
   {% include "evennia_plots/_styles.html" %}
 {% endblock %}
 
-{% block titleblock %}{{ thread.name }} — Plot Thread{% endblock %}
+{% block titleblock %}{{ thread.name }} — Plot{% endblock %}
 
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
     <li class="breadcrumb-item active" aria-current="page">#{{ thread.plot_number }} {{ thread.name }}</li>
   </ol>
 </nav>
@@ -39,6 +39,8 @@
   {% endif %}
   <dt class="col-sm-2">Creator</dt>
   <dd class="col-sm-10">{% if not thread.creator_id and thread.creator_name == "Unknown" %}Unattributed{% else %}{{ thread.creator_name|default:"Unattributed" }}{% endif %}</dd>
+  <dt class="col-sm-2">Owners</dt>
+  <dd class="col-sm-10">{% for owner in owners %}{{ owner.character_name|default:"Unattributed" }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-muted">Not recorded</span>{% endfor %}</dd>
   {% if thread.arc %}
   <dt class="col-sm-2">Arc</dt>
   <dd class="col-sm-10">
@@ -61,16 +63,77 @@
 
 {% if character_id or is_staff %}
 <div class="d-flex evennia-plots-gap mb-3">
-  {% if character_id == thread.creator_id or is_staff %}
-  <a href="{% url 'evennia_plots:plot-edit' thread.pk %}" class="btn btn-sm btn-outline-secondary">Edit Thread</a>
+  {% if character_id %}
+  <a href="{% url 'evennia_plots:plot-update-create' thread.pk %}" class="btn btn-sm btn-primary">Add Update</a>
+  {% endif %}
+  {% if can_manage %}
+  <a href="{% url 'evennia_plots:plot-edit' thread.pk %}" class="btn btn-sm btn-outline-secondary">Edit Plot</a>
+  <a href="{% url 'evennia_plots:plot-owners' thread.pk %}" class="btn btn-sm btn-outline-secondary">Manage Owners</a>
   {% if thread.privacy == "invite_only" %}
   <a href="{% url 'evennia_plots:plot-invite' thread.pk %}" class="btn btn-sm btn-outline-secondary">Manage Invites</a>
   {% endif %}
   {% endif %}
-  {% if character_id %}
-  <a href="{% url 'evennia_plots:plot-update-create' thread.pk %}" class="btn btn-sm btn-primary">Add Update</a>
-  {% endif %}
 </div>
+{% endif %}
+
+<!-- Threads -->
+<section id="threads" aria-labelledby="evennia-plots-threads-heading">
+<h2 id="evennia-plots-threads-heading">Threads</h2>
+<p class="text-muted small">
+  Open questions, problems and leads in this plot. Who may add threads: {{ thread.get_thread_policy_display|lower }}.
+  {% if is_owner_led %}<span class="badge badge-warning text-dark">Owner-led</span> The owners hold the answer to at least one open thread.{% endif %}
+</p>
+{% if thread_add_mode %}
+<p><a href="{% url 'evennia_plots:plot-thread-create' thread.pk %}" class="btn btn-sm btn-primary">{% if thread_add_mode == "request" %}Request a Thread{% else %}Add a Thread{% endif %}</a></p>
+{% endif %}
+{% if open_story_threads %}
+<ul class="list-unstyled">
+  {% for st in open_story_threads %}
+  <li class="evennia-plots-thread">
+    <strong>{{ st.ref }}</strong> {{ st.title }}
+    {% if st.is_held %}<span class="badge badge-warning text-dark">Held</span>{% endif %}
+    {% if st.status == "requested" %}<span class="badge badge-info">Requested by {{ st.created_by_name|default:"Unattributed" }}</span>{% endif %}
+    {% if st.detail %}<div class="small text-muted">{{ st.detail }}</div>{% endif %}
+    {% if st.leads %}<div class="small">Led by {{ st.leads|join:", " }}</div>{% endif %}
+    {% if st.interested_count %}<div class="small text-muted">{{ st.interested_count }} interested</div>{% endif %}
+    {% include "evennia_plots/_thread_actions.html" %}
+  </li>
+  {% empty %}<li class="text-muted">No open threads.</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="evennia-plots-empty">No open threads. In game, add one with <code>+plot/thread #{{ thread.plot_number }}=&lt;title&gt;</code>.</p>
+{% endif %}
+{% if finished_story_threads %}
+<h3 class="h6">Finished threads</h3>
+<ul class="list-unstyled">
+  {% for st in finished_story_threads %}
+  <li class="evennia-plots-thread">
+    <strong>{{ st.ref }}</strong> {{ st.title }}
+    <span class="badge badge-secondary">{{ st.get_status_display }}</span>
+    {% if st.is_held %}<span class="badge badge-warning text-dark">Held</span>{% endif %}
+    {% if st.status == "resolved" and st.resolution %}<div class="small evennia-plots-pre-wrap">{{ st.resolution }}</div>{% endif %}
+    {% if st.status == "declined" and st.decline_reason %}<div class="small text-muted">{{ st.decline_reason }}</div>{% endif %}
+    {% if st.status == "carried" and st.carried_to %}<div class="small">Carried to <a href="{% url 'evennia_plots:plot-detail' st.carried_to.plot.pk %}#threads">{{ st.carried_to.ref }}</a></div>{% endif %}
+    {% if st.sealed_answer_revealed and st.has_sealed_answer %}
+    <div class="small evennia-plots-pre-wrap"><strong>The planned answer:</strong> {{ st.sealed_answer }}</div>
+    {% endif %}
+    {% include "evennia_plots/_thread_actions.html" %}
+  </li>
+  {% empty %}<li class="text-muted">No finished threads.</li>
+  {% endfor %}
+</ul>
+{% endif %}
+</section>
+
+{% if staff_log %}
+<h2 class="h5">Staff actions</h2>
+<ul class="small">
+  {% for entry in staff_log %}
+  <li>{{ entry.at|slice:":10" }}: {{ entry.staff }} {{ entry.action }}{% if entry.detail %}: {{ entry.detail }}{% endif %}</li>
+  {% empty %}<li class="text-muted">No staff actions recorded.</li>
+  {% endfor %}
+</ul>
 {% endif %}
 
 <!-- IC Narrative Updates -->
@@ -157,9 +220,9 @@
 </p>
 {% endif %}
 
-<!-- Thread Connections -->
+<!-- Plot connections -->
 {% if sequels or related_threads %}
-<h2>Connected Threads</h2>
+<h2>Connected Plots</h2>
 <h3 class="h6">Sequels</h3>
 <ul>
   {% for link in sequels %}
@@ -179,11 +242,11 @@
     <a href="{% url 'evennia_plots:plot-detail' link.from_thread.pk %}">#{{ link.from_thread.plot_number }} {{ link.from_thread.name }}</a>
     {% endif %}
   </li>
-  {% empty %}<li class="text-muted">No related threads linked.</li>
+  {% empty %}<li class="text-muted">No related plots linked.</li>
   {% endfor %}
 </ul>
 {% else %}
-<p class="text-muted">No connected threads recorded.</p>
+<p class="text-muted">No connected plots recorded.</p>
 {% endif %}
 
 {% endblock %}

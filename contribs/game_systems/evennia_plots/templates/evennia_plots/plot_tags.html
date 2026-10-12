@@ -10,7 +10,7 @@
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
     <li class="breadcrumb-item active" aria-current="page">Tags</li>
   </ol>
 </nav>
@@ -29,7 +29,7 @@
 <div class="evennia-plots-table-scroll" role="region" aria-label="Major tags" tabindex="0">
 <table role="table" class="evennia-plots-table-stack table table-sm">
   <thead role="rowgroup">
-    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Threads</th><th role="columnheader" scope="col">Arcs</th></tr>
+    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Plots</th><th role="columnheader" scope="col">Arcs</th></tr>
   </thead>
   <tbody role="rowgroup">
     {% for entry in major_tags %}
@@ -38,7 +38,7 @@
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
            class="badge badge-primary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
-      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Threads</span>{{ entry.thread_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Plots</span>{{ entry.thread_count }}</td>
       <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arcs</span>{{ entry.arc_count }}</td>
     </tr>
     {% empty %}<tr role="row"><td role="cell" colspan="3" class="text-muted">No major tags yet.</td></tr>
@@ -53,7 +53,7 @@
 <div class="evennia-plots-table-scroll" role="region" aria-label="Minor tags" tabindex="0">
 <table role="table" class="evennia-plots-table-stack table table-sm">
   <thead role="rowgroup">
-    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Threads</th><th role="columnheader" scope="col">Arcs</th></tr>
+    <tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Plots</th><th role="columnheader" scope="col">Arcs</th></tr>
   </thead>
   <tbody role="rowgroup">
     {% for entry in minor_tags %}
@@ -62,7 +62,7 @@
         <a href="{% url 'evennia_plots:plot-list' %}?tag={{ entry.tag.name|urlencode }}"
            class="badge badge-secondary text-decoration-none">{{ entry.tag.name }}</a>
       </td>
-      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Threads</span>{{ entry.thread_count }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Plots</span>{{ entry.thread_count }}</td>
       <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arcs</span>{{ entry.arc_count }}</td>
     </tr>
     {% empty %}<tr role="row"><td role="cell" colspan="3" class="text-muted">No minor tags yet.</td></tr>

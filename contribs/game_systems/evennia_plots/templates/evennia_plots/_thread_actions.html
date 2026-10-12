@@ -1,0 +1,91 @@
+{% comment %}
+  Action buttons for one thread on the plot page.
+
+  Variables:
+    thread — the plot (PlotThread)
+    st     — the thread (StoryThread), with ``st.actions`` from
+             evennia_plots.threads.available_actions()
+
+  Player actions and owner actions are separate groups. The view and the
+  thread services re-check every permission on submit.
+{% endcomment %}
+{% if "lead" in st.actions or "unlead" in st.actions or "interest" in st.actions or "uninterest" in st.actions or "resolve" in st.actions or "withdraw" in st.actions or "answer" in st.actions %}
+<div class="evennia-plots-actions mt-1" role="group" aria-label="Your actions on {{ st.ref }}">
+  {% if "lead" in st.actions or "unlead" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'lead' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-primary">{% if "unlead" in st.actions %}Stop leading{% else %}Lead{% endif %}</button>
+  </form>
+  {% endif %}
+  {% if "interest" in st.actions or "uninterest" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'interest' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-secondary">{% if "uninterest" in st.actions %}Not interested{% else %}Interested{% endif %}</button>
+  </form>
+  {% endif %}
+  {% if "resolve" in st.actions %}
+  <a href="{% url 'evennia_plots:plot-thread-resolve' thread.pk st.number %}" class="btn btn-sm btn-success">Resolve</a>
+  {% endif %}
+  {% if "answer" in st.actions %}
+  <a href="{% url 'evennia_plots:plot-thread-answer' thread.pk st.number %}" class="btn btn-sm btn-outline-secondary">{% if st.sealed_answer_revealed %}Planned answer{% else %}Sealed answer{% endif %}</a>
+  {% endif %}
+  {% if "withdraw" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'withdraw' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Withdraw request</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% if "accept" in st.actions or "hold" in st.actions or "unhold" in st.actions or "seal" in st.actions or "drop" in st.actions or "reopen" in st.actions or "reveal" in st.actions or "carry" in st.actions %}
+<div class="evennia-plots-actions mt-1" role="group" aria-label="Owner actions on {{ st.ref }}">
+  {% if "accept" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'accept' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-success">Accept</button>
+  </form>
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'decline' %}" class="d-flex evennia-plots-gap">
+    {% csrf_token %}
+    <label for="decline-reason-{{ st.number }}" class="sr-only">Reason for declining {{ st.ref }}</label>
+    <input type="text" id="decline-reason-{{ st.number }}" name="reason" maxlength="500" placeholder="Reason (optional)" class="form-control form-control-sm">
+    <button type="submit" class="btn btn-sm btn-outline-danger">Decline</button>
+  </form>
+  {% endif %}
+  {% if "hold" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'hold' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-warning">Mark held</button>
+  </form>
+  {% endif %}
+  {% if "unhold" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'unhold' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-warning">Release hold</button>
+  </form>
+  {% endif %}
+  {% if "seal" in st.actions %}
+  <a href="{% url 'evennia_plots:plot-thread-answer' thread.pk st.number %}" class="btn btn-sm btn-outline-secondary">{% if st.has_sealed_answer %}Edit sealed answer{% else %}Seal an answer{% endif %}</a>
+  {% endif %}
+  {% if "drop" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'drop' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-danger">Drop</button>
+  </form>
+  {% endif %}
+  {% if "reopen" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'reopen' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Reopen</button>
+  </form>
+  {% endif %}
+  {% if "reveal" in st.actions %}
+  <form method="post" action="{% url 'evennia_plots:plot-thread-action' thread.pk st.number 'reveal' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-warning">Reveal the planned answer</button>
+  </form>
+  {% endif %}
+  {% if "carry" in st.actions %}
+  <a href="{% url 'evennia_plots:plot-thread-carry' thread.pk st.number %}" class="btn btn-sm btn-outline-primary">Carry into a sequel</a>
+  {% endif %}
+</div>
+{% endif %}

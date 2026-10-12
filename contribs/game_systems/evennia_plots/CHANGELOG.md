@@ -7,6 +7,42 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.7.0] - 2026-10-11
+
+- **Added:** threads. A thread (`StoryThread`) is an open question, problem or
+  lead inside a plot, referenced as `#<plot>.<thread>`. Threads can be
+  requested, accepted or declined, resolved with a summary, dropped, reopened,
+  and led or followed. A plot's `thread_policy` says who adds them: `open`
+  (anyone who can link; the default), `request` (others ask, owners decide) or
+  `owners`. In game: `+plot/thread` and its switches, and `+plot/threads`. On
+  the web: a Threads section on the plot page, and add, resolve, answer and
+  carry pages. The API lists each plot's threads.
+- **Added:** held threads and sealed answers. Owners mark a thread held when
+  they already know its answer; a plot with an open held thread shows
+  *Owner-led*. An optional sealed answer is readable by owners and staff only,
+  keeps every earlier wording, and is revealed only by choice, when the thread
+  resolves or later. It is never shown in `+plot`, on the plot page, in the
+  API or on the map while sealed, and the API never includes it at all.
+- **Added:** loose ends. Concluding or archiving a plot turns its open threads
+  into loose ends and declines pending requests, without blocking. A loose end
+  can be carried into a declared sequel by someone who runs both plots; its
+  sealed answer travels only when the sequel has no new owners.
+- **Added:** plot owners (`PlotOwner`). The creator is the first owner;
+  `+plot/owner` and the web's *Manage Owners* page add and remove more. Owners
+  replace the creator in every permission check (`plot.is_owner()`,
+  `plot.can_manage()`). Ownership never creates a `PlotParticipant`, so it
+  never pays the conclusion bonus. Staff actions on plots they don't own are
+  kept in `staff_log`.
+- **Added:** migrations `0002` (owners, threads, thread policy, staff log) and
+  `0003` (makes each existing plot's creator its first owner).
+- **Changed:** player-facing wording says "plot" where it said "plot thread",
+  in commands, pages, guides and the admin. The XP source label is now "Plot
+  Bonus"; the stored key stays `thread_bonus`. Python names are unchanged.
+- **Removed:** the `+thread` alias of `+plot`, which would now mislead.
+- **Unchanged:** the conclusion bonus and the 24-hour anti-gaming rule. Threads
+  have no effect on XP, in either direction.
+- **Fixed:** the package docstring's mis-encoded dashes.
+
 ## [0.6.0] - 2026-10-10
 
 - **Added:** a "Plots here" section in evennia-maps' room panel (0.9+): active

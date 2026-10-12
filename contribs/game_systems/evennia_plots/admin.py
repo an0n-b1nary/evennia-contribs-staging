@@ -7,13 +7,36 @@ from evennia_plots.models import (
     PlotBoardLink,
     PlotBonusCredit,
     PlotCalendarLink,
+    PlotOwner,
     PlotParticipant,
     PlotTag,
     PlotThread,
     PlotUpdate,
     ScenePlotLink,
+    StoryThread,
+    StoryThreadAnswerVersion,
+    StoryThreadInterest,
     ThreadLink,
 )
+
+
+class PlotOwnerInline(admin.TabularInline):
+    model = PlotOwner
+    extra = 0
+    readonly_fields = ["added_by_name", "added_at"]  # noqa: RUF012
+    fields = ["character", "character_name", "added_by_name", "added_at"]  # noqa: RUF012
+    raw_id_fields = ["character"]  # noqa: RUF012
+
+
+class StoryThreadInline(admin.TabularInline):
+    """Threads on the plot page; sealed answers are edited on the thread's own page."""
+
+    model = StoryThread
+    fk_name = "plot"
+    extra = 0
+    show_change_link = True
+    readonly_fields = ["number", "created_by_name"]  # noqa: RUF012
+    fields = ["number", "title", "status", "is_held", "created_by_name"]  # noqa: RUF012
 
 
 class PlotUpdateInline(admin.TabularInline):
@@ -80,11 +103,13 @@ class PlotThreadAdmin(admin.ModelAdmin):
         "bonus_xp_awarded",
         "created_at",
     ]
-    list_filter = ["status", "privacy", "bonus_xp_awarded"]  # noqa: RUF012
+    list_filter = ["status", "privacy", "thread_policy", "bonus_xp_awarded"]  # noqa: RUF012
     search_fields = ["name", "creator_name"]  # noqa: RUF012
     readonly_fields = ["plot_number", "created_at", "concluded_at", "archived_at"]  # noqa: RUF012
     filter_horizontal = ["tags", "invited_characters"]  # noqa: RUF012
     inlines = [  # noqa: RUF012
+        PlotOwnerInline,
+        StoryThreadInline,
         PlotUpdateInline,
         PlotParticipantInline,
         ThreadLinkInline,
@@ -154,6 +179,32 @@ class PlotBoardLinkAdmin(admin.ModelAdmin):
     list_display = ["thread", "post_id", "is_ic_post", "created_by_name", "created_at"]  # noqa: RUF012
     list_filter = ["is_ic_post"]  # noqa: RUF012
     readonly_fields = ["created_at"]  # noqa: RUF012
+
+
+class StoryThreadAnswerVersionInline(admin.TabularInline):
+    model = StoryThreadAnswerVersion
+    extra = 0
+    can_delete = False
+    readonly_fields = ["version_number", "content", "editor_name", "created_at"]  # noqa: RUF012
+    fields = ["version_number", "content", "editor_name", "created_at"]  # noqa: RUF012
+
+
+class StoryThreadInterestInline(admin.TabularInline):
+    model = StoryThreadInterest
+    extra = 0
+    readonly_fields = ["character_name", "created_at"]  # noqa: RUF012
+    fields = ["character_name", "is_lead", "created_at"]  # noqa: RUF012
+
+
+@admin.register(StoryThread)
+class StoryThreadAdmin(admin.ModelAdmin):
+    """Threads. Staff may read sealed answers here, as in game and on the web."""
+
+    list_display = ["__str__", "plot", "status", "is_held", "created_by_name", "updated_at"]  # noqa: RUF012
+    list_filter = ["status", "is_held", "sealed_answer_revealed"]  # noqa: RUF012
+    search_fields = ["title", "plot__name"]  # noqa: RUF012
+    readonly_fields = ["plot", "number", "sealed_at", "created_at", "updated_at"]  # noqa: RUF012
+    inlines = [StoryThreadInterestInline, StoryThreadAnswerVersionInline]  # noqa: RUF012
 
 
 @admin.register(PlotBonusCredit)

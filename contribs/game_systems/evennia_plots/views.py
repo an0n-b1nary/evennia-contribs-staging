@@ -3,17 +3,25 @@
 """
 Web views for the evennia_plots contrib.
 
+Players call a PlotThread a "plot" and a StoryThread a "thread".
+
 Read-only views:
-    PlotListView            — /plots/           thread list with tag filter
-    PlotDetailView          — /plots/<pk>/      thread detail with IC updates
+    PlotListView            — /plots/           plot list with tag filter
+    PlotDetailView          — /plots/<pk>/      plot detail with threads and IC updates
     PlotArcListView         — /plots/arcs/      staff-only arc list with filters
-    PlotArcDetailView       — /plots/arc/<pk>/  arc with IC updates + member threads
+    PlotArcDetailView       — /plots/arc/<pk>/  arc with IC updates + member plots
     PlotTagListView         — /plots/tags/      tag index
 
 Authoring views:
     PlotCreateView          — /plots/new/
     PlotEditView            — /plots/<pk>/edit/
     PlotInviteView          — /plots/<pk>/invite/
+    PlotOwnersView          — /plots/<pk>/owners/
+    StoryThreadCreateView   — /plots/<pk>/threads/new/
+    StoryThreadResolveView  — /plots/<pk>/threads/<number>/resolve/
+    StoryThreadAnswerView   — /plots/<pk>/threads/<number>/answer/
+    StoryThreadCarryView    — /plots/<pk>/threads/<number>/carry/
+    StoryThreadActionView   — /plots/<pk>/threads/<number>/<action>/ (POST only)
     PlotUpdateCreateView    — /plots/<pk>/updates/new/
     PlotUpdateEditView      — /plots/<pk>/updates/<update_id>/edit/
     PlotUpdateHistoryView   — /plots/<pk>/updates/<update_id>/history/
@@ -31,7 +39,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import HttpResponseBadRequest, HttpResponseRedirect
+from django.db.models import Count, Exists, OuterRef, Q
+from django.http import Http404, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
@@ -39,16 +48,22 @@ from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 from evennia.objects.models import ObjectDB
 
+from evennia_plots import threads as thread_services
 from evennia_plots.authoring import AuthoringMixin
 from evennia_plots.forms import (
     PlotArcCreateForm,
     PlotArcEditForm,
     PlotInviteForm,
+    PlotOwnerForm,
     PlotTagCreateForm,
     PlotThreadCreateForm,
     PlotThreadEditForm,
     PlotUpdateEditForm,
     PlotUpdateForm,
+    SealedAnswerForm,
+    StoryThreadCarryForm,
+    StoryThreadForm,
+    StoryThreadResolveForm,
 )
 from evennia_plots.models import (
     PlotArc,
@@ -56,9 +71,39 @@ from evennia_plots.models import (
     PlotThread,
     PlotUpdate,
     PlotUpdateVersion,
+    StoryThread,
 )
 from evennia_plots.permissions import can_manage_arc, get_character_id, is_staff_user
 from evennia_plots.signals import arc_currency_changed, arc_type_changed
+
+
+def _character(character_id):
+    return ObjectDB.objects.filter(pk=character_id).first() if character_id else None
+
+
+def _require_manager(request, plot, character_id):
+    """Raise PermissionDenied unless the acting character owns *plot*, or is staff."""
+    if is_staff_user(request):
+        return
+    if character_id and plot.owners.filter(character_id=character_id).exists():
+        return
+    raise PermissionDenied
+
+
+def _with_open_thread_counts(queryset):
+    """Annotate plots with ``open_thread_count`` and ``owner_led`` for list pages."""
+    held_open = StoryThread.objects.filter(
+        plot=OuterRef("pk"), status=StoryThread.Status.OPEN, is_held=True
+    )
+    return queryset.annotate(
+        open_thread_count=Count(
+            "story_threads",
+            filter=Q(story_threads__status=StoryThread.Status.OPEN),
+            distinct=True,
+        ),
+        owner_led=Exists(held_open),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Read-only views
@@ -79,17 +124,17 @@ class PlotListView(ListView):
                 status=PlotThread.Status.ACTIVE,
                 privacy__in=[PlotThread.Privacy.PUBLIC, PlotThread.Privacy.INVITE_ONLY],
             )
-            .prefetch_related("tags")
+            .prefetch_related("tags", "owners")
             .order_by("-created_at")
         )
         tag = self.request.GET.get("tag", "").strip()
         if tag:
             qs = qs.filter(tags__name__icontains=tag).distinct()
-        return qs
+        return _with_open_thread_counts(qs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["page_title"] = "Plot Threads"
+        context["page_title"] = "Plots"
         context["tag_filter"] = self.request.GET.get("tag", "")
         context["all_major_tags"] = PlotTag.objects.filter(is_major=True).order_by("name")
         return context
@@ -108,7 +153,7 @@ class PlotDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         thread = self.object
-        context["page_title"] = f"Plot Thread: {thread.name}"
+        context["page_title"] = f"Plot: {thread.name}"
 
         context["updates"] = thread.updates.filter(update_type="ic").order_by("created_at")
 
@@ -180,8 +225,38 @@ class PlotDetailView(DetailView):
             )
         )
 
-        context["is_staff"] = is_staff_user(self.request)
-        context["character_id"] = get_character_id(self.request.user)
+        staff = is_staff_user(self.request)
+        character_id = get_character_id(self.request.user)
+        character = _character(character_id)
+        manages = staff or thread.is_owner(character)
+        story_threads = thread_services.visible_threads(thread, character)
+        for story_thread in story_threads:
+            story_thread.actions = thread_services.available_actions(story_thread, character)
+            story_thread.leads = [
+                i.character_name for i in story_thread.interests.all() if i.is_lead
+            ]
+            story_thread.interested_count = sum(
+                1 for i in story_thread.interests.all() if not i.is_lead
+            )
+        live = (StoryThread.Status.OPEN, StoryThread.Status.REQUESTED)
+        context["open_story_threads"] = sorted(
+            (t for t in story_threads if t.status in live),
+            key=lambda t: (t.status != StoryThread.Status.OPEN, not t.is_held, t.number),
+        )
+        context["finished_story_threads"] = [t for t in story_threads if t.status not in live]
+        if thread_services.can_add_directly(thread, character):
+            context["thread_add_mode"] = "add"
+        elif thread_services.can_request(thread, character):
+            context["thread_add_mode"] = "request"
+        else:
+            context["thread_add_mode"] = ""
+        context["owners"] = thread.owners.all()
+        context["is_owner_led"] = thread.is_owner_led
+        context["can_manage"] = manages
+        context["staff_log"] = list(reversed(thread.staff_log or []))[:10] if manages else []
+
+        context["is_staff"] = staff
+        context["character_id"] = character_id
         return context
 
 
@@ -313,7 +388,7 @@ class PlotCreateView(AuthoringMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["page_title"] = "Start a New Plot Thread"
+        context["page_title"] = "Start a New Plot"
         context["form_action"] = reverse("evennia_plots:plot-create")
         return context
 
@@ -325,6 +400,7 @@ class PlotCreateView(AuthoringMixin, FormView):
             creator=character,
             description=form.cleaned_data.get("description", ""),
             privacy=form.cleaned_data["privacy"],
+            thread_policy=form.cleaned_data.get("thread_policy") or None,
         )
         return HttpResponseRedirect(reverse("evennia_plots:plot-detail", kwargs={"pk": thread.pk}))
 
@@ -333,9 +409,9 @@ class PlotCreateView(AuthoringMixin, FormView):
 
 
 class PlotEditView(AuthoringMixin, FormView):
-    """Edit an existing thread's name, description, or privacy.
+    """Edit an existing plot's name, description, privacy or thread policy.
 
-    Permission: creator or staff.
+    Permission: owners or staff.
     """
 
     form_class = PlotThreadEditForm
@@ -350,12 +426,7 @@ class PlotEditView(AuthoringMixin, FormView):
         return self._get_thread()
 
     def check_permission(self, character_id, target):
-        thread = target
-        if is_staff_user(self.request):
-            return
-        if thread.creator_id and thread.creator_id == character_id:
-            return
-        raise PermissionDenied
+        _require_manager(self.request, target, character_id)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -365,7 +436,7 @@ class PlotEditView(AuthoringMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         thread = self._get_thread()
-        context["page_title"] = f"Edit Plot Thread: {thread.name}"
+        context["page_title"] = f"Edit Plot: {thread.name}"
         context["thread"] = thread
         context["form_action"] = reverse("evennia_plots:plot-edit", kwargs={"pk": thread.pk})
         return context
@@ -379,6 +450,7 @@ class PlotEditView(AuthoringMixin, FormView):
             name=form.cleaned_data["name"],
             description=form.cleaned_data.get("description", ""),
             privacy=form.cleaned_data["privacy"],
+            thread_policy=form.cleaned_data.get("thread_policy") or None,
         )
         return HttpResponseRedirect(reverse("evennia_plots:plot-detail", kwargs={"pk": thread.pk}))
 
@@ -387,9 +459,9 @@ class PlotEditView(AuthoringMixin, FormView):
 
 
 class PlotInviteView(AuthoringMixin, FormView):
-    """Toggle invited characters on an invite-only thread.
+    """Toggle invited characters on an invite-only plot.
 
-    Permission: creator or staff. The form takes a character name string;
+    Permission: owners or staff. The form takes a character name string;
     the view resolves it to an ObjectDB instance.
     """
 
@@ -405,12 +477,7 @@ class PlotInviteView(AuthoringMixin, FormView):
         return self._get_thread()
 
     def check_permission(self, character_id, target):
-        thread = target
-        if is_staff_user(self.request):
-            return
-        if thread.creator_id and thread.creator_id == character_id:
-            return
-        raise PermissionDenied
+        _require_manager(self.request, target, character_id)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -656,6 +723,370 @@ class PlotUpdateDiffView(TemplateView):
         context["diff_lines"] = diff_lines
         context["no_diff"] = not diff_lines
         return context
+
+
+# ---------------------------------------------------------------------------
+# Owners and threads
+# ---------------------------------------------------------------------------
+# Private plots are not served on the web (see PlotDetailView), so neither are
+# their owner and thread pages. Every rule lives in evennia_plots.threads; the
+# views only translate ThreadError into a form error or a flash message.
+
+
+def _web_plot(pk):
+    return get_object_or_404(PlotThread.objects.exclude(privacy=PlotThread.Privacy.PRIVATE), pk=pk)
+
+
+def _plot_threads_url(plot):
+    return reverse("evennia_plots:plot-detail", kwargs={"pk": plot.pk}) + "#threads"
+
+
+class _StoryThreadMixin:
+    """Look up the plot and thread from the URL, as the acting character sees them."""
+
+    def _get_plot(self):
+        if not hasattr(self, "_plot"):
+            self._plot = _web_plot(self.kwargs["pk"])
+        return self._plot
+
+    def _get_story_thread(self):
+        if not hasattr(self, "_story_thread"):
+            plot = self._get_plot()
+            thread = get_object_or_404(StoryThread, plot=plot, number=self.kwargs["number"])
+            character = _character(self.get_character())
+            if thread not in thread_services.visible_threads(plot, character):
+                raise Http404
+            self._story_thread = thread
+        return self._story_thread
+
+    def get_permission_target(self):
+        return self._get_story_thread()
+
+
+class PlotOwnersView(AuthoringMixin, FormView):
+    """Add or remove a plot's owners. Permission: owners or staff."""
+
+    form_class = PlotOwnerForm
+    template_name = "evennia_plots/plot_owners_form.html"
+
+    def _get_plot(self):
+        if not hasattr(self, "_plot"):
+            self._plot = _web_plot(self.kwargs["pk"])
+        return self._plot
+
+    def get_permission_target(self):
+        return self._get_plot()
+
+    def check_permission(self, character_id, target):
+        _require_manager(self.request, target, character_id)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        plot = self._get_plot()
+        context["page_title"] = f"Owners: {plot.name}"
+        context["thread"] = plot
+        context["owners"] = plot.owners.all()
+        context["form_action"] = reverse("evennia_plots:plot-owners", kwargs={"pk": plot.pk})
+        return context
+
+    def form_valid(self, form):
+        plot = self._get_plot()
+        actor = _character(self.get_character())
+        name = form.cleaned_data["character_name"].strip()
+        target = ObjectDB.objects.filter(db_key__iexact=name).first()
+        if target is None:
+            form.add_error("character_name", f"No character named '{name}' found.")
+            return self.form_invalid(form)
+        try:
+            if form.cleaned_data["action"] == PlotOwnerForm.ACTION_ADD:
+                thread_services.add_owner(plot, actor, target)
+            else:
+                thread_services.remove_owner(plot, actor, target)
+        except thread_services.ThreadError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(reverse("evennia_plots:plot-owners", kwargs={"pk": plot.pk}))
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class StoryThreadCreateView(AuthoringMixin, FormView):
+    """Add a thread to a plot, or request one, as the plot's policy allows."""
+
+    form_class = StoryThreadForm
+    template_name = "evennia_plots/plot_thread_form.html"
+
+    def _get_plot(self):
+        if not hasattr(self, "_plot"):
+            self._plot = _web_plot(self.kwargs["pk"])
+        return self._plot
+
+    def get_permission_target(self):
+        return self._get_plot()
+
+    def _mode(self):
+        character = _character(self.get_character())
+        plot = self._get_plot()
+        if thread_services.can_add_directly(plot, character):
+            return "add"
+        if thread_services.can_request(plot, character):
+            return "request"
+        return ""
+
+    def check_permission(self, character_id, target):
+        if not self._mode():
+            raise PermissionDenied
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        plot = self._get_plot()
+        mode = self._mode()
+        context["page_title"] = (
+            f"Request a Thread: {plot.name}" if mode == "request" else f"Add a Thread: {plot.name}"
+        )
+        context["thread"] = plot
+        context["mode"] = mode
+        context["submit_label"] = "Send Request" if mode == "request" else "Add Thread"
+        context["form_action"] = reverse("evennia_plots:plot-thread-create", kwargs={"pk": plot.pk})
+        return context
+
+    def form_valid(self, form):
+        plot = self._get_plot()
+        try:
+            thread_services.add_thread(
+                plot,
+                _character(self.get_character()),
+                form.cleaned_data["title"],
+                form.cleaned_data.get("detail", ""),
+            )
+        except thread_services.ThreadError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(_plot_threads_url(plot))
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class StoryThreadActionView(_StoryThreadMixin, AuthoringMixin, View):
+    """POST-only one-step thread actions; the outcome is flashed on the plot page."""
+
+    http_method_names = ["post"]  # noqa: RUF012
+    ACTIONS = (
+        "accept",
+        "decline",
+        "withdraw",
+        "hold",
+        "unhold",
+        "lead",
+        "interest",
+        "drop",
+        "reopen",
+        "reveal",
+    )
+
+    def check_permission(self, character_id, target):
+        """Each action checks its own rules in evennia_plots.threads."""
+
+    def post(self, request, *args, **kwargs):
+        action = kwargs["action"]
+        if action not in self.ACTIONS:
+            raise Http404
+        actor = get_object_or_404(ObjectDB, pk=self.get_character())
+        thread = self._get_story_thread()
+        plot = thread.plot
+        ref = thread.ref
+        try:
+            if action == "accept":
+                thread_services.accept(thread, actor)
+                note = f"Thread {ref} is open."
+            elif action == "decline":
+                thread_services.decline(thread, actor, request.POST.get("reason", ""))
+                note = f"Declined thread request {ref}."
+            elif action == "withdraw":
+                thread_services.withdraw(thread, actor)
+                note = f"Withdrew your request {ref}."
+            elif action in ("hold", "unhold"):
+                thread_services.set_held(thread, actor, action == "hold")
+                note = f"Thread {ref} is held." if action == "hold" else f"{ref} is no longer held."
+            elif action == "lead":
+                leading = thread_services.toggle_lead(thread, actor)
+                note = f"You're leading {ref}." if leading else f"You're no longer leading {ref}."
+            elif action == "interest":
+                interested = thread_services.toggle_interest(thread, actor)
+                note = (
+                    f"Marked your interest in {ref}."
+                    if interested
+                    else f"Removed your interest in {ref}."
+                )
+            elif action == "drop":
+                thread_services.drop(thread, actor)
+                note = f"Dropped {ref}."
+            elif action == "reopen":
+                thread_services.reopen(thread, actor)
+                note = f"Reopened {ref}."
+            else:
+                thread_services.reveal(thread, actor)
+                note = f"Revealed the planned answer to {ref}."
+            messages.success(request, note, fail_silently=True)
+        except thread_services.ThreadError as exc:
+            messages.error(request, str(exc), fail_silently=True)
+        return HttpResponseRedirect(_plot_threads_url(plot))
+
+
+class StoryThreadResolveView(_StoryThreadMixin, AuthoringMixin, FormView):
+    """Resolve a thread with a summary; owners may reveal its sealed answer."""
+
+    form_class = StoryThreadResolveForm
+    template_name = "evennia_plots/plot_thread_resolve_form.html"
+
+    def check_permission(self, character_id, target):
+        if not thread_services.can_resolve(target, _character(character_id)):
+            raise PermissionDenied
+
+    def _manages(self):
+        return self._get_story_thread().plot.can_manage(_character(self.get_character()))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        story_thread = self._get_story_thread()
+        manages = self._manages()
+        context["page_title"] = f"Resolve {story_thread.ref}: {story_thread.title}"
+        context["thread"] = story_thread.plot
+        context["story_thread"] = story_thread
+        context["offer_reveal"] = manages and story_thread.answer_is_sealed
+        context["form_action"] = reverse(
+            "evennia_plots:plot-thread-resolve",
+            kwargs={"pk": story_thread.plot.pk, "number": story_thread.number},
+        )
+        return context
+
+    def form_valid(self, form):
+        story_thread = self._get_story_thread()
+        try:
+            thread_services.resolve(
+                story_thread,
+                _character(self.get_character()),
+                form.cleaned_data["summary"],
+                reveal_answer=bool(form.cleaned_data.get("reveal")) and self._manages(),
+            )
+        except thread_services.ThreadError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(_plot_threads_url(story_thread.plot))
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class StoryThreadAnswerView(_StoryThreadMixin, AuthoringMixin, FormView):
+    """Read a thread's sealed answer and its history; owners also write it.
+
+    Owners and staff always see it. Once revealed, anyone who can see the plot
+    may read it. Everyone else gets a 404, never a hint that an answer exists.
+    """
+
+    form_class = SealedAnswerForm
+    template_name = "evennia_plots/plot_thread_answer.html"
+
+    def _manages(self):
+        return self._get_story_thread().plot.can_manage(_character(self.get_character()))
+
+    def _can_edit(self):
+        return self._manages() and self._get_story_thread().status == StoryThread.Status.OPEN
+
+    def check_permission(self, character_id, target):
+        if self._can_edit():
+            return
+        if not thread_services.can_read_answer(target, _character(character_id)):
+            raise Http404
+
+    def get_initial(self):
+        return {"answer": self._get_story_thread().sealed_answer}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        story_thread = self._get_story_thread()
+        context["page_title"] = f"Answer to {story_thread.ref}: {story_thread.title}"
+        context["thread"] = story_thread.plot
+        context["story_thread"] = story_thread
+        context["can_edit"] = self._can_edit()
+        context["versions"] = story_thread.answer_versions.order_by("-version_number")
+        context["form_action"] = reverse(
+            "evennia_plots:plot-thread-answer",
+            kwargs={"pk": story_thread.plot.pk, "number": story_thread.number},
+        )
+        return context
+
+    def form_valid(self, form):
+        story_thread = self._get_story_thread()
+        if not self._can_edit():
+            raise PermissionDenied
+        try:
+            thread_services.seal(
+                story_thread, _character(self.get_character()), form.cleaned_data["answer"]
+            )
+        except thread_services.ThreadError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(
+            reverse(
+                "evennia_plots:plot-thread-answer",
+                kwargs={"pk": story_thread.plot.pk, "number": story_thread.number},
+            )
+        )
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class StoryThreadCarryView(_StoryThreadMixin, AuthoringMixin, FormView):
+    """Carry a loose end into a sequel plot the actor also runs."""
+
+    form_class = StoryThreadCarryForm
+    template_name = "evennia_plots/plot_thread_carry_form.html"
+
+    def _targets(self):
+        return thread_services.carry_targets(
+            self._get_story_thread(), _character(self.get_character())
+        )
+
+    def check_permission(self, character_id, target):
+        if target.status != StoryThread.Status.LOOSE_END:
+            raise PermissionDenied
+        _require_manager(self.request, target.plot, character_id)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["targets"] = self._targets()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        story_thread = self._get_story_thread()
+        context["page_title"] = f"Carry {story_thread.ref}: {story_thread.title}"
+        context["thread"] = story_thread.plot
+        context["story_thread"] = story_thread
+        context["targets"] = self._targets()
+        context["form_action"] = reverse(
+            "evennia_plots:plot-thread-carry",
+            kwargs={"pk": story_thread.plot.pk, "number": story_thread.number},
+        )
+        return context
+
+    def form_valid(self, form):
+        story_thread = self._get_story_thread()
+        target = get_object_or_404(PlotThread, pk=form.cleaned_data["target"])
+        try:
+            thread_services.carry(story_thread, _character(self.get_character()), target)
+        except thread_services.ThreadError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(_plot_threads_url(target))
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
 
 
 # ---------------------------------------------------------------------------
