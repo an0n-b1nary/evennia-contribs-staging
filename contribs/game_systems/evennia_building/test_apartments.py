@@ -5,8 +5,10 @@ from unittest.mock import patch
 
 from django.apps import apps
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import connection
 from django.http import Http404
 from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
@@ -224,6 +226,29 @@ class TestApartments(EvenniaCommandTestMixin, EvenniaTest):
             self.assertFalse(attachments.departure_allows(bedroom_door))
         checked.assert_not_called()
         self.assertTrue(attachments.departure_allows(self.parent.departure))
+
+    def test_exit_deletion_checks_only_related_agreements(self):
+        child = self.apartment()
+        with CaptureQueriesContext(connection) as queries:
+            self.assertFalse(attachments.protected_exit(self.exit))
+        self.assertFalse(
+            any("attachmentagreement" in row["sql"].lower() for row in queries.captured_queries)
+        )
+        route_door = ObjectDB.objects.get(
+            db_location=self.entry.room, db_destination=self.hall.room
+        )
+        for exit in (
+            route_door,
+            self.parent.entrance,
+            self.parent.departure,
+            child.entrance,
+            child.departure,
+        ):
+            self.assertTrue(attachments.protected_exit(exit))
+        bedroom_door = ObjectDB.objects.get(
+            db_location=self.hall.room, db_destination=self.bedroom.room
+        )
+        self.assertFalse(attachments.protected_exit(bedroom_door))
 
     def test_map_only_invitation_and_unlocked_child_do_not_grant_passage(self):
         child = self.apartment()

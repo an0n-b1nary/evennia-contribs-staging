@@ -374,7 +374,18 @@ def departure_allows(exit):
 
 
 def protected_exit(exit):
-    for agreement in AttachmentAgreement.objects.all():
+    # Agreed exits are a parent's or child's entrance/departure, or route doors
+    # inside the parent, so unrelated exits never load the agreement table.
+    boundary = Q(entrance_id=exit.pk) | Q(departure_id=exit.pk)
+    related = set(Property.objects.filter(boundary).values_list("pk", flat=True))
+    record = ownership(exit.location) if exit.db_location_id else None
+    if record:
+        related.add(record.property_id)
+    if not related:
+        return False
+    for agreement in AttachmentAgreement.objects.select_related("child").filter(
+        Q(parent_id__in=related) | Q(child_id__in=related)
+    ):
         route = agreement.route
         if exit.pk in {
             route["entrance"]["id"],
