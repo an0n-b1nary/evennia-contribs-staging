@@ -169,7 +169,13 @@ def is_plane_visible(plane, *, viewer=None, staff=False):
         return False
     if staff or plane.visibility_room_id is None:
         return True
-    return is_room_web_visible(plane.visibility_room, viewer)
+    if not is_room_web_visible(plane.visibility_room, viewer):
+        return False
+    # An anchor grants access to the stack, not to every floor's metadata.
+    # A bedroom-only floor must reveal neither its name nor its existence.
+    return any(
+        is_room_web_visible(tile.room, viewer) for tile in plane.tiles.select_related("room")
+    )
 
 
 def visible_planes(queryset, *, viewer=None, staff=False):
