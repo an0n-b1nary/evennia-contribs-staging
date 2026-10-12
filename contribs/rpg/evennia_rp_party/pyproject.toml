@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-rp-party"
+version = "0.1.0"
+description = "Fight-local tactical parties, Formation, Cover and shared support over RP combat."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "an0n-b1nary" }]
+requires-python = ">=3.12"
+dependencies = ["evennia>=6.0", "evennia-links>=0.5", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-combat>=0.2.1,<0.3"]
+
+[project.optional-dependencies]
+guides = ["evennia-guides>=0.1"]
+
+[project.urls]
+Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
+Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
+
+[tool.setuptools]
+packages = ["evennia_rp_party"]
+
+[tool.setuptools.package-dir]
+"evennia_rp_party" = "."
+
+[tool.setuptools.package-data]
+evennia_rp_party = ["guides/*.md"]

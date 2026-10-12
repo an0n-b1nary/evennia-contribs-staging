@@ -107,6 +107,38 @@ class CombatSuite(Suite):
         self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
         self.command("bob", "+combat/accept", "accepted request")
 
+    def party_coordination(self):
+        self.command("alice", "+combat/setup Party rehearsal", "set up combat")
+        self.command("alice", "+combat/join one", "joined")
+        self.command("bob", "+combat/join one", "joined")
+        spawned = self.command("alice", "+combatstory/template Sparring Post=two", "Sparring Post")
+        npc_id = re.search(r"Spawned Sparring Post \(NPC\) #(\d+)", spawned["output"]).group(1)
+        created = self.command("alice", "+party/create Live Team", r"Party create: [0-9.]+")
+        key = re.search(r"Party create: ([0-9]+\.[0-9]+)", created["output"]).group(1)
+        self.command("alice", "+party/invite pt-bob", "Party invite")
+        self.command("bob", "+party/accept", "Party accept")
+        self.command("alice", "+party/formation front", "Party formation")
+        self.command("bob", "+party/formation back=on", "Party formation")
+        self.command("bob", "+combat/auto on", "auto on")
+        self.command("alice", "+npc/puppet #" + npc_id, "Now portraying")
+        self.command("alice", "+combat/attack/npc pt-bob=balanced")
+        queue = self.command("bob", "+combat")["output"]
+        token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
+        self.command("alice", "+party/coverodds pt-bob=" + token, "neutral RPS estimates")
+        self.command("alice", "+party/cover pt-bob=" + token + ",resist", "Covered")
+        self.command("alice", "+npc/unpuppet", "released")
+        self.command("bob", "+combat/assist pt-alice", r"[0-9]+\.[0-9]+")
+        self.command("alice", "+party", "boost [1-9]")
+        chat = self.command("bob", "+party/chat Ready for the next exchange", "Party OOC")
+        assert "Ready for the next exchange" in self.observer(chat, actor="alice")
+        self.command("bob", "+combat/posed", "posed")
+        self.command("bob", "+combat/fade", "fade")
+        self.command("bob", "+combat/join one", "joined")
+        self.command("bob", "+party", re.escape(key) + r".*back.*Cover on")
+        self.command("alice", "+party/dissolve", "waiting")
+        self.command("bob", "+party/agree", "dissolved")
+        self.command("alice", "+party", "No tactical parties")
+
 
 def run_combat(session):
     suite = CombatSuite(session)
@@ -129,6 +161,10 @@ def run_combat(session):
         (
             "consented revival by an ally, standing acceptance and one recovery action",
             suite.revival_and_recovery,
+        ),
+        (
+            "optional Party, standing Cover, support, private chat and retained Fade",
+            suite.party_coordination,
         ),
     ]
     for name, function in cases:

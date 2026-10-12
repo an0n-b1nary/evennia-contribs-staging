@@ -82,6 +82,7 @@ INSTALLED_APPS += [
     "evennia_rp_contest",
     "evennia_npcs",
     "evennia_rp_combat",
+    "evennia_rp_party",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -768,9 +769,20 @@ RP_RULES_EFFECT_KINDS = (
     if "evennia_rp_combat" in INSTALLED_APPS
     else {}
 )
-# Pure combat partner providers are opt-in. Their versioned state is kept
-# through rollback and provider removal; no Party provider ships yet.
-RP_COMBAT_PARTNERS = {}
+######################################################################
+# Party (evennia-rp-party) - optional tactical teams within combat sides
+######################################################################
+RP_PARTY_REVEALED = True
+RP_PARTY_FROZEN = False
+RP_COMBAT_PARTNERS = {
+    "party": {"app": "evennia_rp_party", "provider": "evennia_rp_party.providers.PROVIDER"},
+}
+# Provisional playtest calibration; all values are exact rational strings.
+RP_PARTY_SPIRIT_COEFFICIENT = "1"
+RP_PARTY_SUPPORT_POINTS = "5"
+RP_PARTY_BOOST_CAP = "30"
+RP_PARTY_PINPOINT_PENALTY = "10"
+RP_PARTY_ENCORE_FACTOR = "1/2"
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

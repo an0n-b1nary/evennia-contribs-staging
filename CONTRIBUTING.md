@@ -366,3 +366,20 @@ adds real NPCs and repeats with the other partners still physically absent.
 The full sandbox gate covers the installed-partner configuration and rendered
 guide; `scripts/playtest.py run --suite combat --profile normal --no-browser`
 checks ordinary authenticated player commands, including a Server reload.
+
+### Party without optional partners
+
+The `party-independent` CI job builds combat and Party wheels in a fresh
+environment containing only Evennia, links and rules. Use an initialized,
+migrated disposable game with those four contrib apps installed, then run
+`python scripts/ci_run_party_tests.py <game>` with the same `--absent`
+arguments above. The script requires physical package absence and a positive
+test count. It writes only the disposable host's test settings and fixtures.
+
+Run `--phase create` to save a populated fight and pending packet. Uninstall
+Party, run `--phase absent --absent evennia_rp_party`, reinstall the built
+wheel, then run `--phase restored`. Each phase starts a new process; it checks
+retained Party data/build hashes, resolution without its modifiers, restored
+old modifiers, unmodified packets created absent, and shelving. No live host
+or production database belongs in this recipe. The full sandbox gate and
+live combat suite also exercise Party with actual optional partners.

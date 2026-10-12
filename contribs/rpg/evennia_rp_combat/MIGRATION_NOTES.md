@@ -1,5 +1,13 @@
 # Adoption and upgrades
 
+## Upgrade from 0.2.0 to 0.2.1
+
+No model migration or fight-schema change is added. Optional partners can
+now request validated support recipients and preview an atomic interception;
+recovery emits its own transition event. Without an installed provider,
+support and revival keep their ordinary behavior. Party 0.1 requires this
+version rather than approximating combat 0.2's recovery state.
+
 This is a contrib-native implementation of a consent-based RP combat design.
 No source-project tables or Python modules are imported. Install hard
 partners first, configure stat-role/content mappings, migrate, register the

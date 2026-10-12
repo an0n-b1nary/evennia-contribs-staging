@@ -207,6 +207,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "evennia_rp_combat", "CmdCombat", "CmdCombatStory", "CmdTactics"
         ):
             self.add(command)
+        for command in _optional_commands("evennia_rp_party", "CmdParty"):
+            self.add(command)
         # Last so NPC-aware pose/say/emit and +test replace the normal commands.
         if apps.is_installed("evennia_npcs"):
             from evennia_npcs.commands import NPCCmdSet
