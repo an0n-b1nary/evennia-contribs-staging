@@ -28,6 +28,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from world.sandbox.test_apartments import ApartmentSeams
 from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
@@ -818,7 +819,8 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
             RoomTile.objects.filter(plane__name=content.DRAFTING_PLANE_NAME).count(), 1
         )
         self.assertEqual(Region.all_objects.count(), len(content.REGIONS) + 1)
-        self.assertEqual(RegionMembership.objects.count(), expected_memberships + 3)
+        # Residential Court, the two-room home and its independent apartment.
+        self.assertEqual(RegionMembership.objects.count(), expected_memberships + 4)
 
 
 class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):

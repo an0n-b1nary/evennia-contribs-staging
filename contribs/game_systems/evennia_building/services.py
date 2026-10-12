@@ -96,6 +96,10 @@ def _touch(project):
     ):
         raise ValidationError("This project has changed; reload it first.")
     project.version += 1
+    for consent in project.consents.filter(state__in=["requested", "granted"]):
+        consent.state = "invalidated"
+        consent.save(update_fields=["state"])
+        audit(project.owner, "consent_invalidated", project=project, consent=consent.pk)
 
 
 def _quota(owner, *, project=False):
@@ -306,10 +310,9 @@ def _anchor(project):
     if owner:
         if owner.property.state != "live" or not owner.owner_id:
             raise ValidationError("The attachment property is unavailable.")
-        if owner.owner_id != project.owner_id:
-            raise ValidationError(
-                "Attaching inside another character's property is not yet available."
-            )
+        from .attachments import parent_for
+
+        parent_for(project)
     if (
         _read_attr(anchor, "room_type", "ic") != "ic"
         or _read_attr(anchor, "allow_teleport") == "secret"
@@ -321,7 +324,7 @@ def _anchor(project):
 
 
 @atomic_objects
-def attach(actor, project, anchor, entrance_name, *, expected_version=None):
+def attach(actor, project, anchor, entrance_name, *, expected_version=None, passage=None):
     project = _project(project, actor, editable=True, expected_version=expected_version)
     _touch(project)
     name = _text(entrance_name, 100)
@@ -351,7 +354,16 @@ def attach(actor, project, anchor, entrance_name, *, expected_version=None):
     project.anchor = anchor
     project.entrance_name = name
     _anchor(project)
-    project.save(update_fields=["anchor", "entrance_name"])
+    from .attachments import attachment_snapshot, default_route, parent_for, require_route_selection
+
+    parent = parent_for(project)
+    project.passage = (
+        default_route(parent, anchor) if parent and passage is None else (passage or [])
+    )
+    attachment_snapshot(project)
+    if parent:
+        require_route_selection(actor, project.passage)
+    project.save(update_fields=["anchor", "entrance_name", "passage"])
     audit(actor, "attached", project=project, anchor=anchor.pk, entrance=name)
     return project
 
@@ -568,7 +580,7 @@ def snapshot(project):
         }
         for door in project.doors.select_related("exit").order_by("pk")
     ]
-    return {
+    candidate = {
         "project": project.pk,
         "version": project.version,
         "name": project.name,
@@ -584,6 +596,12 @@ def snapshot(project):
         "doors": doors,
         "report": report,
     }
+    from .attachments import attachment_snapshot
+
+    attachment = attachment_snapshot(project)
+    if attachment:
+        candidate["attachment"] = attachment
+    return candidate
 
 
 def fingerprint(candidate):
@@ -605,6 +623,11 @@ def submit(actor, project, *, expected_version, acknowledgement):
             "Read and acknowledge the current content reuse wording before submitting."
         )
     candidate = snapshot(project)
+    from .attachments import validate_consent
+
+    consent = validate_consent(project, candidate)
+    if consent:
+        candidate["consent"] = consent.pk
     candidate["acknowledgement"] = {
         "wording": wording,
         "version": getattr(settings, "BUILDING_REUSE_VERSION", "1"),
@@ -726,6 +749,11 @@ def promote(submission, actor):
         return receipt
     project, submission = _current(submission)
     candidate = snapshot(project)
+    from .attachments import consume, validate_consent
+
+    consent = validate_consent(project, candidate)
+    if consent:
+        candidate["consent"] = consent.pk
     candidate["acknowledgement"] = submission.snapshot["acknowledgement"]
     if fingerprint(candidate) != submission.fingerprint:
         raise ValidationError(
@@ -794,6 +822,7 @@ def promote(submission, actor):
             RoomTile.objects.filter(room=room).update(
                 terrain=resolve_terrain(room), room_name=room.key
             )
+    consume(submission, property)
     audit(actor, "promoted", project=project, property=property, submission=submission.pk)
     signals.property_promoted.send(
         sender=Property, property=property, submission=submission, actor=actor
@@ -810,7 +839,7 @@ def _property(property, actor, *, staff=False):
     Property.objects.filter(pk=property.pk).update(locked=F("locked"))
     require_revealed(actor)
     property = Property.objects.select_for_update().get(pk=property.pk)
-    if property.state != "live" or not property.owner_id:
+    if property.state not in ({"live", "archived"} if staff else {"live"}) or not property.owner_id:
         raise ValidationError("This property needs staff repair.")
     if (staff and not is_staff(actor)) or (not staff and property.owner_id != actor.pk):
         raise PermissionDenied("Only the property owner may manage these rights.")
@@ -949,6 +978,23 @@ def transfer(actor, property, new_owner, *, expected_owner, reason, retain_grant
         reason=reason,
         retain_grants=retain_grants,
     )
+    from django.utils import timezone
+
+    from .models import QuietFlag
+
+    QuietFlag.objects.filter(property=property, resolved_at__isnull=True).update(
+        resolved_at=timezone.now()
+    )
+    for consent in property.consent_requests.filter(state__in=["requested", "granted"]):
+        consent.state = "invalidated"
+        consent.save(update_fields=["state"])
+        audit(
+            actor,
+            "consent_invalidated",
+            project=consent.project,
+            consent=consent.pk,
+            reason="Parent ownership transferred",
+        )
     return property
 
 
@@ -1059,8 +1105,13 @@ def discard(actor, project, token):
     for obj, destination in relocation:
         obj.location = destination
     for door in project.doors.select_related("exit"):
-        if door.exit and not door.exit.delete():
-            raise ValidationError("A door could not be removed; cleanup rolled back.")
+        if door.exit:
+            door.exit.ndb.building_cleanup = True
+            try:
+                if not door.exit.delete():
+                    raise ValidationError("A door could not be removed; cleanup rolled back.")
+            finally:
+                door.exit.ndb.building_cleanup = None
     if apps.is_installed("evennia_maps"):
         from evennia_maps.models import MapPlane
 
@@ -1075,6 +1126,7 @@ def discard(actor, project, token):
     project.state = "discarded"
     _touch(project)
     project.save(update_fields=["state"])
+    project.consents.filter(state__in=["requested", "granted"]).update(state="invalidated")
     audit(
         actor,
         "discarded",

@@ -1,9 +1,10 @@
 # evennia-building
 
-Version 0.1.0 supplies individually owned, reviewed interiors. Players draft
+Version 0.2.0 supplies individually owned, reviewed interiors. Players draft
 isolated rooms, submit immutable revisions, withdraw to edit, and receive an
-atomic staff approval. Homes begin unlocked; maps remain private. Apartment
-consent, archival and quiet-property flags are reserved for a later release.
+atomic staff approval. Homes begin unlocked; maps remain private. Apartments
+have explicit parent-owner consent and durable shared passage. Staff can
+archive/restore property and review quiet flags without automatic reclamation.
 
 Install `evennia-links` first, then `pip install -e contribs/game_systems/evennia_building`.
 Only Links and Evennia are hard dependencies. Maps, Regions, Jobs, Economy and
@@ -75,8 +76,8 @@ queue and histories intact. Review and promotion use the same services.
 The content reuse wording/version belong to host settings:
 `BUILDING_REUSE_ACKNOWLEDGEMENT` and `BUILDING_REUSE_VERSION`. Each submission
 records the exact acknowledgement and actor; acknowledgements do not grant
-another owner's consent. Attaching inside another character's property and
-frontier creation are explicitly unavailable in this release.
+another owner's consent. Apartment attachment uses a separate owner consent
+workflow. Frontier creation remains unavailable.
 
 Room `build_policy` tags override active primary-region `RegionBuildPolicy`
 defaults, then `BUILDING_DEFAULT_POLICY` (`open`). Policies are `open`,
@@ -113,7 +114,69 @@ and `actor`. Required listener errors roll back everything, including a Jobs
 decision. Use the unique `property.promotion_id` for idempotent later shop
 reconciliation. `property_changed` runs after commit for cache invalidation;
 it is not durable external delivery. Ownership is per room and per property,
-ready for future separate apartment boundaries. Deleted owners/anchors deny
+including separate apartment boundaries. Deleted owners/anchors deny
 access pending staff repair; audit records preserve character names and IDs.
 
 See [the player guide](guides/building.md) and `services.py` for the shared API.
+
+## Apartments and consent
+
+`attach(..., passage=[room_id, ...])` names a route from the parent's entrance
+to the apartment attachment. Omit it to use the parent's generated outward tree.
+Applicants need existing entry or preview rights to the proposed passage;
+requesting consent cannot discover a restricted parent route by guessing IDs.
+All route rooms must belong to one live top-level parent, with usable doors in
+both directions. Nested apartments and routes crossing another property are
+refused. Request consent with `attachments.request_consent`, inspect the exact
+candidate and wording, then the current parent owner calls `answer_consent`.
+Only that owner may grant/decline/revoke; staff and residents cannot substitute.
+Self-owned attachments record their own receipt. Consent freezes names,
+descriptions, geometry, owner, anchor, route, policy report and agreement wording.
+Editing invalidates outstanding grants. Approval rechecks the candidate and
+consumes its receipt into `AttachmentAgreement`; pre-approval revocation blocks
+promotion and rolls back a Jobs decision as well.
+
+The parent gives durable passage to the apartment owner, its residents and
+accepted guests with entry scope. Parent locks, bedroom overrides, resident
+removal and transfer cannot defeat that specific passage. It confers no parent
+floor-plan, remote presence, teleport, ownership, editing or installation rights.
+An unlocked child alone grants no passage through a locked parent. The child
+controls its door and guests. Neither owner can delete an established route.
+Only staff may propose/apply replacement passage; both current owners explicitly
+acknowledge the exact route and wording through `PassageChange` first.
+
+## Archive, restore and quiet review
+
+`lifecycle.archive(actor, property, reason=..., include_children=False)` detaches
+the preserved entrance, hides ordinary access/discovery and returns characters
+to safe rooms. Loose/carried belongings and all room/exit/ownership IDs survive.
+Active children block parent archival unless staff explicitly archives them
+together. Restore the parent first, then each child. `restore` rechecks the live
+anchor, policy, door names/limits, actual geometry and passage. Changed owners
+since archival require renewed agreement from both current owners; changed
+routes require agreed replacement passage. No timeout changes rights.
+
+Quiet review uses character play, never account login. Configure
+`BUILDING_ACTIVITY_PROVIDER` as a callable returning an aware datetime or None.
+The reference game uses its existing puppet/unpuppet `sandbox_last_seen` hook.
+The default reads `building_last_played`: compose `BuildingCharacterMixin`
+before DefaultCharacter with cooperative `super()` to maintain it. Online
+characters are active; missing history starts at property creation. The runtime
+`BUILDING_QUIET_DAYS` defaults to 35. A persisted first revealed check starts a
+minimum reveal grace of the same duration. New activity resolves open flags;
+repeated checks deduplicate, and flags grant/revoke no rights. Staff see them
+via `+build/quiet`, the Building page and inspection-only admin, even without Jobs.
+
+Schedule automatic checks with a persistent global script:
+
+```python
+GLOBAL_SCRIPTS = {
+    **GLOBAL_SCRIPTS,
+    "building_quiet_review": {"typeclass": "evennia_building.scripts.QuietReview"},
+}
+```
+
+Upgrading 0.1 preserves migrations, objects, ownership, reviews and snapshots.
+Existing top-level pending submissions keep their fingerprint. New apartment
+proposals require consent; an old self-owned internal proposal must be withdrawn
+and resubmitted with its passage receipt before approval.

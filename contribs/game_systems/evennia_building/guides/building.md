@@ -31,5 +31,25 @@ Use `/property` to list homes. The Building website offers the same actions and
 exact submission pages. Staff transfer preserves rooms and belongings and clears
 ordinary access grants by default. Draft discard displays a confirmation token;
 it refuses stale confirmations and safely returns occupants and loose belongings.
-Withdraw first. Live homes cannot be discarded. Apartment attachments, staff
-archival and frontier building will arrive in later releases.
+Withdraw first. Live homes cannot be discarded. Frontier building comes later.
+
+To propose an apartment inside another home, choose the attachment and passage
+route, then `+build/consent/request <project>`. The parent owner uses
+`+build/consent/list` and `/consent/show <request>` to inspect the exact candidate.
+They grant it with `/consent/grant <request>=<displayed agreement wording>`, or
+decline it. They may revoke before approval. Changes invalidate consent, so ask
+again after editing. The website provides the same inspection and answers.
+
+The agreement means the parent owner cannot lock the named passage rooms
+against your apartment, its residents or guests you admit. You control your own
+home and guests; the parent controls theirs. Passage grants no other parent
+rooms, floor plans, editing or installation rights. A guest must accept an
+invitation with entry scope before gaining passage through a locked parent.
+Room overrides and parent locks never prevent departure. Apartments cannot
+contain further separately owned apartments in this release.
+
+Staff can archive/restore a live property while preserving rooms, belongings
+and history. Parent archival cannot strand active apartments; staff must handle
+affected homes together or arrange replacement passage with both owners.
+Quiet-property flags after about five weeks without character play are for
+staff review only. They never automatically reclaim or transfer a home.

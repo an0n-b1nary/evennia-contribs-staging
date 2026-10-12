@@ -4,8 +4,8 @@ from django.conf import settings
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia_building import services
-from evennia_building.models import BuildProject, RegionBuildPolicy
+from evennia_building import attachments, services
+from evennia_building.models import BuildProject, Property, RegionBuildPolicy
 
 from evennia_regions.models import Region, RegionMembership
 
@@ -25,6 +25,8 @@ def seed(outer):
     resident = _object("Demo Resident", "typeclasses.characters.Character")
     reviewer = _object("Demo Building Reviewer", "typeclasses.characters.Character")
     reviewer.permissions.add("Builder")
+    tenant = _object("Demo Apartment Owner", "typeclasses.characters.Character")
+    guest = _object("Demo Apartment Guest", "typeclasses.characters.Character")
     court = _object("Residential Court", "typeclasses.rooms.Room")
     court.db.room_type = "ic"
     court.db.allow_teleport = "public"
@@ -98,9 +100,36 @@ def seed(outer):
             outcome="changes_requested",
             reason="Add a room description before resubmitting.",
         )
+    parent = Property.objects.get(promotion__project__owner=owner, name="Sample Home")
+    if not BuildProject.objects.filter(owner=tenant, name="Sample Apartment").exists():
+        project = services.new_project(tenant, "Sample Apartment")
+        entry = project.rooms.get(entry=True)
+        services.edit_project(
+            tenant,
+            project,
+            room=entry,
+            description="A separately owned apartment. Its owner admits guests through the agreed common room, while the parent's bedroom and floor plan remain private.",
+        )
+        anchor = parent.promotion.project.rooms.get(entry=True).room
+        services.attach(tenant, project, anchor, "sample apartment")
+        project.refresh_from_db()
+        consent = attachments.request_consent(tenant, project, expected_version=project.version)
+        attachments.answer_consent(owner, consent, action="grant", acknowledgement=consent.wording)
+        submission = services.submit(
+            tenant, project, expected_version=project.version, acknowledgement=ack
+        )
+        services.review(
+            reviewer,
+            submission,
+            expected_revision=1,
+            outcome="approved",
+            reason="Separate ownership and exact shared passage approved.",
+        )
+        invitation = services.invite(tenant, submission.property, guest, entry=True, maps=False)
+        services.answer_invitation(guest, invitation, accept=True)
     # Persistent generated demo geometry is seeded content, not hand-dug rooms.
-    for project in BuildProject.objects.filter(owner=owner):
+    for project in BuildProject.objects.filter(owner__in=[owner, tenant]):
         for record in project.rooms.select_related("room"):
             if record.room:
                 record.room.tags.add(TAG, category="sandbox")
-    return {"building_projects": BuildProject.objects.filter(owner=owner).count()}
+    return {"building_projects": BuildProject.objects.filter(owner__in=[owner, tenant]).count()}

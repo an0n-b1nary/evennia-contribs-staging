@@ -1502,7 +1502,7 @@ command and Social's room-permission seam under the actual partners.
 
 ### Reviewed interiors
 
-Building 0.1 is installed after Links, with the sandbox reveal switch enabled.
+Building 0.2 is installed after Links, with the sandbox reveal switch enabled.
 `BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
 `DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
 and traversal checks run. `CmdBuild` is registered in the character command set.
@@ -1532,8 +1532,20 @@ Building-owned form. Native review continues when Jobs is absent.
 privacy, selected-character pages/API and contents-preserving cleanup.
 The partner CI matrix also starts fresh processes with Maps, Regions, Jobs,
 Economy and Social each absent, and all five absent together. It runs
-file-backed review/withdrawal and quota races separately. Apartment consent,
-archive/restore and quiet flags are reserved for the next Building release.
+file-backed review/withdrawal and quota races separately.
+
+**Demo Apartment Owner** owns **Sample Apartment** inside Sample Home, with
+recorded homeowner consent covering only the common entrance room.
+**Demo Apartment Guest** has accepted an entry-only invitation. Lock Sample Home
+to verify that the tenant and admitted guest retain passage, while the restricted
+bedroom and parent floor plan remain private. `world/sandbox/test_apartments.py`
+exercises this under actual room/exit composition, including deletion guards,
+archive/restore, consent pages and Social/Maps privacy.
+
+Staff `/archive`, `/restore` and `/quiet` use Building's shared lifecycle services.
+The persistent `building_quiet_review` script checks daily using the existing
+character-specific `sandbox_last_seen` activity provider. The runtime threshold
+defaults to 35 days, with a reveal grace. Flags never change ownership/access.
 
 ## Combat practice
 

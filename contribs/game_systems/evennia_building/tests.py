@@ -89,13 +89,17 @@ class TestInteriors(EvenniaCommandTestMixin, EvenniaTest):
         with self.assertRaises(PermissionDenied):
             services.edit_project(self.char1, self.project, name="Staff as collaborator")
 
-    def test_unsupported_frontier_and_apartment_refused(self):
+    def test_unsupported_frontier_and_apartment_requires_consent(self):
         with self.assertRaisesMessage(ValidationError, "frontier"):
             services.new_project(self.char2, "Frontier", kind="frontier")
         property = self.approve()
         project = services.new_project(self.char1, "Apartment")
-        with self.assertRaisesMessage(ValidationError, "not yet available"):
-            services.attach(self.char1, project, self.entry.room, "apartment")
+        services.attach(self.char1, project, self.entry.room, "apartment")
+        project.refresh_from_db()
+        with self.assertRaisesMessage(ValidationError, "consent"):
+            services.submit(
+                self.char1, project, expected_version=project.version, acknowledgement=ACK
+            )
         self.assertEqual(property.owner_id, self.char2.pk)
 
     def test_quotas_include_submitted_and_multiple_projects(self):
