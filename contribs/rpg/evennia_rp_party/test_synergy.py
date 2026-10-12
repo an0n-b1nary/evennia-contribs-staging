@@ -501,11 +501,9 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         state = combat.state_for(self.char1)
         self.assertFalse(rules.data(state)["surges"])
         self.assertEqual(synergy.pool(state, self.key), 100)
-        combat.control(
-            self.char2,
-            "cancel",
-            argument=f"{state['participants'][str(self.char1.pk)]['outgoing']}:1",
-        )
+        # Auto-Act picks at random; a Dispirit resolves with nothing incoming.
+        for token in state["participants"][str(self.char2.pk)]["incoming"]:
+            combat.control(self.char2, "cancel", argument=token)
         combat.storyteller(self.char1, "pause")
         with self.assertRaisesRegex(CombatError, "paused"):
             services.surge(self.char1, [self.char2])

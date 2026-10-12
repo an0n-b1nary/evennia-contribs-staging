@@ -279,6 +279,27 @@ def identity(subject):
     return plain(subject.key)
 
 
+def requested(requests, targets=()):
+    """Public wording for partner requests; it also fingerprints retries.
+
+    Names replace database ids. The provider still validates every request.
+    """
+    if not requests or not isinstance(requests, dict):
+        return ""
+    names = {str(target.pk): identity(target) for target in targets}
+    words = []
+    for key, request in sorted(requests.items(), key=lambda item: str(item[0])):
+        request = request if isinstance(request, dict) else {}
+        options = "".join(
+            f" {plain(name, 60)}={plain(value, 60)}"
+            for name, value in sorted(request.items(), key=lambda item: str(item[0]))
+            if name != "target"
+        )
+        target = names.get(request.get("target"), "")
+        words.append(f"{plain(key, 60)} request{options}" + (f" for {target}" if target else ""))
+    return f"; {', '.join(words)}"
+
+
 def emit(room, actor, text):
     """Mechanics are SYSTEM entries only, never posing or tracker activity."""
     if room is None:
@@ -816,11 +837,7 @@ def declare(
     return execute(
         actor,
         f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}"
-        + (
-            f"; shared resource request {json.dumps(partner_requests, sort_keys=True)}"
-            if partner_requests
-            else ""
-        ),
+        + requested(partner_requests, targets),
         operation,
         operation_id=operation_id,
         subject=subject,
@@ -1282,11 +1299,7 @@ def control(
     return execute(
         actor,
         f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}"
-        + (
-            f"; shared resource request {json.dumps(partner_requests, sort_keys=True)}"
-            if partner_requests
-            else ""
-        ),
+        + requested(partner_requests),
         change,
         progressing=not cleanup,
         operation_id=operation_id,

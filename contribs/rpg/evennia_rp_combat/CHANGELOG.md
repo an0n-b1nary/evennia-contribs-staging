@@ -8,7 +8,9 @@
 
 - Explicit partner declaration/pressed-hit reservation hooks run before
   frozen modifiers and automatic execution, within the fight transaction.
-  Failed explicit spends leave pure engine inputs unchanged too.
+  Failed explicit spends leave pure engine inputs unchanged too. The
+  announced journal line names the request and its target, never raw ids,
+  and still distinguishes a spend from a plain retry of the same operation.
 - Typed partner transition notices are journaled and announced in the
   operation that produced them, including saved-state reconciliation.
 - Attributed hostile Poison damage events on ordinary completed actions;
