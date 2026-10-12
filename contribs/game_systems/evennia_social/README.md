@@ -316,3 +316,16 @@ is the existing control-lock check. A configured provider can grant rights to
 owners/residents/stewards without granting general Evennia control. Staff and
 mood's scene-host/participant permissions remain independent. See Links' room
 provider settings; Social never imports an ownership package.
+
+### Host temporary mood permission
+
+`SOCIAL_ROOM_MOOD_PERMISSION` accepts a callable or dotted path taking
+`(character, room)`. Return True to grant, False to deny, or None to defer to
+the existing staff, scene and Links configure checks. Exceptions and invalid
+results deny. This permission only sets temporary mood text; it does not grant
+room configuration. Building 0.3 supplies `evennia_building.access.steward_mood_permission`.
+
+Room configuration display also renders an optional room method
+`get_extra_room_details(viewer)`, returning `(label, value)` pairs. Cooperative
+host mixins can show provenance here while keeping it out of ordinary look text.
+Displaying metadata does not grant configuration permission.
