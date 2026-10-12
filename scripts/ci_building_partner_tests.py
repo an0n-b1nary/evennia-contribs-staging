@@ -27,6 +27,8 @@ urlpatterns += defaults
 
 
 @override_settings(
+    # TestInteriors mounts only Building; keep this profile's partner routes.
+    ROOT_URLCONF=__name__,
     LINKS_ROOM_TRAVEL="evennia_building.access.can_teleport",
     LINKS_ROOM_VISIBILITY="evennia_building.visibility.room_visibility",
 )

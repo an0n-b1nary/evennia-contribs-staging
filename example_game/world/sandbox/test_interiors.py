@@ -14,6 +14,9 @@ from evennia_maps.permissions import is_room_web_visible
 from evennia_social import presence
 
 
+# TestInteriors mounts only Building; render inherited pages against the host's
+# own URLconf so its includes and namespaces are what get exercised.
+@override_settings(ROOT_URLCONF="web.urls")
 class BuildingInteriorSeams(TestInteriors):
     character_typeclass = Character
     room_typeclass = Room

@@ -6,9 +6,11 @@ from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import RequestFactory, override_settings
+from django.urls import include, path
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 from . import services, signals
 from .access import can_enter, can_teleport, owner_of, room_permission
@@ -18,8 +20,16 @@ from .visibility import room_visibility
 
 ACK = "My submitted content may be reused."
 
+# A contrib-only suite runs under a host URLconf that need not mount Building.
+# Evennia's routes come along because website/base.html reverses them.
+urlpatterns = [
+    path("building/", include("evennia_building.urls")),
+    *evennia_default_urlpatterns,
+]
+
 
 @override_settings(
+    ROOT_URLCONF=__name__,
     BUILDING_REVEALED=True,
     BUILDING_REUSE_ACKNOWLEDGEMENT=ACK,
     JOBS_REQUEST_FORMS={FORM_KEY: FORM},
