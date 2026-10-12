@@ -28,6 +28,10 @@
     <a href="{% url 'evennia_regions:region-detail' membership.region.pk %}">{{ membership.region.name }}</a>{% if not membership.is_primary %} <span class="badge badge-secondary">Secondary</span>{% endif %}{% if not forloop.last %}, {% endif %}
     {% empty %}Not recorded{% endfor %}
   </dd>
+  {% for label, value in extra_room_details %}
+  <dt class="col-sm-3">{{ label }}</dt><dd class="col-sm-9">{{ value }}</dd>
+  {% empty %}{# Additional room metadata is optional. #}
+  {% endfor %}
 </dl>
 
 {% if tiles %}

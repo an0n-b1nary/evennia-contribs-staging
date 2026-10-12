@@ -132,6 +132,12 @@ class RoomDetailView(DetailView):
         room = self.object
         context["page_title"] = room.key
         context["description"] = getattr(getattr(room, "db", None), "desc", "") or ""
+        details = getattr(room, "get_extra_room_details", None)
+        context["extra_room_details"] = (
+            details(request_viewer(self.request, staff=is_staff_user(self.request)))
+            if details
+            else ()
+        )
         # RegionMembership uses related_name="+", so query by room explicitly.
         context["memberships"] = list(
             RegionMembership.objects.filter(room=room, region__is_archived=False).select_related(

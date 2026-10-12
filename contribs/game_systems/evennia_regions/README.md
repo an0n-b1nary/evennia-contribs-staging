@@ -1,5 +1,10 @@
 # evennia-regions
 
+Visible room pages render a host room's optional `get_extra_room_details(viewer)`
+sequence of `(label, value)` pairs. The view applies its normal room visibility
+first and escapes the values. Cooperative mixins may add provenance through this
+protocol without introducing a dependency between Regions and the owning system.
+
 > ⚠️ **Preview status.** This contrib is in the [evennia-contribs-staging](https://github.com/an0n-b1nary/evennia-contribs-staging) pre-upstream channel. APIs may change before submission to `evennia/evennia`.
 
 Geographic grouping of rooms into named regions for [Evennia](https://www.evennia.com/) games.

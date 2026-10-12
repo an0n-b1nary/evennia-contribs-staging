@@ -2,6 +2,11 @@
 
 All notable changes to `evennia-regions` will be documented here.
 
+## 0.5.1 — 2026-10-12
+
+- Render optional cooperative `get_extra_room_details(viewer)` metadata on visible
+  room pages, allowing host-composed provenance without a Building dependency.
+
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
