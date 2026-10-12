@@ -2,13 +2,13 @@
   Empty state partial — shown when a list has no items.
 
   Variables (pass via "with"):
-    message     — required — brief description, e.g. "No plot threads yet."
+    message     — required — brief description, e.g. "No plots yet."
     action      — optional — in-game command hint, e.g. "Use +plot/create to start one."
     action_url  — optional — URL for a web call-to-action link.
     action_label — optional — link text for action_url (default: "Get started").
 
   Usage:
-    {% include "evennia_plots/_empty_state.html" with message="No active plot threads." %}
+    {% include "evennia_plots/_empty_state.html" with message="No active plots." %}
 {% endcomment %}
 <div class="text-center py-5">
   <p class="text-muted mb-1">{{ message }}</p>

@@ -85,7 +85,7 @@ def _on_plot_thread_concluded(sender, thread, concluded_by=None, **kwargs):
             file_staff_review(
                 f"Sealed lore on concluded plot #{number}",
                 (
-                    f"Plot thread #{number} '{name}' concluded with linked lore still "
+                    f"Plot #{number} '{name}' concluded with linked lore still "
                     f"sealed: {numbers}.\n\nUnseal each with +lore/unseal <id>=<accuracy> "
                     "when the story has settled it."
                 ),

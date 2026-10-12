@@ -232,7 +232,7 @@ class CmdLore(EditingMixin, MuxCommand):
         +lore/object <id>=<#objref>        Tag entry to an in-game object
         +lore/unobject <id>=<#objref>      Remove object tag
         +lore/link/scene <id>=<scene#>     Link entry to a scene
-        +lore/link/plot <id>=<plot#>       Link entry to a plot thread
+        +lore/link/plot <id>=<plot#>       Link entry to a plot
         +lore/approve <id>                 Approve a submitted entry (staff only)
         +lore/reject <id>=<reason>         Reject a submitted entry (staff only)
         +lore/flag <id>=<reason>           Flag an entry for staff review
@@ -949,17 +949,17 @@ class CmdLore(EditingMixin, MuxCommand):
             caller.msg(err)
             return
         if not _can_edit_entry(entry, caller):
-            caller.msg("Only the entry author (or staff) can link plot threads.")
+            caller.msg("Only the entry author (or staff) can link plots.")
             return
         plot_arg = plot_arg.lstrip("#")
         if not plot_arg.isdigit():
-            caller.msg("Plot thread ID must be an integer (e.g. #5 or 5).")
+            caller.msg("Plot ID must be an integer (e.g. #5 or 5).")
             return
         try:
             PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "evennia_plots")
             thread = PlotThread.objects.get(plot_number=int(plot_arg))
         except Exception:
-            caller.msg(f"No plot thread #{plot_arg} found.")
+            caller.msg(f"No plot #{plot_arg} found.")
             return
         _, created = PlotLoreLink.objects.get_or_create(
             thread_id=thread.pk,
@@ -967,9 +967,7 @@ class CmdLore(EditingMixin, MuxCommand):
             defaults={"created_by": caller, "created_by_name": caller.key},
         )
         if created:
-            caller.msg(
-                f"|gLinked entry #{entry.entry_number} to plot thread #{thread.plot_number}.|n"
-            )
+            caller.msg(f"|gLinked entry #{entry.entry_number} to plot #{thread.plot_number}.|n")
         else:
             caller.msg(f"Entry #{entry.entry_number} is already linked to #{thread.plot_number}.")
 
@@ -1157,7 +1155,7 @@ class CmdInvestigate(MuxCommand):
         +investigate/tag <name>            Lean toward any tag
         +investigate/region <name>         Lean toward a region
         +investigate/entry <id>            Lean toward a specific entry
-        +investigate/plot <id>             Lean toward a plot thread's lore
+        +investigate/plot <id>             Lean toward a plot's lore
         +investigate/clear                 Clear your current lean
 
     Sets a persistent preference tilting your passive lore acquisition toward
@@ -1237,7 +1235,7 @@ class CmdInvestigate(MuxCommand):
                 PlotThread = _get_model("LORE_PLOTS_APP_LABEL", "PlotThread", "evennia_plots")
                 thread = PlotThread.objects.get(plot_number=int(val))
             except Exception:
-                caller.msg(f"No plot thread #{val} found.")
+                caller.msg(f"No plot #{val} found.")
                 return
             caller.lore_lean_type = lean_type
             caller.lore_lean_value = thread.plot_number

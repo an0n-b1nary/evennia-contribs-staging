@@ -5,26 +5,26 @@
   {% include "evennia_plots/_styles.html" %}
 {% endblock %}
 
-{% block titleblock %}Plot Threads{% endblock %}
+{% block titleblock %}Plots{% endblock %}
 
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item active" aria-current="page">Plot Threads</li>
+    <li class="breadcrumb-item active" aria-current="page">Plots</li>
   </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-<h1 class="mb-0">Plot Threads</h1>
+<h1 class="mb-0">Plots</h1>
 {% if request.user.is_authenticated %}
 <a href="{% url 'evennia_plots:plot-create' %}" class="btn btn-sm btn-primary">New Plot</a>
 {% endif %}
 </div>
 
 <div class="mb-3">
-  <form method="get" class="d-inline-flex evennia-plots-gap" role="search" aria-label="Filter plot threads by tag">
+  <form method="get" class="d-inline-flex evennia-plots-gap" role="search" aria-label="Filter plots by tag">
     <label for="id_tag_filter" class="sr-only">Filter by tag</label>
     <input type="text" id="id_tag_filter" name="tag" value="{{ tag_filter }}"
            placeholder="Filter by tag..." class="form-control form-control-sm evennia-plots-filter-control">
@@ -45,14 +45,14 @@
 </div>
 
 {% if threads %}
-<div class="evennia-plots-table-scroll" role="region" aria-label="Plot threads" tabindex="0">
+<div class="evennia-plots-table-scroll" role="region" aria-label="Plots" tabindex="0">
 <table role="table" class="evennia-plots-table-stack table table-striped">
   <thead role="rowgroup">
     <tr role="row">
       <th role="columnheader" scope="col">#</th>
       <th role="columnheader" scope="col">Name</th>
       <th role="columnheader" scope="col">Tags</th>
-      <th role="columnheader" scope="col">Creator</th>
+      <th role="columnheader" scope="col">Owners</th>
       <th role="columnheader" scope="col">Scenes</th>
       <th role="columnheader" scope="col">Arc</th>
     </tr>
@@ -65,6 +65,12 @@
         {% if thread.description %}
         <br><small class="text-muted">{{ thread.description }}</small>
         {% endif %}
+        {% if thread.open_thread_count or thread.owner_led %}
+        <br><small>
+          {% if thread.open_thread_count %}{{ thread.open_thread_count }} open thread{{ thread.open_thread_count|pluralize }}{% endif %}
+          {% if thread.owner_led %}<span class="badge badge-warning text-dark">Owner-led</span>{% endif %}
+        </small>
+        {% endif %}
       </td>
       <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Tags</span>
         {% for tag in thread.tags.all %}
@@ -75,7 +81,7 @@
         {% empty %}<span class="text-muted">Not recorded</span>
         {% endfor %}
       </td>
-      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Creator</span>{% if not thread.creator_id and thread.creator_name == "Unknown" %}Unattributed{% else %}{{ thread.creator_name|default:"Unattributed" }}{% endif %}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Owners</span>{% for owner in thread.owners.all %}{{ owner.character_name|default:"Unattributed" }}{% if not forloop.last %}, {% endif %}{% empty %}Unattributed{% endfor %}</td>
       <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Scenes</span>{{ thread.scene_links.count }}</td>
       <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Arc</span>{% if thread.arc %}<a href="{% url 'evennia_plots:plot-arc-detail' thread.arc.pk %}">{{ thread.arc.name }}</a>{% endif %}</td>
     </tr>
@@ -91,9 +97,9 @@
 {% else %}
 {% url 'evennia_plots:plot-create' as action_url %}
 {% if tag_filter %}
-{% include "evennia_plots/_empty_state.html" with message="No active plot threads with that tag." action_url=action_url action_label="Start a new thread" %}
+{% include "evennia_plots/_empty_state.html" with message="No active plots with that tag." action_url=action_url action_label="Start a new plot" %}
 {% else %}
-{% include "evennia_plots/_empty_state.html" with message="No active plot threads." action_url=action_url action_label="Start a new thread" %}
+{% include "evennia_plots/_empty_state.html" with message="No active plots." action_url=action_url action_label="Start a new plot" %}
 {% endif %}
 {% endif %}
 {% endblock %}

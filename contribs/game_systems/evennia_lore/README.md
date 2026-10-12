@@ -146,7 +146,7 @@ at their next puppet (a `LoreNotice`, delivered through Evennia's
 `SIGNAL_OBJECT_POST_PUPPET`, with no typeclass wiring). Authors are told the same
 way when staff affirm or decline.
 
-When a plot thread concludes with linked lore still sealed, whoever concluded it
+When a plot concludes with linked lore still sealed, whoever concluded it
 (evennia-plots 0.4.0 sends `concluded_by`; older versions fall back to the thread's
 creator) is reminded. If that person isn't lore staff, the reminder also goes to
 `LORE_STAFF_REVIEW_HOOK`.
@@ -166,7 +166,7 @@ proportionally:
 
 | Signal | Weight |
 |---|---|
-| Linked to an active plot thread (via PlotLoreLink) | 8 |
+| Linked to an active plot (via PlotLoreLink) | 8 |
 | Room directly tagged on entry | 5 |
 | Region linked (via LoreRegionLink) | 3 |
 | Major tag match | 2 |

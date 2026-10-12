@@ -28,5 +28,5 @@ losing permission ends virtual portrayal. Private scenes still require an
 invitation for your own character.
 
 `+npc/history Name` shows appearances you are currently allowed to read.
-`+npc/plot Name=#thread` associates an NPC with an accessible plot thread.
+`+npc/plot Name=#plot` associates an NPC with an accessible plot.
 NPC play grants no extra RP rewards and needs no combat system.

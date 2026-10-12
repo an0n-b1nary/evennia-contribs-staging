@@ -86,6 +86,7 @@ LORE_TITLES = [entry["title"] for entry in content.LORE_ENTRIES]
 SCENE_TITLES = [scene["title"] for scene in content.SCENES]
 PLOT_ARC_NAME = content.PLOT_ARC["name"]
 PLOT_THREAD_NAME = content.PLOT_THREAD["name"]
+PLOT_NAMES = (PLOT_THREAD_NAME, content.PLOT_PRELUDE["name"])
 CALENDAR_EVENT_TITLES = [event["title"] for event in content.CALENDAR_EVENTS]
 REGION_NAMES = [region["name"] for region in content.REGIONS]
 
@@ -230,7 +231,8 @@ class Command(BaseCommand):
 
         from evennia_plots.models import PlotArc, PlotThread
 
-        threads = PlotThread.objects.filter(name=PLOT_THREAD_NAME)
+        # Deleting a plot cascades to its owners and threads.
+        threads = PlotThread.objects.filter(name__in=PLOT_NAMES)
         counts["plot_threads"] = threads.count()
         if not dry_run:
             threads.delete()
@@ -319,6 +321,7 @@ class Command(BaseCommand):
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
+        counts["plots"], counts["story_threads"] = self._create_plot_threads(authors)
         counts.update(self._create_rp_playground(rooms, authors))
         from django.apps import apps
 
@@ -966,6 +969,59 @@ class Command(BaseCommand):
             description=content.PLOT_THREAD["description"],
         )
         return 1, 1
+
+    def _create_plot_threads(self, authors):
+        """Owners and threads: a steered plot, its requests, and a carried loose end.
+
+        Runs after _link_overlays() has activated The Founding Storm, because a
+        thread request needs a plot that can be linked to. Everything goes
+        through evennia_plots.threads, the same rules +plot and the web use.
+        """
+        from evennia_plots import threads as svc
+        from evennia_plots.models import PlotOwner, PlotThread, ThreadLink
+
+        if len(authors) < 2:
+            return 0, 0
+        owner = authors[0]
+        storm = PlotThread.objects.get(name=content.PLOT_THREAD["name"])
+        # The storm is seeded without a creator; the seeder hands it to its
+        # storyteller directly, as staff would.
+        PlotOwner.objects.create(
+            plot=storm, character=owner, character_name=owner.key, added_by_name="System"
+        )
+        svc.set_policy(storm, owner, content.PLOT_STORM_POLICY)
+
+        # The prelude ends first, leaving its open thread as a loose end.
+        prelude = PlotThread.create_thread(
+            name=content.PLOT_PRELUDE["name"],
+            creator=owner,
+            description=content.PLOT_PRELUDE["description"],
+        )
+        prelude.activate()
+        loose = svc.add_thread(prelude, owner, content.PLOT_PRELUDE["loose_end"])
+        prelude.conclude(concluded_by=owner)
+        loose.refresh_from_db()
+        ThreadLink.objects.create(
+            from_thread=storm,
+            to_thread=prelude,
+            link_type=ThreadLink.LinkType.SEQUEL,
+            created_by=owner,
+            created_by_name=owner.key,
+            is_accepted=True,
+        )
+        svc.carry(loose, owner, storm)
+        count = 2
+
+        for spec in content.PLOT_STORM_THREADS:
+            thread = svc.add_thread(storm, owner, spec["title"], spec["detail"])
+            if spec.get("sealed_answer"):
+                svc.seal(thread, owner, spec["sealed_answer"])
+            if "lead" in spec:
+                svc.toggle_lead(thread, authors[spec["lead"]])
+            count += 1
+        requester = authors[content.PLOT_STORM_REQUEST["by"]]
+        svc.add_thread(storm, requester, content.PLOT_STORM_REQUEST["title"])
+        return 2, count + 1
 
     # ------------------------------------------------------------------
     # Regions and maps

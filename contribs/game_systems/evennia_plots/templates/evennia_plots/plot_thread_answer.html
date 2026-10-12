@@ -1,0 +1,83 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Answer to {{ story_thread.ref }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<dl class="row">
+  <dt class="col-sm-3">Answer</dt>
+  <dd class="col-sm-9">
+    {% if story_thread.sealed_answer_revealed %}<span class="badge badge-success">Revealed</span>
+    {% elif story_thread.has_sealed_answer %}<span class="badge badge-warning text-dark">Sealed</span> Only the plot's owners and staff can read it.
+    {% else %}<span class="badge badge-secondary">None yet</span>{% endif %}
+  </dd>
+  <dt class="col-sm-3">First sealed</dt>
+  <dd class="col-sm-9">{{ story_thread.sealed_at|date:"Y-m-d"|default:"Not recorded" }}</dd>
+</dl>
+
+{% if story_thread.has_sealed_answer %}
+<div class="card mb-3">
+  <div class="card-body"><p class="card-text evennia-plots-pre-wrap">{{ story_thread.sealed_answer }}</p></div>
+</div>
+{% endif %}
+
+<h2 class="h5">Earlier wordings</h2>
+{% if versions %}
+<div class="evennia-plots-table-scroll" role="region" aria-label="Earlier wordings of the answer" tabindex="0">
+<table role="table" class="evennia-plots-table-stack table table-sm">
+  <thead role="rowgroup">
+    <tr role="row">
+      <th role="columnheader" scope="col">Version</th>
+      <th role="columnheader" scope="col">Replaced</th>
+      <th role="columnheader" scope="col">By</th>
+      <th role="columnheader" scope="col">Wording</th>
+    </tr>
+  </thead>
+  <tbody role="rowgroup">
+    {% for version in versions %}
+    <tr role="row">
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Version</span>v{{ version.version_number }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Replaced</span>{{ version.created_at|date:"Y-m-d" }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">By</span>{{ version.editor_name|default:"Unattributed" }}</td>
+      <td role="cell"><span class="evennia-plots-cell-label" aria-hidden="true">Wording</span><span class="evennia-plots-pre-wrap">{{ version.content }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="evennia-plots-empty">No earlier wordings. Each edit of a sealed answer keeps the wording it replaced.</p>
+{% endif %}
+
+{% if can_edit %}
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">{% if story_thread.has_sealed_answer %}Edit the sealed answer{% else %}Seal an answer{% endif %}</legend>
+    <p class="small text-muted">Sealing an answer marks the thread held. You can reveal it when the thread resolves, or later.</p>
+    {% include "evennia_accessibility/_form_field.html" with field=form.answer %}
+  </fieldset>
+  {% url 'evennia_plots:plot-detail' thread.pk as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Seal Answer" %}
+</form>
+{% else %}
+<p><a href="{% url 'evennia_plots:plot-detail' thread.pk %}#threads">&larr; Back to plot</a></p>
+{% endif %}
+{% endblock %}

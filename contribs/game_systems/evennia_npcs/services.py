@@ -648,15 +648,15 @@ def partner_model(setting, model):
 def link_plot(actor, blueprint, ref, *, unlink=False):
     model = partner_model("NPCS_PLOTS_APP_LABEL", "PlotThread")
     if model is None:
-        raise NPCError("Plot threads are not installed.")
+        raise NPCError("Plots are not installed.")
     with transaction.atomic():
         blueprint = _locked(actor, blueprint)
         try:
             thread = model.objects.get(plot_number=int(str(ref).lstrip("#")))
         except (ValueError, model.DoesNotExist) as exc:
-            raise NPCError("No accessible plot thread matches that id.") from exc
+            raise NPCError("No accessible plot matches that id.") from exc
         if not thread.can_link(actor):
-            raise NPCError("No accessible plot thread matches that id.")
+            raise NPCError("No accessible plot matches that id.")
         if unlink:
             if not can_manage(actor, blueprint):
                 raise NPCError("Only the NPC owner or staff may unlink it.")

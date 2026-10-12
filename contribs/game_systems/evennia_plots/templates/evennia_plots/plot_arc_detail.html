@@ -10,7 +10,7 @@
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
     {% if is_staff %}<li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-arc-list' %}">Arcs</a></li>{% endif %}
     <li class="breadcrumb-item active" aria-current="page">Arc #{{ arc.arc_number }}: {{ arc.name }}</li>
   </ol>
@@ -43,7 +43,7 @@
 
 {% if pauses_xp %}
 <div class="alert alert-warning" role="alert" aria-live="polite">
-  <strong>XP gain is paused</strong> — this is a Downtime arc and is currently active. XP from plot thread conclusions will not be distributed while this arc is current.
+  <strong>XP gain is paused</strong> — this is a Downtime arc and is currently active. XP from plot conclusions will not be distributed while this arc is current.
 </div>
 {% endif %}
 
@@ -115,10 +115,10 @@
 <p class="text-muted"><em>No narrative updates yet.</em></p>
 {% endif %}
 
-<!-- Member Threads -->
-<h2>Threads ({{ threads.count }})</h2>
+<!-- Member plots -->
+<h2>Plots ({{ threads.count }})</h2>
 {% if threads %}
-<div class="evennia-plots-table-scroll" role="region" aria-label="Member threads" tabindex="0">
+<div class="evennia-plots-table-scroll" role="region" aria-label="Member plots" tabindex="0">
 <table role="table" class="evennia-plots-table-stack table table-striped">
   <thead role="rowgroup">
     <tr role="row">
@@ -157,7 +157,7 @@
 </table>
 </div>
 {% else %}
-{% include "evennia_plots/_empty_state.html" with message="No threads in this arc yet." %}
+{% include "evennia_plots/_empty_state.html" with message="No plots in this arc yet." %}
 {% endif %}
 
 {% endblock %}

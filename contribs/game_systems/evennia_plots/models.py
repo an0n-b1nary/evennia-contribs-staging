@@ -1,16 +1,28 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-PlotThread, PlotArc, and related models for evennia_plots.
+PlotThread, PlotArc, StoryThread and related models for evennia_plots.
 
-Plot threads are named narrative containers linking Scenes, board Posts,
-CalendarEvents, and Lore entries into a storyline. Plot arcs are higher-level
-staff-only containers grouping multiple threads.
+Players call a ``PlotThread`` a **plot**: a named narrative container linking
+Scenes, board Posts, CalendarEvents, and Lore entries into a storyline. Plot
+arcs are higher-level staff-only containers grouping multiple plots. A
+``StoryThread`` is what players call a **thread**: an open question, problem
+or lead inside one plot ("Investigate the drowned bell").
+
+The Python names predate that vocabulary and stay until 1.0, so partner
+contribs that look up ``PlotThread`` by name keep finding the plot. The thread
+model is deliberately not called ``PlotThread``.
 
 Design notes:
 
 - plot_number / arc_number are globally auto-incrementing (never reuse) so
-  players and staff can reference any thread or arc by a short, stable ID.
+  players and staff can reference any plot or arc by a short, stable ID.
+  StoryThread.number counts within its plot (``#12.3``).
+- PlotOwner rows say who runs a plot. They are separate from PlotParticipant,
+  which decides who receives the conclusion bonus, so ownership never pays XP.
+- A held thread is one whose answer the owners already know. Its optional
+  sealed answer is readable by owners and staff only until it is revealed.
+- Threads have no effect on XP.
 - description is a brief tagline (max 500 chars). Evolving narrative detail
   lives in append-only PlotUpdate blocks.
 - IC PlotUpdate blocks are public (per-thread privacy rules). OOC blocks are
@@ -179,7 +191,7 @@ class PlotArc(models.Model):
         null=True,
         blank=True,
         validators=_xp_mult_validators,
-        help_text="XP multiplier for plot-thread conclusion bonus. Blank = type default.",
+        help_text="XP multiplier for the plot conclusion bonus. Blank = type default.",
     )
     # Seam for a future IC-channel session collector. NULL = type default.
     xp_mult_rp_channel_session = models.DecimalField(
@@ -231,7 +243,7 @@ class PlotArc(models.Model):
         "rp_session": "RP Session",
         "cutscene": "Cutscene",
         "lore": "Lore",
-        "thread_bonus": "Thread Bonus",
+        "thread_bonus": "Plot Bonus",
         "rp_channel_session": "RP Channel Session",
     }
 
@@ -320,18 +332,29 @@ class PlotArc(models.Model):
 
 
 class PlotThread(models.Model):
-    """A named narrative container linking Scenes, Posts, CalendarEvents, and Lore.
+    """A plot: a named narrative container linking Scenes, Posts, CalendarEvents, and Lore.
+
+    Players call this a *plot*; the class keeps its older name until 1.0.
 
     Status lifecycle::
 
         proposed → active → concluded  (intentional wrap-up; bonus XP awarded)
                           → archived   (stale; no bonus)
 
+    Concluding or archiving turns open threads into loose ends and declines
+    pending thread requests.
+
     Privacy modes:
 
     - PUBLIC      — anyone can view and link content
-    - PRIVATE     — only creator (and staff) can view and link
-    - INVITE_ONLY — anyone can view; only creator and invited characters can link
+    - PRIVATE     — only owners (and staff) can view and link
+    - INVITE_ONLY — anyone can view; only owners and invited characters can link
+
+    Thread policy (who may add threads):
+
+    - OWNERS  — owners and staff only
+    - REQUEST — anyone who can link may request; owners accept or decline
+    - OPEN    — anyone who can link adds threads directly
 
     Bonus XP (computed at conclusion, max 5):
 
@@ -354,9 +377,14 @@ class PlotThread(models.Model):
         PRIVATE = "private", "Private"
         INVITE_ONLY = "invite_only", "Invite-Only"
 
+    class ThreadPolicy(models.TextChoices):
+        OWNERS = "owners", "Owners only"
+        REQUEST = "request", "By request"
+        OPEN = "open", "Open"
+
     plot_number = models.PositiveIntegerField(
         unique=True,
-        help_text="Auto-incremented globally. Used as the human-readable thread ID.",
+        help_text="Auto-incremented globally. Used as the human-readable plot ID.",
     )
     name = models.CharField(max_length=255, db_index=True)
     description = models.CharField(
@@ -383,7 +411,7 @@ class PlotThread(models.Model):
         null=True,
         blank=True,
         related_name="+",
-        help_text="The character who created the thread.",
+        help_text="The character who started the plot. Who runs it is PlotOwner.",
     )
     creator_name = models.CharField(max_length=255, blank=True)
     arc = models.ForeignKey(
@@ -398,13 +426,25 @@ class PlotThread(models.Model):
         "objects.ObjectDB",
         blank=True,
         related_name="evennia_plots_invites",
-        help_text="Characters explicitly invited to link content (invite_only threads).",
+        help_text="Characters explicitly invited to link content (invite_only plots).",
+    )
+    thread_policy = models.CharField(
+        max_length=8,
+        choices=ThreadPolicy.choices,
+        default=ThreadPolicy.OPEN,
+        help_text="Who may add threads to this plot.",
     )
     # Anti-favoritism audit log. JSON list of {staff, target, at} entries.
     hook_log = models.JSONField(
         default=list,
         blank=True,
-        help_text="Staff-visible record of +hook calls targeting this thread.",
+        help_text="Staff-visible record of +hook calls targeting this plot.",
+    )
+    # Staff stepping in for owners. JSON list of {staff, action, detail, at}.
+    staff_log = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Record of staff actions on this plot's owners and threads. Never trimmed.",
     )
     bonus_xp_computed = models.SmallIntegerField(
         default=0,
@@ -425,6 +465,8 @@ class PlotThread(models.Model):
 
     class Meta:
         ordering = ["-created_at"]  # noqa: RUF012
+        verbose_name = "plot"
+        verbose_name_plural = "plots"
 
     def __str__(self):
         return f"#{self.plot_number} {self.name}"
@@ -434,14 +476,17 @@ class PlotThread(models.Model):
     # ------------------------------------------------------------------
 
     @classmethod
-    def create_thread(cls, name, creator, description="", privacy="public"):
-        """Create a new PlotThread with an auto-assigned plot_number.
+    def create_thread(cls, name, creator, description="", privacy="public", thread_policy=None):
+        """Create a new plot with an auto-assigned plot_number.
+
+        The creator becomes its first owner.
 
         Args:
-            name: Thread name.
+            name: Plot name.
             creator: ObjectDB character instance.
             description: Brief tagline (optional).
             privacy: One of "public", "private", "invite_only".
+            thread_policy: One of "owners", "request", "open"; defaults to open.
 
         Returns:
             The newly created PlotThread instance.
@@ -452,9 +497,18 @@ class PlotThread(models.Model):
             name=name,
             description=description,
             privacy=privacy,
+            thread_policy=thread_policy or cls.ThreadPolicy.OPEN,
             creator=creator,
             creator_name=creator.key if creator else "Unknown",
         )
+        if creator is not None:
+            PlotOwner.objects.create(
+                plot=thread,
+                character=creator,
+                character_name=creator.key,
+                added_by=creator,
+                added_by_name=creator.key,
+            )
         plot_signals.plot_thread_created.send(sender=cls, thread=thread)
         return thread
 
@@ -482,6 +536,7 @@ class PlotThread(models.Model):
         self.status = self.Status.CONCLUDED
         self.concluded_at = timezone.now()
         self.save(update_fields=["status", "concluded_at", "bonus_xp_computed"])
+        self.close_story_threads()
         plot_signals.plot_thread_concluded.send(
             sender=type(self), thread=self, bonus_xp=bonus, concluded_by=concluded_by
         )
@@ -492,7 +547,28 @@ class PlotThread(models.Model):
         self.status = self.Status.ARCHIVED
         self.archived_at = timezone.now()
         self.save(update_fields=["status", "archived_at"])
+        self.close_story_threads()
         plot_signals.plot_thread_archived.send(sender=type(self), thread=self)
+
+    def close_story_threads(self):
+        """Turn open threads into loose ends and decline pending requests.
+
+        Called when the plot concludes or is archived. Never blocks either:
+        unresolved threads are allowed, and carry no XP consequence.
+
+        Returns:
+            tuple: (number of loose ends, number of requests declined)
+        """
+        now = timezone.now()
+        loose = self.story_threads.filter(status=StoryThread.Status.OPEN).update(
+            status=StoryThread.Status.LOOSE_END, updated_at=now
+        )
+        declined = self.story_threads.filter(status=StoryThread.Status.REQUESTED).update(
+            status=StoryThread.Status.DECLINED,
+            decline_reason="The plot ended before this request was answered.",
+            updated_at=now,
+        )
+        return loose, declined
 
     # ------------------------------------------------------------------
     # Bonus XP
@@ -537,21 +613,58 @@ class PlotThread(models.Model):
     # Permissions
     # ------------------------------------------------------------------
 
+    def owner_ids(self):
+        """Return the set of ObjectDB pks of this plot's owners."""
+        return set(
+            self.owners.filter(character__isnull=False).values_list("character_id", flat=True)
+        )
+
+    def is_owner(self, character):
+        """Return True if *character* is one of this plot's owners."""
+        if character is None:
+            return False
+        return self.owners.filter(character_id=character.pk).exists()
+
+    def can_manage(self, character):
+        """Return True if *character* may manage this plot: an owner, or staff."""
+        if character is None:
+            return False
+        return is_plot_staff(character) or self.is_owner(character)
+
+    @property
+    def is_owner_led(self):
+        """True while the plot has an open held thread: its owners are steering it."""
+        return self.story_threads.filter(status=StoryThread.Status.OPEN, is_held=True).exists()
+
+    def log_staff_action(self, staff, action, detail=""):
+        """Append a staff action to staff_log. The log is never trimmed."""
+        log = list(self.staff_log or [])
+        log.append(
+            {
+                "staff": staff.key if staff else "System",
+                "action": action,
+                "detail": detail,
+                "at": timezone.now().isoformat(),
+            }
+        )
+        self.staff_log = log
+        self.save(update_fields=["staff_log"])
+
     def can_link(self, character):
-        """Return True if *character* may link content to this thread.
+        """Return True if *character* may link content to this plot.
 
         Rules:
 
-        - Thread must be ACTIVE.
+        - Plot must be ACTIVE.
         - PUBLIC: anyone may link.
-        - PRIVATE: only creator and staff.
-        - INVITE_ONLY: creator, invited characters, and staff.
+        - PRIVATE: only owners and staff.
+        - INVITE_ONLY: owners, invited characters, and staff.
         """
         if self.status != self.Status.ACTIVE:
             return False
         if is_plot_staff(character):
             return True
-        if self.creator_id and character.id == self.creator_id:
+        if self.is_owner(character):
             return True
         if self.privacy == self.Privacy.PUBLIC:
             return True
@@ -560,10 +673,10 @@ class PlotThread(models.Model):
         return False
 
     def can_view(self, character):
-        """Return True if *character* may view this thread.
+        """Return True if *character* may view this plot.
 
-        PUBLIC and INVITE_ONLY threads are visible to all.
-        PRIVATE threads are visible only to creator and staff.
+        PUBLIC and INVITE_ONLY plots are visible to all.
+        PRIVATE plots are visible only to owners and staff.
         """
         if self.privacy != self.Privacy.PRIVATE:
             return True
@@ -571,13 +684,17 @@ class PlotThread(models.Model):
             return False
         if is_plot_staff(character):
             return True
-        return self.creator_id and character.id == self.creator_id
+        return self.is_owner(character)
 
     def is_participant(self, character):
-        """Return True if *character* is a participant, creator, or invited."""
+        """Return True if *character* is a participant, an owner, or invited.
+
+        This governs OOC visibility and posting updates. XP never reads it:
+        the conclusion bonus goes to PlotParticipant rows only.
+        """
         if character is None:
             return False
-        if self.creator_id and character.id == self.creator_id:
+        if self.is_owner(character):
             return True
         if self.invited_characters.filter(pk=character.pk).exists():
             return True
@@ -589,7 +706,7 @@ class PlotThread(models.Model):
             return False
         return self.is_participant(character) or is_plot_staff(character)
 
-    def edit(self, editor, name=None, description=None, privacy=None):
+    def edit(self, editor, name=None, description=None, privacy=None, thread_policy=None):
         """Update editable fields and fire plot_thread_edited.
 
         Args:
@@ -597,6 +714,7 @@ class PlotThread(models.Model):
             name: New name, or None to leave unchanged.
             description: New description, or None to leave unchanged.
             privacy: New privacy value, or None to leave unchanged.
+            thread_policy: New thread policy, or None to leave unchanged.
         """
         update_fields = []
         if name is not None:
@@ -608,6 +726,9 @@ class PlotThread(models.Model):
         if privacy is not None:
             self.privacy = privacy
             update_fields.append("privacy")
+        if thread_policy is not None:
+            self.thread_policy = thread_policy
+            update_fields.append("thread_policy")
         if update_fields:
             self.save(update_fields=update_fields)
         plot_signals.plot_thread_edited.send(sender=type(self), thread=self, editor=editor)
@@ -651,6 +772,247 @@ class PlotParticipant(models.Model):
 
     def __str__(self):
         return f"{self.character_name} → {self.thread}"
+
+
+# ---------------------------------------------------------------------------
+# PlotOwner
+# ---------------------------------------------------------------------------
+
+
+class PlotOwner(models.Model):
+    """A character who runs a plot.
+
+    Owners manage the plot: its tagline, privacy, invitations, thread policy
+    and threads. The creator is the first owner. Ownership is deliberately
+    separate from PlotParticipant, which decides who receives the conclusion
+    bonus, so adding an owner never hands out XP.
+    """
+
+    plot = models.ForeignKey(
+        PlotThread,
+        on_delete=models.CASCADE,
+        related_name="owners",
+    )
+    character = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    character_name = models.CharField(max_length=255, blank=True)
+    added_by = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    added_by_name = models.CharField(max_length=255, blank=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("plot", "character")]  # noqa: RUF012
+        ordering = ["added_at", "pk"]  # noqa: RUF012
+
+    def __str__(self):
+        return f"{self.character_name} owns {self.plot}"
+
+
+# ---------------------------------------------------------------------------
+# StoryThread
+# ---------------------------------------------------------------------------
+
+
+class StoryThread(models.Model):
+    """A thread: an open question, problem or lead inside one plot.
+
+    Players call this a *thread*. The class is not named ``PlotThread`` because
+    that name still means the plot (see the module docstring).
+
+    Status lifecycle::
+
+        requested → open | declined | (withdrawn: deleted)
+        open      → resolved | dropped | loose_end (plot concluded or archived)
+        resolved / dropped → open (reopened)
+        loose_end → carried (into a sequel plot)
+
+    A *held* thread is one whose answer the plot's owners already know. Owners
+    may write that answer down as a sealed answer, readable by owners and staff
+    only until someone who manages the plot reveals it. Earlier wordings are
+    kept in StoryThreadAnswerVersion, so a revealed answer shows its history.
+
+    Threads have no effect on XP.
+    """
+
+    class Status(models.TextChoices):
+        REQUESTED = "requested", "Requested"
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+        DROPPED = "dropped", "Dropped"
+        DECLINED = "declined", "Declined"
+        LOOSE_END = "loose_end", "Loose end"
+        CARRIED = "carried", "Carried forward"
+
+    plot = models.ForeignKey(
+        PlotThread,
+        on_delete=models.CASCADE,
+        related_name="story_threads",
+    )
+    number = models.PositiveSmallIntegerField(
+        help_text="Sequential within the plot and never reused. Shown as #<plot>.<number>.",
+    )
+    title = models.CharField(max_length=200)
+    detail = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="Optional OOC context for the thread.",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+    )
+    is_held = models.BooleanField(
+        default=False,
+        help_text="The plot's owners already know the answer.",
+    )
+    sealed_answer = models.TextField(
+        blank=True,
+        help_text="The owners' intended answer. Owners and staff only until revealed.",
+    )
+    sealed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When an answer was first sealed. Later edits are versioned.",
+    )
+    sealed_answer_revealed = models.BooleanField(default=False)
+    resolution = models.CharField(
+        max_length=1000,
+        blank=True,
+        help_text="OOC summary of how the thread resolved.",
+    )
+    created_by = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    created_by_name = models.CharField(max_length=255, blank=True)
+    decided_by = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Who accepted or declined the request.",
+    )
+    decided_by_name = models.CharField(max_length=255, blank=True)
+    decline_reason = models.CharField(max_length=500, blank=True)
+    resolved_by = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    resolved_by_name = models.CharField(max_length=255, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    carried_to = models.OneToOneField(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="carried_from",
+        help_text="The thread this loose end became in a sequel plot.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["plot", "number"]  # noqa: RUF012
+        verbose_name = "thread"
+        verbose_name_plural = "threads"
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(
+                fields=["plot", "number"], name="evennia_plots_storythread_unique_number"
+            ),
+            models.CheckConstraint(
+                condition=Q(is_held=True) | Q(sealed_answer=""),
+                name="evennia_plots_storythread_sealed_needs_held",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.ref} {self.title}"
+
+    @property
+    def ref(self):
+        """The thread's public reference, e.g. ``#12.3``."""
+        return f"#{self.plot.plot_number}.{self.number}"
+
+    @property
+    def has_sealed_answer(self):
+        return bool(self.sealed_answer.strip())
+
+    @property
+    def answer_is_sealed(self):
+        """True while a sealed answer exists and has not been revealed."""
+        return self.has_sealed_answer and not self.sealed_answer_revealed
+
+    @classmethod
+    def next_number(cls, plot):
+        current_max = cls.objects.filter(plot=plot).aggregate(m=Max("number")).get("m") or 0
+        return current_max + 1
+
+
+class StoryThreadAnswerVersion(AbstractVersion):
+    """An earlier wording of a thread's sealed answer.
+
+    Stores the OLD answer before each edit, so "decided in advance" can be
+    checked. Readable by owners and staff, and by everyone once revealed.
+    """
+
+    parent = models.ForeignKey(
+        StoryThread,
+        on_delete=models.CASCADE,
+        related_name="answer_versions",
+    )
+
+    class Meta(AbstractVersion.Meta):
+        unique_together = [("parent", "version_number")]  # noqa: RUF012
+
+
+class StoryThreadInterest(models.Model):
+    """A character's interest in a thread; ``is_lead`` means "I'm chasing this".
+
+    A social signal only: leads have no permissions beyond resolving an
+    unheld thread, and any number of characters may lead.
+    """
+
+    thread = models.ForeignKey(
+        StoryThread,
+        on_delete=models.CASCADE,
+        related_name="interests",
+    )
+    character = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    character_name = models.CharField(max_length=255, blank=True)
+    is_lead = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("thread", "character")]  # noqa: RUF012
+        ordering = ["-is_lead", "created_at", "pk"]  # noqa: RUF012
+
+    def __str__(self):
+        role = "leads" if self.is_lead else "follows"
+        return f"{self.character_name} {role} {self.thread}"
 
 
 # ---------------------------------------------------------------------------

@@ -1271,7 +1271,7 @@ class TestWebPagesRender(EvenniaTest):
 
     def test_thread_list_renders_active_threads(self):
         html = self._render(PlotListView)
-        self.assertIn("Plot Threads", html)
+        self.assertIn("Plots", html)
         self.assertIn("The Salt Road", html)
         self.assertIn(f'href="/plots/{self.thread.pk}/"', html)
         self.assertRegex(
@@ -1284,11 +1284,11 @@ class TestWebPagesRender(EvenniaTest):
         PlotThread.objects.all().delete()
         # The empty state is an {% include %} of a partial. Compiling the
         # template never resolves that target; only rendering does.
-        self.assertIn("No active plot threads.", self._render(PlotListView))
+        self.assertIn("No active plots.", self._render(PlotListView))
 
     def test_filtered_thread_list_renders_its_own_empty_state(self):
         html = self._render(PlotListView, path_="/plots/?tag=nosuchtag")
-        self.assertIn("No active plot threads with that tag.", html)
+        self.assertIn("No active plots with that tag.", html)
 
     def test_thread_detail_renders_updates(self):
         html = self._render(PlotDetailView, path_=f"/plots/{self.thread.pk}/", pk=self.thread.pk)
@@ -1340,7 +1340,7 @@ class TestWebPagesRender(EvenniaTest):
     def test_arc_detail_renders_its_empty_states(self):
         html = self._render(PlotArcDetailView, path_=f"/plots/arc/{self.arc.pk}/", pk=self.arc.pk)
         self.assertIn("No narrative updates yet.", html)
-        self.assertIn("No threads in this arc yet.", html)
+        self.assertIn("No plots in this arc yet.", html)
 
     def test_tag_index_renders_major_and_minor_tags(self):
         PlotTag.objects.create(name="Smuggling", is_major=False)
@@ -1357,7 +1357,7 @@ class TestWebPagesRender(EvenniaTest):
 
     def test_thread_create_form_renders(self):
         html = self._as_owner(PlotCreateView, path_="/plots/new/")
-        self.assertIn("Start a New Plot Thread", html)
+        self.assertIn("Start a New Plot", html)
         self.assertIn("id_name", html)
         self.assertIn('name="csrfmiddlewaretoken"', html)
 
@@ -1365,7 +1365,7 @@ class TestWebPagesRender(EvenniaTest):
         html = self._as_owner(
             PlotEditView, path_=f"/plots/{self.thread.pk}/edit/", pk=self.thread.pk
         )
-        self.assertIn("Edit Plot Thread: The Salt Road", html)
+        self.assertIn("Edit Plot: The Salt Road", html)
         self.assertIn(f'action="/plots/{self.thread.pk}/edit/"', html)
 
     def test_invite_form_renders_its_empty_roster(self):

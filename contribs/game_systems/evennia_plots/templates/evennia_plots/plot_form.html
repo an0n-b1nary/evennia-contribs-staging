@@ -10,8 +10,8 @@
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
-    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plot Threads</a></li>
-    <li class="breadcrumb-item active" aria-current="page">New Thread</li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
+    <li class="breadcrumb-item active" aria-current="page">New Plot</li>
   </ol>
 </nav>
 {% endblock %}
@@ -24,11 +24,12 @@
 <form method="post" action="{{ form_action }}" novalidate>
   {% csrf_token %}
   <fieldset class="evennia-plots-fieldset">
-    <legend class="evennia-plots-legend">Thread details</legend>
+    <legend class="evennia-plots-legend">Plot details</legend>
     {% include "evennia_accessibility/_form_field.html" with field=form.name %}
     {% include "evennia_accessibility/_form_field.html" with field=form.description %}
     {% include "evennia_accessibility/_form_field.html" with field=form.privacy %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.thread_policy %}
   </fieldset>
-  {% include "evennia_accessibility/_form_actions.html" with cancel_url=request.META.HTTP_REFERER|default:"" submit_label="Create Thread" %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=request.META.HTTP_REFERER|default:"" submit_label="Create Plot" %}
 </form>
 {% endblock %}

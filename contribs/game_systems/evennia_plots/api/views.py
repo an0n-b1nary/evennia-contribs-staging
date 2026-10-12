@@ -29,7 +29,7 @@ from evennia_plots.permissions import is_staff_user
 
 
 class PlotThreadViewSet(ReadOnlyModelViewSet):
-    """Active public and invite-only plot threads.
+    """Active public and invite-only plots, with their owners and threads.
 
     Staff see all threads regardless of status or privacy.
 
@@ -48,13 +48,14 @@ class PlotThreadViewSet(ReadOnlyModelViewSet):
     ordering = ["-created_at"]  # noqa: RUF012
 
     def get_queryset(self):
+        related = ("tags", "owners", "story_threads__interests")
         if is_staff_user(self.request):
-            return PlotThread.objects.prefetch_related("tags").order_by("-created_at")
+            return PlotThread.objects.prefetch_related(*related).order_by("-created_at")
         return (
             PlotThread.objects.filter(
                 status=PlotThread.Status.ACTIVE,
                 privacy__in=[PlotThread.Privacy.PUBLIC, PlotThread.Privacy.INVITE_ONLY],
             )
-            .prefetch_related("tags")
+            .prefetch_related(*related)
             .order_by("-created_at")
         )

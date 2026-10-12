@@ -37,7 +37,7 @@ class XPLog(models.Model):
         LORE_AUTHORED = "lore_authored", "Lore Authored"
         LORE_INSPIRATION = "lore_inspiration", "Lore Inspiration"
         CUTSCENE = "cutscene", "Cutscene"
-        THREAD_BONUS = "thread_bonus", "Thread Bonus"
+        THREAD_BONUS = "thread_bonus", "Plot Bonus"
         ARC_BONUS = "arc_bonus", "Arc Bonus"
         MANUAL_GRANT = "manual_grant", "Manual Grant"
         RP_CHANNEL_SESSION = "rp_channel_session", "RP Channel Session"

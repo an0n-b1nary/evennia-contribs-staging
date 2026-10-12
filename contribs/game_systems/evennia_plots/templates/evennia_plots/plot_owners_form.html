@@ -1,0 +1,46 @@
+{% extends "website/base.html" %}
+
+{% block header_ext %}
+  {{ block.super }}
+  {% include "evennia_plots/_styles.html" %}
+{% endblock %}
+
+{% block titleblock %}{{ page_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="Breadcrumb" class="evennia-plots-breadcrumb container mt-2">
+  <ol class="breadcrumb bg-transparent px-0">
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-list' %}">Plots</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'evennia_plots:plot-detail' thread.pk %}">{{ thread.name }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Manage Owners</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<p class="text-muted">Owners run the plot: its tagline, privacy, invitations and threads. Owning a plot earns no XP by itself.</p>
+
+<h2 class="h5 mt-3">Current owners</h2>
+<ul>
+  {% for owner in owners %}
+  <li>{{ owner.character_name|default:"Unattributed" }}</li>
+  {% empty %}
+  <li class="text-muted">No owners. Staff manage this plot.</li>
+  {% endfor %}
+</ul>
+
+{% include "evennia_accessibility/_form_errors.html" with form=form %}
+
+<form method="post" action="{{ form_action }}" novalidate>
+  {% csrf_token %}
+  <fieldset class="evennia-plots-fieldset">
+    <legend class="evennia-plots-legend">Add or remove an owner</legend>
+    {% include "evennia_accessibility/_form_field.html" with field=form.character_name %}
+    {% include "evennia_accessibility/_form_field.html" with field=form.action %}
+  </fieldset>
+  {% url 'evennia_plots:plot-detail' thread.pk as cancel_url %}
+  {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Update Owners" %}
+</form>
+{% endblock %}

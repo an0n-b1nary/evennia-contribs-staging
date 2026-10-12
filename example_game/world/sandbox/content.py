@@ -821,7 +821,35 @@ PLOT_ARC = {
 PLOT_THREAD = {
     "slug": "storm",
     "name": "The Founding Storm",
-    "description": "[Placeholder] One line: a thread inside the arc, open for hooks.",
+    "description": "[Placeholder] One line: a plot inside the arc, open for hooks.",
+}
+
+# Threads on The Founding Storm, which runs "by request" with the first seeded
+# speaker as its owner. One is held with a sealed answer (so the plot shows
+# Owner-led), one is open with the second speaker leading it, and the second
+# speaker has asked for a third. Threads never touch XP.
+PLOT_STORM_POLICY = "request"
+PLOT_STORM_THREADS = (
+    {
+        "title": "[Placeholder] Who called the storm?",
+        "detail": "[Placeholder] One line of OOC context for a held thread.",
+        "sealed_answer": "[Placeholder] What the owners know, sealed until the story reveals it.",
+    },
+    {
+        "title": "[Placeholder] Venture to Market Row",
+        "detail": "",
+        "lead": 1,
+    },
+)
+PLOT_STORM_REQUEST = {"title": "[Placeholder] Ask the old fishers", "by": 1}
+
+# A concluded plot whose loose end carries on in The Founding Storm, its
+# declared sequel.
+PLOT_PRELUDE = {
+    "slug": "quiet",
+    "name": "The Quiet Before",
+    "description": "[Placeholder] One line: a concluded plot that left a loose end.",
+    "loose_end": "[Placeholder] Where did the first lanterns go?",
 }
 
 # Two events, and the second one demonstrates public lottery mode:
