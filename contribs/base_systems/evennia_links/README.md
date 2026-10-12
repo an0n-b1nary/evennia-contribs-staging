@@ -456,3 +456,21 @@ once on the request, so map bounds or region lists do not repeat account
 lookups per room. Set `staff=True` when a caller has already established a
 staff bypass; it returns `None` without resolving a character. It grants no
 rights on its own.
+
+### Managed travel and remote visibility
+
+`evennia_links.travel.travel_permission(actor, room)` consults
+`LINKS_ROOM_TRAVEL`; `room_visibility(room, viewer=None)` consults
+`LINKS_ROOM_VISIBILITY`. Providers return `True` or `False` for a managed room,
+or `None` to retain the caller's existing rules. Missing settings return
+`None`; configured provider errors or invalid results return `False`.
+Social checks these seams during room search, home travel, summon/join
+acceptance and remote discovery. Physical entry and floor-plan visibility
+remain separate policies. The providers do not import an ownership package.
+
+`evennia_links.transactions.atomic_objects` decorates transactional services
+that mutate Evennia objects. On failure it rolls back SQL and restores cached
+object fields, Attributes, tags, aliases, locks and contents, including existing
+references to deleted objects. Required database listeners must run within the
+decorated service; schedule cache notifications after commit. It does not undo
+external effects or mutations made after the decorated service returns.
