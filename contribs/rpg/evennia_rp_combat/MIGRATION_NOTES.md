@@ -1,5 +1,15 @@
 # Adoption and upgrades
 
+## Upgrade from 0.2.1 to 0.2.2
+
+No model migration or core state-schema change. Existing providers remain
+compatible; `reserve` is an optional callback, and ordinary transitions may
+still return their owned envelope. `Transition` additionally carries bounded
+public notices, now journaled with `state_changed` reconciliation in the
+same operation. Explicit declaration/press requests are optional and absent
+from ordinary Auto-Act. Restore old checkpoints through the normal upgrade
+path; no historical snapshots or build hashes need rewriting.
+
 ## Upgrade from 0.2.0 to 0.2.1
 
 No model migration or fight-schema change is added. Optional partners can

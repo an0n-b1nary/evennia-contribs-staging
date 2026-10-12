@@ -279,6 +279,27 @@ def identity(subject):
     return plain(subject.key)
 
 
+def requested(requests, targets=()):
+    """Public wording for partner requests; it also fingerprints retries.
+
+    Names replace database ids. The provider still validates every request.
+    """
+    if not requests or not isinstance(requests, dict):
+        return ""
+    names = {str(target.pk): identity(target) for target in targets}
+    words = []
+    for key, request in sorted(requests.items(), key=lambda item: str(item[0])):
+        request = request if isinstance(request, dict) else {}
+        options = "".join(
+            f" {plain(name, 60)}={plain(value, 60)}"
+            for name, value in sorted(request.items(), key=lambda item: str(item[0]))
+            if name != "target"
+        )
+        target = names.get(request.get("target"), "")
+        words.append(f"{plain(key, 60)} request{options}" + (f" for {target}" if target else ""))
+    return f"; {', '.join(words)}"
+
+
 def emit(room, actor, text):
     """Mechanics are SYSTEM entries only, never posing or tracker activity."""
     if room is None:
@@ -388,6 +409,7 @@ def commit(
     """Save state and append one journal entry; caller holds the row lock."""
     from .models import FightEntry
 
+    partners.emit(state, partners.Event("state_changed", str(getattr(actor, "pk", "")), "", 0))
     notes = state.pop("notices", [])
     if notes:
         summary = f"{summary} {' '.join(plain(note, 400) for note in notes)}"
@@ -403,7 +425,6 @@ def commit(
     )
     if state["ended"] and fight.status == fight.OPEN:
         fight.status, fight.closed_at = fight.ENDED, timezone.now()
-    partners.emit(state, partners.Event("state_changed", str(getattr(actor, "pk", "")), "", 0))
     fight.state = stored(fight, state)
     fight.save()
     synchronize_locks(fight, state, release=release)
@@ -778,6 +799,7 @@ def declare(
     public=False,
     rng=None,
     operation_id=None,
+    partner_requests=None,
 ):
     subject = subject or actor
     authorize(actor, subject)
@@ -807,13 +829,15 @@ def declare(
             waive=waive,
             public=public,
             support_allowed=support_recipients(state, subject),
+            partner_requests=partner_requests,
         )
         run_automatic(state, subject.location)
         return ex_id
 
     return execute(
         actor,
-        f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}",
+        f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}"
+        + requested(partner_requests, targets),
         operation,
         operation_id=operation_id,
         subject=subject,
@@ -1161,8 +1185,18 @@ def withdraw_end_proposal(state):
 
 
 def control(
-    actor, operation, *, subject=None, argument=None, reason="", rng=None, operation_id=None
+    actor,
+    operation,
+    *,
+    subject=None,
+    argument=None,
+    reason="",
+    rng=None,
+    operation_id=None,
+    partner_requests=None,
 ):
+    if partner_requests and operation != "press":
+        raise CombatError("Only a freshly pressed hit accepts a partner declaration request.")
     subject = subject or actor
     cleanup = operation in ("cancel", "fade", "withdraw", "posed", "decline", "retract", "revive")
     authorize(actor, subject, cleanup=cleanup)
@@ -1208,6 +1242,7 @@ def control(
                 (rng or random.SystemRandom()).randint(1, 100),
                 stop=operation == "stop",
                 empower=argument == "empower",
+                partner_requests=partner_requests,
             )
             run_automatic(state, actor.location)
         elif operation == "cap":
@@ -1263,7 +1298,8 @@ def control(
 
     return execute(
         actor,
-        f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}",
+        f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}"
+        + requested(partner_requests),
         change,
         progressing=not cleanup,
         operation_id=operation_id,

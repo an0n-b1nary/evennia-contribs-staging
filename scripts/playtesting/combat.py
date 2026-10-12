@@ -139,6 +139,57 @@ class CombatSuite(Suite):
         self.command("bob", "+party/agree", "dissolved")
         self.command("alice", "+party", "No tactical parties")
 
+    def synergy_reservations(self):
+        self.command("alice", "+combatstory/end Next rehearsal", "Ending needs agreement")
+        self.command("bob", "+combat/accept", "accepted request")
+        self.command("alice", "+combat/setup Synergy rehearsal", "set up combat")
+        self.command("alice", "+combat/join one=3,4", "joined")
+        self.command("bob", "+combat/join one", "joined")
+        self.command("alice", "+npc/create Synergy Post=template", "Created NPC blueprint")
+        stats = ",".join(
+            f"{stat}:B"
+            for stat in (
+                "strength",
+                "endurance",
+                "intellect",
+                "intuition",
+                "presence",
+                "resolve",
+                "agility",
+            )
+        )
+        self.command("alice", f"+npc/stats Synergy Post={stats}", "updated")
+        spawned = self.command("alice", "+combatstory/template Synergy Post=two", "Synergy Post")
+        npc_id = re.search(r"Spawned Synergy Post \(NPC\) #(\d+)", spawned["output"]).group(1)
+        self.command("alice", "+party/create Synergy Team", "Party create")
+        self.command("alice", "+party/invite pt-bob", "Party invite")
+        self.command("bob", "+party/accept", "Party accept")
+        # Ten ordinary exchanges fund the pool without a fixture resource grant.
+        for _ in range(10):
+            self.command("alice", "+combat/assist pt-bob", r"[0-9]+\.[0-9]+")
+            self.command("alice", "+combat/posed", "posed")
+        self.command("alice", "+party", "Synergy 100 available")
+        self.command("alice", "+party/surge Synergy Post=balanced", "reserved 100 Synergy")
+        self.command("alice", "+npc/puppet #" + npc_id, "Now portraying")
+        queue = self.command("alice", "+combat/npc")["output"]
+        token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
+        self.session.host.reload()
+        self.command("alice", "+party", "100 reserved")
+        self.command("alice", "+combat/cancel/npc " + token, "refunded 100")
+        self.command("alice", "+party", "Synergy 100 available")
+        self.command("alice", "+party/surge Synergy Post=balanced", "reserved 100 Synergy")
+        queue = self.command("alice", "+combat/npc")["output"]
+        token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
+        self.command("alice", "+combat/react/npc " + token + "=resist", "resist")
+        self.command("alice", "+party", "Synergy 10 available")
+        self.command("alice", "+npc/unpuppet", "released")
+        self.command("alice", "+combat/posed", "posed")
+        self.command(
+            "alice",
+            "+party/surge Synergy Post=balanced",
+            "already reserved or used this personal turn",
+        )
+
 
 def run_combat(session):
     suite = CombatSuite(session)
@@ -165,6 +216,10 @@ def run_combat(session):
         (
             "optional Party, standing Cover, support, private chat and retained Fade",
             suite.party_coordination,
+        ),
+        (
+            "earned Synergy, pending reservation reload, cancellation refund and personal-turn use",
+            suite.synergy_reservations,
         ),
     ]
     for name, function in cases:

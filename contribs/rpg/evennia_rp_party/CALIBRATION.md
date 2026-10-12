@@ -8,8 +8,9 @@ exact fractions, with decimal rounding only in the sustained-run report.
 Retain the initial playtesting defaults: Spirit coefficient 1, Rally/Rattle
 5 percentage points, boost cap 30%, Pinpoint Cover penalty 10 points, and
 Encore Spirit strength one-half. These are provisional host settings, not
-an established balance result. Synergy is deferred rather than introducing
-another multiplier before these mechanics receive human playtesting.
+an established balance result. Party 0.1.0 deferred Synergy; the point
+release's separate [Synergy samples and limits](SYNERGY_CALIBRATION.md)
+cover its earning and one-packet output.
 
 ## Encore and party size
 

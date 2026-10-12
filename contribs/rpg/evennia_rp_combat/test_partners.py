@@ -150,6 +150,62 @@ class TestStateUpgrade(SimpleTestCase):
         with self.assertRaises(CombatError):
             partners.SupportSpread((1,), "1/2")
 
+    def test_unavailable_and_invalid_spend_requests_leave_engine_state_unchanged(self):
+        for requests in (
+            {"absent": {"kind": "spend", "target": "2"}},
+            {"demo": {"kind": "spend", "target": "2"}},
+            [],
+        ):
+            state = duel()
+            before = deepcopy(state)
+            with self.assertRaises(CombatError):
+                declare(state, partner_requests=requests)
+            self.assertEqual(state, before)
+
+    def test_transition_notices_are_bounded_and_cannot_replace_other_state(self):
+        state = duel()
+        state["partners"]["demo"] = {"schema": 1, "data": {"balance": 10}}
+        provider = partners.Provider(
+            snapshot=lambda state, declaration: partners.PacketModifiers(),
+            upgrade=lambda section: section,
+            transition=lambda detached, event: partners.Transition(
+                {"schema": 1, "data": {"balance": 20}}, ("Public resource change.",)
+            ),
+        )
+        original = deepcopy(state["participants"])
+        with patch.object(partners, "registered", return_value={"demo": provider}):
+            partners.emit(state, partners.Event("state_changed", "1", "", 0))
+        self.assertEqual(state["participants"], original)
+        self.assertEqual(state["partners"]["demo"]["data"]["balance"], 20)
+        self.assertEqual(state["notices"], ["Public resource change."])
+        for notices in (["not a tuple"], ("x" * 401,), ("two\nlines",), (123,)):
+            with self.assertRaises(CombatError):
+                partners.Transition({"schema": 1, "data": {}}, notices)
+
+    def test_explicit_reservation_precedes_snapshot_and_provider_inputs_are_detached(self):
+        state = duel()
+        state["partners"]["demo"] = {"schema": 1, "data": {"surge": "0"}}
+
+        def reserve(detached, declaration, request):
+            detached["participants"].clear()
+            self.assertEqual((declaration.target_id, request["target"]), ("2", "2"))
+            return partners.Transition(
+                {"schema": 1, "data": {"surge": "25"}}, ("Reserved output.",)
+            )
+
+        provider = partners.Provider(
+            upgrade=lambda section: section,
+            snapshot=lambda detached, declaration: partners.PacketModifiers(
+                surge=detached["partners"]["demo"]["data"]["surge"]
+            ),
+            reserve=reserve,
+        )
+        with patch.object(partners, "registered", return_value={"demo": provider}):
+            token = declare(state, partner_requests={"demo": {"target": "", "kind": "spend"}})
+            self.assertEqual(partners.modifiers(engine.get_exchange(state, token), 2).surge, "25")
+        self.assertEqual(len(state["participants"]), 2)
+        self.assertEqual(state["notices"], ["Reserved output."])
+
 
 @override_settings(RP_COMBAT_PARTNERS=REGISTRY)
 class TestPartnerPackets(SimpleTestCase):
@@ -368,6 +424,24 @@ class TestPartnerCoordinator(EvenniaCommandTest):
             services.shelve(self.char1, "continue without optional partner")
         fight = services._fights().objects.latest("pk")
         self.assertIn("demo", fight.state["partners"])
+
+    def test_spend_request_journal_names_targets_and_still_fingerprints_retries(self):
+        provider = replace(
+            PROVIDER, reserve=lambda detached, declaration, request: detached["partners"]["demo"]
+        )
+        with patch.object(partners, "registered", return_value={"demo": provider}):
+            services.declare(
+                self.char1,
+                [self.char2],
+                operation_id="partner-spend",
+                partner_requests={"demo": {"kind": "spend", "target": str(self.char2.pk)}},
+            )
+            summary = services.open_fight(self.char1.location).entries.latest("sequence").summary
+            # The summary is announced to the room, so it shows no raw ids.
+            self.assertIn(f"; demo request kind=spend for {self.char2.key}", summary)
+            self.assertNotIn('"target"', summary)
+            with self.assertRaisesRegex(CombatError, "different request"):
+                services.declare(self.char1, [self.char2], operation_id="partner-spend")
 
     def test_duplicate_delivery_does_not_duplicate_partner_events(self):
         services.declare(self.char1, [self.char2], operation_id="partner-declaration")

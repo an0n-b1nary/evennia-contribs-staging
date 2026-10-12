@@ -3,7 +3,7 @@ key: party
 title: Party tactics
 category: Playing together
 requires: RP_PARTY_REVEALED
-summary: Coordinate Formation, Cover and support within a combat side.
+summary: Coordinate Formation, Cover, support and shared Synergy within a combat side.
 ---
 A side says who is allied and owns the combat assessment. A Party is an
 optional tactical team within that side. You can remain unpartied, form
@@ -68,6 +68,41 @@ own repeat tracking. Heal/cleansing/revival stay on the named ally only.
 Resistance does not block helpful Encore; unavailable/ignored incidental
 recipients are skipped. An unpartied ally gets ordinary single-target support.
 
+## Synergy and Team Surge
+
+Your party earns Synergy by finishing exchanges (10), suffering actual
+hostile damage (1/4 per Vitality), and executing an outgoing Empower (40
+extra once per exchange). A Burst is one exchange. Recovery, cancellations,
+self-costs, OOC corrections and joining grant none. The cap is 100 per
+counted member, up to 500. A smaller active roster can clamp it; everybody
+Fading freezes it for return. Moving never carries a share to another party.
+
+Spend 100 with `+party/surge enemy=balanced` for +25% primary output against
+one target. Use `+party/surge ally=assist` or `enemy=dispirit` for support;
+a named Heal uses `+party/surge ally=move;action=assist`. Spell adds
+`;action=spell`. Other ordinary options include `rps=bet`, `domain=key`,
+`burst` and `empower`. On a multi-target action, `;target=name` selects the
+boosted target; the first is the default. `+party/surgepress [empower]`
+boosts the next Burst hit; further hits receive no carried-over Surge.
+For an improvised Heal, use
+`+party/surge/improv ally={"action":"assist","effects":["heal"]}`.
+Other improvised moves use the same JSON as combat, with ordinary options
+after it, such as `;empower` or `;burst;rps=subtle`.
+
+It boosts damage or ordinary support Spirit/healing, with no Accuracy,
+Reserve, extra action or target. Support Empower and Surge together give
+1.75 times ordinary output; attack Empower keeps its normal tier benefits.
+Encore boosts only the named recipient's primary output, while its other
+recipients and domain riders keep ordinary strength. A covered packet keeps
+its Surge against the coverer. Rally/Rattle, counters and Poison are not boosted.
+
+Any member may spend; coordinate culturally. Each character gets one use
+per personal turn, including across Boss allowances and party changes.
+Declaration reserves both pool and use. A canceled boosted packet or
+declined revival refunds it; an executed miss spends it. Other targets'
+cancellations do not refund it. Refunds respect the current cap. Ordinary
+Auto-Act never spends. `+party` shows available/reserved Synergy and your use.
+
 ## OOC coordination and continuity
 
 `+party/chat message` routes private OOC to connected roster members in this
@@ -79,5 +114,9 @@ revived ally awaiting recovery supplies no tactics until recovery completes.
 Using up personal turns still permits ordinary defensive participation.
 Moving parties never resets personal turns, support repeats or assessment.
 
-The initial numbers are provisional playtest defaults. Synergy/Team Surge
-will follow after calibration; Boss Checks are planned for Party 0.2.
+The initial numbers are provisional playtest defaults. Pool, reservations
+and use markers survive reload and rollback. Shelving normally cancels
+unaccepted packets with refunds, while keeping pool and use history. Old parties start
+earning at zero on upgrade. If Party is uninstalled, its modifiers switch
+off and data stays saved; reinstalling settles executed/canceled reservations
+without replaying rewards or results. Boss Checks are planned for Party 0.2.

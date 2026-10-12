@@ -374,6 +374,7 @@ def settle(state):
                     voided = True
 
 
+@partners.atomic_requests
 def declaration(
     state,
     ident,
@@ -389,6 +390,7 @@ def declaration(
     waive=False,
     public=False,
     support_allowed=None,
+    partner_requests=None,
 ):
     progress(state)
     domain_effects = domain_effects or {}
@@ -510,6 +512,7 @@ def declaration(
     exchange["attack_spirit"] = actor["spirit"]
     exchange["carry"] = actor["carry"]
     actor["outgoing"] = ex_id
+    partners.reserve(state, exchange, partner_requests)
     partners.snapshot(state, exchange)
     state["exchanges"][ex_id] = exchange
     partners.emit(state, partners.Event("declare", actor["id"], ex_id, 1))
@@ -1382,7 +1385,8 @@ def support_exchange(state, exchange, *, allowed=None):
     finish_exchange(state, exchange)
 
 
-def press(state, ident, draw, *, stop=False, empower=False):
+@partners.atomic_requests
+def press(state, ident, draw, *, stop=False, empower=False, partner_requests=None):
     progress(state)
     actor = participant(state, ident)
     exchange = state["exchanges"].get(actor["outgoing"])
@@ -1405,6 +1409,8 @@ def press(state, ident, draw, *, stop=False, empower=False):
     except CombatError:
         reserves = None
     if reserves is None or actor["hp"] - exchange["strain_cost"] - blood < 1:
+        if partner_requests:
+            raise CombatError("The Burst cannot be afforded; no partner resource was spent.")
         # The chain cannot be afforded; it ends as a stop.
         finish_exchange(state, exchange)
         return
@@ -1429,6 +1435,7 @@ def press(state, ident, draw, *, stop=False, empower=False):
     exchange["attack_spirit"] = actor["spirit"]
     exchange["covered_targets"] = []
     exchange["interception_penalties"] = {}
+    partners.reserve(state, exchange, partner_requests)
     partners.snapshot(state, exchange)
     partners.emit(state, partners.Event("declare", actor["id"], exchange["id"], exchange["hit"]))
     condition(
@@ -1475,7 +1482,22 @@ def finish_exchange(state, exchange):
         actor["tempo"] = min(math.rounded(tempo["cap"]), actor.get("tempo", 0) + 1)
     actor["clock"] += 1
     if value(actor, "poisoned"):
-        harm(actor, value(actor, "poisoned"))
+        eligible = participating(actor)
+        source = actor["conditions"]["poisoned"].get("source", "")
+        loss = harm(actor, value(actor, "poisoned"))
+        if source in state["participants"] and source != actor["id"]:
+            partners.emit(
+                state,
+                partners.Event(
+                    "hostile_damage",
+                    source,
+                    exchange["id"],
+                    0,
+                    actor["id"],
+                    damage=loss,
+                    target_was_participating=eligible,
+                ),
+            )
     actor["conditions"] = {
         k: v for k, v in actor["conditions"].items() if v["expires"] > actor["clock"]
     }

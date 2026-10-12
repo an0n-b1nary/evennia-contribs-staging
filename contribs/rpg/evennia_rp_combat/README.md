@@ -1,6 +1,6 @@
 # evennia-rp-combat
 
-> **Preview (0.2.1, Pre-Alpha).** Pin an exact commit. Initial coefficients
+> **Preview (0.2.2, Pre-Alpha).** Pin an exact commit. Initial coefficients
 > are a playtesting baseline; no human balance result is claimed.
 
 Consent-based room combat for Evennia 6.x: personal turns, queued reactions,
