@@ -89,7 +89,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        calendar: [present, absent]
+        include:
+          - profile: calendar-present
+            args: "--calendar present"
+            excludes: ""
+          - profile: calendar-absent
+            args: "--calendar absent"
+            excludes: "--exclude evennia-calendar"
+          - profile: building-present
+            args: "--building"
+            excludes: ""
+          - profile: building-no-maps
+            args: "--building --absent evennia_maps"
+            excludes: "--exclude evennia-maps"
+          - profile: building-no-regions
+            args: "--building --absent evennia_regions"
+            excludes: "--exclude evennia-regions"
+          - profile: building-no-jobs
+            args: "--building --absent evennia_jobs"
+            excludes: "--exclude evennia-jobs"
+          - profile: building-no-economy
+            args: "--building --absent evennia_economy"
+            excludes: "--exclude evennia-economy"
+          - profile: building-no-social
+            args: "--building --absent evennia_social"
+            excludes: "--exclude evennia-social"
+          - profile: building-core
+            args: "--building --absent evennia_maps --absent evennia_regions --absent evennia_jobs --absent evennia_economy --absent evennia_social"
+            excludes: "--exclude evennia-maps --exclude evennia-regions --exclude evennia-jobs --exclude evennia-economy --exclude evennia-social"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -99,17 +126,13 @@ jobs:
         run: pip install evennia==6.0.0
       - name: Initialize throwaway game directory
         run: evennia --init ci_game < /dev/null
-      - name: Install all partners
-        if: matrix.calendar == 'present'
-        run: python scripts/ci_install_contribs.py ci_game
-      - name: Install without the optional calendar partner
-        if: matrix.calendar == 'absent'
-        run: python scripts/ci_install_contribs.py ci_game --exclude evennia-calendar
+      - name: Install selected partners in dependency order
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
       - name: Migrate
         working-directory: ci_game
         run: evennia migrate --noinput < /dev/null
       - name: Fresh-process partner seams and host-configured maps suite
-        run: python scripts/ci_run_partner_tests.py ci_game --calendar ${{ matrix.calendar }}
+        run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
   resources-partners:
     runs-on: ubuntu-latest

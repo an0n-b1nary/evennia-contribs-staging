@@ -83,12 +83,15 @@ class BuildingFoundationSeams(EvenniaTest):
         from web.website.views.index import _map_summary
 
         public = _map_summary()
-        self.assertEqual(public["plane_count"], MapPlane.objects.count() - 2)
+        self.assertEqual(
+            public["plane_count"], MapPlane.objects.filter(visibility_room__isnull=True).count()
+        )
         self.entry.locks.add(f"control:id({self.char2.pk})")
         request = RequestFactory().get("/")
         request.user = self.account2
         owner = _map_summary(request)
-        self.assertEqual(owner["plane_count"], public["plane_count"] + 2)
+        # Seeing the entry does not reveal a floor whose tile is still private.
+        self.assertEqual(owner["plane_count"], public["plane_count"] + 1)
         self.assertEqual(owner["tile_count"], public["tile_count"] + 1)
 
     @override_settings(

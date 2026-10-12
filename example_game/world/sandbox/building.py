@@ -2,10 +2,15 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Reference-game composition for private map previews, before projects exist."""
 
+from evennia_building.visibility import room_visibility
+
 from evennia_maps.permissions import room_attr_values
 
 
 def room_visible(room, viewer=None):
+    managed = room_visibility(room, viewer)
+    if managed is not None:
+        return managed
     room_types = room_attr_values(room, "room_type")
     teleport_rules = room_attr_values(room, "allow_teleport")
     if "staff" in room_types:

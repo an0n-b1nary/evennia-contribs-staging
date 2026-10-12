@@ -41,6 +41,7 @@ def _stray_rooms():
     """
     from evennia.objects.objects import DefaultRoom
     from evennia.utils.search import search_tag
+    from world.sandbox.building_seed import TAG as BUILDING_TAG
 
     # Imported lazily, and from the seeder rather than re-declared, so the tags
     # this counts against cannot drift from the tags the purge acts on.
@@ -51,7 +52,7 @@ def _stray_rooms():
     )
 
     known = set()
-    for tag in (SANDBOX_TAG, STABLE_TAG):
+    for tag in (SANDBOX_TAG, STABLE_TAG, BUILDING_TAG):
         known |= {obj.id for obj in search_tag(tag, category=SANDBOX_TAG_CATEGORY)}
     return [room for room in DefaultRoom.objects.all_family() if room.id not in known]
 

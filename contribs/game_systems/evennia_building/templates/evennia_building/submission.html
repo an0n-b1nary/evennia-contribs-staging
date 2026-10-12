@@ -1,0 +1,10 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>{{ submission.project.name }} — submitted revision {{ submission.revision }}</h1>
+<p>Snapshot fingerprint: {{ submission.fingerprint }}</p>
+<p>Review outcome: {{ submission.review.outcome|default:"Pending" }}. {{ submission.review.reason }}</p>
+<h2>Exact submitted content</h2><pre>{{ snapshot }}</pre>
+<h2>Withdrawal or staff review</h2><p>Staff outcomes: approved, changes_requested, declined. Explain the decision in Reason. Withdrawal preserves this revision.</p>
+{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply action</button></form>
+<p><a href="{% url 'evennia_building:project' submission.project_id %}">Project and history</a></p>
+{% endblock %}

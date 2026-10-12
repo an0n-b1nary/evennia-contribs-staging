@@ -1477,10 +1477,46 @@ nothing. The command is demonstration glue, not a player construction tool.
 
 `world/sandbox/building.py` supplies one viewer-aware visibility callback for
 Maps and Regions; the shared web-character middleware handles offline and
-selected characters. Links permission/owner providers remain unset until an
-ownership package is installed. `world/sandbox/test_building.py` exercises
+selected characters. Building now supplies Links permission/owner providers;
+unmanaged rooms retain the host's control and visibility rules.
+`world/sandbox/test_building.py` exercises
 seed idempotence, selected-character SVG/live/API/region access, the transplant
 command and Social's room-permission seam under the actual partners.
+
+### Reviewed interiors
+
+Building 0.1 is installed after Links, with the sandbox reveal switch enabled.
+`BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
+`DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
+and traversal checks run. `CmdBuild` is registered in the character command set.
+The **My Building** page mounts `/building/` and the read-only API mounts
+`/api/v1/building/`. The host composes Building's three-way visibility answer
+with its existing private-preview rules for Maps and Regions.
+
+`seed_sandbox` retains the **Residential Court** and **Residential Demonstration**
+region with residential policy. **Demo Homeowner** owns **Sample Home**, an
+approved unlocked two-floor home. **Demo Resident** has residence; its
+**Restricted Bedroom** remains owner-only. **Two-floor Draft** is disconnected,
+OOC and secret, and **Revision Requested** demonstrates the changes-requested
+review loop. **Demo Building Reviewer** has the Builder permission for review.
+These characters are generic demo objects, not additional login accounts.
+Building content survives sandbox reset so proposals and ownership stay stable.
+
+Use `help +build` or `/guide/building/` for authoring and property commands.
+Staff can inspect the projects immediately. To test ordinary permissions, add
+the homeowner and resident to separate nonstaff test accounts' playable rosters,
+then select them in the web account menu. The homeowner can inspect the draft
+and exact submissions; the resident sees the restricted upper floor disappear from map
+names and counts. Unlocked entry alone never grants interior map access.
+Jobs stores snapshot pointers; its generic questionnaires cannot submit the
+Building-owned form. Native review continues when Jobs is absent.
+
+`world/sandbox/test_interiors.py` exercises the actual room/exit MRO, review,
+privacy, selected-character pages/API and contents-preserving cleanup.
+The partner CI matrix also starts fresh processes with Maps, Regions, Jobs,
+Economy and Social each absent, and all five absent together. It runs
+file-backed review/withdrawal and quota races separately. Apartment consent,
+archive/restore and quiet flags are reserved for the next Building release.
 
 ## Combat practice
 
