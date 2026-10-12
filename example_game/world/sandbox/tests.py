@@ -266,7 +266,7 @@ class TestScreenreaderCommandSeam(EvenniaTest):
         for command, method, heading in (
             (CmdBoard(), "_list_boards", "Bulletin Boards: 1 board"),
             (CmdCalendar(), "_list_upcoming", "Upcoming Events: 1 event"),
-            (CmdPlot(), "_do_list", "Plot Threads: 1 thread"),
+            (CmdPlot(), "_do_list", "Plots: 1 plot"),
         ):
             with self.subTest(command=command.key):
                 command.caller = self.char1

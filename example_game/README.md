@@ -36,7 +36,7 @@ out, including the two that stay in `world/sandbox/glue.py`:
 |---|---|
 | `RPTRACKER_FLAG_REVIEW_HOOK` | `evennia_jobs.integrations.staff_review.file_review_job` → a staff-only `+discuss` ticket |
 | `BOARDS_ANTIGAMING_REPORTER` | the same jobs reporter |
-| `LORE_SESSION_CONTEXT_PROVIDER` | `evennia_lore.integrations.session_context.get_session_context` → room, primary region, plot threads |
+| `LORE_SESSION_CONTEXT_PROVIDER` | `evennia_lore.integrations.session_context.get_session_context` → room, primary region, plots |
 | `LORE_STAFF_REVIEW_HOOK` | the same jobs reporter → lore affirmation requests, and sealed lore left on a thread a player concluded |
 | `RPTRACKER_XP_PROJECTION` | `evennia_xp.projection.activity_lines` → projected XP under `+activity` (unset without `evennia_xp`) |
 | `RP_RULES_SUBJECT_ADAPTER` | `world/sandbox/glue.py` → chargen sheet, else a sandbox stat block |
@@ -1342,8 +1342,23 @@ different concepts but are not presented as connected players.
 The seed varies scene lengths and speakers, with an intentionally empty archive
 entry, plausible timestamps, authored/tagged lore, and posts on both boards.
 The lore shows each layer feature: an affirmed Fact, a false Rumor whose OOC
-notes say so, and a Legend with sealed notes, linked to the seeded plot thread.
-Concluding that thread reminds whoever concludes it that the legend is still sealed.
+notes say so, and a Legend with sealed notes, linked to the seeded plot.
+Concluding that plot reminds whoever concludes it that the legend is still sealed.
+
+The seeded plots show threads (evennia-plots 0.7). The Founding Storm is owned
+by the first demo speaker and takes threads **by request**. It has a held
+thread with a sealed answer, which makes the plot *Owner-led*, and an open
+thread the second speaker leads. The second speaker also has a pending request.
+Its prequel, The Quiet Before, is concluded, and its loose end has been carried
+into the Storm. `world/sandbox/test_plots.py` renders these pages through the
+site and checks that the sealed answer and the request stay hidden from
+visitors.
+
+Browser check: open The Founding Storm as a visitor and as its owner (puppet
+the first demo speaker). Only the owner sees the request, the accept and
+decline buttons, and *Manage Owners*. Open the sealed answer, resolve the held
+thread with "Reveal the planned answer" ticked, and confirm the answer then
+appears on the plot page for everyone.
 
 Browser check: open a live scene from the home page and map, add a pose in-game,
 and confirm it arrives within ten seconds. Check the latest-page rollover, an
