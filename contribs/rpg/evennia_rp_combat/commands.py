@@ -21,9 +21,13 @@ class CmdCombat(MuxCommand):
     +combat/join                 Rejoin after Fade, restoring your place
     +combat/invite name[=side]   Private invitation; never enroll another PC
     +combat/refuse               Decline an invitation privately, no penalty
-    +combat/attack names=move[;rps=bet;domain=key;burst;empower]
+    +combat/attack names=move[;rps=bet;domain=key;burst;empower;public]
+                                 (public: Calling the Shot announces the bet)
     +combat/spell names=move     The same options as Attack
-    +combat/assist name[=move]   Another ally; special move may Heal
+    +combat/assist name[=move]   Another ally; special move may Heal,
+                                 including an incapacitated ally, who
+                                 must accept (add ;domain=medicine;waive to
+                                 skip their recovery action instead of Treat)
     +combat/dispirit name        An opponent; no incoming reaction
     +combat/improv names=JSON    An improvised move definition
     +combat/react token=evade|resist|overpower[,counter][,empower]
@@ -37,9 +41,12 @@ class CmdCombat(MuxCommand):
     +combat/posed                Acknowledge your own RP; grants no RP/XP
     +combat/fade                 Step out; releases your sheet, /join restores
     +combat/withdraw             Leave accounting remaining Vitality as lost
-    +combat/accept [n]           Accept a storyteller request shown by +combat
-    +combat/decline [n]          Decline it (Vitality, Spirit, conditions,
-                                 cap, return or ending the fight)
+    +combat/accept [n|token]     Accept a storyteller request or revival offer
+    +combat/decline [n|token]    Decline it (Vitality, Spirit, conditions,
+                                 cap, return, ending the fight or revival)
+    +combat/revive accept|ask    Accept allies' revival Heals automatically
+    +combat/retract              Withdraw your unaccepted revival offer
+    +combat/recover              After revival, one action to get back up
     +combat/unlock [reason]      Announced correction, clear queues first
     +combat/relock [reason]      Validate and freeze a corrected build
     +combat/cap number           Voluntarily reduce your personal Turn Limit
@@ -47,6 +54,7 @@ class CmdCombat(MuxCommand):
     +combat/rollback seq=reason  Staff only, whole-fight consistent checkpoint
     +combat/journal              Public sequence summaries for recovery
     +combat/result exchange      Recover committed results after reconnect
+    +combat/help                 Core help and installed partner commands
 
     +combat acts only as your own character (or, with /npc, as the NPC you
     control). Storyteller actions live in +combatstory. Add /npc to direct
@@ -90,6 +98,8 @@ class CmdCombat(MuxCommand):
         operation = switches[0] if switches else ""
         if not operation:
             self.msg(services.render(self.caller, subject=subject))
+        elif operation == "help":
+            self.msg(services.help_for(self.caller))
         elif operation == "setup":
             services.setup(self.caller, reason=self.args.strip())
         elif operation == "join":
@@ -128,7 +138,7 @@ class CmdCombat(MuxCommand):
             options = {}
             for part in parts[1:]:
                 name, sep, value = part.partition("=")
-                if name not in ("rps", "domain", "burst", "empower"):
+                if name not in ("rps", "domain", "burst", "empower", "waive", "public"):
                     raise CombatError("Unknown move option.")
                 options[name] = value if sep else True
             result = services.declare(
@@ -141,6 +151,8 @@ class CmdCombat(MuxCommand):
                 domain=options.get("domain", ""),
                 burst=bool(options.get("burst")),
                 empower=bool(options.get("empower")),
+                waive=bool(options.get("waive")),
+                public=bool(options.get("public")),
                 improvised=json.loads(self.rhs) if operation == "improv" else None,
             )
             self.msg(f"{result}")
@@ -191,6 +203,9 @@ class CmdCombat(MuxCommand):
             "cap",
             "accept",
             "decline",
+            "revive",
+            "retract",
+            "recover",
         ):
             argument = int(self.args) if operation == "cap" else self.args.strip()
             services.control(

@@ -566,10 +566,17 @@ class Command(BaseCommand):
                     )
                     moves.equip(author, move.key)
                 counts["combat_signatures"] = len(authors)
+                from evennia_rp_chargen import abilities
+
+                for author, keys in zip(authors, content.RP_SAMPLE_COMBAT_ABILITIES, strict=True):
+                    for key in keys:
+                        abilities.grant(author, key)
+                counts["combat_abilities"] = len(authors)
             room.db.desc += (
                 "\n\nCombat practice: +combat shows personal turns and your queue. "
                 "+combat/join <side> explicitly accepts a fight; everyone may use "
-                "+combatstory. Sample builds carry Ready Guard Signatures and Balanced Tactics. "
+                "+combatstory. Sample builds carry Ready Guard Signatures, Balanced Tactics "
+                "and combat Abilities such as Flowing Guard and Bait. "
                 "See help +combat and the Combat guide."
             )
         return counts

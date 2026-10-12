@@ -40,7 +40,9 @@ Repeatedly standing still and Resisting is not a reliable defense.
 
 An attack may secretly bet reaching, penetrating or subtle, each favoring
 one reaction and disadvantaging another. Add `;rps=reaching` when declaring.
-Equipped Insight can buy `+combat/read token=insight` before reacting.
+Equipped Insight can buy `+combat/read token=insight` before reacting. With
+Calling the Shot equipped, `;public` announces your bet so its penalty bites
+harder; the defender sees it and keeps every choice.
 
 ## Moves and resources
 
@@ -61,6 +63,23 @@ Evade, Resist and Overpower Stances prepare their matching next reaction.
 Distinct Stances can coexist, but each reduces the move's Accuracy and adds
 cost. Beating the target's defense grants the full bonus; a successful
 defense greatly reduces it. Unused Stances expire after your next action.
+
+Abilities you equip before the fight can change these rules in small ways:
+softer Resists from Agility, wider glancing blows, cheaper Stances, a sharper
+Burst after patient turns, and more. Each one rewards a choice your build
+would usually skip. Domain Resistance blocks a domain's effect aimed at you.
+
+## When you're down
+
+At 0 Vitality you are incapacitated: you can't act or react, and attacks you
+hadn't answered yet are voided with a refund to the attacker. An ally can
+offer to revive you with a Heal. It waits in `+combat` until you
+`+combat/accept` or `+combat/decline` it, and you can set
+`+combat/revive accept` to accept allies' revivals automatically. Once
+revived, take `+combat/recover`: one action to get back up, before anything
+else. Until then nobody can target you. A healer with Medicine can waive that
+recovery instead of treating a condition. Poison and other conditions keep
+running, so a weak revival can be undone.
 
 ## Consent and corrections
 
@@ -89,7 +108,7 @@ The storyteller cannot change your character without you. Damage, healing,
 Spirit, conditions, a lower Turn Limit or a return to the fight arrive as a
 numbered request in `+combat`; answer with `+combat/accept n` or
 `+combat/decline n`. Ending a fight needs every present player's agreement.
-An incapacitated or withdrawn character returns only through a visible
+A withdrawn character, or an OOC correction, returns only through a visible
 `+combatstory/requestreturn name=Vitality;reason` they accept. Returning
 retains turns, resources and loadout, and restored Vitality adds assessment
 exposure rather than erasing prior loss. Late arrivals can voluntarily reduce

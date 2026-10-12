@@ -188,6 +188,12 @@ class ReactionView:
     penalties: tuple[tuple[str, str], ...] = ()
     bonuses: tuple[tuple[str, str], ...] = ()
     estimates: bool = True
+    damage_boost: str = "0"
+    surge: str = "0"
+    reactions: tuple[str, ...] = REACTIONS
+    # A bet its attacker made public (Calling the Shot), never a hidden one.
+    public_bet: str = ""
+    public_shift: tuple[str, str] = ("0", "0")
 
 
 @dataclass(frozen=True)

@@ -1521,9 +1521,14 @@ archive/restore and quiet flags are reserved for the next Building release.
 ## Combat practice
 
 The Proving Grounds wires `evennia-rp-combat` after rules/chargen/NPCs.
-Seeded sample builds carry an equipped Ready Guard Signature and Balanced
-Tactics; the room has an empty open practice fight, so no PC is enrolled by
-seeding. `+combat/join side` explicitly accepts. See `/guide/combat/` and
+Seeded sample builds carry an equipped Ready Guard Signature, Balanced
+Tactics and combat Abilities (Flowing Guard and Calling the Shot, or Deflect
+and Bait); the room has an empty open practice fight, so no PC is enrolled by
+seeding. `world.ruleset.COMBAT_ABILITIES` holds neutral demonstration entries
+for every combat 0.2 Ability and two Flaws (Telegraph, Off-Balance), seeded
+only when combat is installed; `RP_RULES_EFFECT_KINDS` registers
+`combat_rule` beside `combat_bonus`. Revive an incapacitated ally with a Heal
+Assist they accept, then `+combat/recover`. `+combat/join side` explicitly accepts. See `/guide/combat/` and
 `help +combat`; `+combatstory` is available to ordinary players, and its
 changes to another player's character wait for that player's
 `+combat/accept`. Use the Market's permitted NPC templates with
@@ -1539,3 +1544,11 @@ combat leaves the Signature library usable. The sandbox tests include
 `world.sandbox.test_combat` for real partner seams. Run the integration gate
 with `evennia test --settings test_settings.py typeclasses commands world`
 and closed stdin; confirm a positive test count.
+
+Combat 0.1.1 exposes the optional `RP_COMBAT_PARTNERS` registry, empty by
+default here. Providers keep versioned fight data, freeze public packet
+modifiers and append plain-text status/help through the contracts in
+`contribs/rpg/evennia_rp_combat/PARTNERS.md`. The combat seam also checks
+retained data and pending packets with a provider disabled. No additional
+database migration, seed content or golden-database change is required for
+this API alone.

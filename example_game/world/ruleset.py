@@ -473,3 +473,171 @@ CATALOG = [
         ],
     },
 ]
+
+
+# Combat Abilities and Flaws (evennia-rp-combat 0.2). Neutral demonstration
+# entries: the combat contrib owns what each `combat_rule` means, while names,
+# coefficients and Memory (loadout) costs are this game's starting calibration.
+# Each one rewards a choice that is normally weaker for the build that takes it.
+COMBAT_LOADOUT = {"modest": 5, "standard": 10, "strong": 15}
+
+
+def _combat(key, name, description, effects, *, cost="standard", max_level=1, flaw=False):
+    entry = {
+        "key": key,
+        "name": name,
+        "category": "combat",
+        "acquisition": "free" if flaw else "xp",
+        "max_level": 1 if flaw else max_level,
+        "description": description,
+        "effects": effects,
+    }
+    if flaw:
+        entry["is_flaw"] = True
+    else:
+        entry["xp_cost"] = ABILITY_XP_COST["proficiency"]
+        entry["budget_cost"] = COMBAT_LOADOUT[cost]
+    return entry
+
+
+def _rule(rule, **fields):
+    return {"kind": "combat_rule", "rule": rule, **{k: str(v) for k, v in fields.items()}}
+
+
+COMBAT_ABILITIES = [
+    _combat(
+        "deflect",
+        "Deflect",
+        "Agility softens a successful Resist further; you tire from blocking sooner.",
+        [_rule("deflect", amount="1/400", per_level="1/800")],
+        max_level=3,
+    ),
+    _combat(
+        "stoneskin",
+        "Stoneskin",
+        "Sturdiness turns some clean hits on a failed Evade into glancing blows.",
+        [_rule("stoneskin", band="1/8", per_level="1/16", cap=5, mitigation="1/10")],
+        max_level=3,
+    ),
+    *(
+        _combat(
+            f"{bet}-specialist",
+            f"{bet.title()} Specialist",
+            f"Your {bet.title()} bet hits harder when right and backfires harder when wrong.",
+            [_rule("rps", bet=bet, penalty=8, bonus=8)],
+        )
+        for bet in ("reaching", "penetrating", "subtle")
+    ),
+    _combat(
+        "finesse",
+        "Finesse",
+        "A weaker but more accurate counter loses less of its Overpower chance.",
+        [_rule("finesse", amount=5, per_level="5/2")],
+        max_level=3,
+    ),
+    _combat(
+        "tactician",
+        "Tactician",
+        "Stance-bearing moves cost a Reserve less; each exchange earns less Transcendence.",
+        [_rule("tactician", discount=1, transcendence=4)],
+    ),
+    _combat(
+        "measured-tempo",
+        "Measured Tempo",
+        "Each completed action without a Burst, support included, sharpens your next Burst.",
+        [_rule("measured_tempo", amount="1/4", per_level="1/8", cap=3)],
+        cost="strong",
+        max_level=3,
+    ),
+    _combat(
+        "explosive",
+        "Explosive",
+        "Pressing a Burst, or having it broken, overextends you less.",
+        [_rule("explosive", factor="3/4")],
+        cost="strong",
+    ),
+    _combat(
+        "catch-breath",
+        "Catch Breath",
+        "Assisting or Dispiriting lets you recover extra Resist pressure.",
+        [
+            {
+                "kind": "combat_bonus",
+                "phase": "exchange_end",
+                "field": "pressure_recovery",
+                "amount": 3,
+                "per_level": 1,
+                "actions": ["assist", "dispirit"],
+            }
+        ],
+        max_level=3,
+    ),
+    _combat(
+        "flowing-guard",
+        "Flowing Guard",
+        "A successful Evade readies your next Resist, and a successful Resist your next Evade.",
+        [_rule("flowing_guard", amount=5, per_level="5/2")],
+        max_level=3,
+    ),
+    _combat(
+        "braced-support",
+        "Braced Support",
+        "After supporting, Vulnerable spares your Resist but weighs more on Evade and Overpower.",
+        [_rule("braced_support", amount=5)],
+        cost="modest",
+    ),
+    _combat(
+        "calling-the-shot",
+        "Calling the Shot",
+        "Announce your RPS bet (;public) to make its penalty bite harder; the bonus is unchanged.",
+        [_rule("calling_the_shot", amount=10, per_level=5)],
+        max_level=3,
+    ),
+    _combat(
+        "desperate-counter",
+        "Desperate Counter",
+        "While your Spirit is negative, it no longer lowers your Overpower chance.",
+        [_rule("desperate_counter")],
+    ),
+    _combat(
+        "taunting-opener",
+        "Taunting Opener",
+        "A landed Dispirit lowers the ante of your next Burst.",
+        [_rule("taunting_opener", amount=200, per_level=100)],
+        max_level=3,
+    ),
+    _combat(
+        "bait",
+        "Bait",
+        "When a defender's Overpower against your attack fails, you gain a Reserve.",
+        [_rule("bait")],
+    ),
+    _combat(
+        "blood-price",
+        "Blood Price",
+        "Pay Vitality for Reserves you lack on a special move; it never takes you to 0.",
+        [_rule("blood_price", amount=6)],
+        cost="strong",
+    ),
+    _combat(
+        "telegraph",
+        "Telegraph",
+        "Your RPS bets apply at half strength.",
+        [_rule("rps", bet="", penalty=-10, bonus=-10)],
+        flaw=True,
+    ),
+    _combat(
+        "off-balance",
+        "Off-Balance",
+        "A successful Evade unsettles your next Resist, and a successful Resist your next Evade.",
+        [_rule("flowing_guard", amount=-5)],
+        flaw=True,
+    ),
+]
+
+
+def catalog():
+    """The seed: combat entries only where combat interprets combat_rule."""
+    from django.apps import apps
+
+    return CATALOG + (COMBAT_ABILITIES if apps.is_installed("evennia_rp_combat") else [])

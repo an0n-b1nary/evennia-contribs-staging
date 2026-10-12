@@ -5,6 +5,7 @@
 from evennia_rp_rules._config import setting
 
 DEFAULTS = {
+    "RP_COMBAT_PARTNERS": {},
     "RP_COMBAT_SOURCE": None,
     "RP_COMBAT_WEAPON_FLAVOR": None,
     "RP_COMBAT_ROLES": {

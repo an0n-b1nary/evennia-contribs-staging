@@ -9,9 +9,50 @@ from evennia.utils.test_resources import EvenniaCommandTest
 
 from world.sandbox.test_rp_partners import RPSeedMixin
 
+FOUNDATION_PROVIDER = None  # Assigned only within the extension seam test.
+
 
 @skipUnless(apps.is_installed("evennia_rp_combat"), "Combat partner absent")
 class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
+    def test_partner_snapshots_use_real_frozen_sheets_and_survive_absence(self):
+        from evennia_rp_combat import partners, services
+
+        provider = partners.Provider(
+            upgrade=lambda section: section or {"schema": 1, "data": {"retained": True}},
+            snapshot=lambda state, declaration: partners.PacketModifiers(
+                damage_boost="20", facts=(("target", declaration.target_id),)
+            ),
+            status=lambda state, subject: ("Foundation partner active.",),
+        )
+        registry = {
+            "foundation": {
+                "app": "evennia_rp_combat",
+                "provider": "world.sandbox.test_combat.FOUNDATION_PROVIDER",
+            }
+        }
+        first, second = self.samples[:2]
+        with (
+            patch("world.sandbox.test_combat.FOUNDATION_PROVIDER", provider),
+            override_settings(RP_COMBAT_PARTNERS=registry),
+        ):
+            services.setup(first)
+            services.join(first, "one")
+            services.join(second, "two")
+            exchange_id = services.declare(first, [second])
+            state = services.state_for(first)
+            saved = state["exchanges"][exchange_id]["partner_modifiers"][str(second.pk)]
+            self.assertEqual(saved["foundation"]["damage_boost"], "20")
+            self.assertTrue(state["participants"][str(first.pk)]["build"]["scores"])
+            self.assertIn("Foundation partner active", services.render(first))
+            with override_settings(RP_COMBAT_PARTNERS={}):
+                services.react(second, f"{exchange_id}:1", "resist")
+                self.assertIn("partner rules unavailable", services.render(first))
+            reloaded = services.state_for(first)
+            self.assertEqual(reloaded["partners"]["foundation"]["data"], {"retained": True})
+            self.assertEqual(
+                reloaded["exchanges"][exchange_id]["partner_modifiers"][str(second.pk)], saved
+            )
+
     def test_seeded_signatures_tactics_and_command_registration(self):
         from commands.default_cmdsets import CharacterCmdSet
         from evennia_rp_chargen.models import SignatureMove
@@ -58,6 +99,32 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         locks.unlock(first)
         services.control(first, "relock")
         self.assertNotIn("ready-guard", fight_moves())
+
+    def test_combat_abilities_validate_freeze_and_call_a_public_shot(self):
+        from evennia_rp_chargen.catalog import definition_problems
+        from evennia_rp_chargen.models import AbilityDefinition
+        from evennia_rp_combat import services
+        from evennia_rp_combat.modifiers import rules
+        from evennia_rp_combat.sources import snapshot
+
+        from world.ruleset import COMBAT_ABILITIES
+
+        for entry in COMBAT_ABILITIES:
+            row = AbilityDefinition.objects.get(key=entry["key"])
+            self.assertEqual(definition_problems(row), [], entry["key"])
+        first, second = self.samples[:2]
+        self.assertIn("calling_the_shot", rules(snapshot(first)))
+        self.assertIn("bait", rules(snapshot(second)))
+        services.setup(first)
+        services.join(first, "one")
+        services.join(second, "two")
+        exchange_id = services.declare(first, [second], bet="reaching", public=True)
+        state = services.state_for(first)
+        self.assertTrue(state["exchanges"][exchange_id]["public_bet"])
+        self.assertIn("reaching bet publicly", services.odds(second, f"{exchange_id}:1"))
+        services.control(second, "cancel", argument=f"{exchange_id}:1")
+        with self.assertRaisesRegex(ValueError, "Calling the Shot"):
+            services.declare(second, [first], bet="subtle", public=True)
 
     def test_mechanics_system_entries_do_not_create_rp_activity(self):
         if not apps.is_installed("evennia_scenes"):

@@ -195,7 +195,7 @@ RP_CHARGEN_LOCK_TTL = 3 * 60 * 60
 RP_CHARGEN_REQUIRE_APPROVAL = False
 RP_CHARGEN_MOVE_VALIDATOR = "world.sandbox.glue.validate_signature_move"
 RP_CHARGEN_RPTRACKER_APP_LABEL = "evennia_rptracker"
-RP_CHARGEN_CATALOG_SEED = "world.ruleset.CATALOG"
+RP_CHARGEN_CATALOG_SEED = "world.ruleset.catalog"
 RP_CHARGEN_STARTING_ALLOWANCE = rp_values.STARTING_ALLOWANCE
 RP_CHARGEN_UPGRADE_COST = rp_values.UPGRADE_COST
 # Purchases use the starting allowance first, then earned XP when installed.
@@ -776,10 +776,16 @@ RP_COMBAT_ELEMENT_TRAITS = {
     "spellcraft": ["spirit_loss"],
 }
 RP_RULES_EFFECT_KINDS = (
-    {"combat_bonus": "evennia_rp_combat.modifiers.CombatEffect"}
+    {
+        "combat_bonus": "evennia_rp_combat.modifiers.CombatEffect",
+        "combat_rule": "evennia_rp_combat.modifiers.CombatRule",
+    }
     if "evennia_rp_combat" in INSTALLED_APPS
     else {}
 )
+# Pure combat partner providers are opt-in. Their versioned state is kept
+# through rollback and provider removal; no Party provider ships yet.
+RP_COMBAT_PARTNERS = {}
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.
