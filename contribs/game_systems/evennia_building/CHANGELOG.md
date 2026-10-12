@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-12
+
+- Add public frontier and atomic mixed settlements with independently owned interiors.
+- Add accepted collaborators, lead-only management and exact contributor/recipient agreements.
+- Freeze explicit grid connections; validate mapped geometry or require manual staff certification.
+- Add public stewardship, temporary mood permission, inactivity flags without automatic action,
+  coordinated retirement, replacement connections and connectivity-preserving restore.
+- Add selected-character web/command controls, public growth map/API/overlay and reference seams.
+- Preserve 0.2 migrations, ordinary pending snapshots and apartment passage inside mixed homes.
+
 ## 0.2.0 — 2026-10-11
 
 - Add exact-candidate attachment consent, independent one-level apartments and

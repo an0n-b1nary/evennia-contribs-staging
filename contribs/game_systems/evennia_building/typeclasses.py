@@ -1,6 +1,13 @@
 class BuildingRoomMixin:
     """Place before DefaultRoom; room deletion is a lifecycle service."""
 
+    def get_extra_room_details(self, viewer=None):
+        """Cooperative room-detail protocol; grants no configuration rights."""
+        from .details import room_details
+
+        inherited = getattr(super(), "get_extra_room_details", None)
+        return list(inherited(viewer) if inherited else ()) + room_details(self, viewer)
+
     def at_object_delete(self):
         from .access import ownership
         from .models import DraftRoom
@@ -51,12 +58,13 @@ class BuildingExitMixin:
 
     def at_object_delete(self):
         from .attachments import protected_exit
-        from .models import DraftDoor, Property
+        from .models import DraftDoor, FrontierConnection, Property
 
         if (
             protected_exit(self)
             or Property.objects.filter(entrance=self).exists()
             or Property.objects.filter(departure=self).exists()
+            or FrontierConnection.objects.filter(object_id=self.pk).exists()
         ):
             return False
         if (
@@ -71,7 +79,15 @@ class BuildingExitMixin:
     def at_traverse(self, traversing_object, target_location, **kwargs):
         from .access import can_enter
         from .attachments import departure_allows
-        from .models import DraftDoor, Property
+        from .models import DraftDoor, FrontierRoom, Property
+
+        if (
+            FrontierRoom.objects.filter(room=target_location)
+            .exclude(frontier__state="live")
+            .exists()
+        ):
+            traversing_object.msg("That public route is archived.")
+            return
 
         outward = (
             DraftDoor.objects.filter(exit=self, outward=True).exists()

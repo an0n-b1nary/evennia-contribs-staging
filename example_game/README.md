@@ -1502,7 +1502,7 @@ command and Social's room-permission seam under the actual partners.
 
 ### Reviewed interiors
 
-Building 0.2 is installed after Links, with the sandbox reveal switch enabled.
+Building 0.3 is installed after Links, with the sandbox reveal switch enabled.
 `BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
 `DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
 and traversal checks run. `CmdBuild` is registered in the character command set.
@@ -1612,3 +1612,17 @@ also installs combat/Party wheels without optional packages, removes Party
 while a populated fight is open, then reinstalls it and checks saved data
 and packet continuity. The synthetic golden database includes the empty
 practice party.
+
+
+### Public frontier and shared settlement reference
+
+From Residential Court take **frontier gate** to Frontier Demonstration. The
+approved **Sample Settlement** has two public streets maintained by Demo Frontier
+Lead, a recorded contribution by Demo Frontier Author, and a private Settlement
+Home owned independently by Demo Settlement Homeowner. Exact reuse and ownership
+agreements are retained. Reseeding preserves all generated identities and rights.
+Use `/building/frontier/` for public growth and provenance; private home boundaries
+are visible only through their owners' normal property controls. Staff see quiet
+steward flags alongside property flags and must explicitly decide any reassignment.
+The shared inactivity threshold defaults to 35 days; no automated action occurs.
+Social 0.7.2 uses the narrow mood provider so stewards receive no configure rights.

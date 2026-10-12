@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia_building import attachments, services
+from evennia_building import attachments, collaboration, frontier, services
 from evennia_building.models import BuildProject, Property, RegionBuildPolicy
 
 from evennia_regions.models import Region, RegionMembership
@@ -127,9 +127,79 @@ def seed(outer):
         )
         invitation = services.invite(tenant, submission.property, guest, entry=True, maps=False)
         services.answer_invitation(guest, invitation, accept=True)
+    lead = _object("Demo Frontier Lead", "typeclasses.characters.Character")
+    author = _object("Demo Frontier Author", "typeclasses.characters.Character")
+    recipient = _object("Demo Settlement Homeowner", "typeclasses.characters.Character")
+    edge = _object("Frontier Gate", "typeclasses.rooms.Room")
+    edge.db.room_type = "ic"
+    edge.db.allow_teleport = "public"
+    edge.db.desc = "An open gate leads to a collaboratively built public trail and an independently owned home."
+    edge.terrain_tags = {"urban"}
+    RegionMembership.objects.get_or_create(
+        region=region, room=edge, defaults={"room_name": edge.key, "is_primary": True}
+    )
+    from evennia_maps.models import MapPlane, RoomTile
+    from evennia_maps.placement import place_tile
+
+    plane, _ = MapPlane.objects.get_or_create(
+        name="Frontier Demonstration", defaults={"zstack": "sandbox-frontier"}
+    )
+    if not RoomTile.objects.filter(room=edge).exists():
+        place_tile(edge, plane, 0, 0, actor=reviewer)
+    for source, target, name in (
+        (court, edge, "frontier gate"),
+        (edge, court, "residential court"),
+    ):
+        if not ObjectDB.objects.filter(db_location=source, db_destination=target).exists():
+            create_object("typeclasses.exits.Exit", key=name, location=source, destination=target)
+    if not BuildProject.objects.filter(owner=lead, name="Sample Settlement").exists():
+        project = services.new_project(lead, "Sample Settlement", kind="frontier")
+        entry = project.rooms.get(entry=True)
+        invitation = collaboration.invite(lead, project, author)
+        collaboration.answer(author, invitation)
+        services.edit_project(
+            author,
+            project,
+            room=entry,
+            name="Settlement Trail",
+            description="A public trail maintained by its steward. The nearby home's ownership and guests remain independent.",
+        )
+        services.dig(author, project, entry, "Settlement Outlook", door="east", back="west", x=1)
+        services.attach(lead, project, edge, "east")
+        frontier.add_interior(
+            lead,
+            project,
+            entry,
+            "Settlement Home",
+            owner=recipient,
+            entrance_name="settlement home",
+        )
+        project.refresh_from_db()
+        digest = services.fingerprint(services.snapshot(project))
+        for actor, role in ((author, "contributor"), (recipient, "ownership")):
+            collaboration.acknowledge(
+                actor,
+                project,
+                role=role,
+                expected_version=project.version,
+                expected_fingerprint=digest,
+                acknowledgement=collaboration.wording(role),
+            )
+        submission = services.submit(
+            lead, project, expected_version=project.version, acknowledgement=ack
+        )
+        services.review(
+            reviewer,
+            submission,
+            expected_revision=submission.revision,
+            outcome="approved",
+            reason="Whole mixed settlement, explicit grid connection and independent home approved.",
+        )
     # Persistent generated demo geometry is seeded content, not hand-dug rooms.
-    for project in BuildProject.objects.filter(owner__in=[owner, tenant]):
+    for project in BuildProject.objects.filter(owner__in=[owner, tenant, lead]):
         for record in project.rooms.select_related("room"):
             if record.room:
                 record.room.tags.add(TAG, category="sandbox")
-    return {"building_projects": BuildProject.objects.filter(owner__in=[owner, tenant]).count()}
+    return {
+        "building_projects": BuildProject.objects.filter(owner__in=[owner, tenant, lead]).count()
+    }

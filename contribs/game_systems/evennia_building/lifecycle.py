@@ -164,7 +164,9 @@ def restore(actor, property, *, reason):
         or property.rooms.exclude(owner_id=property.owner_id).exists()
     ):
         raise ValidationError("The room ownership set needs repair.")
-    for door in property.promotion.project.doors.select_related("exit", "source", "target"):
+    for door in property.promotion.project.doors.filter(
+        source__object_id__in=property.rooms.values_list("object_id", flat=True)
+    ).select_related("exit", "source", "target"):
         data = _exit_data(door.exit) if door.exit_id else {}
         if (
             not door.exit_id

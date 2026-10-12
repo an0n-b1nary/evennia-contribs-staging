@@ -4,7 +4,7 @@ from django.core.exceptions import PermissionDenied
 from evennia_links.rooms import ACTIONS
 from evennia_links.runtime import get
 
-from .models import DraftRoom, GuestInvitation, Resident, RoomOverride, RoomOwnership
+from .models import DraftRoom, FrontierRoom, GuestInvitation, Resident, RoomOverride, RoomOwnership
 
 
 def is_staff(actor):
@@ -59,6 +59,14 @@ def room_permission(actor, room, action):
                 property=record.property, character=actor, can_install=True
             ).exists()
         )
+    frontier = FrontierRoom.objects.select_related("frontier").filter(object_id=room.pk).first()
+    if frontier:
+        return bool(
+            get("BUILDING_REVEALED")
+            and frontier.frontier.state == "live"
+            and frontier.steward_id == actor.pk
+            and action == "describe"
+        )
     draft = DraftRoom.objects.select_related("project").filter(object_id=room.pk).first()
     if draft:
         # Draft edits must version the proposal and preserve isolation flags.
@@ -109,6 +117,17 @@ def managed_access(room, actor, *, scope="entry", public_entry=False):
         if not _override_allows(record, actor):
             return False
         return _granted(record, actor, scope) or bool(public_entry and not record.property.locked)
+    frontier = (
+        FrontierRoom.objects.select_related("frontier")
+        .filter(object_id=getattr(room, "pk", None))
+        .first()
+    )
+    if frontier:
+        return bool(
+            frontier.room_id
+            and frontier.frontier.state == "live"
+            and (get("BUILDING_REVEALED") or is_staff(actor))
+        )
     draft = (
         DraftRoom.objects.select_related("project")
         .filter(object_id=getattr(room, "pk", None))
@@ -120,9 +139,27 @@ def managed_access(room, actor, *, scope="entry", public_entry=False):
             and draft.project.state in {"draft", "submitted"}
             and actor
             and (
-                is_staff(actor) or (get("BUILDING_REVEALED") and actor.pk == draft.project.owner_id)
+                is_staff(actor)
+                or (get("BUILDING_REVEALED") and _draft_author(actor, draft.project))
             )
         )
+    return None
+
+
+def _draft_author(actor, project):
+    from .collaboration import can_author
+
+    return can_author(actor, project)
+
+
+def steward_mood_permission(actor, room):
+    """An additional temporary-atmosphere right; no lasting configuration grant."""
+    if (
+        actor
+        and get("BUILDING_REVEALED")
+        and FrontierRoom.objects.filter(room=room, steward=actor, frontier__state="live").exists()
+    ):
+        return True
     return None
 
 

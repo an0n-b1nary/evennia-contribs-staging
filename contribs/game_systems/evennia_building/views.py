@@ -16,7 +16,7 @@ from evennia.objects.models import ObjectDB
 
 from evennia_links.characters import web_character
 
-from . import attachments, lifecycle, services
+from . import attachments, collaboration, frontier_lifecycle, lifecycle, services
 from .access import is_staff, require_revealed
 from .models import (
     AttachmentAgreement,
@@ -24,6 +24,7 @@ from .models import (
     BuildSubmission,
     GuestInvitation,
     PassageChange,
+    ProjectContributor,
     Property,
 )
 from .policy import set_policy
@@ -32,12 +33,20 @@ from .visibility import room_visibility
 
 class ProjectForm(forms.Form):
     name = forms.CharField(max_length=255)
+    kind = forms.ChoiceField(
+        choices=[("interior", "Interior"), ("frontier", "Public frontier / settlement")],
+        required=False,
+    )
     purpose = forms.ChoiceField(
         choices=[
             ("home", "Home"),
+            ("public", "Public frontier"),
             ("shop", "Shop proposal (selling requires a separate shop integration)"),
         ]
     )
+
+    def clean_kind(self):
+        return self.cleaned_data["kind"] or "interior"
 
 
 class ActionForm(forms.Form):
@@ -67,6 +76,7 @@ class ActionForm(forms.Form):
                 ("discard", "Confirm discard"),
                 ("environment", "Request environment changes"),
                 ("approve_environment", "Approve requested environment (staff)"),
+                ("approve_geometry", "Certify manually reviewed frontier geometry (staff)"),
                 ("policy", "Set room building policy (staff)"),
                 ("region_policy", "Set region building policy (staff)"),
                 ("consent_request", "Request attachment consent"),
@@ -140,6 +150,7 @@ class ActionForm(forms.Form):
             "discard": ("version", "confirmation"),
             "environment": ("version", "value"),
             "approve_environment": ("version", "reason"),
+            "approve_geometry": ("version", "reason"),
             "withdraw": ("version", "reason"),
             "review": ("version", "value", "reason"),
             "lock": (),
@@ -233,7 +244,7 @@ def actor_for(request):
 
 def project_for(actor, pk):
     project = get_object_or_404(BuildProject, pk=pk)
-    if project.owner_id != actor.pk and not is_staff(actor):
+    if not collaboration.can_inspect(actor, project):
         raise Http404
     return project
 
@@ -266,9 +277,7 @@ def index(request):
             return redirect("evennia_building:project", pk=project.pk)
         except (ValidationError, PermissionDenied) as exc:
             _error(form, exc)
-    projects = (
-        BuildProject.objects.all() if is_staff(actor) else BuildProject.objects.filter(owner=actor)
-    )
+    projects = collaboration.visible_projects(actor)
     properties = [
         property
         for property in (
@@ -296,6 +305,10 @@ def index(request):
                 Q(parent_owner=actor) | Q(child_owner=actor), state="pending"
             ),
             "quiet_flags": lifecycle.quiet_list(actor) if is_staff(actor) else (),
+            "steward_flags": frontier_lifecycle.quiet_list(actor) if is_staff(actor) else (),
+            "collaboration_invitations": ProjectContributor.objects.filter(
+                character=actor, state="invited"
+            ).select_related("project"),
         },
     )
 
@@ -323,13 +336,25 @@ def project_detail(request, pk):
         if project.state == "draft" and actor.pk == project.owner_id
         else {"submit"}
     )
-    form = ActionForm(
-        request.POST if request.method == "POST" else None,
-        actions=actions,
-        selected=request.GET.get("action"),
-        initial={"version": project.version},
-        rooms=[(row.pk, row.room.key if row.room else "Missing room") for row in rooms],
+    if actor.pk != project.owner_id:
+        actions = (
+            {"room_name", "description", "dig", "door"}
+            if project.state == "draft" and collaboration.can_author(actor, project)
+            else set()
+        )
+    form = (
+        ActionForm(
+            request.POST if request.method == "POST" else None,
+            actions=actions,
+            selected=request.GET.get("action"),
+            initial={"version": project.version},
+            rooms=[(row.pk, row.room.key if row.room else "Missing room") for row in rooms],
+        )
+        if actions
+        else None
     )
+    if request.method == "POST" and form is None:
+        raise PermissionDenied("This candidate is available for inspection and agreement only.")
     if request.method == "POST" and form.is_valid():
         try:
             values = form.cleaned_data
@@ -419,7 +444,7 @@ def project_detail(request, pk):
         if project.state == "draft" and actor.pk == project.owner_id
         else ""
     )
-    if "confirmation" in form.fields:
+    if form and "confirmation" in form.fields:
         form.fields["confirmation"].initial = confirmation
     return render(
         request,
@@ -448,7 +473,9 @@ def submission_detail(request, pk):
     project_for(actor, submission.project_id)
     form = ActionForm(
         request.POST if request.method == "POST" else None,
-        actions={"withdraw", "review", "approve_environment"} if is_staff(actor) else {"withdraw"},
+        actions={"withdraw", "review", "approve_environment", "approve_geometry"}
+        if is_staff(actor)
+        else {"withdraw"},
         selected=request.GET.get("action"),
         initial={"version": submission.revision},
     )
@@ -469,6 +496,12 @@ def submission_detail(request, pk):
                 )
             elif values["action"] == "approve_environment":
                 services.approve_environment(
+                    actor, submission, expected_revision=values["version"], reason=values["reason"]
+                )
+            elif values["action"] == "approve_geometry":
+                from .frontier import approve_geometry
+
+                approve_geometry(
                     actor, submission, expected_revision=values["version"], reason=values["reason"]
                 )
             else:

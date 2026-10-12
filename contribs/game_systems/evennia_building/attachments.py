@@ -55,7 +55,15 @@ def parent_for(project):
 
 def default_route(parent, anchor):
     """Use the parent's generated outward tree; callers can instead name a route."""
-    records = {row.room_id: row for row in parent.promotion.project.rooms.all()}
+    from .services import _exit_data
+
+    entry_id = _exit_data(parent.entrance)["target"] if parent.entrance else None
+    records = {
+        row.room_id: row
+        for row in parent.promotion.project.rooms.filter(
+            object_id__in=parent.rooms.values_list("object_id", flat=True)
+        )
+    }
     current = records.get(anchor.pk)
     by_id = {row.pk: row for row in records.values()}
     route = []
@@ -63,7 +71,7 @@ def default_route(parent, anchor):
         if current.room_id in route:
             break
         route.append(current.room_id)
-        if current.entry:
+        if current.room_id == entry_id:
             return list(reversed(route))
         current = by_id.get(current.parent_id)
     raise ValidationError("No usable parent passage was found; name an explicit route.")

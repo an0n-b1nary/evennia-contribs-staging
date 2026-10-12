@@ -12,6 +12,8 @@ class QuietReview(DefaultScript):
         self.start_delay = True
 
     def at_repeat(self):
+        from .frontier_lifecycle import check_quiet as check_stewards
         from .lifecycle import check_quiet
 
         check_quiet()
+        check_stewards()

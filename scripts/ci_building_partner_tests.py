@@ -8,6 +8,7 @@ from django.test import override_settings
 from django.urls import include, path
 from evennia.web.urls import urlpatterns as defaults
 from evennia_building.test_apartments import TestApartments
+from evennia_building.test_frontier import TestFrontier
 from evennia_building.tests import TestInteriors
 
 urlpatterns = [
@@ -25,6 +26,14 @@ if apps.is_installed("evennia_regions"):
         path("api/v1/", include("evennia_regions.api.urls")),
     ]
 urlpatterns += defaults
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class FrontierPartnerTests(TestFrontier):
+    def test_physical_partner_absence(self):
+        for label in settings.BUILDING_ABSENT_PARTNERS:
+            self.assertFalse(apps.is_installed(label))
+            self.assertIsNone(find_spec(label))
 
 
 @override_settings(ROOT_URLCONF=__name__)

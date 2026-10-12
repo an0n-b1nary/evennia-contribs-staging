@@ -36,5 +36,13 @@ for model in (
     models.PassageChange,
     models.QuietFlag,
     models.BuildingClock,
+    models.BuildPart,
+    models.ProjectContributor,
+    models.ProjectAgreement,
+    models.Frontier,
+    models.FrontierRoom,
+    models.FrontierConnection,
+    models.GeometryApproval,
+    models.StewardQuietFlag,
 ):
     admin.site.register(model, AuditAdmin)

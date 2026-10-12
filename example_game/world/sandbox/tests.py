@@ -32,6 +32,7 @@ from world.sandbox.test_apartments import ApartmentSeams
 from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
+from world.sandbox.test_frontier import FrontierSeams
 from world.sandbox.test_interiors import BuildingInteriorSeams
 from world.sandbox.test_jobs import JobsSeams
 from world.sandbox.test_npcs import NPCCommandSeams, NPCSeams
@@ -807,6 +808,7 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
             {
                 *PLANE_NAMES,
                 content.DRAFTING_PLANE_NAME,
+                "Frontier Demonstration",
                 *content.PRIVATE_PREVIEW_PLANES,
                 *interior_planes,
             },
@@ -819,8 +821,8 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
             RoomTile.objects.filter(plane__name=content.DRAFTING_PLANE_NAME).count(), 1
         )
         self.assertEqual(Region.all_objects.count(), len(content.REGIONS) + 1)
-        # Residential Court, the two-room home and its independent apartment.
-        self.assertEqual(RegionMembership.objects.count(), expected_memberships + 4)
+        # Court, home and apartment, plus gate, two public streets and a separate home.
+        self.assertEqual(RegionMembership.objects.count(), expected_memberships + 8)
 
 
 class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
@@ -868,8 +870,9 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
 
         return ObjectDB.objects.get(pk=self.tile_by_name[name].room_id)
 
-    def test_all_eight_overlay_keys_are_answered(self):
-        # The keys evennia_maps/overlays.py documents. A provider that failed
+    def test_all_nine_overlay_keys_are_answered(self):
+        # The standard Maps keys plus Building's public frontier metadata.
+        # A provider that failed
         # to connect degrades to an absent key rather than an error, which is
         # exactly why this has to be asserted somewhere.
         self.char2.location = self._room("Market Row")
@@ -886,7 +889,27 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
                 "has_lore",
                 "upcoming_events",
                 "present",
+                "frontier",
             },
+        )
+        from evennia_building.models import DraftRoom, FrontierRoom
+
+        from evennia_maps.overlays import collect_overlays
+
+        public_ids = list(
+            FrontierRoom.objects.filter(frontier__state="live").values_list("object_id", flat=True)
+        )
+        private_ids = list(
+            DraftRoom.objects.exclude(object_id__in=public_ids).values_list("object_id", flat=True)
+        )
+        metadata = collect_overlays([*public_ids, *private_ids], staff=False)["frontier"]
+        self.assertEqual(set(metadata), set(public_ids))
+        self.assertEqual(len(metadata), 2)
+        self.assertTrue(
+            all(
+                row["approved_by"] and row["reclaimed_by"] and row["promoted_at"]
+                for row in metadata.values()
+            )
         )
 
     def test_social_names_who_is_here_and_honors_unfindable(self):

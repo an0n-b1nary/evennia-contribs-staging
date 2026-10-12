@@ -1,0 +1,11 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Frontier growth</h1><p>Public places reclaimed by players, in promotion order.</p>
+<form method="get"><label>Highlight growth since <input type="date" name="since" value="{{ since }}"></label>{% if planes %}<label>Map <select name="plane">{% for plane in planes %}<option value="{{ plane.pk }}"{% if plane == selected_plane %} selected{% endif %}>{{ plane.name }}</option>{% endfor %}</select></label>{% endif %}<button type="submit">Update growth map</button></form>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if tiles %}<p>Blue squares mark frontier rooms promoted on or after the selected date. Grey squares show the rest of the visible grid.</p>
+<svg role="img" aria-label="Frontier growth on {{ selected_plane.name }}" viewBox="0 0 {{ width }} {{ height }}" style="max-width:100%;max-height:36rem">{% for tile in tiles %}<rect x="{{ tile.svg_x }}" y="{{ tile.svg_y }}" width="28" height="28" fill="{% if tile.new %}#2466a8{% else %}#737373{% endif %}"><title>{{ tile.name }}{% if tile.new %} — highlighted frontier growth{% endif %}</title></rect>{% endfor %}</svg>
+<details><summary>Growth map room list</summary><ul>{% for tile in tiles %}<li>{{ tile.name }}{% if tile.new %} — highlighted frontier growth{% endif %}</li>{% endfor %}</ul></details>{% endif %}
+<ul>{% for frontier in frontiers %}<li><a href="{% url 'evennia_building:frontier' frontier.pk %}">{{ frontier.name }}</a> — {{ frontier.created_at }}</li>{% empty %}<li>No frontier areas have been promoted.</li>{% endfor %}</ul>
+<p><a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% endblock %}

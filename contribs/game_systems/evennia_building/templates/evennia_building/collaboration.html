@@ -1,0 +1,15 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>{{ project.name }} — collaboration and agreement</h1>
+<p>Lead: {{ project.owner_name }}. Candidate version {{ project.version }}.</p>
+<p>Collaborators may enter, dig and edit. The lead manages membership, boundaries and submission. Shared drafts use the lead's quota. Removal preserves authorship and cannot bypass acknowledgement.</p>
+<h2>Contributors</h2><ul>{% for row in contributors %}<li>{{ row.character_name }}: {{ row.state }}{% if row.contributed %}; has contributed{% endif %}</li>{% empty %}<li>The lead is the sole author.</li>{% endfor %}</ul>
+<h2>Proposed interiors</h2><ul>{% for part in parts %}<li>{{ part.name }} — proposed owner: {{ part.owner_name }}; entrance: {{ part.entrance_name }}</li>{% empty %}<li>No separate interiors.</li>{% endfor %}</ul>
+{% if candidate %}<h2>Exact candidate</h2><p>Fingerprint: <code>{{ fingerprint }}</code></p><pre>{{ candidate|pprint }}</pre>{% elif candidate_error %}<p>{{ candidate_error }}</p>{% endif %}
+<h2>Contributor acknowledgement</h2><p>{{ contributor_wording }}</p>
+<h2>Ownership acceptance</h2><p>{{ ownership_wording }}</p>
+<p>Agreement covers this candidate only. Edits require fresh agreement. You may explicitly revoke before promotion. Leaving a project never takes away an already promoted home.</p>
+{% if form %}{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply selected action</button></form>{% endif %}
+<h2>Recorded agreements</h2><ul>{% for row in agreements %}<li>{{ row.actor.key|default:row.actor_object_id }}: {{ row.role }} — {{ row.state }} ({{ row.created_at }})</li>{% empty %}<li>No agreements recorded.</li>{% endfor %}</ul>
+<p><a href="{% url 'evennia_building:project' project.pk %}">Back to project</a></p>
+{% endblock %}

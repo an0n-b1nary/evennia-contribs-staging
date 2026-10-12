@@ -89,9 +89,9 @@ class TestInteriors(EvenniaCommandTestMixin, EvenniaTest):
         with self.assertRaises(PermissionDenied):
             services.edit_project(self.char1, self.project, name="Staff as collaborator")
 
-    def test_unsupported_frontier_and_apartment_requires_consent(self):
-        with self.assertRaisesMessage(ValidationError, "frontier"):
-            services.new_project(self.char2, "Frontier", kind="frontier")
+    def test_unsupported_kind_and_apartment_requires_consent(self):
+        with self.assertRaisesMessage(ValidationError, "interior or frontier"):
+            services.new_project(self.char2, "Unknown", kind="unsupported")
         property = self.approve()
         project = services.new_project(self.char1, "Apartment")
         services.attach(self.char1, project, self.entry.room, "apartment")

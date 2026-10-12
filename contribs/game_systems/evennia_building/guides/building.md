@@ -1,9 +1,9 @@
 ---
 key: building
-title: Building a home
+title: Building homes and public places
 category: Places & travel
 requires: BUILDING_REVEALED
-summary: Draft an interior, request staff review, and manage private home access.
+summary: Draft homes and shared settlements, request staff review, and maintain public places.
 order: 50
 ---
 
@@ -31,7 +31,7 @@ Use `/property` to list homes. The Building website offers the same actions and
 exact submission pages. Staff transfer preserves rooms and belongings and clears
 ordinary access grants by default. Draft discard displays a confirmation token;
 it refuses stale confirmations and safely returns occupants and loose belongings.
-Withdraw first. Live homes cannot be discarded. Frontier building comes later.
+Withdraw first. Live homes cannot be discarded.
 
 To propose an apartment inside another home, choose the attachment and passage
 route, then `+build/consent/request <project>`. The parent owner uses
@@ -53,3 +53,30 @@ and history. Parent archival cannot strand active apartments; staff must handle
 affected homes together or arrange replacement passage with both owners.
 Quiet-property flags after about five weeks without character play are for
 staff review only. They never automatically reclaim or transfer a home.
+
+Start public growth with `+build/new frontier=New place`, then attach it to a
+public room with a compass direction. Frontier compass doors must agree with
+coordinates. Nearby grid rooms stay unconnected unless the lead explicitly adds
+`+build/connect <project> <draft room> <existing room>=<direction>` before review.
+
+The lead invites collaborators with `+build/collaborator/add <project> <character>`.
+The named character accepts the invitation. Accepted authors may enter, dig and
+edit room text; the lead manages membership, attachment, submission and discard.
+The lead's quotas cover the whole shared project. Groups grant no building rights.
+
+For a mixed settlement the lead adds an independent home with
+`+build/interior <project> <street room> <owner>=<name>;<entrance name>`.
+Every collaborator acknowledges the exact candidate and reuse wording using
+`+build/ack/show` and `/ack/contributor`; every future home owner separately uses
+`/ack/ownership`. The website provides candidate inspection and agreement forms.
+Changes require fresh agreements. Removal cannot erase a retained contribution;
+agreements may be revoked before promotion. Staff approve the entire project at
+once. Each home owner independently manages their property after approval.
+
+Public streets have stewards who may describe them and set temporary moods.
+Stewards cannot lock, admit, install or configure. `/frontier/steward` lets a
+steward explicitly relinquish to staff; staff may record departure or assignment.
+Inactivity only flags a room for staff review. Retirement must preserve access to
+surviving homes and public streets through an explicit coordinated plan.
+The website's Frontier page shows public growth by date. Provenance appears in
+room details and staff inspection, without adding a byline to ordinary look text.
