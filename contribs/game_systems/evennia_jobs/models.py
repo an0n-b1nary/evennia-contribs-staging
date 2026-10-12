@@ -309,6 +309,18 @@ class RequestSubmission(models.Model):
     answers = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def effective_state(self):
+        if hasattr(self, "withdrawal"):
+            return "withdrawn"
+        if hasattr(self, "decision"):
+            return self.decision.outcome
+        return "pending"
+
+    @property
+    def can_revise(self):
+        return self.effective_state in {"withdrawn", "changes_requested"}
+
     class Meta:
         ordering = ["revision"]  # noqa: RUF012
         constraints = [  # noqa: RUF012
@@ -343,4 +355,18 @@ class RequestDecision(models.Model):
     )
     reviewer_name = models.CharField(max_length=255)
     reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class RequestWithdrawal(models.Model):
+    """Author action, deliberately separate from a staff review decision."""
+
+    submission = models.OneToOneField(
+        RequestSubmission, on_delete=models.CASCADE, related_name="withdrawal"
+    )
+    actor = models.ForeignKey(
+        "objects.ObjectDB", on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    actor_name = models.CharField(max_length=255)
+    reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

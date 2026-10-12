@@ -39,6 +39,7 @@ mixin):
 from django.apps import apps
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
+from evennia_building.typeclasses import BuildingRoomMixin
 
 from evennia_maps.typeclasses import MapsRoomMixin
 from evennia_posing import PosingRoomMixin
@@ -55,7 +56,13 @@ else:
 
 
 class Room(
-    MarketRoomMixin, MapsRoomMixin, SocialRoomMixin, PosingRoomMixin, ObjectParent, DefaultRoom
+    BuildingRoomMixin,
+    MarketRoomMixin,
+    MapsRoomMixin,
+    SocialRoomMixin,
+    PosingRoomMixin,
+    ObjectParent,
+    DefaultRoom,
 ):
     """
     Rooms are like any Object, except their location is None

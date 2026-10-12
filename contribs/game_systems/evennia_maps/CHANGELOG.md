@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.1 ? 2026-10-11
+
+- Hide private floors without visible tiles, including names, details, API and pagination.
+
 ## [0.10.0] - 2026-10-10
 
 - Added read-only cross-plane transplant previews, collision and adjacency

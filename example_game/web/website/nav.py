@@ -82,6 +82,7 @@ NAV_GROUPS = (
 # places to browse -- all of them redirect or 403 without a login, and the first
 # three additionally want a puppet.
 ACCOUNT_LINKS = (
+    ("My Building", "evennia_building:index", AUTHENTICATED),
     ("My XP", "xp-summary", AUTHENTICATED),
     ("My Tickets", "job-list", AUTHENTICATED),
     ("My Lore", "lore-compendium", AUTHENTICATED),

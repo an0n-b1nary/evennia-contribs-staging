@@ -315,6 +315,9 @@ class Command(BaseCommand):
         counts["map_tiles"] = self._create_map(rooms)
         counts["scratch_tiles"] = self._create_scratch_plane(rooms)
         counts["private_preview_tiles"] = self._create_private_preview(authors)
+        from world.sandbox.building_seed import seed as seed_building
+
+        counts.update(seed_building(rooms[content.IC_ENTRY_SLUG]))
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
@@ -554,6 +557,22 @@ class Command(BaseCommand):
             from evennia_rp_combat import tactics
 
             combat.setup(authors[0], reason="Proving Grounds: consent-based practice")
+            if apps.is_installed("evennia_rp_party"):
+                from evennia_rp_party import rules as party_rules
+
+                def seed_party(state):
+                    return party_rules.prepare(state, "Practice Formation", "practice")
+
+                combat.execute(
+                    authors[0], "prepared an empty practice party; no PC enrolled", seed_party
+                )
+                counts["combat_parties"] = 1
+                room.db.desc += (
+                    "\n\nParty practice: after +combat/join practice, +party lists an empty "
+                    "Practice Formation team you may join yourself. Choose Front/Back/Flex "
+                    "with +party/formation; Back Cover requires explicit permission. "
+                    "See help +party and the Party guide."
+                )
             for author in authors:
                 tactics.save(author, "Balanced", appetite="balanced", rps_appetite="balanced")
             counts["combat_tactics"] = len(authors)

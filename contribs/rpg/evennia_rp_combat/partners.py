@@ -42,6 +42,27 @@ class Declaration:
     domain_effect: str
     exchange_id: str
     hit: int
+    domain: str = ""
+
+
+@dataclass(frozen=True)
+class SupportSpread:
+    """Ordinary Spirit only; primary healing/riders and action costs stay single."""
+
+    recipients: tuple[str, ...]
+    factor: str = "1"
+
+    def __post_init__(self):
+        if (
+            not isinstance(self.recipients, tuple)
+            or any(not isinstance(ident, str) for ident in self.recipients)
+            or len(set(self.recipients)) != len(self.recipients)
+        ):
+            raise CombatError("Support recipients must be distinct saved participant identifiers.")
+        factor = number(self.factor)
+        if not 0 <= factor <= 1:
+            raise CombatError("Support spread strength must be between 0 and 1.")
+        object.__setattr__(self, "factor", str(factor))
 
 
 @dataclass(frozen=True)
@@ -127,6 +148,7 @@ class Provider:
     transition: Callable | None = None
     status: Callable | None = None
     help: Callable | None = None
+    support: Callable | None = None
 
     def __post_init__(self):
         if (
@@ -134,7 +156,7 @@ class Provider:
             or not callable(self.upgrade)
             or any(
                 callback is not None and not callable(callback)
-                for callback in (self.transition, self.status, self.help)
+                for callback in (self.transition, self.status, self.help, self.support)
             )
         ):
             raise CombatError("Combat partner providers need callable contracts.")
@@ -205,6 +227,7 @@ def declaration(exchange, target_id):
         exchange["domain_effect"],
         exchange["id"],
         exchange["hit"],
+        exchange["domain"],
     )
 
 
@@ -246,6 +269,22 @@ def modifiers(exchange, target_id):
         auto_resolve=automatic,
         facts=tuple(facts[:32]),
     )
+
+
+def support_spread(state, exchange, target_id):
+    result = None
+    for key, provider in registered().items():
+        if provider.support is None:
+            continue
+        value = provider.support(deepcopy(state), declaration(exchange, target_id))
+        if value is None:
+            continue
+        if not isinstance(value, SupportSpread) or result is not None:
+            raise CombatError(
+                f"Combat partner {key} returned conflicting or invalid support spread."
+            )
+        result = value
+    return result
 
 
 def emit(state, event):

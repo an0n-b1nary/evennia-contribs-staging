@@ -2,6 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Web submission, revision and explicit staff review of structured requests."""
 
+from django import forms
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, HttpResponseRedirect
@@ -12,10 +13,10 @@ from evennia.objects.models import ObjectDB
 
 from evennia_jobs.authoring import AuthoringMixin
 from evennia_jobs.forms import RequestReviewForm, StructuredRequestForm
-from evennia_jobs.models import Job, JobStatus, RequestOutcome
+from evennia_jobs.models import Job, JobStatus
 from evennia_jobs.permissions import is_staff_user
 from evennia_jobs.requests import get_request_form
-from evennia_jobs.review import review_request, submit_request
+from evennia_jobs.review import review_request, submit_request, withdraw_request
 
 
 class StructuredRequestView(AuthoringMixin, FormView):
@@ -36,10 +37,7 @@ class StructuredRequestView(AuthoringMixin, FormView):
         if target and target.author_id != character_id:
             raise PermissionDenied
         if target and (
-            not self.latest
-            or target.status == JobStatus.CLOSED
-            or not hasattr(self.latest, "decision")
-            or self.latest.decision.outcome != RequestOutcome.CHANGES_REQUESTED
+            not self.latest or target.status == JobStatus.CLOSED or not self.latest.can_revise
         ):
             raise PermissionDenied("This request is not awaiting revision.")
 
@@ -143,6 +141,53 @@ class RequestReviewView(AuthoringMixin, FormView):
                 outcome=form.cleaned_data["outcome"],
                 reason=form.cleaned_data["reason"],
                 expected_revision=form.cleaned_data["revision"],
+            )
+        except ValidationError as exc:
+            form.add_error(None, "; ".join(exc.messages))
+            return self.form_invalid(form)
+        return HttpResponseRedirect(reverse("job-detail", kwargs={"pk": self.job.pk}))
+
+
+class WithdrawalForm(forms.Form):
+    revision = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+    reason = forms.CharField(required=False, max_length=10000, widget=forms.Textarea)
+
+
+class RequestWithdrawView(AuthoringMixin, FormView):
+    form_class = WithdrawalForm
+    template_name = "evennia_jobs/request_withdraw_form.html"
+
+    def get_permission_target(self):
+        self.job = get_object_or_404(Job, pk=self.kwargs["pk"])
+        return self.job
+
+    def check_permission(self, character_id, target):
+        if target.author_id != character_id:
+            raise PermissionDenied
+        self.latest = target.submissions.last()
+        if not self.latest:
+            raise Http404
+
+    def get_initial(self):
+        return {"revision": self.latest.revision}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            page_title="Withdraw request",
+            job=self.job,
+            submission=self.latest,
+            form_action=self.request.path,
+        )
+        return context
+
+    def form_valid(self, form):
+        try:
+            withdraw_request(
+                job=self.job,
+                author=get_object_or_404(ObjectDB, pk=self.get_character()),
+                expected_revision=form.cleaned_data["revision"],
+                reason=form.cleaned_data["reason"],
             )
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))

@@ -169,6 +169,12 @@ class CmdSummon(MuxCommand):
         del requests[target.id]
         caller.pending_summon_requests = requests
 
+        # Consent from an occupant does not substitute for property admission.
+        from evennia_links.travel import travel_permission
+
+        if not is_staff(caller) and travel_permission(caller, destination) is False:
+            caller.msg("You do not have permission to enter that room.")
+            return
         # Execute the move.
         caller.move_to(destination, quiet=False)
         caller.msg(f"You were summoned to |w{target.key}|n's location.")
@@ -320,6 +326,11 @@ class CmdJoin(MuxCommand):
         del requests[target.id]
         caller.pending_summon_requests = requests
 
+        from evennia_links.travel import travel_permission
+
+        if not is_staff(target) and travel_permission(target, destination) is False:
+            caller.msg("That character does not have permission to enter this room.")
+            return
         # Execute the move.
         target.move_to(destination, quiet=False)
         target.msg(f"|w{caller.key}|n accepted your join request. You have been moved.")

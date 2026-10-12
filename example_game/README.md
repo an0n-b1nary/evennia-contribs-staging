@@ -664,6 +664,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_combat \
+         contribs/rpg/evennia_rp_party \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -831,6 +832,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_combat \
+         contribs/rpg/evennia_rp_party \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -1492,10 +1494,46 @@ nothing. The command is demonstration glue, not a player construction tool.
 
 `world/sandbox/building.py` supplies one viewer-aware visibility callback for
 Maps and Regions; the shared web-character middleware handles offline and
-selected characters. Links permission/owner providers remain unset until an
-ownership package is installed. `world/sandbox/test_building.py` exercises
+selected characters. Building now supplies Links permission/owner providers;
+unmanaged rooms retain the host's control and visibility rules.
+`world/sandbox/test_building.py` exercises
 seed idempotence, selected-character SVG/live/API/region access, the transplant
 command and Social's room-permission seam under the actual partners.
+
+### Reviewed interiors
+
+Building 0.1 is installed after Links, with the sandbox reveal switch enabled.
+`BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
+`DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
+and traversal checks run. `CmdBuild` is registered in the character command set.
+The **My Building** page mounts `/building/` and the read-only API mounts
+`/api/v1/building/`. The host composes Building's three-way visibility answer
+with its existing private-preview rules for Maps and Regions.
+
+`seed_sandbox` retains the **Residential Court** and **Residential Demonstration**
+region with residential policy. **Demo Homeowner** owns **Sample Home**, an
+approved unlocked two-floor home. **Demo Resident** has residence; its
+**Restricted Bedroom** remains owner-only. **Two-floor Draft** is disconnected,
+OOC and secret, and **Revision Requested** demonstrates the changes-requested
+review loop. **Demo Building Reviewer** has the Builder permission for review.
+These characters are generic demo objects, not additional login accounts.
+Building content survives sandbox reset so proposals and ownership stay stable.
+
+Use `help +build` or `/guide/building/` for authoring and property commands.
+Staff can inspect the projects immediately. To test ordinary permissions, add
+the homeowner and resident to separate nonstaff test accounts' playable rosters,
+then select them in the web account menu. The homeowner can inspect the draft
+and exact submissions; the resident sees the restricted upper floor disappear from map
+names and counts. Unlocked entry alone never grants interior map access.
+Jobs stores snapshot pointers; its generic questionnaires cannot submit the
+Building-owned form. Native review continues when Jobs is absent.
+
+`world/sandbox/test_interiors.py` exercises the actual room/exit MRO, review,
+privacy, selected-character pages/API and contents-preserving cleanup.
+The partner CI matrix also starts fresh processes with Maps, Regions, Jobs,
+Economy and Social each absent, and all five absent together. It runs
+file-backed review/withdrawal and quota races separately. Apartment consent,
+archive/restore and quiet flags are reserved for the next Building release.
 
 ## Combat practice
 
@@ -1524,10 +1562,36 @@ combat leaves the Signature library usable. The sandbox tests include
 with `evennia test --settings test_settings.py typeclasses commands world`
 and closed stdin; confirm a positive test count.
 
-Combat 0.1.1 exposes the optional `RP_COMBAT_PARTNERS` registry, empty by
-default here. Providers keep versioned fight data, freeze public packet
+Combat exposes the optional `RP_COMBAT_PARTNERS` registry, with Party
+registered here. Providers keep versioned fight data, freeze public packet
 modifiers and append plain-text status/help through the contracts in
 `contribs/rpg/evennia_rp_combat/PARTNERS.md`. The combat seam also checks
 retained data and pending packets with a provider disabled. No additional
 database migration, seed content or golden-database change is required for
 this API alone.
+
+## Party practice
+
+`evennia-rp-party` follows combat in the install and app order. It needs no
+typeclass mixin, new database table, URL or API mount. Its guide is available
+at `/guide/party/`. The Proving Grounds seeds an empty Practice Formation
+party on the practice side; no character is enrolled automatically. Join
+the fight with `+combat/join practice`, inspect `+party`, then join the
+displayed party identity. Another party or unpartied participation is valid.
+
+Members choose Front, Back or Flex. Use `+party/formation back=on` to permit
+Cover, then a same-party Front can `+party/cover defender=token,resist` or
+preview with `/coverodds`. Cover and ordinary combat use the same frozen
+packet inputs. Rally/Rattle entries are independent per supporter; Encore
+spreads Spirit without spreading healing or revival. `+party/chat message`
+is transient OOC delivery to connected members in the room, without Scene
+entries, poses or RP credit. Authorized NPCs use `/as NPC=...`.
+
+The settings block exposes provisional coefficients for host calibration.
+Synergy/Team Surge is deferred to a point release; Boss Checks are reserved
+for Party 0.2. `world.sandbox.test_party` exercises real sheets, NPC control,
+Calling the Shot previews, ignores, guides and chat. The independent CI job
+also installs combat/Party wheels without optional packages, removes Party
+while a populated fight is open, then reinstalls it and checks saved data
+and packet continuity. The synthetic golden database includes the empty
+practice party.

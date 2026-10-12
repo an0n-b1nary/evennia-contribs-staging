@@ -335,6 +335,10 @@ class CmdHangouts(MuxCommand):
         if include_empty:
             all_hangout_rooms = ObjectDB.objects.get_by_attribute(key="hangout_type")
             for room in all_hangout_rooms:
+                from evennia_links.travel import room_visibility
+
+                if not is_viewer_staff and room_visibility(room, viewer) is False:
+                    continue
                 if room in populated:
                     continue
                 room_type = getattr(room, "room_type", "ic") or "ic"

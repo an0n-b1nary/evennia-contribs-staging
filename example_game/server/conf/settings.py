@@ -49,6 +49,7 @@ EVENNIA_ADMIN = False
 # base models are imported at their app-load time).
 INSTALLED_APPS += [
     "evennia_links",
+    "evennia_building",
     "evennia_economy",
     "evennia_rp_resources",
     "evennia_rp_crafting",
@@ -82,6 +83,7 @@ INSTALLED_APPS += [
     "evennia_rp_contest",
     "evennia_npcs",
     "evennia_rp_combat",
+    "evennia_rp_party",
     # This game's own glue module + seed_sandbox management command, plus
     # (via its apps.py) the pose_recorded signal connect. No models —
     # registered only so Django's management-command autodiscovery finds
@@ -695,11 +697,25 @@ MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 # Room permissions and private previews (links, maps and regions)
 ######################################################################
 # Control access remains the default until an ownership provider is installed.
-LINKS_ROOM_PERMISSION = None
-LINKS_ROOM_OWNER = None
+LINKS_ROOM_PERMISSION = "evennia_building.access.room_permission"
+LINKS_ROOM_OWNER = "evennia_building.access.owner_of"
 # One viewer-aware policy on both surfaces, including disconnected web users.
 MAPS_ROOM_VISIBILITY = "world.sandbox.building.room_visible"
 REGIONS_ROOM_VISIBILITY = MAPS_ROOM_VISIBILITY
+
+######################################################################
+# Building (evennia-building) — reviewed private interiors
+######################################################################
+BUILDING_REVEALED = True  # The reference game demonstrates revealed mechanics.
+BUILDING_DEFAULT_POLICY = "open"
+BUILDING_SAFE_ROOM = "#2"
+LOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")
+LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
+LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"
+from evennia_building.request_form import FORM as BUILDING_REQUEST_FORM
+from evennia_building.request_form import FORM_KEY as BUILDING_REQUEST_FORM_KEY
+
+JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, BUILDING_REQUEST_FORM_KEY: BUILDING_REQUEST_FORM}
 
 ######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues
@@ -768,9 +784,20 @@ RP_RULES_EFFECT_KINDS = (
     if "evennia_rp_combat" in INSTALLED_APPS
     else {}
 )
-# Pure combat partner providers are opt-in. Their versioned state is kept
-# through rollback and provider removal; no Party provider ships yet.
-RP_COMBAT_PARTNERS = {}
+######################################################################
+# Party (evennia-rp-party) - optional tactical teams within combat sides
+######################################################################
+RP_PARTY_REVEALED = True
+RP_PARTY_FROZEN = False
+RP_COMBAT_PARTNERS = {
+    "party": {"app": "evennia_rp_party", "provider": "evennia_rp_party.providers.PROVIDER"},
+}
+# Provisional playtest calibration; all values are exact rational strings.
+RP_PARTY_SPIRIT_COEFFICIENT = "1"
+RP_PARTY_SUPPORT_POINTS = "5"
+RP_PARTY_BOOST_CAP = "30"
+RP_PARTY_PINPOINT_PENALTY = "10"
+RP_PARTY_ENCORE_FACTOR = "1/2"
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

@@ -388,6 +388,7 @@ def declaration(
     domain_effects=None,
     waive=False,
     public=False,
+    support_allowed=None,
 ):
     progress(state)
     domain_effects = domain_effects or {}
@@ -521,9 +522,9 @@ def declaration(
         target = participant(state, targets[0])
         target["incoming"].append(f"{ex_id}:1")
         if target.get("revive") == "accept":
-            accept_revival(state, target["id"], f"{ex_id}:1")
+            accept_revival(state, target["id"], f"{ex_id}:1", support_allowed=support_allowed)
     else:
-        support_exchange(state, exchange)
+        support_exchange(state, exchange, allowed=support_allowed)
     return ex_id
 
 
@@ -537,7 +538,7 @@ def revivable(row):
     )
 
 
-def accept_revival(state, ident, token):
+def accept_revival(state, ident, token, *, support_allowed=None):
     """The incapacitated ally accepts a pending revival Heal; it resolves now."""
     progress(state)
     row = participant(state, ident)
@@ -547,7 +548,7 @@ def accept_revival(state, ident, token):
     if not revivable(row):
         raise CombatError("Only a present, incapacitated participant can accept a revival.")
     row["incoming"].remove(token)
-    support_exchange(state, exchange)
+    support_exchange(state, exchange, allowed=support_allowed)
 
 
 def retract(state, ident):
@@ -593,6 +594,7 @@ def recover(state, ident):
         row["turns"] += 1
         row["actions_left"] = row["allowance"]
     row["pose"] = not row["auto"]
+    partners.emit(state, partners.Event("recovery", row["id"], "", 0))
     settle(state)
 
 
@@ -1232,7 +1234,47 @@ def apply_domain(state, actor, target, effect, domain=""):
     return True
 
 
-def support_exchange(state, exchange):
+def support_spirit(state, exchange, target, *, empowered=False, surge=0):
+    """Ordinary support calculation shared by a primary and incidental allies."""
+    actor = participant(state, exchange["actor"])
+    move = Move.from_dict(exchange["move"])
+    actor_build = Build.from_dict(actor["build"])
+    previous = actor["support_history"].get(f"{move.action}:{target['id']}")
+    active_stat = None
+    if move.assist_stat:
+        from .conf import get
+
+        role = next(
+            (
+                k
+                for k, v in get("RP_COMBAT_ROLES").items()
+                if v == move.assist_stat and k in ("attack", "spell", "dispirit")
+            ),
+            None,
+        )
+        if role is None:
+            raise CombatError("Assist must use a legal active stat.")
+        active_stat = actor_build.score(role)
+    spirit, healing, success = math.support_values(
+        actor_build,
+        Build.from_dict(target["build"]),
+        move.action,
+        exchange["draw"],
+        active=active_stat,
+        factor=1 + F(exchange["attack_spirit"], 4000),
+        repeat=previous is not None and actor["clock"] - previous <= 3,
+        heals=target["heals"],
+        empower=empowered,
+        surge=surge,
+    )
+    provoked = actor["conditions"].get("provoked")
+    if provoked and provoked["source"] != target["id"]:
+        spirit = math.rounded(F(9, 10) * spirit)
+        healing = math.rounded(F(9, 10) * healing)
+    return spirit, healing, success
+
+
+def support_exchange(state, exchange, *, allowed=None):
     actor = participant(state, exchange["actor"])
     actor_build = Build.from_dict(actor["build"])
     move = Move.from_dict(exchange["move"])
@@ -1240,39 +1282,29 @@ def support_exchange(state, exchange):
         target = participant(state, target_id)
         packet = partners.modifiers(exchange, target_id)
         key = f"{move.action}:{target_id}"
-        previous = actor["support_history"].get(key)
-        repeated = previous is not None and actor["clock"] - previous <= 3
-        active_stat = None
-        if move.assist_stat:
-            from .conf import get
-
-            role = next(
-                (
-                    k
-                    for k, v in get("RP_COMBAT_ROLES").items()
-                    if v == move.assist_stat and k in ("attack", "spell", "dispirit")
-                ),
-                None,
-            )
-            if role is None:
-                raise CombatError("Assist must use a legal active stat.")
-            active_stat = actor_build.score(role)
-        spirit, healing, success = math.support_values(
-            actor_build,
-            Build.from_dict(target["build"]),
-            move.action,
-            exchange["draw"],
-            active=active_stat,
-            factor=1 + F(exchange["attack_spirit"], 4000),
-            repeat=repeated,
-            heals=target["heals"],
-            empower=exchange["empower"] and exchange["resolved"] == 0,
-            surge=F(packet.surge),
+        empowered = exchange["empower"] and exchange["resolved"] == 0
+        spread = (
+            partners.support_spread(state, exchange, target_id)
+            if move.action == "assist" and not exchange["domain_used"]
+            else None
         )
-        provoked = actor["conditions"].get("provoked")
-        if provoked and provoked["source"] != target_id:
-            spirit = math.rounded(F(9, 10) * spirit)
-            healing = math.rounded(F(9, 10) * healing)
+        recipients = []
+        if spread is not None:
+            for ident in spread.recipients:
+                other = state["participants"].get(ident)
+                if (
+                    other
+                    and other["side"] == actor["side"]
+                    and participating(other)
+                    and (allowed is None or ident in allowed)
+                ):
+                    recipients.append(ident)
+            exchange.setdefault("support_spread", {})[target_id] = recipients
+        spirit, healing, success = support_spirit(
+            state, exchange, target, empowered=empowered, surge=F(packet.surge)
+        )
+        if spread is not None:
+            spirit = math.rounded(spirit * F(spread.factor)) if target_id in recipients else 0
         actual_spirit = change_spirit(target, spirit)
         resisted = blocks(target, exchange["domain"], exchange["domain_effect"])
         if exchange["domain_effect"] == "beguile" and success and not resisted:
@@ -1298,7 +1330,9 @@ def support_exchange(state, exchange):
             exchange["outcomes"][-1]["revived"] = bool(revived)
         exchange["resolved"] += 1
         if exchange["domain"] and success and not exchange["domain_used"]:
-            if exchange.get("waive_recovery"):
+            if spread is not None and exchange["domain_effect"] == "encore":
+                pass  # The spread replaces Encore's single-target fallback rider.
+            elif exchange.get("waive_recovery"):
                 # Medicine's alternative: no cleansing, no recovery action.
                 exchange["outcomes"][-1]["recovery_waived"] = bool(revived)
             elif not apply_domain(
@@ -1322,6 +1356,24 @@ def support_exchange(state, exchange):
                 target_was_participating=participating(target),
             ),
         )
+        for ident in recipients:
+            if ident == target_id or ident in exchange["targets"]:
+                continue
+            other = participant(state, ident)
+            amount, _healing, _success = support_spirit(state, exchange, other, empowered=empowered)
+            actual = change_spirit(other, math.rounded(amount * F(spread.factor)))
+            actor["support_history"][f"assist:{ident}"] = actor["clock"]
+            exchange["outcomes"].append(
+                {
+                    "target": ident,
+                    "hit": 1,
+                    "draw": exchange["draw"],
+                    "success": True,
+                    "spirit": actual,
+                    "healing": 0,
+                    "incidental": True,
+                }
+            )
     taunting = rules(actor_build).get("taunting_opener")
     if taunting and move.action == "dispirit" and any(o["success"] for o in exchange["outcomes"]):
         # One charge for the next Burst, gone after the next own action.
@@ -1461,6 +1513,29 @@ def redirect(
     same exchange against the replacement; later hits declare fresh inputs.
     Even direct pure-engine callers get no partial transfer on failure.
     """
+    candidate = interception_state(state, token, original_id, replacement_id, reaction_penalty)
+    reaction(
+        candidate,
+        replacement_id,
+        token,
+        kind,
+        counter=counter,
+        empower=empower,
+        domain=domain,
+        domain_effects=domain_effects,
+    )
+    state.clear()
+    state.update(candidate)
+
+
+def interception_view(state, token, original_id, replacement_id, *, reaction_penalty="0"):
+    """Public Cover estimates without accepting, revealing or spending anything."""
+    candidate = interception_state(state, token, original_id, replacement_id, reaction_penalty)
+    return reaction_view(candidate, replacement_id, token)
+
+
+def interception_state(state, token, original_id, replacement_id, reaction_penalty):
+    """Detached handoff candidate shared by preview and atomic acceptance."""
     candidate = deepcopy(state)
     progress(candidate)
     original = participant(candidate, original_id)
@@ -1475,11 +1550,11 @@ def redirect(
         or exchange["reactions"]
         or exchange.get("revival")
         or exchange.get("covered_targets")
+        or (exchange["burst"] and exchange.get("redirects"))
         or replacement["id"] in exchange["targets"]
         or replacement["side"] != original["side"]
         or replacement["incoming"]
         or replacement["outgoing"]
-        or kind not in ("resist", "overpower")
     ):
         raise CombatError("That packet cannot be intercepted by this participant.")
     index = exchange["targets"].index(original["id"])
@@ -1494,18 +1569,7 @@ def redirect(
     exchange.setdefault("redirects", []).append(
         {"from": original["id"], "to": replacement["id"], "hit": exchange["hit"]}
     )
-    reaction(
-        candidate,
-        replacement["id"],
-        token,
-        kind,
-        counter=counter,
-        empower=empower,
-        domain=domain,
-        domain_effects=domain_effects,
-    )
-    state.clear()
-    state.update(candidate)
+    return candidate
 
 
 def fade(state, ident, *, withdraw=False):

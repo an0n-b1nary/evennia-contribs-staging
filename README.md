@@ -45,13 +45,14 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-links` (base_systems) — shared bridge-model base classes, edit-history & soft-delete mixins, optional notification dispatcher
 - [`evennia-guides`](contribs/utils/evennia_guides/README.md) (utils) — preview 0.1.0; player guides written in Markdown and served as web pages, with design-insight asides, links between pages, and pages hidden until a reveal check passes
 
-**RP infrastructure** (all but the posing/social layer depend on `evennia-links`; posing and social are model-free and depend only on each other)
+**RP infrastructure** (posing is model-free; Social depends on posing and links)
 - `evennia-posing` (game_systems) — the pose pipeline: pose/emit/semipose capture, pose-order tracker, pose headers, name highlighting; foundation other RP systems build on
 - `evennia-social` (game_systems) — social QoL layer on evennia-posing: profiles, player/venue discovery, page, ignore/mute, consensual teleportation, OOC chat, navigation shortcuts
 - `evennia-regions` (game_systems) — geographic grouping of rooms with soft-archive, web views, and a region label on every mapped tile
 - `evennia-maps` (game_systems) — a 2D coordinate map of your rooms, auto-grown from canonical exits, with a BFS reflow engine, an SVG + Leaflet web map, and a signal seam other contribs light overlays through
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns
+- [`evennia-building`](contribs/game_systems/evennia_building/README.md) (game_systems) — preview 0.1.0; reviewed private interiors, individual ownership, residents, accepted guest invitations and room access overrides; depends only on links, with optional maps, regions, jobs, economy and social
 - `evennia-lore` (game_systems) — wiki-style knowledge entries with approval queue, version history, region-weighted passive discovery
 - `evennia-xp` (game_systems) — pluggable XP collection, login summaries, projected earnings and atomic spending/refunds (preview 0.4.0)
 - `evennia-boards` (game_systems) — flat bulletin boards with subscriptions and post versioning
@@ -63,13 +64,12 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 **RP cluster** — mechanics for RP-focused games; named with the `rp-` prefix to distinguish from PvE-leveling-loot systems
 - [`evennia-rp-rules`](contribs/rpg/evennia_rp_rules/README.md) (rpg) — preview 0.1.0; value-neutral graded resolution, modifier pipeline, subjects, vocabulary and exact odds
 - [`evennia-rp-chargen`](contribs/rpg/evennia_rp_chargen/README.md) (rpg) — preview 0.4.0; sheets, allocation, pips, catalog, loadouts, allowance/XP spending, build locks and change guards; depends on rules and links
-- [`evennia-rp-combat`](contribs/rpg/evennia_rp_combat/README.md) (rpg) - preview 0.1.0; consent-based personal turns, queued reactions, Signatures, Tactics, Boss allowances and optional NPC/storytelling integration
+- [`evennia-rp-combat`](contribs/rpg/evennia_rp_combat/README.md) (rpg) - preview 0.2.1; consent-based personal turns, queued reactions, Burst chains, revival, recovery, Abilities and optional NPC/storytelling integration
 - [`evennia-rp-contest`](contribs/rpg/evennia_rp_contest/README.md) (rpg) — preview 0.1.0; playable `+test` checks and player-led room challenges with private audits; depends on rules and links, with optional chargen, scenes and session integration
-- `evennia-rp-combat` (rpg) — planned; turn-based combat tuned for PvP parity and narrative integration, using the rules kernel directly and its own resolver; never requires contest
 - [`evennia-rp-equipment`](contribs/rpg/evennia_rp_equipment/README.md) (rpg) — preview 0.1.2; wearable gear anyone can make, with worn lines, provenance display and requirements on the wearer's build that grant nothing; worn gear holds the pips and abilities it needs through chargen's change guard; depends on rules and chargen
 - [`evennia-rp-resources`](contribs/game_systems/evennia_rp_resources/README.md) (game_systems) — preview 0.1.3; passive resource accrual, atomic holdings, gathering leans, optional economy exchanges and reserved-stock refunds; depends only on links
 - [`evennia-economy`](contribs/game_systems/evennia_economy/README.md) (game_systems) — preview 0.2.3; integer purses, passive income, atomic trades, reserved-stock stalls, fee boundaries and staff reconciliation; depends only on links
-- `evennia-rp-party` (rpg) — party coordination for group combat
+- [`evennia-rp-party`](contribs/rpg/evennia_rp_party/README.md) (rpg) — preview 0.1.0; optional fight-scoped tactical teams, Formation/Cover, shared Spirit damage boosts, Rally/Rattle, Encore and transient party OOC chat
 - [`evennia-rp-crafting`](contribs/game_systems/evennia_rp_crafting/README.md) (game_systems) — preview 0.2.0; invested Workshops, four cosmetic item behaviours, protected hallmarks, rate-limited EVENTs and staff review; depends on resources and links, with optional economy, equipment and accessibility
 - `evennia-ooc-cosmetics` (game_systems) — out-of-character cosmetics driven by player nominations
 
@@ -80,7 +80,7 @@ Shared behavior and reusable integrations across all contribs are developed
 here first; downstream games consume pinned public snapshots and own their
 content, ruleset values, theme and composition. See
 [CONTRIBUTING.md](CONTRIBUTING.md). The pilot does not establish production
-readiness or several weeks of downstream use. Combat and party mechanics remain planned.
+readiness or several weeks of downstream use. Combat and Party are also available as previews.
 
 Clean package installation, populated upgrades and backup restores can be
 verified with the [downstream snapshot gate](scripts/DOWNSTREAM.md).

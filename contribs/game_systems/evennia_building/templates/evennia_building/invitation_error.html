@@ -1,0 +1,6 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Invitation could not be answered</h1>
+<p>{{ error }}</p>
+<p><a href="{% url 'evennia_building:index' %}">Return to Building</a></p>
+{% endblock %}

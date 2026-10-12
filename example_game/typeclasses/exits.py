@@ -8,11 +8,12 @@ for allowing Characters to traverse the exit to its destination.
 """
 
 from evennia.objects.objects import DefaultExit
+from evennia_building.typeclasses import BuildingExitMixin
 
 from .objects import ObjectParent
 
 
-class Exit(ObjectParent, DefaultExit):
+class Exit(BuildingExitMixin, ObjectParent, DefaultExit):
     """
     Exits are connectors between rooms. Exits are normal Objects except
     they defines the `destination` property and overrides some hooks
