@@ -28,6 +28,14 @@ OPTIONAL = (
 )
 
 
+class ROLL:
+    """Fixed d100: exchange outcomes move Spirit, which the boost averages."""
+
+    @staticmethod
+    def randint(low, high):
+        return 50
+
+
 def fixture(game, phase):
     os.chdir(game)
     sys.path.insert(0, str(game))
@@ -82,11 +90,11 @@ def fixture(game, phase):
             services.join(supporter, "one")
         key = party.change(first, "create", "Retained team")
         party.change(supporter, "join", key)
-        services.declare(supporter, [first], action="assist")
+        services.declare(supporter, [first], action="assist", rng=ROLL)
         services.control(supporter, "posed")
         services.storyteller(first, "spirit", target=first, value=1000)
         services.control(first, "accept")
-        token = f"{services.declare(first, [second])}:1"
+        token = f"{services.declare(first, [second], rng=ROLL)}:1"
         state = services.state_for(first)
         fight = services.open_fight(room)
         path.write_text(
@@ -125,9 +133,9 @@ def fixture(game, phase):
             assert partners.modifiers(exchange, second.pk).damage_boost == "0"
             services.control(first, "posed")
             supporter = ObjectDB.objects.get(pk=saved["supporter"])
-            support_token = f"{services.declare(supporter, [second])}:1"
+            support_token = f"{services.declare(supporter, [second], rng=ROLL)}:1"
             services.react(second, support_token, "resist")
-            saved["absent_token"] = f"{services.declare(first, [second])}:1"
+            saved["absent_token"] = f"{services.declare(first, [second], rng=ROLL)}:1"
             path.write_text(json.dumps(saved), encoding="utf-8")
         else:
             assert "party" in partners.registered()
@@ -136,11 +144,13 @@ def fixture(game, phase):
             absent = engine.get_exchange(state, saved["absent_token"])
             assert partners.modifiers(absent, second.pk).damage_boost == "0"
             services.control(second, "cancel", argument=saved["absent_token"])
-            token = f"{services.declare(first, [second])}:1"
+            token = f"{services.declare(first, [second], rng=ROLL)}:1"
             current = services.state_for(first)
+            # The fixed rolls leave Spirit 12 and 2. The boost is their average
+            # alone: the rally expired with Party absent, or it would be 12.
             assert (
                 partners.modifiers(engine.get_exchange(current, token), second.pk).damage_boost
-                == "5"
+                == "7"
             )
             services.control(second, "cancel", argument=token)
             retained = deepcopy(current["partners"]["party"])
