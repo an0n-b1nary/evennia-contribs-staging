@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-building"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reviewed private interiors and individual property rights for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

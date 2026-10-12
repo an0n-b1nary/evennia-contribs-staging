@@ -101,6 +101,11 @@ def managed_access(room, actor, *, scope="entry", public_entry=False):
             return False
         if actor and actor.pk == record.owner_id:
             return True
+        if scope == "entry" and public_entry:
+            from .attachments import passage_allows
+
+            if passage_allows(room, actor):
+                return True
         if not _override_allows(record, actor):
             return False
         return _granted(record, actor, scope) or bool(public_entry and not record.property.locked)

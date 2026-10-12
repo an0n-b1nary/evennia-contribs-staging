@@ -31,5 +31,10 @@ for model in (
     models.Resident,
     models.GuestInvitation,
     models.RoomOverride,
+    models.AttachmentConsent,
+    models.AttachmentAgreement,
+    models.PassageChange,
+    models.QuietFlag,
+    models.BuildingClock,
 ):
     admin.site.register(model, AuditAdmin)

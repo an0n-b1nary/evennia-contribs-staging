@@ -17,6 +17,7 @@ class BuildProject(models.Model):
     anchor = character()
     entrance_name = models.CharField(max_length=100, default="home")
     requested_environment = models.JSONField(default=dict)
+    passage = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -121,6 +122,7 @@ class Property(models.Model):
     locked = models.BooleanField(default=False)
     state = models.CharField(max_length=20, default="live")
     provenance = models.JSONField(default=dict)
+    archive_data = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -186,3 +188,90 @@ class BuildAudit(models.Model):
     action = models.CharField(max_length=64)
     data = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AttachmentConsent(models.Model):
+    project = models.ForeignKey(BuildProject, on_delete=models.PROTECT, related_name="consents")
+    parent = models.ForeignKey(Property, on_delete=models.PROTECT, related_name="consent_requests")
+    owner = character()
+    owner_name = models.CharField(max_length=255)
+    owner_object_id = models.PositiveIntegerField()
+    applicant_object_id = models.PositiveIntegerField()
+    candidate = models.JSONField()
+    fingerprint = models.CharField(max_length=64)
+    wording = models.TextField()
+    wording_version = models.CharField(max_length=20)
+    state = models.CharField(max_length=20, default="requested")
+    created_at = models.DateTimeField(auto_now_add=True)
+    answered_at = models.DateTimeField(null=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            from django.core.exceptions import ValidationError
+
+            original = type(self).objects.get(pk=self.pk)
+            fields = (
+                "project_id",
+                "parent_id",
+                "owner_object_id",
+                "applicant_object_id",
+                "candidate",
+                "fingerprint",
+                "wording",
+                "wording_version",
+            )
+            if any(getattr(original, field) != getattr(self, field) for field in fields):
+                raise ValidationError(
+                    "Consent candidates and agreement wording are immutable; request consent again."
+                )
+        return super().save(*args, **kwargs)
+
+
+class AttachmentAgreement(models.Model):
+    child = models.OneToOneField(Property, on_delete=models.PROTECT, related_name="attachment")
+    parent = models.ForeignKey(Property, on_delete=models.PROTECT, related_name="apartments")
+    consent = models.OneToOneField(AttachmentConsent, on_delete=models.PROTECT)
+    route = models.JSONField()
+    parent_owner_id_snapshot = models.PositiveIntegerField()
+    child_owner_id_snapshot = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PassageChange(models.Model):
+    """Both affected owners acknowledge a replacement; staff alone applies it."""
+
+    agreement = models.ForeignKey(
+        AttachmentAgreement, on_delete=models.PROTECT, related_name="changes"
+    )
+    route = models.JSONField()
+    previous_route = models.JSONField()
+    parent_owner = character()
+    child_owner = character()
+    wording = models.TextField()
+    parent_accepted = models.BooleanField(default=False)
+    child_accepted = models.BooleanField(default=False)
+    state = models.CharField(max_length=20, default="pending")
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class QuietFlag(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.PROTECT, related_name="quiet_flags")
+    owner_object_id = models.PositiveIntegerField(null=True)
+    last_played = models.DateTimeField(null=True)
+    reason = models.CharField(max_length=100, default="quiet")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(
+                fields=["property"],
+                condition=models.Q(resolved_at__isnull=True),
+                name="building_active_quiet_unique",
+            )
+        ]
+
+
+class BuildingClock(models.Model):
+    revealed_at = models.DateTimeField()

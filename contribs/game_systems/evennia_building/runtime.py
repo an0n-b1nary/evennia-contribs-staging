@@ -11,6 +11,12 @@ def positive(value):
 
 def register():
     runtime.register(
+        "BUILDING_QUIET_DAYS",
+        35,
+        validator=positive,
+        description="Days without character play before a staff-only property review flag.",
+    )
+    runtime.register(
         "BUILDING_REVEALED", False, validator=boolean, description="Reveal player interiors."
     )
     runtime.register(

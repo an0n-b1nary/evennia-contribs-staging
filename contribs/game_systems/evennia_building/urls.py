@@ -9,4 +9,6 @@ urlpatterns = [
     path("submissions/<int:pk>/", views.submission_detail, name="submission"),
     path("properties/<int:pk>/", views.property_detail, name="property"),
     path("invitations/<int:pk>/answer/", views.invitation_answer, name="invitation-answer"),
+    path("consents/<int:pk>/", views.consent_detail, name="consent"),
+    path("passage/<int:pk>/", views.passage_detail, name="passage"),
 ]

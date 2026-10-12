@@ -5,9 +5,16 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.objects.models import ObjectDB
 
-from . import services
+from . import attachments, lifecycle, services
 from .access import is_staff, require_revealed
-from .models import BuildProject, BuildSubmission, GuestInvitation, Property
+from .models import (
+    AttachmentAgreement,
+    BuildProject,
+    BuildSubmission,
+    GuestInvitation,
+    PassageChange,
+    Property,
+)
 from .policy import set_policy
 from .visibility import room_visibility
 
@@ -41,6 +48,14 @@ class CmdBuild(MuxCommand):
     +build/transfer <property> <expected owner> <new owner>=<reason> (staff)
     +build/policy <room dbref>=open|residential|commercial|closed|reset (staff)
     +build/policy/region <region>=open|residential|commercial|closed|reset (staff)
+    +build/attach <project> <anchor dbref>=<entrance name>[;<passage room dbrefs>]
+    +build/consent/request <project> | +build/consent/list
+    +build/consent/show|grant|decline|revoke <request>[=<displayed agreement wording>]
+    +build/archive[/children] <property>=<reason> (staff)
+    +build/restore <property>=<reason> (staff; parent before apartment)
+    +build/quiet (staff review flags; never automatic reclamation)
+    +build/passage/propose <agreement>=<room dbrefs>;<reason> (staff)
+    +build/passage/show|accept|apply <change>[=<displayed agreement wording>]
     """
 
     key = "+build"
@@ -69,7 +84,97 @@ class CmdBuild(MuxCommand):
                     raise ValidationError("Choose a character.")
                 return obj
 
-            if "new" in switches:
+            if "consent" in switches:
+                if "request" in switches:
+                    obj = project()
+                    consent = attachments.request_consent(actor, obj, expected_version=obj.version)
+                    actor.msg(
+                        f"Consent request {consent.pk}: {consent.state}. The parent owner must inspect +build/consent/show {consent.pk}."
+                    )
+                elif "list" in switches:
+                    actor.msg(
+                        "\n".join(
+                            f"{row.pk}: {row.project.name}; parent owner {row.owner_name}; {row.state}"
+                            for row in attachments.visible_consents(actor)
+                        )
+                        or "No consent requests."
+                    )
+                else:
+                    consent = attachments.visible_consents(actor).get(pk=number())
+                    if "show" in switches:
+                        import json
+
+                        actor.msg(
+                            f"Request {consent.pk}: {consent.state}\n{consent.wording}\n{json.dumps(consent.candidate, indent=2)}"
+                        )
+                    else:
+                        action = next(
+                            (key for key in ("grant", "decline", "revoke") if key in switches), ""
+                        )
+                        attachments.answer_consent(
+                            actor, consent, action=action, acknowledgement=self.rhs or ""
+                        )
+            elif "passage" in switches:
+                if "list" in switches:
+                    rows = PassageChange.objects.filter(state="pending")
+                    if not is_staff(actor):
+                        from django.db.models import Q
+
+                        rows = rows.filter(Q(parent_owner=actor) | Q(child_owner=actor))
+                    actor.msg(
+                        "\n".join(
+                            f"{row.pk}: {row.reason}; parent accepted {row.parent_accepted}; apartment owner accepted {row.child_accepted}"
+                            for row in rows
+                        )
+                        or "No passage changes awaiting agreement."
+                    )
+                elif "propose" in switches:
+                    route, reason = (self.rhs or "").split(";", 1)
+                    change = attachments.propose_passage(
+                        actor,
+                        AttachmentAgreement.objects.get(pk=number()),
+                        [int(pk.strip().removeprefix("#")) for pk in route.split(",")],
+                        reason=reason,
+                    )
+                    actor.msg(
+                        f"Passage change {change.pk}: both affected owners must inspect and accept it before staff applies it."
+                    )
+                else:
+                    change = PassageChange.objects.select_related("agreement").get(pk=number())
+                    if not is_staff(actor) and actor.pk not in {
+                        change.parent_owner_id,
+                        change.child_owner_id,
+                    }:
+                        raise PermissionDenied("This passage proposal is private.")
+                    if "show" in switches:
+                        actor.msg(
+                            f"Passage change {change.pk}: {change.route}; {change.reason}\n{change.wording}\nParent accepted: {change.parent_accepted}; apartment owner accepted: {change.child_accepted}"
+                        )
+                    elif "accept" in switches:
+                        attachments.accept_passage(actor, change, acknowledgement=self.rhs or "")
+                    elif "apply" in switches:
+                        attachments.apply_passage(actor, change)
+                    else:
+                        raise ValidationError("Choose passage propose, show, accept or apply.")
+            elif switches & {"archive", "restore"}:
+                obj = Property.objects.get(pk=number())
+                if "archive" in switches:
+                    lifecycle.archive(
+                        actor, obj, reason=self.rhs or "", include_children="children" in switches
+                    )
+                else:
+                    lifecycle.restore(actor, obj, reason=self.rhs or "")
+            elif "quiet" in switches:
+                lifecycle.quiet_list(actor)  # Authorize before the maintenance write.
+                lifecycle.check_quiet()
+                actor.msg(
+                    "\n".join(
+                        f"{row.property_id}: {row.property.name}; owner {row.property.owner_name}; {row.reason}; last played {row.last_played or 'unknown'}"
+                        for row in lifecycle.quiet_list(actor)
+                    )
+                    or "No properties need quiet review."
+                )
+            elif "new" in switches:
                 obj = services.new_project(actor, self.rhs or "", kind=self.lhs.strip())
                 actor.msg(
                     f"Project {obj.pk}, version {obj.version}, created. Use +build/enter {obj.pk}."
@@ -152,12 +257,16 @@ class CmdBuild(MuxCommand):
                 )
             elif "attach" in switches:
                 obj = project()
+                values = (self.rhs or "").split(";", 1)
                 services.attach(
                     actor,
                     obj,
                     ObjectDB.objects.get(pk=number(1)),
-                    self.rhs or "",
+                    values[0],
                     expected_version=obj.version,
+                    passage=[int(pk.strip().removeprefix("#")) for pk in values[1].split(",")]
+                    if len(values) > 1
+                    else None,
                 )
             elif "check" in switches:
                 obj = project()
