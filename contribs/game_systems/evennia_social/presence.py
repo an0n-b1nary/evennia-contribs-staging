@@ -23,6 +23,7 @@ Every presence surface asks this module, so the settings can't disagree:
 in-game viewer uses ``is_publicly_findable`` / ``is_publicly_listed``.
 """
 
+from evennia_links.travel import room_visibility
 from evennia_social.social import is_staff
 
 FINDABLE = "findable"
@@ -70,7 +71,12 @@ def _sees_through(character, viewer):
 
 def is_findable(character, viewer=None):
     """Whether ``viewer`` may see where ``character`` is."""
-    return visibility(character) == FINDABLE or _sees_through(character, viewer)
+    if _sees_through(character, viewer):
+        return True
+    room = getattr(character, "location", None)
+    if room is not None and room_visibility(room, viewer) is False:
+        return False
+    return visibility(character) == FINDABLE
 
 
 def is_listed(character, viewer=None):
@@ -80,7 +86,7 @@ def is_listed(character, viewer=None):
 
 def is_publicly_findable(character):
     """``is_findable`` for a viewer who is in no room and not staff (the public web)."""
-    return visibility(character) == FINDABLE
+    return is_findable(character)
 
 
 def is_publicly_listed(character):

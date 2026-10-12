@@ -2,7 +2,13 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from django.contrib import admin
 
-from evennia_jobs.models import Job, JobComment, RequestDecision, RequestSubmission
+from evennia_jobs.models import (
+    Job,
+    JobComment,
+    RequestDecision,
+    RequestSubmission,
+    RequestWithdrawal,
+)
 
 
 class RequestSubmissionInline(admin.TabularInline):
@@ -11,7 +17,7 @@ class RequestSubmissionInline(admin.TabularInline):
     model = RequestSubmission
     extra = 0
     can_delete = False
-    fields = ["revision", "form_key", "schema", "answers", "created_at"]  # noqa: RUF012
+    fields = ["revision", "effective_state", "form_key", "schema", "answers", "created_at"]  # noqa: RUF012
     readonly_fields = fields
 
     def has_add_permission(self, request, obj=None):
@@ -56,6 +62,21 @@ class RequestDecisionAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RequestWithdrawal)
+class RequestWithdrawalAdmin(admin.ModelAdmin):
+    list_display = ["submission", "actor_name", "reason", "created_at"]  # noqa: RUF012
+    readonly_fields = [field.name for field in RequestWithdrawal._meta.fields]  # noqa: RUF012
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
 

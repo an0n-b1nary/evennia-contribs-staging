@@ -1,0 +1,7 @@
+<form method="get">
+  <label for="building-action">Choose an action</label>
+  <select id="building-action" name="action">
+    {% for value, label in form.action_choices %}<option value="{{ value }}"{% if value == form.selected_action %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button type="submit">Choose</button>
+</form>

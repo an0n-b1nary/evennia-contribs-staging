@@ -219,6 +219,11 @@ class TestPrivateStacks(MapsTestCase):
         self.assertNotEqual(other.zstack, self.plane.zstack)
         floor = placement.resolve_stacked_plane(self.plane, 1)
         self.assertEqual(floor.visibility_room, self.room1)
+        self.assertFalse(is_plane_visible(floor, viewer=self.char1))
+        upper = _make_room("Upper preview room")
+        upper.db.allow_teleport = "secret"
+        upper.locks.add(f"control:id({self.char1.pk})")
+        placement.place_tile(upper, floor, 0, 0)
         self.assertTrue(is_plane_visible(floor, viewer=self.char1))
         self.assertFalse(is_plane_visible(floor, viewer=self.char2))
         self.assertFalse(is_plane_visible(floor))
@@ -244,6 +249,10 @@ class TestPrivateWeb(MapsApiTestCase):
         self.room1.locks.add(f"control:id({self.char2.pk})")
         self.plane = placement.create_private_stack(self.room1, "Hidden workshop")
         self.floor = placement.resolve_stacked_plane(self.plane, 1)
+        self.upper = _make_room("Workshop upper room")
+        self.upper.db.allow_teleport = "secret"
+        self.upper.locks.add(f"control:id({self.char2.pk})")
+        placement.place_tile(self.upper, self.floor, 0, 0)
         self.public = _make_plane("Public street", zstack="world")
         placement.place_tile(self.room2, self.public, 0, 0)
         create.create_object(

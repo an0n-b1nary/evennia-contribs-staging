@@ -1,0 +1,2 @@
+<h2>Map previews</h2>
+<ul>{% for name, url in previews %}<li><a href="{{ url }}">{{ name }}</a></li>{% empty %}<li>No map preview is available. Maps must be installed and mounted, and your selected character must have access.</li>{% endfor %}</ul>

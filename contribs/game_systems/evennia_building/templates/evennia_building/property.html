@@ -1,0 +1,13 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>{{ property.name }}</h1><p>Owner: {{ property.owner_name }}. {{ property.locked|yesno:"Locked,Unlocked" }}.</p>
+<h2>Permitted rooms</h2><ul>{% for room in rooms %}<li>{{ room.key }}<p>{{ room.db.desc|linebreaksbr }}</p></li>{% endfor %}</ul>
+{% if manager %}<h2>Manage home</h2><p>Residents may enter; installation requires explicit permission. Invitations grant entry and maps after acceptance. Locking never prevents departure or moves occupants. Staff transfer clears grants unless retention is selected.</p>{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply action</button></form>{% endif %}
+<p><a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% if manager %}
+<h2>Residents</h2><ul>{% for row in residents %}<li>{{ row.character.key }} ({{ row.character_id }}), may install: {{ row.can_install|yesno }}</li>{% empty %}<li>No residents.</li>{% endfor %}</ul>
+<h2>Guest invitations</h2><ul>{% for row in invitations %}<li>{{ row.character.key }} ({{ row.character_id }}): {{ row.state }}, entry: {{ row.entry|yesno }}, maps: {{ row.maps|yesno }}</li>{% empty %}<li>No invitations.</li>{% endfor %}</ul>
+<h2>Property history</h2><ul>{% for row in audit %}<li>{{ row.created_at }} — {{ row.action }} by {{ row.actor_name }}</li>{% endfor %}</ul>
+{% endif %}
+{% include 'evennia_building/preview_links.html' %}
+{% endblock %}

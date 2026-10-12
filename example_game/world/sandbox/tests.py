@@ -31,6 +31,7 @@ from typeclasses.rooms import Room
 from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
 from world.sandbox.test_economy import EconomySeams
+from world.sandbox.test_interiors import BuildingInteriorSeams
 from world.sandbox.test_jobs import JobsSeams
 from world.sandbox.test_npcs import NPCCommandSeams, NPCSeams
 
@@ -494,7 +495,16 @@ class TestSpawnPoints(SeededSandboxMixin, EvenniaTest):
         }
         from world.sandbox import content
 
-        self.assertEqual(mapped_ooc, {"Drafting Room", *content.PRIVATE_PREVIEW_ROOMS})
+        self.assertEqual(
+            mapped_ooc,
+            {
+                "Drafting Room",
+                *content.PRIVATE_PREVIEW_ROOMS,
+                "Two-floor Draft",
+                "Draft Upper Floor",
+                "Revision Requested",
+            },
+        )
 
 
 class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
@@ -784,9 +794,21 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
 
         call_command("seed_sandbox", verbosity=0)
 
+        from evennia_building.models import DraftRoom
+
+        interior_planes = set(
+            MapPlane.all_objects.filter(
+                visibility_room_id__in=DraftRoom.objects.values_list("object_id", flat=True)
+            ).values_list("name", flat=True)
+        )
         self.assertEqual(
             set(MapPlane.all_objects.values_list("name", flat=True)),
-            {*PLANE_NAMES, content.DRAFTING_PLANE_NAME, *content.PRIVATE_PREVIEW_PLANES},
+            {
+                *PLANE_NAMES,
+                content.DRAFTING_PLANE_NAME,
+                *content.PRIVATE_PREVIEW_PLANES,
+                *interior_planes,
+            },
         )
         self.assertEqual(
             RoomTile.objects.filter(plane__name__in=PLANE_NAMES).count(),
@@ -795,8 +817,8 @@ class TestSeededMapWorld(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(
             RoomTile.objects.filter(plane__name=content.DRAFTING_PLANE_NAME).count(), 1
         )
-        self.assertEqual(Region.all_objects.count(), len(content.REGIONS))
-        self.assertEqual(RegionMembership.objects.count(), expected_memberships)
+        self.assertEqual(Region.all_objects.count(), len(content.REGIONS) + 1)
+        self.assertEqual(RegionMembership.objects.count(), expected_memberships + 3)
 
 
 class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
@@ -1377,7 +1399,7 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
 
         self.assertEqual(
             [item["label"] for item in menu["account"]["personal"]],
-            ["My XP", "My Tickets", "My Lore"],
+            ["My Building", "My XP", "My Tickets", "My Lore"],
         )
         self.assertEqual(menu["account"]["staff"], [])
 

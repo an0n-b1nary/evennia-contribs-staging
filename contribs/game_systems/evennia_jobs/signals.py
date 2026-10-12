@@ -12,3 +12,5 @@ staff member can retry. Jobs itself never creates partner content.
 from django.dispatch import Signal
 
 request_approved = Signal()
+request_reviewed = Signal()  # submission, decision; all outcomes, inside transaction
+request_withdrawn = Signal()  # submission, withdrawal; author action, inside transaction

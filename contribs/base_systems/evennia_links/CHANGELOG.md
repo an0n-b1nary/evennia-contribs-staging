@@ -1,5 +1,9 @@
 # Changelog — evennia-links
 
+## 0.8.3 ? 2026-10-11
+
+- Add three-way travel/visibility providers and rollback-safe Evennia object transactions.
+
 ## [0.8.2] - 2026-10-10
 
 - Added `evennia_links.rooms.can(actor, room, action)` and `owner_of(room)`.

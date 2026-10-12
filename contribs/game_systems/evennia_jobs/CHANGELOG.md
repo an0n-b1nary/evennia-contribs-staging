@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.0 ? 2026-10-11
+
+- Add attributed author withdrawal, domain-owned forms and transactional review/withdrawal signals.
+
 ## [0.6.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `requests` (requests, bugs

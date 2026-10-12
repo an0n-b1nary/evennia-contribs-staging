@@ -108,6 +108,8 @@ def find_room_for_player(caller, query, character):
     Returns:
         tuple: (room_or_none, list_of_suggestions) — same format as find_room().
     """
+    from evennia_links.travel import travel_permission
+
     room, suggestions = find_room(caller, query, exclude_secret=True)
     candidates = [room] if room else suggestions
 
@@ -116,6 +118,12 @@ def find_room_for_player(caller, query, character):
 
     filtered = []
     for r in candidates:
+        managed = travel_permission(character, r)
+        if managed is False:
+            continue
+        if managed is True:
+            filtered.append(r)
+            continue
         access_level = getattr(r, "allow_teleport", "public")
         controls = r.access(character, "control")
 
