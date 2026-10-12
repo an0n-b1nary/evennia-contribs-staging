@@ -23,6 +23,7 @@ class GuestFixture:
         self.account.characters.remove(self.char1)
         self.char1.account = self.guest
         self.guest.characters.add(self.char1)
+        self.char1.tags.add("character", category="guest")
         self.room1.tags.add("wing", category="guest")
         self.room1.tags.add("start", category="guest")
         self.room1.room_type = "ooc"
@@ -31,6 +32,21 @@ class GuestFixture:
 
 
 class TestGuestBoundaries(GuestFixture, EvenniaTest):
+    @override_settings(NEW_ACCOUNT_REGISTRATION_ENABLED=False)
+    def test_closed_registration_blocks_direct_web_get_and_post(self):
+        from evennia.accounts.models import AccountDB
+
+        before = AccountDB.objects.count()
+        self.assertEqual(self.client.get(reverse("register")).status_code, 403)
+        self.assertEqual(
+            self.client.post(reverse("register"), {"username": "WalkIn"}).status_code, 403
+        )
+        self.assertEqual(AccountDB.objects.count(), before)
+
+    @override_settings(NEW_ACCOUNT_REGISTRATION_ENABLED=True)
+    def test_host_can_still_offer_open_registration(self):
+        self.assertEqual(self.client.get(reverse("register")).status_code, 200)
+
     def test_direct_move_cannot_escape_wing(self):
         self.assertFalse(self.char1.move_to(self.room2, quiet=True))
         self.assertEqual(self.char1.location, self.room1)
@@ -159,13 +175,15 @@ class TestGuestBoundaries(GuestFixture, EvenniaTest):
 
     def test_deleting_guest_removes_sheet_but_keeps_staff_request(self):
         from evennia_jobs.models import Job, JobType
-        from evennia_rp_chargen.models import CharacterBuild
+        from evennia_rp_chargen.models import AbilityTransaction, CharacterBuild
 
         job = Job.create_job(JobType.REQUEST, self.char1, "Guest question", "Help")
         CharacterBuild.objects.create(character=self.char1)
         character_id = self.char1.pk
+        AbilityTransaction.objects.create(character_id=character_id, kind="acquire")
         self.guest.at_post_disconnect()
         self.assertFalse(CharacterBuild.objects.filter(character_id=character_id).exists())
+        self.assertFalse(AbilityTransaction.objects.filter(character_id=character_id).exists())
         job.refresh_from_db()
         self.assertIsNone(job.author_id)
         self.assertEqual(job.author_name, "Char")

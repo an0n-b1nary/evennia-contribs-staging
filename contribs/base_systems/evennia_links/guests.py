@@ -18,6 +18,7 @@ def is_guest(obj):
     """
     if obj is None:
         return False
+    from django.core.exceptions import ObjectDoesNotExist
     from evennia.accounts.accounts import DefaultGuest
     from evennia.accounts.models import AccountDB
     from evennia.objects.models import ObjectDB
@@ -31,7 +32,11 @@ def is_guest(obj):
         return False
     if tags.has("character", category="guest"):
         return True
-    account = getattr(obj, "account", None)
+    try:
+        account = getattr(obj, "account", None)
+    except ObjectDoesNotExist:
+        # Evennia may retain an instance's pk after deleting its database row.
+        return False
     if account is not None and is_guest(account):
         return True
     from evennia_links.characters import account_ids

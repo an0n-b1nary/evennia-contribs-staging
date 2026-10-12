@@ -39,6 +39,11 @@ class RPChargenConfig(AppConfig):
         # A resolved check is IC action for its actor (evennia_rp_rules is a
         # hard dependency, so this is always connected).
         check_resolved.connect(on_check_resolved, dispatch_uid="evennia_rp_chargen.check_lock")
+        from django.db.models.signals import pre_delete
+
+        from evennia_rp_chargen.services import discard_guest_audit
+
+        pre_delete.connect(discard_guest_audit, dispatch_uid="evennia_rp_chargen.guest_cleanup")
 
         label = conf.get("RP_CHARGEN_RPTRACKER_APP_LABEL")
         tracker = next((cfg for cfg in apps.get_app_configs() if cfg.label == label), None)

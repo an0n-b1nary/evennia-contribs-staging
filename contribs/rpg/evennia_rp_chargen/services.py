@@ -227,10 +227,27 @@ def reset_trial(character):
 
     if not guest_trial(character):
         raise ChargenError("Only guests in the guest wing may reset a trial sheet.")
+    from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, SignatureMove
+
     with transaction.atomic():
+        CharacterAbility.objects.filter(character_id=character.pk).delete()
+        SignatureMove.objects.filter(character_id=character.pk).delete()
+        AbilityTransaction.objects.filter(character_id=character.pk).delete()
         CharacterBuild.objects.filter(character_id=character.pk).delete()
+        StatHandler(character).wipe()
         locks.release(character, "your trial sheet was reset")
         return ensure_build(character)
+
+
+def discard_guest_audit(sender, instance, **kwargs):
+    """Guest purchase history is disposable; ordinary audits still survive deletion."""
+    from evennia.objects.models import ObjectDB
+
+    from evennia_links.guests import is_guest
+    from evennia_rp_chargen.models import AbilityTransaction
+
+    if isinstance(instance, ObjectDB) and is_guest(instance):
+        AbilityTransaction.objects.filter(character_id=instance.pk).delete()
 
 
 def finalize(character) -> CharacterBuild:

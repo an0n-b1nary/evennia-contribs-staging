@@ -3,6 +3,7 @@
 ## 0.4.1 — 2026-10-12
 
 - Optional disposable guest trials support finalized checks without approval inside tagged trial rooms, and +stats/reset for repeated builds. Ordinary approval policy is unchanged.
+- Trial resets clear ratings, abilities and purchase history; guest deletion also removes purchase history. Trials spend their resettable starting allowance only.
 
 All notable changes to `evennia-rp-chargen` will be documented here.
 

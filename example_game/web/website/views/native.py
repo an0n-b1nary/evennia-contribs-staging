@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.utils.text import slugify
 from django.views.generic import ListView
+from evennia.web.website.views.accounts import AccountCreateView
 from evennia.web.website.views.channels import ChannelMixin
 from evennia.web.website.views.characters import (
     CharacterDetailView,
@@ -13,6 +14,18 @@ from evennia.web.website.views.characters import (
 from evennia.web.website.views.help import HelpDetailView, HelpListView
 
 from web.website.permissions import is_staff_user
+
+
+class SandboxAccountCreateView(AccountCreateView):
+    """Enforce the registration setting on direct website requests too."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not settings.NEW_ACCOUNT_REGISTRATION_ENABLED:
+            return HttpResponse(
+                "Account registration is closed. Contact staff for an invitation.", status=403
+            )
+        return super().dispatch(request, *args, **kwargs)
+
 
 PLAYER_CATEGORY_ORDER = (
     "General",

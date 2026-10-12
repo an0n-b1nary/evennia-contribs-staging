@@ -45,6 +45,7 @@ from evennia.web.website.urls import urlpatterns as evennia_website_urlpatterns
 
 from web.website.views.index import SandboxIndexView
 from web.website.views.native import (
+    SandboxAccountCreateView,
     SandboxChannelListView,
     SandboxCharacterDetailView,
     SandboxCharacterListView,
@@ -55,6 +56,7 @@ from web.website.views.native import (
 
 # add patterns here
 urlpatterns = [
+    path("auth/register", SandboxAccountCreateView.as_view(), name="register"),
     # Shadows Evennia's own `index`, which is appended below - Django takes the
     # first match, so this has to come before that append rather than after.
     # Same route name, so every {% url 'index' %} in Evennia's templates follows
