@@ -23,6 +23,7 @@ from evennia.utils.test_resources import EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 from evennia_scenes.models import Scene
 
+from evennia_links.runtime import get as _runtime
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays, overlay_url_templates
 from evennia_maps.typeclasses import MapsRoomMixin
@@ -123,7 +124,14 @@ class TestPartnerIntegration(EvenniaTest):
         for staff in (False, True):
             with self.subTest(staff=staff):
                 overlays = collect_overlays([self.room1.pk], staff=staff)
-                self.assertEqual(set(overlays), expected)
+                # Building's public growth overlay answers staff, or everyone once revealed.
+                frontier = apps.is_installed("evennia_building") and (
+                    staff or _runtime("BUILDING_REVEALED")
+                )
+                self.assertEqual(set(overlays), expected | ({"frontier"} if frontier else set()))
+                if frontier:
+                    # An ordinary world room carries no growth metadata.
+                    self.assertEqual(overlays["frontier"], {})
                 self.assertEqual(overlays["primary_region"][self.room1.pk]["id"], self.region.pk)
                 self.assertEqual(overlays["active_scenes"][self.room1.pk][0]["id"], self.live.pk)
                 self.assertTrue(overlays["has_lore"][self.room1.pk])
