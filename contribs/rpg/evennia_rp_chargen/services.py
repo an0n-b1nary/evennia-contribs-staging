@@ -246,8 +246,13 @@ def discard_guest_audit(sender, instance, **kwargs):
     from evennia_links.guests import is_guest
     from evennia_rp_chargen.models import AbilityTransaction
 
-    if isinstance(instance, ObjectDB) and is_guest(instance):
-        AbilityTransaction.objects.filter(character_id=instance.pk).delete()
+    if not isinstance(instance, ObjectDB):
+        return
+    history = AbilityTransaction.objects.filter(character_id=instance.pk)
+    # Most deleted objects have no sheet purchases. Avoid resolving their
+    # playable-account rosters on every inventory/world-content deletion.
+    if history.exists() and is_guest(instance):
+        history.delete()
 
 
 def finalize(character) -> CharacterBuild:
