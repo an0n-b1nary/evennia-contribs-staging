@@ -80,7 +80,7 @@ The content reuse wording/version belong to host settings:
 `BUILDING_REUSE_ACKNOWLEDGEMENT` and `BUILDING_REUSE_VERSION`. Each submission
 records the exact acknowledgement and actor; acknowledgements do not grant
 another owner's consent. Apartment attachment uses a separate owner consent
-workflow. Frontier creation remains unavailable.
+workflow; shared frontier projects use per-candidate agreements (below).
 
 Room `build_policy` tags override active primary-region `RegionBuildPolicy`
 defaults, then `BUILDING_DEFAULT_POLICY` (`open`). Policies are `open`,
