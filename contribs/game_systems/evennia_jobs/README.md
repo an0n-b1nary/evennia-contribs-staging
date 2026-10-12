@@ -334,3 +334,11 @@ ignored. To restate one for your game, add a page with the same key to
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+## Disposable guests
+
+Guests retain plain private requests and bug reports; player questionnaires remain unavailable until a dedicated admissions flow is installed.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

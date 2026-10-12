@@ -5,7 +5,11 @@ from django.http import Http404, HttpResponse
 from django.utils.text import slugify
 from django.views.generic import ListView
 from evennia.web.website.views.channels import ChannelMixin
-from evennia.web.website.views.characters import CharacterListView, CharacterManageView
+from evennia.web.website.views.characters import (
+    CharacterDetailView,
+    CharacterListView,
+    CharacterManageView,
+)
 from evennia.web.website.views.help import HelpDetailView, HelpListView
 
 from web.website.permissions import is_staff_user
@@ -172,6 +176,12 @@ class SandboxCharacterListView(CharacterListView):
 
     template_name = "website/character_list.html"
 
+    def get_queryset(self):
+        from evennia_links.guests import is_guest
+
+        queryset = super().get_queryset()
+        return queryset.exclude(pk__in=[char.pk for char in queryset if is_guest(char)])
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         for character in context["object_list"]:
@@ -190,3 +200,11 @@ class SandboxCharacterManageView(CharacterManageView):
     """Native account character-management list with explicit pagination."""
 
     template_name = "website/character_manage_list.html"
+
+
+class SandboxCharacterDetailView(CharacterDetailView):
+    def get_queryset(self):
+        from evennia_links.guests import is_guest
+
+        queryset = super().get_queryset()
+        return queryset.exclude(pk__in=[char.pk for char in queryset if is_guest(char)])

@@ -43,11 +43,19 @@ class ChargenSubject:
             self._build = CharacterBuild.objects.filter(character_id=self.character.id).first()
         return self._build
 
+    def _checks_allowed(self):
+        from evennia_rp_chargen.services import guest_trial
+
+        build = self.build
+        return bool(
+            build and (build.is_playable or (guest_trial(self.character) and not build.is_draft))
+        )
+
     def get_rating(self, stat_key: str) -> Rating | None:
         build = self.build
         if build is None:
             return None
-        if not build.is_playable:
+        if not self._checks_allowed():
             if build.is_draft:
                 raise CheckError(
                     f"{self.character.key}'s sheet is still a draft. Finish it with +stats/finalize."
@@ -58,7 +66,7 @@ class ChargenSubject:
     def get_modifiers(self, check) -> list:
         """Modifiers from equipped abilities and flaws (each still checks it applies)."""
         build = self.build
-        if build is None or not build.is_playable:
+        if build is None or not self._checks_allowed():
             return []
         from evennia_rp_chargen.catalog import modifiers_for
 

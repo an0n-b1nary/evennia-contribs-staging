@@ -10,8 +10,14 @@ def is_staff(caller):
 
 
 def can_set(caller):
-    return caller.locks.check_lockstring(caller, conf.get("RP_CONTEST_CAN_SET_CHALLENGE"))
+    from evennia_links.guests import is_guest
+
+    return not is_guest(caller) and caller.locks.check_lockstring(
+        caller, conf.get("RP_CONTEST_CAN_SET_CHALLENGE")
+    )
 
 
 def can_manage(caller, challenge):
-    return challenge.set_by_id == caller.pk or is_staff(caller)
+    from evennia_links.guests import is_guest
+
+    return not is_guest(caller) and (challenge.set_by_id == caller.pk or is_staff(caller))

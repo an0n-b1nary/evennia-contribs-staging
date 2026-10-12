@@ -82,6 +82,23 @@ class CmdPage(MuxCommand):
 
         caller_account = caller_char.account
 
+        from evennia_links.guests import is_guest
+
+        if is_guest(caller_char):
+            from evennia.accounts.models import AccountDB
+
+            from evennia_links.characters import account_ids
+
+            for target in targets:
+                owners = AccountDB.objects.filter(pk__in=account_ids(target))
+                if target.account:
+                    owners = [target.account, *owners]
+                if not any(
+                    owner.is_superuser or owner.check_permstring("Builder") for owner in owners
+                ):
+                    caller_char.msg("Guests may page staff only.")
+                    return
+
         # Create the persistent Msg with Character sender/receivers.
         target_perms = " or ".join([f"id({t.id})" for t in [*targets, caller_char]])
         create.create_message(

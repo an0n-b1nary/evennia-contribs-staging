@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-contest"
-version = "0.1.2"
+version = "0.1.3"
 description = "Player-led RP tests, room challenges and private resolution audits for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -17,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-links>=0.5"]
+dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-links>=0.8.4"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"

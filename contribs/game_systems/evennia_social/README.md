@@ -329,3 +329,11 @@ Room configuration display also renders an optional room method
 `get_extra_room_details(viewer)`, returning `(label, value)` pairs. Cooperative
 host mixins can show provenance here while keeping it out of ordinary look text.
 Displaying metadata does not grant configuration permission.
+
+## Disposable guests
+
+Guests may page staff only, return to their own lounge with +ooc/+home, appear marked in connected listings, and stay out of permanent public presence.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

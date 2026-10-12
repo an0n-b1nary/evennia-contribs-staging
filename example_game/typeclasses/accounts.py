@@ -24,6 +24,8 @@ several more options for customizing the Guest account system.
 
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
+from evennia_links.guests import GuestAccountMixin
+
 
 class Account(DefaultAccount):
     """
@@ -139,7 +141,7 @@ class Account(DefaultAccount):
     pass
 
 
-class Guest(DefaultGuest):
+class Guest(GuestAccountMixin, DefaultGuest):
     """
     This class is used for guest logins. Unlike Accounts, Guests and their
     characters are deleted after disconnection.

@@ -1626,3 +1626,27 @@ are visible only through their owners' normal property controls. Staff see quiet
 steward flags alongside property flags and must explicitly decide any reassignment.
 The shared inactivity threshold defaults to 35 days; no automated action occurs.
 Social 0.7.2 uses the narrow mood provider so stewards receive no configure rights.
+
+
+### Disposable guest visits
+
+After `seed_sandbox`, `connect guest` enters the Guest Lounge. Five guest slots
+are available. `practice` leads to an OOC practice room; `+ooc` and `+home`
+return to the lounge. Guests may finalize/test/reset their own builds, practise
+posing, chat with `guest <message>`, page staff, and file `+request` or `+bug`.
+Players can enter through `guests` at Arrival and join the Guest channel.
+
+Guests cannot enter player areas, use join/summon/teleport to escape, receive
+items, trade assets, post to boards, open scenes, or create shared challenges.
+The movement rule also covers attempts initiated by another player or staff.
+Guests earn no room/channel RP rewards, money or resources. Practice checks
+produce no durable records. Guest sheets vanish on logout; staff tickets keep
+their author-name snapshot. Website browsing is anonymous, and guests stay out
+of permanent character lists/profiles. Connected who/where listings mark them.
+
+`GuestCharacterMixin` is first in the Character MRO; `GuestAccountMixin` precedes
+DefaultGuest. The explicit command sets in `commands/guests.py` use Replace so
+newly installed commands are unavailable until reviewed. This public demo keeps
+account registration open; invitation-only hosts disable it in their settings.
+The reference game uses multisession mode 3 and 1000 character slots; accounts
+create characters deliberately (`AUTO_CREATE_CHARACTER_WITH_ACCOUNT=False`).

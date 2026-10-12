@@ -46,6 +46,7 @@ from evennia.web.website.urls import urlpatterns as evennia_website_urlpatterns
 from web.website.views.index import SandboxIndexView
 from web.website.views.native import (
     SandboxChannelListView,
+    SandboxCharacterDetailView,
     SandboxCharacterListView,
     SandboxCharacterManageView,
     SandboxHelpDetailView,
@@ -68,6 +69,11 @@ urlpatterns = [
     ),
     path("channels/", SandboxChannelListView.as_view(), name="channels"),
     path("characters/", SandboxCharacterListView.as_view(), name="characters"),
+    path(
+        "characters/detail/<str:slug>/<int:pk>/",
+        SandboxCharacterDetailView.as_view(),
+        name="character-detail",
+    ),
     path(
         "characters/manage/",
         SandboxCharacterManageView.as_view(),

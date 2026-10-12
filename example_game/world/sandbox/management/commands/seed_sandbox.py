@@ -280,6 +280,7 @@ class Command(BaseCommand):
 
     def _rebuild(self):
         counts = {}
+        self._create_guest_wing()
         from django.apps import apps
 
         if apps.is_installed("evennia_rptracker"):
@@ -297,6 +298,27 @@ class Command(BaseCommand):
             counts["ic_channel"] = 1
         authors = self._seed_characters()
         rooms = self._create_rooms()
+        from evennia.utils.create import create_object
+        from evennia.utils.search import search_tag
+
+        guest_lounge = next(iter(search_tag("start", category="guest")))
+        create_object(
+            "typeclasses.exits.Exit",
+            key="guests",
+            location=rooms[content.ARRIVAL_SLUG],
+            destination=guest_lounge,
+        )
+        from evennia.objects.models import ObjectDB
+
+        # The lounge outlives reseeding, so its return exit must follow the hub.
+        for exit_obj in ObjectDB.objects.filter(db_location=guest_lounge, db_key="players"):
+            exit_obj.delete()
+        create_object(
+            "typeclasses.exits.Exit",
+            key="players",
+            location=guest_lounge,
+            destination=rooms[content.ARRIVAL_SLUG],
+        )
         counts["rooms"] = len(rooms)
         counts["exits"] = self._create_exits(rooms)
         counts["objects"] = self._create_plaques(rooms)
@@ -1355,3 +1377,48 @@ class Command(BaseCommand):
                 )
             )
         return len(rooms)
+
+    def _create_guest_wing(self):
+        from evennia.utils.create import create_channel, create_object
+        from evennia.utils.search import search_tag
+
+        rooms = {}
+        for slug, name, description in content.GUEST_ROOMS:
+            found = list(search_tag(slug, category="guest_seed"))
+            if len(found) > 1:
+                raise ValueError("Duplicate guest wing identity")
+            room = found[0] if found else create_object("typeclasses.rooms.Room", key=name)
+            if not found:
+                room.db.desc = description
+            room.tags.add(slug, category="guest_seed")
+            room.tags.add(STABLE_TAG, category=SANDBOX_TAG_CATEGORY)
+            room.tags.add("wing", category="guest")
+            room.room_type = "ooc"
+            if slug == "lounge":
+                room.tags.add("start", category="guest")
+            rooms[slug] = room
+        from evennia.objects.models import ObjectDB
+
+        for source, destination, key in (
+            ("lounge", "practice", "practice"),
+            ("practice", "lounge", "lounge"),
+        ):
+            if not ObjectDB.objects.filter(
+                db_location=rooms[source], db_destination=rooms[destination]
+            ).exists():
+                create_object(
+                    "typeclasses.exits.Exit",
+                    key=key,
+                    location=rooms[source],
+                    destination=rooms[destination],
+                )
+        from evennia.comms.models import ChannelDB
+
+        channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
+        if not channels:
+            channel = create_channel(
+                "Guest",
+                desc=content.GUEST_CHANNEL_DESC,
+                locks="listen:all();send:all();control:perm(Builder)",
+            )
+            channel.tags.add("chat", category="guest")

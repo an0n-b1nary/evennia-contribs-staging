@@ -114,15 +114,21 @@ class CmdStats(_ChargenCommand):
     """
 
     key = "+stats"
-    switch_options = ("clear", "finalize")
+    switch_options = ("clear", "finalize", "reset")
 
     def func(self):
         caller = self.caller
+        if "reset" in self.switches:
+            if self.run(services.reset_trial, caller) is not None:
+                self.msg("Trial sheet reset. Use +stats to build again.")
+            return
         if "finalize" in self.switches:
             build = self.run(services.finalize, caller)
             if build is None:
                 return
-            if conf.require_approval():
+            if services.guest_trial(caller):
+                self.msg("Trial sheet finalized. Try +test, or +stats/reset to rebuild.")
+            elif conf.require_approval():
                 self.msg("Sheet finalized and sent to staff for approval.")
             else:
                 self.msg("Sheet finalized. You're ready to play.")

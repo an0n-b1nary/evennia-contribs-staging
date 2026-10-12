@@ -812,6 +812,19 @@ RP_PARTY_DAMAGE_SYNERGY = "1/4"
 RP_PARTY_EMPOWER_SYNERGY = "40"
 
 ######################################################################
+# Disposable guest trials
+######################################################################
+NEW_ACCOUNT_REGISTRATION_ENABLED = True
+GUEST_ENABLED = True
+GUEST_LIST = [f"Guest{i}" for i in range(1, 6)]
+GUEST_CHARACTER_CMDSET = "commands.guests.GuestCharacterCmdSet"
+GUEST_ACCOUNT_CMDSET = "commands.guests.GuestAccountCmdSet"
+RP_CHARGEN_GUEST_TRIALS = True
+MULTISESSION_MODE = 3
+MAX_NR_CHARACTERS = 1000
+AUTO_CREATE_CHARACTER_WITH_ACCOUNT = False
+
+######################################################################
 # Settings given in secret_settings.py override those in this file.
 ######################################################################
 try:

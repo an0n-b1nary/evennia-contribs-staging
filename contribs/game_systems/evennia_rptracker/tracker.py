@@ -102,7 +102,9 @@ def _get_active_partner_ids(character, room, now):
     cutoff = now - PARTNER_ACTIVE_WINDOW
     partner_ids = set()
     for obj in room.contents:
-        if obj is character:
+        from evennia_links.guests import is_guest
+
+        if obj is character or is_guest(obj):
             continue
         if not hasattr(obj, "last_pose_time"):
             continue
@@ -241,6 +243,10 @@ def record_rp_activity(character, room):
         character: The posing Character typeclass instance.
         room: The Room typeclass instance (character.location).
     """
+    from evennia_links.guests import is_guest
+
+    if is_guest(character):
+        return
     if getattr(room, "room_type", "ic") != "ic":
         return
     if character.tags.get("npc", category="npc_system"):

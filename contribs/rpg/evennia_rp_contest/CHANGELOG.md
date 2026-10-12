@@ -1,5 +1,9 @@
 # Changelog — evennia-rp-contest
 
+## 0.1.3 — 2026-10-12
+
+- Guest practice checks have no persistent audit record, challenge attempt or result signals. Guests cannot create or manage shared challenges.
+
 ## [0.1.2] - 2026-10-10
 
 ### Added

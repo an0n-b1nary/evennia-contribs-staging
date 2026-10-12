@@ -274,3 +274,11 @@ to an existing resources database.
 Stalls, shop/listing models, storefront purchases, stall cap contributions and
 system sellers belong to later releases. This release provides their fee and
 accounting interfaces without exposing unfinished commands.
+
+## Disposable guests
+
+Refuse asset exchanges involving guests; reward eligibility follows the guest-safe shared playable-character policy.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

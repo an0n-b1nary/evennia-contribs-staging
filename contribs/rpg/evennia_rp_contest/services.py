@@ -190,7 +190,14 @@ def bind_challenge(caller, req):
 
 def perform_test(caller, req, *, roller=None):
     room = room_for(caller)
-    challenge = bind_challenge(caller, req)
+    from evennia_links.guests import in_guest_wing, is_guest
+
+    trial = is_guest(caller)
+    if trial and not in_guest_wing(room):
+        raise ContestError("Guest trials are available only in the guest wing.")
+    if trial and req.challenge_number is not None:
+        raise ContestError("Guests may make practice tests, not attempt shared challenges.")
+    challenge = None if trial else bind_challenge(caller, req)
     scene_id = scene_id_for(caller)
     with transaction.atomic():
         if challenge:
@@ -234,7 +241,8 @@ def perform_test(caller, req, *, roller=None):
                 or (challenge.tag and challenge.tag != req.tag)
             )
         )
-        record = CheckRecord.objects.create(
+        make_record = CheckRecord if trial else CheckRecord.objects.create
+        record = make_record(
             character=caller,
             actor_name=caller.get_rp_actor_name()
             if callable(getattr(caller, "get_rp_actor_name", None))
@@ -260,8 +268,9 @@ def perform_test(caller, req, *, roller=None):
         # Signals are transactional so real scene logging rolls back with the record.
         from evennia_rp_rules.signals import check_resolved
 
-        check_resolved.send(sender=Check, check=result.check, result=result)
-        signals.check_recorded.send(sender=CheckRecord, record=record, result=result)
+        if not trial:
+            check_resolved.send(sender=Check, check=result.check, result=result)
+            signals.check_recorded.send(sender=CheckRecord, record=record, result=result)
     resolve_dotted(conf.get("RP_CONTEST_NARRATION"))(record, result=result)
     caller.msg(
         (

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3 — 2026-10-12
+
+- Guests may page staff only, return to their own lounge with +ooc/+home, appear marked in connected listings, and stay out of permanent public presence.
+
 All notable changes to `evennia_social` are documented here.
 
 ## 0.7.2 — 2026-10-12

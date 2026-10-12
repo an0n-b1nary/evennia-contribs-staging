@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4 — 2026-10-12
+
+- Refuse asset exchanges involving guests; reward eligibility follows the guest-safe shared playable-character policy.
+
 ## 0.2.3 — 2026-10-10
 
 - Fixed: market directory discovery (`+market`, `+browse`) skips stalls in rooms

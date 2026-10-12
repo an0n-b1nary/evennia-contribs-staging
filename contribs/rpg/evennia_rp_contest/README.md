@@ -104,3 +104,11 @@ general terms, without exact numbers, and link only to pages this contrib or
 its required dependencies ship. With evennia-guides installed they appear on
 its web guide; without it they're ignored. To restate one for your game, add a
 page with the same key to `GUIDES_DIRS`.
+
+## Disposable guests
+
+Guest practice checks have no persistent audit record, challenge attempt or result signals. Guests cannot create or manage shared challenges.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

@@ -42,13 +42,16 @@ processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
 
 from evennia.objects.objects import DefaultCharacter
 
+from evennia_links.guests import GuestCharacterMixin
 from evennia_posing import PosingCharacterMixin
 from evennia_social import SocialCharacterMixin
 
 from .objects import ObjectParent
 
 
-class Character(SocialCharacterMixin, PosingCharacterMixin, ObjectParent, DefaultCharacter):
+class Character(
+    GuestCharacterMixin, SocialCharacterMixin, PosingCharacterMixin, ObjectParent, DefaultCharacter
+):
     """
     The Character just re-implements some of the Object's methods and hooks
     to represent a Character entity in-game.

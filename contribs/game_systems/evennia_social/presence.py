@@ -91,6 +91,10 @@ def is_publicly_findable(character):
 
 def is_publicly_listed(character):
     """``is_listed`` for a viewer who is in no room and not staff (the public web)."""
+    from evennia_links.guests import is_guest
+
+    if is_guest(character):
+        return False
     return visibility(character) != DARK
 
 

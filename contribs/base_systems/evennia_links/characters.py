@@ -56,10 +56,12 @@ def same_account(first, second):
 
 def playable_characters(predicate=None):
     """Yield each playable character once, filtered by an optional `(character) -> bool`."""
+    from .guests import is_guest
+
     seen = set()
     for _, characters in playable_accounts():
         for character in characters:
-            if character.pk not in seen:
+            if character.pk not in seen and not is_guest(character):
                 seen.add(character.pk)
                 if predicate is None or predicate(character):
                     yield character
@@ -67,13 +69,22 @@ def playable_characters(predicate=None):
 
 def is_playable(character, predicate=None):
     """One character's membership and predicate, without sweeping the others."""
-    return bool(account_ids(character)) and (predicate is None or bool(predicate(character)))
+    from .guests import is_guest
+
+    return (
+        not is_guest(character)
+        and bool(account_ids(character))
+        and (predicate is None or bool(predicate(character)))
+    )
 
 
 def _web_account(user):
     if user is None or not getattr(user, "is_authenticated", False):
         return None
-    return getattr(user, "account", None) or user
+    from .guests import is_guest
+
+    account = getattr(user, "account", None) or user
+    return None if is_guest(account) else account
 
 
 def web_roster(user):

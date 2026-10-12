@@ -208,6 +208,31 @@ def clear_edge(character, stat_text: str | None = None) -> list[Rating]:
 # ---------------------------------------------------------------------------
 
 
+def guest_trial(character):
+    """A host-enabled disposable trial, never ordinary approval eligibility."""
+    from django.conf import settings
+
+    from evennia_links.guests import in_guest_wing, is_guest
+
+    return (
+        getattr(settings, "RP_CHARGEN_GUEST_TRIALS", False)
+        and is_guest(character)
+        and in_guest_wing(character.location)
+    )
+
+
+def reset_trial(character):
+    """Discard only the caller's disposable build and start from its defaults."""
+    from django.db import transaction
+
+    if not guest_trial(character):
+        raise ChargenError("Only guests in the guest wing may reset a trial sheet.")
+    with transaction.atomic():
+        CharacterBuild.objects.filter(character_id=character.pk).delete()
+        locks.release(character, "your trial sheet was reset")
+        return ensure_build(character)
+
+
 def finalize(character) -> CharacterBuild:
     """Finish a draft. Refuses, listing everything left to do, if it isn't ready."""
     build = ensure_build(character)

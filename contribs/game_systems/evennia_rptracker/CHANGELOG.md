@@ -1,5 +1,9 @@
 # Changelog — evennia-rptracker
 
+## 0.2.2 — 2026-10-12
+
+- Exclude guests from room and channel tracking, partner detection and activity reports, including in a misconfigured IC room.
+
 All notable changes to `evennia-rptracker` will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).

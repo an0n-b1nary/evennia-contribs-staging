@@ -37,6 +37,13 @@ class WebCharacterMiddleware:
     def __call__(self, request):
         choice = None
         user = getattr(request, "user", None)
+        from .guests import is_guest
+
+        if is_guest(user):
+            from django.contrib.auth import logout
+
+            logout(request)
+            user = request.user
         session = getattr(request, "session", None)
         if session is not None and getattr(user, "is_authenticated", False):
             try:
