@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.7.1] - 2026-10-11
+
+- **Fixed:** a plot lean (`+investigate/plot`, or "Plot thread" on the web lean
+  form) never matched anything, so lore linked to that plot never got the lean's
+  extra weight. The match filtered on a field plots doesn't have, and the error
+  was swallowed. It now matches by plot number (`3` or `#3`, which is what
+  `+investigate/plot` stores) or by part of the plot's name. Without evennia-plots
+  installed it still matches nothing.
+
 ## [0.7.0] - 2026-10-10
 
 - **Added:** a `lore` section in evennia-maps' room panel (0.9+), for the room's
