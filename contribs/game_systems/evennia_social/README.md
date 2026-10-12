@@ -1,5 +1,14 @@
 # evennia-social
 
+Managed property integration uses Links' optional `LINKS_ROOM_TRAVEL` and
+`LINKS_ROOM_VISIBILITY` providers. A three-way travel answer can explicitly
+admit a character to a private, unvisited home or deny entry; `None` preserves
+existing teleport rules. Home arrival and summon/join acceptance recheck
+admission, so an occupant's consent never substitutes for the owner's grant.
+Remote presence and empty hangout discovery respect managed-room visibility;
+self, same-room and existing staff visibility remain intact. Individual
+unfindable/scene privacy continues to apply. Social imports no property package.
+
 > ⚠️ **Preview status.** This contrib is in the [evennia-contribs-staging](https://github.com/an0n-b1nary/evennia-contribs-staging) pre-upstream channel. APIs may change before the contrib is submitted to `evennia/evennia`.
 
 The social quality-of-life command layer for [Evennia](https://www.evennia.com/)

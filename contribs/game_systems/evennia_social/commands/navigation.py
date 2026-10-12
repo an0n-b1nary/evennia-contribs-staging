@@ -124,6 +124,11 @@ class CmdHome(MuxCommand):
                 caller.msg("You are already in the OOC room.")
             return
 
+        from evennia_links.travel import travel_permission
+
+        if not is_staff(caller) and travel_permission(caller, destination) is False:
+            caller.msg("You no longer have permission to enter your home.")
+            return
         caller.move_to(destination, quiet=False)
         caller.msg(f"You teleport to {label}.")
 
@@ -136,7 +141,13 @@ class CmdHome(MuxCommand):
             return
 
         # Require room control or staff.
-        if not room.access(caller, "control") and not is_staff(caller):
+        from evennia_links.travel import travel_permission
+
+        if (
+            not room.access(caller, "control")
+            and not is_staff(caller)
+            and travel_permission(caller, room) is not True
+        ):
             caller.msg("You can only set your home in a room you control.")
             return
 
