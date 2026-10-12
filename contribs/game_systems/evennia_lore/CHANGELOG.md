@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.7.2] - 2026-10-11
+
+- **Changed:** player-facing wording says "plot" where it said "plot thread",
+  following evennia-plots 0.7, where a thread is now a question inside a plot:
+  `+lore/link/plot` and `+investigate/plot` help and messages, the web lean
+  form's "Plot (number or name)" choice, and the sealed-lore reminder. Nothing
+  else changes.
+
 ## [0.7.1] - 2026-10-11
 
 - **Fixed:** a plot lean (`+investigate/plot`, or "Plot thread" on the web lean

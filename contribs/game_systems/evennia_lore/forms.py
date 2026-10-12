@@ -62,7 +62,7 @@ _LEAN_TYPE_CHOICES = [
     ("tag", "Tag"),
     ("region", "Region"),
     ("entry", "Entry # (number)"),
-    ("plot", "Plot thread (name)"),
+    ("plot", "Plot (number or name)"),
 ]
 
 
