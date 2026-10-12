@@ -105,20 +105,27 @@ def _lean_matches(entry, lean_type, lean_value):
     if lean_type == "theme":
         return entry.tags.filter(name__icontains=lean_value, is_major=True).exists()
     if lean_type == "plot":
+        from django.apps import apps as _apps
+        from django.conf import settings as _s
+
         from evennia_lore.models import PlotLoreLink
 
-        try:
-            from django.apps import apps as _apps
-            from django.conf import settings as _s
-
-            plots_label = getattr(_s, "LORE_PLOTS_APP_LABEL", "evennia_plots")
-            PlotThread = _apps.get_model(plots_label, "PlotThread")
-            thread_ids = PlotThread.objects.filter(plot__title__icontains=lean_value).values_list(
-                "id", flat=True
-            )
-            return PlotLoreLink.objects.filter(entry=entry, thread_id__in=thread_ids).exists()
-        except Exception:
+        # +investigate/plot stores the plot number; the web lean form stores
+        # whatever was typed: a number ("#3", "3") or part of the plot's name.
+        value = str(lean_value).strip().lstrip("#").strip()
+        if not value:
             return False
+        plots_label = getattr(_s, "LORE_PLOTS_APP_LABEL", "evennia_plots")
+        try:
+            PlotThread = _apps.get_model(plots_label, "PlotThread")
+        except LookupError:
+            return False
+        if value.isdigit():
+            plots = PlotThread.objects.filter(plot_number=int(value))
+        else:
+            plots = PlotThread.objects.filter(name__icontains=value)
+        thread_ids = plots.values_list("pk", flat=True)
+        return PlotLoreLink.objects.filter(entry=entry, thread_id__in=thread_ids).exists()
     return False
 
 

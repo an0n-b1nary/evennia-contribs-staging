@@ -158,12 +158,17 @@ class JobDetailView(LoginRequiredMixin, DetailView):
             context["is_submitter"]
             and job.status != JobStatus.CLOSED
             and latest
-            and hasattr(latest, "decision")
-            and latest.decision.outcome == "changes_requested"
+            and latest.can_revise
             and latest.form_key in request_forms()
         )
         context["can_review"] = (
-            staff and latest and not hasattr(latest, "decision") and job.status != JobStatus.CLOSED
+            staff
+            and latest
+            and latest.effective_state == "pending"
+            and job.status != JobStatus.CLOSED
+        )
+        context["can_withdraw"] = (
+            context["is_submitter"] and latest and latest.effective_state == "pending"
         )
 
         return context

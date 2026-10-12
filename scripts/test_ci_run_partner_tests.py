@@ -75,6 +75,41 @@ class TestPartnerRunner(unittest.TestCase):
                 ).read_bytes(),
             )
 
+    def test_building_rejects_an_allegedly_absent_importable_partner(self):
+        with (
+            patch.object(runner, "find_spec", return_value=object()),
+            self.assertRaisesRegex(ValueError, "still importable"),
+        ):
+            runner.building_profile(Path("unused"), ["evennia_maps"], "evennia")
+
+    def test_building_race_gate_cannot_pass_without_running_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            game = Path(directory)
+            (game / "server/conf").mkdir(parents=True)
+            with (
+                patch.object(runner, "find_spec", return_value=None),
+                patch.object(
+                    runner.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess([], 0, stdout="Ran 24 tests\nOK\n"),
+                        subprocess.CompletedProcess([], 0, stdout="Settings import failed\n"),
+                    ],
+                ) as launch,
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(runner.building_profile(game, ["evennia_jobs"], "evennia"), 1)
+            self.assertEqual(launch.call_count, 2)
+            race_command = launch.call_args.args[0]
+            self.assertIn("--settings=building_race_settings.py", race_command)
+            self.assertNotIn("evennia_jobs.test_concurrency", race_command)
+            self.assertEqual(launch.call_args.kwargs["stdin"], subprocess.DEVNULL)
+            self.assertIn(
+                "building-races.sqlite3",
+                (game / "server/conf/building_race_settings.py").read_text(encoding="utf-8"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -313,6 +313,9 @@ class Command(BaseCommand):
         counts["map_tiles"] = self._create_map(rooms)
         counts["scratch_tiles"] = self._create_scratch_plane(rooms)
         counts["private_preview_tiles"] = self._create_private_preview(authors)
+        from world.sandbox.building_seed import seed as seed_building
+
+        counts.update(seed_building(rooms[content.IC_ENTRY_SLUG]))
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)

@@ -59,7 +59,10 @@
     {% empty %}<dt>Answers</dt><dd>No saved answers.</dd>
     {% endfor %}
   </dl>
-  {% if submission.decision %}
+  {% if submission.withdrawal %}
+    <p><strong>Withdrawn</strong> by {{ submission.withdrawal.actor_name }}, {{ submission.withdrawal.created_at|date:"Y-m-d H:i" }} UTC</p>
+    <p>{{ submission.withdrawal.reason|linebreaksbr }}</p>
+  {% elif submission.decision %}
     <p><strong>{{ submission.decision.get_outcome_display }}</strong> by {{ submission.decision.reviewer_name }}, {{ submission.decision.created_at|date:"Y-m-d H:i" }} UTC</p>
     <p>{{ submission.decision.reason|linebreaksbr }}</p>
   {% else %}<p>Awaiting review.</p>{% endif %}
@@ -68,6 +71,7 @@
 {% endfor %}
 {% if can_revise %}<p><a class="btn btn-primary" href="{% url 'job-request-revise' job.pk %}">Revise proposal</a></p>{% endif %}
 {% if can_review %}<p><a class="btn btn-primary" href="{% url 'job-request-review' job.pk %}">Review proposal</a></p>{% endif %}
+{% if can_withdraw %}<p><a href="{% url 'job-request-withdraw' job.pk %}">Withdraw proposal</a></p>{% endif %}
 
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="mb-0">Comments <span class="badge badge-secondary">{{ comments|length }}</span></h2>

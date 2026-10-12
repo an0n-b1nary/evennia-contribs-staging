@@ -192,6 +192,28 @@ With no listeners installed, approval simply records staff authorization.
 Upgrade with ordinary migrations. Existing jobs and comments remain unchanged;
 the new tables begin empty. Do not regenerate earlier migrations.
 
+### Author withdrawal and domain-owned forms (0.7)
+
+The author may withdraw a pending revision with
+`+request/withdraw <ticket> <revision>=<optional reason>` or its web withdrawal action.
+`withdraw_request(job=..., author=..., expected_revision=..., reason="")`
+records an append-only `RequestWithdrawal`, marks the ticket answered and
+removes it from the active queue. A withdrawal is distinct from a staff decision.
+`RequestSubmission.effective_state` and the read-only API report it consistently;
+the command and ticket page retain its actor, time and reason. A new revision
+may follow withdrawal or changes requested. Decline and approval remain final
+for that ticket cycle. Review and withdrawal serialize on the same ticket;
+the first commit wins and the conflicting operation gets a stale-state error.
+
+A form may specify `"owner": "domain_app_label"`. Generic command/web forms
+hide and refuse it, including generic revision. The domain submits through
+`submit_request(..., owner="domain_app_label")`; callers without the matching
+owner are refused. This is a service boundary, not a credential for untrusted
+Python code. Domain receivers must still verify their own immutable content
+binding. Jobs never imports the domain. `request_reviewed` emits every staff
+outcome and `request_withdrawn` emits author withdrawal inside their respective
+transactions. Jobs now requires Links for Evennia object-cache rollback.
+
 ---
 
 ## Screen-reader support (optional)

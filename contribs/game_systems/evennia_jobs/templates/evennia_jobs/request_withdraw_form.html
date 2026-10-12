@@ -1,0 +1,7 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Withdraw request</h1>
+<p>Ticket #{{ job.job_number }}, revision {{ submission.revision }}. Withdrawal preserves this revision and its history, removes it from active review, and lets you submit a new revision.</p>
+<form method="post" action="{{ form_action }}">{% csrf_token %}{{ form.as_p }}<button type="submit">Withdraw revision</button></form>
+<p><a href="{% url 'job-detail' job.pk %}">Return to ticket</a></p>
+{% endblock %}

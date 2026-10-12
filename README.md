@@ -45,13 +45,14 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-links` (base_systems) — shared bridge-model base classes, edit-history & soft-delete mixins, optional notification dispatcher
 - [`evennia-guides`](contribs/utils/evennia_guides/README.md) (utils) — preview 0.1.0; player guides written in Markdown and served as web pages, with design-insight asides, links between pages, and pages hidden until a reveal check passes
 
-**RP infrastructure** (all but the posing/social layer depend on `evennia-links`; posing and social are model-free and depend only on each other)
+**RP infrastructure** (posing is model-free; Social depends on posing and links)
 - `evennia-posing` (game_systems) — the pose pipeline: pose/emit/semipose capture, pose-order tracker, pose headers, name highlighting; foundation other RP systems build on
 - `evennia-social` (game_systems) — social QoL layer on evennia-posing: profiles, player/venue discovery, page, ignore/mute, consensual teleportation, OOC chat, navigation shortcuts
 - `evennia-regions` (game_systems) — geographic grouping of rooms with soft-archive, web views, and a region label on every mapped tile
 - `evennia-maps` (game_systems) — a 2D coordinate map of your rooms, auto-grown from canonical exits, with a BFS reflow engine, an SVG + Leaflet web map, and a signal seam other contribs light overlays through
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns
+- [`evennia-building`](contribs/game_systems/evennia_building/README.md) (game_systems) — preview 0.1.0; reviewed private interiors, individual ownership, residents, accepted guest invitations and room access overrides; depends only on links, with optional maps, regions, jobs, economy and social
 - `evennia-lore` (game_systems) — wiki-style knowledge entries with approval queue, version history, region-weighted passive discovery
 - `evennia-xp` (game_systems) — pluggable XP collection, login summaries, projected earnings and atomic spending/refunds (preview 0.4.0)
 - `evennia-boards` (game_systems) — flat bulletin boards with subscriptions and post versioning

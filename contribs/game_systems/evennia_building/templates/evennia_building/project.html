@@ -1,0 +1,12 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>{{ project.name }}</h1><p>{{ project.state }} — version {{ project.version }}. Owner: {{ project.owner_name }}.</p>
+<p>Submitted drafts are frozen. Withdraw before editing. Discard removes draft geometry and safely returns occupants and belongings.</p>
+<h2>Rooms</h2><ul>{% for record in rooms %}<li>{{ record.pk }}: {{ record.room.key }} (floor {{ record.floor }})<p>{{ record.room.db.desc|linebreaksbr }}</p></li>{% endfor %}</ul>
+<h2>Review history</h2><ul>{% for submission in submissions %}<li><a href="{% url 'evennia_building:submission' submission.pk %}">Revision {{ submission.revision }}</a></li>{% empty %}<li>Not submitted.</li>{% endfor %}</ul>
+<h2>Content reuse acknowledgement</h2><p>{{ acknowledgement }}</p>
+<h2>Project action</h2>{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply action</button></form>
+<h2>Audit history</h2><ul>{% for row in audit %}<li>{{ row.created_at }} — {{ row.action }} by {{ row.actor_name }}</li>{% endfor %}</ul>
+<p><a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% include 'evennia_building/preview_links.html' %}
+{% endblock %}

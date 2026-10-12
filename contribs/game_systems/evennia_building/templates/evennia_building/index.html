@@ -1,0 +1,14 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Building</h1>
+<p>Draft an interior, submit an exact revision for staff review, and manage your home.</p>
+{% if pending_reviews %}<h2>Pending staff review</h2><ul>{% for submission in pending_reviews %}<li><a href="{% url 'evennia_building:submission' submission.pk %}">{{ submission.project.name }} — revision {{ submission.revision }}</a></li>{% endfor %}</ul>{% endif %}
+<h2>Projects</h2>
+<ul>{% for project in projects %}<li><a href="{% url 'evennia_building:project' project.pk %}">{{ project.name }}</a> — {{ project.state }}</li>{% empty %}<li>No projects yet.</li>{% endfor %}</ul>
+<h2>Homes</h2>
+<ul>{% for property in properties %}<li><a href="{% url 'evennia_building:property' property.pk %}">{{ property.name }}</a></li>{% empty %}<li>No homes available.</li>{% endfor %}</ul>
+<h2>Invitations</h2>
+{% for invitation in invitations %}<form method="post" action="{% url 'evennia_building:invitation-answer' invitation.pk %}">{% csrf_token %}<p>{{ invitation.property.name }} — entry: {{ invitation.entry|yesno }}, map: {{ invitation.maps|yesno }}</p><button name="answer" value="accept">Accept</button> <button name="answer" value="decline">Decline</button></form>{% empty %}<p>No pending invitations.</p>{% endfor %}
+<h2>New interior</h2>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create draft</button></form>
+{% endblock %}

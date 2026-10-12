@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-jobs"
-version = "0.6.1"
+version = "0.7.0"
 description = "Staff ticket system (+request, +bug, +issue, +discuss, +jobs) for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
 # Core: models + commands only. No web/API deps.
-dependencies = ["evennia>=6.0"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.3"]
 
 [project.optional-dependencies]
 # [web] enables website views, DRF API, and accessible forms/templates.

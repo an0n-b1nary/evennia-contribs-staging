@@ -16,7 +16,7 @@ _KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _TYPES = {"text", "longtext", "choice", "boolean"}
 
 
-def request_forms():
+def request_forms(*, include_owned=False):
     """Return enabled, normalized forms; reject malformed configuration."""
     registry = getattr(settings, "JOBS_REQUEST_FORMS", {})
     if not isinstance(registry, dict):
@@ -27,8 +27,11 @@ def request_forms():
             raise ImproperlyConfigured("Request form keys must be stable lowercase identifiers.")
         if not isinstance(definition, dict):
             raise ImproperlyConfigured(f"Request form {key} must be a dictionary.")
-        if set(definition) - {"label", "description", "enabled", "questions"}:
+        if set(definition) - {"label", "description", "enabled", "questions", "owner"}:
             raise ImproperlyConfigured(f"Unknown option in request form {key}.")
+        owner = definition.get("owner")
+        if owner is not None and (not isinstance(owner, str) or not _KEY.fullmatch(owner)):
+            raise ImproperlyConfigured(f"Invalid domain owner in request form {key}.")
         if type(definition.get("enabled", True)) is not bool:
             raise ImproperlyConfigured(f"Request form {key} needs a boolean enabled flag.")
         if definition.get("enabled", True) is False:
@@ -92,14 +95,18 @@ def request_forms():
         if not questions:
             raise ImproperlyConfigured(f"Request form {key} needs at least one question.")
         form["questions"] = questions
-        result[key] = form
+        if not owner or include_owned:
+            result[key] = form
     return result
 
 
-def get_request_form(key):
+def get_request_form(key, *, owner=None):
     """Resolve an enabled form, refusing unknown or disabled keys."""
     try:
-        return request_forms()[key]
+        form = request_forms(include_owned=True)[key]
+        if form.get("owner") and form["owner"] != owner:
+            raise ValidationError("Use the owning feature to submit this request.")
+        return form
     except KeyError as exc:
         raise ValidationError("That request form is unavailable.") from exc
 

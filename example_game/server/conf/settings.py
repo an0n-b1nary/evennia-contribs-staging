@@ -49,6 +49,7 @@ EVENNIA_ADMIN = False
 # base models are imported at their app-load time).
 INSTALLED_APPS += [
     "evennia_links",
+    "evennia_building",
     "evennia_economy",
     "evennia_rp_resources",
     "evennia_rp_crafting",
@@ -696,11 +697,25 @@ MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 # Room permissions and private previews (links, maps and regions)
 ######################################################################
 # Control access remains the default until an ownership provider is installed.
-LINKS_ROOM_PERMISSION = None
-LINKS_ROOM_OWNER = None
+LINKS_ROOM_PERMISSION = "evennia_building.access.room_permission"
+LINKS_ROOM_OWNER = "evennia_building.access.owner_of"
 # One viewer-aware policy on both surfaces, including disconnected web users.
 MAPS_ROOM_VISIBILITY = "world.sandbox.building.room_visible"
 REGIONS_ROOM_VISIBILITY = MAPS_ROOM_VISIBILITY
+
+######################################################################
+# Building (evennia-building) — reviewed private interiors
+######################################################################
+BUILDING_REVEALED = True  # The reference game demonstrates revealed mechanics.
+BUILDING_DEFAULT_POLICY = "open"
+BUILDING_SAFE_ROOM = "#2"
+LOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")
+LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
+LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"
+from evennia_building.request_form import FORM as BUILDING_REQUEST_FORM
+from evennia_building.request_form import FORM_KEY as BUILDING_REQUEST_FORM_KEY
+
+JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, BUILDING_REQUEST_FORM_KEY: BUILDING_REQUEST_FORM}
 
 ######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues

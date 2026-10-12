@@ -215,6 +215,13 @@ def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
         # mirrors Evennia's own dummyrunner profiling mixin. CI/test only.
         f.write("\n# Fast test-only password hasher (see comment in this script).\n")
         f.write('PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)\n')
+        if "evennia_building" in labels:
+            f.write('\nLOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")\n')
+            if "evennia_jobs" in labels:
+                f.write("from evennia_building.request_form import FORM, FORM_KEY\n")
+                f.write(
+                    'JOBS_REQUEST_FORMS = {**globals().get("JOBS_REQUEST_FORMS", {}), FORM_KEY: FORM}\n'
+                )
     print(f"Registered {len(labels)} contrib app(s) in {settings_path}")
     return 0
 

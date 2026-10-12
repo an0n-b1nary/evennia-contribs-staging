@@ -430,6 +430,70 @@ class TestBuildPool(EvenniaTest):
         self.assertEqual(pool[0][1], 2)
 
 
+@unittest.skipUnless(apps.is_installed("evennia_plots"), "evennia-plots not installed")
+class TestPlotLean(EvenniaTest):
+    """A plot lean matches entries linked to that plot.
+
+    ``+investigate/plot`` stores the plot number; the web lean form stores
+    whatever was typed, a number or part of the plot's name.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from evennia_plots.models import PlotThread
+
+        # Offset plot numbers from pks so a pk/number mix-up can't pass.
+        PlotThread.objects.create(plot_number=40, name="Offset")
+        self.plot = PlotThread.create_thread(name="The Drowned Bell", creator=self.char1)
+        self.linked = _make_entry("Bell Lore", author=self.char1)
+        self.unlinked = _make_entry("Other Lore", author=self.char1)
+        PlotLoreLink.objects.create(thread_id=self.plot.pk, entry=self.linked)
+
+    def test_plot_number_from_the_command(self):
+        self.assertNotEqual(self.plot.plot_number, self.plot.pk)
+        self.assertTrue(_lean_matches(self.linked, "plot", self.plot.plot_number))
+        self.assertFalse(_lean_matches(self.unlinked, "plot", self.plot.plot_number))
+
+    def test_number_typed_into_the_web_form(self):
+        self.assertTrue(_lean_matches(self.linked, "plot", f"#{self.plot.plot_number}"))
+        self.assertTrue(_lean_matches(self.linked, "plot", str(self.plot.plot_number)))
+
+    def test_part_of_the_name(self):
+        self.assertTrue(_lean_matches(self.linked, "plot", "drowned"))
+        self.assertFalse(_lean_matches(self.unlinked, "plot", "drowned"))
+        self.assertFalse(_lean_matches(self.linked, "plot", "Lantern"))
+
+    def test_blank_value_matches_nothing(self):
+        self.assertFalse(_lean_matches(self.linked, "plot", "  "))
+
+    @override_settings(
+        LORE_SESSION_CONTEXT_PROVIDER=None,
+        LORE_PASSIVE_LEAN_MULTIPLIER=Decimal("2.0"),
+    )
+    def test_lean_multiplier_applied_to_plot_lore(self):
+        from evennia_rptracker.models import RPSession
+
+        self.linked.tags.add(_make_tag("History"))
+        self.char1.lore_lean_type = "plot"
+        self.char1.lore_lean_value = self.plot.plot_number
+        session = RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            status=RPSession.Status.COMPLETED,
+        )
+        pool = dict(_build_pool(self.char1, session))
+        # base weight = 1 (minor tag), multiplied by 2 = 2
+        self.assertEqual(pool[self.linked], 2)
+
+
+class TestPlotLeanWithoutPlots(EvenniaTest):
+    @override_settings(LORE_PLOTS_APP_LABEL="not_an_installed_app")
+    def test_missing_plots_app_matches_nothing(self):
+        entry = _make_entry("Lore", author=self.char1)
+        self.assertFalse(_lean_matches(entry, "plot", 3))
+        self.assertFalse(_lean_matches(entry, "plot", "bell"))
+
+
 class TestSelectPassiveLore(EvenniaTest):
     def _session(self):
         from evennia_rptracker.models import RPSession

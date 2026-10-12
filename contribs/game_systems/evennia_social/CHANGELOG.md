@@ -2,6 +2,10 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.7.1 ? 2026-10-11
+
+- Respect authoritative property travel and visibility in discovery, home, teleport, summon and join.
+
 ## [0.7.0] - 2026-10-10
 
 - Room configuration and the owner/control branch of mood permissions now

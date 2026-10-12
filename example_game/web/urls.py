@@ -20,6 +20,8 @@ from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
 # add patterns
 urlpatterns = [
+    path("building/", include("evennia_building.urls")),
+    path("api/v1/building/", include("evennia_building.api.urls")),
     # website
     path("", include("web.website.urls")),
     # webclient
