@@ -150,3 +150,37 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         fight.refresh_from_db()
         self.assertEqual(fight.state, before)
         self.assertEqual(fight.entries.count(), entries)
+
+    def test_real_team_surge_snapshots_cover_and_restore_use_one_combat_journal(self):
+        from evennia_rp_combat import services as combat
+        from evennia_rp_party import rules, services, synergy
+
+        attacker, defender = self.samples
+        combat.join(attacker, "one")
+        combat.join(defender, "two")
+        coverer = self.opponent(attacker, "two")
+        attacking = services.change(attacker, "create", "Surging")
+        defending = services.change(defender, "create", "Covering")
+        services.change(attacker, "join", defending, subject=coverer)
+        services.change(defender, "formation", "back", cover=True)
+        services.change(attacker, "formation", "front", subject=coverer)
+        # Host fixture only; there is no player command that sets Synergy.
+        combat.execute(
+            attacker,
+            "fixture party balance",
+            lambda state: rules.party(state, attacking).update(synergy="100"),
+        )
+        ex = services.surge(attacker, [defender], operation_id="sandbox-surge")
+        fight = combat.open_fight(self.grounds)
+        self.assertIn("reserved 100 Synergy", fight.entries.latest("sequence").summary)
+        before = combat.state_for(attacker)
+        self.assertEqual(synergy.held(before, attacking), 100)
+        services.cover(attacker, defender, f"{ex}:1", subject=coverer)
+        state = combat.state_for(attacker)
+        self.assertEqual(rules.data(state)["surges"][f"{ex}:1"]["status"], "executed")
+        self.assertEqual(state["participants"][str(defender.pk)]["hp"], 100)
+        self.assertEqual(synergy.pool(state, attacking), 10)
+        self.assertGreater(synergy.pool(state, defending), 0)
+        self.assertEqual(state["participants"][str(attacker.pk)]["clock"], 1)
+        self.assertEqual(services.surge(attacker, [defender], operation_id="sandbox-surge"), ex)
+        self.assertEqual(combat.state_for(attacker), state)

@@ -798,6 +798,11 @@ RP_PARTY_SUPPORT_POINTS = "5"
 RP_PARTY_BOOST_CAP = "30"
 RP_PARTY_PINPOINT_PENALTY = "10"
 RP_PARTY_ENCORE_FACTOR = "1/2"
+RP_PARTY_SURGE_COST = "100"
+RP_PARTY_SURGE_POINTS = "25"
+RP_PARTY_EXCHANGE_SYNERGY = "10"
+RP_PARTY_DAMAGE_SYNERGY = "1/4"
+RP_PARTY_EMPOWER_SYNERGY = "40"
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

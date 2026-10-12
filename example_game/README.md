@@ -1588,8 +1588,13 @@ is transient OOC delivery to connected members in the room, without Scene
 entries, poses or RP credit. Authorized NPCs use `/as NPC=...`.
 
 The settings block exposes provisional coefficients for host calibration.
-Synergy/Team Surge is deferred to a point release; Boss Checks are reserved
-for Party 0.2. `world.sandbox.test_party` exercises real sheets, NPC control,
+Completed exchanges, hostile damage and outgoing Empower earn shared
+Synergy. `+party/surge enemy=balanced` spends 100 to boost one packet's
+primary output by 25%; `+party/surgepress` selects a later Burst hit. Support
+and multi-target options are documented in the Party guide. Reservations,
+refunds and once-per-personal-turn use share combat's transaction and journal.
+Auto-Act never spends. Boss Checks are reserved for Party 0.2.
+`world.sandbox.test_party` exercises real sheets, NPC control,
 Calling the Shot previews, ignores, guides and chat. The independent CI job
 also installs combat/Party wheels without optional packages, removes Party
 while a populated fight is open, then reinstalls it and checks saved data

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-11
+
+### Added
+
+- Explicit partner declaration/pressed-hit reservation hooks run before
+  frozen modifiers and automatic execution, within the fight transaction.
+  Failed explicit spends leave pure engine inputs unchanged too.
+- Typed partner transition notices are journaled and announced in the
+  operation that produced them, including saved-state reconciliation.
+- Attributed hostile Poison damage events on ordinary completed actions;
+  recovery still grants no partner resource reward.
+
+No model migration or core state-schema change is required.
+
 ## [0.2.1] - 2026-10-11
 
 ### Added

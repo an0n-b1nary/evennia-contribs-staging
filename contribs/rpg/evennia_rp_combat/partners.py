@@ -14,6 +14,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict, dataclass, fields
 from fractions import Fraction
+from functools import wraps
 
 from django.apps import apps
 from django.utils.module_loading import import_string
@@ -29,6 +30,22 @@ def number(value):
         return Fraction(value)
     except (ValueError, ZeroDivisionError) as exc:
         raise CombatError("Partner modifiers must be exact finite numbers.") from exc
+
+
+def atomic_requests(operation):
+    """A refused explicit spend leaves even a pure engine caller unchanged."""
+
+    @wraps(operation)
+    def apply(state, *args, **kwargs):
+        if kwargs.get("partner_requests") is None or kwargs["partner_requests"] == {}:
+            return operation(state, *args, **kwargs)
+        candidate = deepcopy(state)
+        result = operation(candidate, *args, **kwargs)
+        state.clear()
+        state.update(candidate)
+        return result
+
+    return apply
 
 
 @dataclass(frozen=True)
@@ -142,6 +159,20 @@ class Event:
 
 
 @dataclass(frozen=True)
+class Transition:
+    """An owned state envelope and public notices, committed together."""
+
+    section: dict
+    notices: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        if not isinstance(self.notices, tuple) or any(
+            not isinstance(line, str) or len(line) > 400 or "\n" in line for line in self.notices
+        ):
+            raise CombatError("Partner notices must be bounded public text lines.")
+
+
+@dataclass(frozen=True)
 class Provider:
     snapshot: Callable
     upgrade: Callable
@@ -149,6 +180,7 @@ class Provider:
     status: Callable | None = None
     help: Callable | None = None
     support: Callable | None = None
+    reserve: Callable | None = None
 
     def __post_init__(self):
         if (
@@ -156,7 +188,13 @@ class Provider:
             or not callable(self.upgrade)
             or any(
                 callback is not None and not callable(callback)
-                for callback in (self.transition, self.status, self.help, self.support)
+                for callback in (
+                    self.transition,
+                    self.status,
+                    self.help,
+                    self.support,
+                    self.reserve,
+                )
             )
         ):
             raise CombatError("Combat partner providers need callable contracts.")
@@ -245,6 +283,50 @@ def snapshot(state, exchange):
     exchange["partner_modifiers"] = snapshots
 
 
+def install(state, key, result):
+    """Providers can replace only their own section and append public notices."""
+    section = result.section if isinstance(result, Transition) else result
+    state["partners"][key] = envelope(section)
+    if isinstance(result, Transition) and result.notices:
+        state.setdefault("notices", []).extend(result.notices)
+
+
+def reserve(state, exchange, requests=None):
+    """Explicit host requests, before frozen modifiers or automatic execution.
+
+    Each request names one declared target. Auto-Act passes no requests.
+    The owning provider validates its remaining JSON options and resource
+    rules. Failure rolls back with the declaration in the coordinator.
+    """
+    requests = {} if requests is None else requests
+    if not isinstance(requests, dict):
+        raise CombatError("Partner declaration requests must be a mapping.")
+    present = registered()
+    for key, request in requests.items():
+        provider = present.get(key)
+        if provider is None or provider.reserve is None:
+            raise CombatError("That partner's declaration spending is unavailable.")
+        if (
+            isinstance(request, dict)
+            and request.get("target") == ""
+            and len(exchange["targets"]) == 1
+        ):
+            request = {**request, "target": exchange["targets"][0]}
+        if not isinstance(request, dict) or request.get("target") not in exchange["targets"]:
+            raise CombatError("A partner spend must name one declared target.")
+        try:
+            json.dumps(request, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise CombatError("Partner declaration requests must be finite JSON data.") from exc
+        install(
+            state,
+            key,
+            provider.reserve(
+                deepcopy(state), declaration(exchange, request["target"]), deepcopy(request)
+            ),
+        )
+
+
 def modifiers(exchange, target_id):
     """Use frozen values only; removing a provider disables its modifiers."""
     values = exchange.get("partner_modifiers", {}).get(str(target_id), {})
@@ -290,8 +372,7 @@ def support_spread(state, exchange, target_id):
 def emit(state, event):
     for key, provider in registered().items():
         if provider.transition is not None:
-            section = provider.transition(deepcopy(state), event)
-            state["partners"][key] = envelope(section)
+            install(state, key, provider.transition(deepcopy(state), event))
 
 
 def lines(state, subject_id, *, help=False):

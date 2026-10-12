@@ -17,7 +17,7 @@ POSITIONS = ("front", "back", "flex")
 def upgrade(section):
     if section is None:
         return {
-            "schema": 1,
+            "schema": 2,
             "data": {
                 "next_party": 1,
                 "parties": {},
@@ -26,12 +26,22 @@ def upgrade(section):
                 "support": {},
                 "pending_support": {},
                 "proposals": {},
+                "surges": {},
+                "synergy_awards": {},
             },
         }
-    if section.get("schema") != 1:
+    if section.get("schema") not in (1, 2):
         raise CombatError("Unsupported Party state version; no progress was applied.")
     result = deepcopy(section)
     data = result["data"]
+    if not isinstance(data, dict) or not isinstance(data.get("parties"), dict):
+        raise CombatError("Invalid saved Party state.")
+    if result["schema"] == 1:
+        result["schema"] = 2
+        data["surges"] = {}
+        data["synergy_awards"] = {}
+        for row in data.get("parties", {}).values():
+            row["synergy"] = "0"
     if (
         type(data.get("next_party")) is not int
         or data["next_party"] < 1
@@ -44,10 +54,38 @@ def upgrade(section):
                 "support",
                 "pending_support",
                 "proposals",
+                "surges",
+                "synergy_awards",
             )
         )
     ):
         raise CombatError("Invalid saved Party state.")
+    for row in data["parties"].values():
+        if not isinstance(row, dict) or number(row.get("synergy")) < 0:
+            raise CombatError("Invalid saved Party Synergy balance.")
+    if any(
+        not isinstance(key, str) or value is not True
+        for key, value in data["synergy_awards"].items()
+    ):
+        raise CombatError("Invalid saved Synergy award ledger.")
+    for ident, row in data["surges"].items():
+        if (
+            not isinstance(ident, str)
+            or not isinstance(row, dict)
+            or row.get("status") not in ("reserved", "executed", "refunded")
+            or type(row.get("turn")) is not int
+            or row["turn"] < 0
+            or type(row.get("hit")) is not int
+            or not 1 <= row["hit"] <= 3
+            or any(
+                not isinstance(row.get(key), str)
+                for key in ("actor", "party", "target", "exchange")
+            )
+            or row["party"] not in data["parties"]
+            or number(row.get("cost")) <= 0
+            or not 0 <= number(row.get("potency")) <= 100
+        ):
+            raise CombatError("Invalid saved Team Surge reservation.")
     return result
 
 
@@ -181,7 +219,7 @@ def prepare(state, value, side):
     value = name(state, value)
     key = f"{state['epoch']}.{section['next_party']}"
     section["next_party"] += 1
-    section["parties"][key] = {"name": value, "side": side, "dissolved": False}
+    section["parties"][key] = {"name": value, "side": side, "dissolved": False, "synergy": "0"}
     return key
 
 
@@ -266,6 +304,7 @@ def dissolve(state, ident, key, *, agree=False, decline=False):
             "cover": False,
         }
     party(state, key)["dissolved"] = True
+    section["parties"][key]["synergy"] = "0"
     section["support"] = {
         source: entry for source, entry in section["support"].items() if entry["party"] != key
     }

@@ -11,7 +11,14 @@ def check_configuration(app_configs=None, **kwargs):
     for name in conf.DEFAULTS:
         try:
             value = number(conf.get(name))
-            if not 0 <= value <= (1 if name == "RP_PARTY_ENCORE_FACTOR" else 100):
+            maximum = (
+                500
+                if name == "RP_PARTY_SURGE_COST"
+                else 1
+                if name == "RP_PARTY_ENCORE_FACTOR"
+                else 100
+            )
+            if not 0 <= value <= maximum or (name == "RP_PARTY_SURGE_COST" and value == 0):
                 raise ValueError
         except ValueError:
             errors.append(

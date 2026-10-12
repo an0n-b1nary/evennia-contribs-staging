@@ -2,11 +2,12 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Pure Party provider; combat owns resolution and commits."""
 
+from copy import deepcopy
 from fractions import Fraction as F
 
 from evennia_rp_combat import engine, partners
 
-from . import conf, rules
+from . import conf, rules, synergy
 
 
 def snapshot(state, declaration):
@@ -26,6 +27,7 @@ def snapshot(state, declaration):
     return partners.PacketModifiers(
         formation_penalty=penalty,
         damage_boost=rules.boost(state, key) if declaration.action in ("attack", "spell") else 0,
+        surge=synergy.potency(state, declaration),
         cover_eligible=bool(
             rules.party_id(state, target)
             and rules.position(state, target) == "back"
@@ -91,10 +93,13 @@ def transition(state, event):
                 for ident in rules.roster(state, entry["party"])
             }
             data["support"][event.actor_id] = entry
-    return section
+    notices = synergy.transition(state, event)
+    return partners.Transition(section, tuple(notices))
 
 
 def status(state, subject_id):
+    state = deepcopy(state)
+    synergy.reconcile(state)
     lines = []
     for key, row in rules.data(state)["parties"].items():
         if row["dissolved"]:
@@ -108,6 +113,14 @@ def status(state, subject_id):
         lines.append(
             f"Party {key}: {row['name']} / side {row['side']}; boost {rules.boost(state, key)}%; Spirit {rules.average(state, key)}."
         )
+        frozen = (
+            f" ({synergy.pool(state, key)} retained, pool frozen)"
+            if not rules.counted(state, key)
+            else ""
+        )
+        lines.append(
+            f"  Synergy {synergy.available(state, key)} available, {synergy.held(state, key)} reserved; cap {synergy.cap(state, key)}{frozen}."
+        )
         lines.extend(f"  {value}" for value in names)
         proposal = rules.data(state)["proposals"].get(key)
         if proposal:
@@ -118,6 +131,16 @@ def status(state, subject_id):
     invitation = rules.data(state)["invitations"].get(str(subject_id))
     if invitation:
         lines.append(f"Party invitation: {invitation['party']}; +party/accept or /decline.")
+    if rules.party_id(state, subject_id):
+        turn = state["participants"][subject_id]["turns"]
+        used = [
+            row["status"]
+            for row in rules.data(state)["surges"].values()
+            if row["actor"] == subject_id and row["turn"] == turn and row["status"] != "refunded"
+        ]
+        lines.append(
+            f"Your Team Surge this personal turn: {used[0] if used else 'available (requires Synergy and a legal action)'}."
+        )
     return tuple(lines) or ("No tactical parties. Unpartied combat remains available.",)
 
 
@@ -130,4 +153,5 @@ PROVIDER = partners.Provider(
         "+party: optional tactical teams within a side. See help +party and the Party guide.",
     ),
     support=support,
+    reserve=synergy.reserve,
 )

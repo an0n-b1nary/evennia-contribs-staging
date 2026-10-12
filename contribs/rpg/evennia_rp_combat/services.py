@@ -388,6 +388,7 @@ def commit(
     """Save state and append one journal entry; caller holds the row lock."""
     from .models import FightEntry
 
+    partners.emit(state, partners.Event("state_changed", str(getattr(actor, "pk", "")), "", 0))
     notes = state.pop("notices", [])
     if notes:
         summary = f"{summary} {' '.join(plain(note, 400) for note in notes)}"
@@ -403,7 +404,6 @@ def commit(
     )
     if state["ended"] and fight.status == fight.OPEN:
         fight.status, fight.closed_at = fight.ENDED, timezone.now()
-    partners.emit(state, partners.Event("state_changed", str(getattr(actor, "pk", "")), "", 0))
     fight.state = stored(fight, state)
     fight.save()
     synchronize_locks(fight, state, release=release)
@@ -778,6 +778,7 @@ def declare(
     public=False,
     rng=None,
     operation_id=None,
+    partner_requests=None,
 ):
     subject = subject or actor
     authorize(actor, subject)
@@ -807,13 +808,19 @@ def declare(
             waive=waive,
             public=public,
             support_allowed=support_recipients(state, subject),
+            partner_requests=partner_requests,
         )
         run_automatic(state, subject.location)
         return ex_id
 
     return execute(
         actor,
-        f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}",
+        f"{identity(subject)} declared {plain(key)} against {', '.join(identity(t) for t in targets)}"
+        + (
+            f"; shared resource request {json.dumps(partner_requests, sort_keys=True)}"
+            if partner_requests
+            else ""
+        ),
         operation,
         operation_id=operation_id,
         subject=subject,
@@ -1161,8 +1168,18 @@ def withdraw_end_proposal(state):
 
 
 def control(
-    actor, operation, *, subject=None, argument=None, reason="", rng=None, operation_id=None
+    actor,
+    operation,
+    *,
+    subject=None,
+    argument=None,
+    reason="",
+    rng=None,
+    operation_id=None,
+    partner_requests=None,
 ):
+    if partner_requests and operation != "press":
+        raise CombatError("Only a freshly pressed hit accepts a partner declaration request.")
     subject = subject or actor
     cleanup = operation in ("cancel", "fade", "withdraw", "posed", "decline", "retract", "revive")
     authorize(actor, subject, cleanup=cleanup)
@@ -1208,6 +1225,7 @@ def control(
                 (rng or random.SystemRandom()).randint(1, 100),
                 stop=operation == "stop",
                 empower=argument == "empower",
+                partner_requests=partner_requests,
             )
             run_automatic(state, actor.location)
         elif operation == "cap":
@@ -1263,7 +1281,12 @@ def control(
 
     return execute(
         actor,
-        f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}",
+        f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}"
+        + (
+            f"; shared resource request {json.dumps(partner_requests, sort_keys=True)}"
+            if partner_requests
+            else ""
+        ),
         change,
         progressing=not cleanup,
         operation_id=operation_id,

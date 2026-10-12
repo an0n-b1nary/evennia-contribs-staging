@@ -1,4 +1,4 @@
-# Combat partner contract (0.2.1)
+# Combat partner contract (0.2.2)
 
 Combat owns transactions, queues, costs, accepted inputs, personal clocks,
 draws and rollback. A partner owns its own rules and versioned state. No
@@ -44,7 +44,8 @@ its empty modifier snapshot. Old schema-1 packets also remain unmodified.
 
 A `Provider` requires `snapshot(state, declaration)` and `upgrade(section)`.
 Its optional callbacks are `transition(state, event)`, `status(state,
-subject_id)`, `help(state, subject_id)` and `support(state, declaration)`.
+subject_id)`, `help(state, subject_id)`, `support(state, declaration)` and
+`reserve(state, declaration, request)`.
 All receive detached inputs.
 No callback may query models, sample randomness, read live presence or
 send messages. Transactions and authorization remain in the coordinator.
@@ -88,9 +89,13 @@ are installed by the foundation.
 
 ## Engine events and transaction boundaries
 
-`transition(state, Event)` returns only the provider's own envelope. Combat
+`transition(state, Event)` returns only the provider's own envelope, or a
+`Transition(section, notices)` containing that envelope and bounded public
+notice lines (tuple, each at most 400 characters, no newlines). Combat
 validates and installs that result inside its current mechanical operation.
 Mutating the detached input cannot modify other partners or participants.
+Notices are journaled/announced with that operation, including notices from
+`state_changed`; they are never saved as an unconsumed next-operation message.
 Callbacks must use `event.kind` explicitly:
 
 - `declare`: the new hit's modifiers are frozen and costs reserved.
@@ -105,6 +110,10 @@ Callbacks must use `event.kind` explicitly:
   once, including exactly once for a Burst.
 - `recovery`: the recovery action advanced its actor's allowance and clock;
   no attack or support executed and no action reward is implied.
+- `hostile_damage`: attributed Poison suffered on an ordinary own exchange,
+  with source actor, actual victim/loss and pre-damage participation. A
+  recovery Poison tick emits no resource-reward event. Source-less or self
+  Poison is not attributed hostile damage. The partner still checks sides.
 - `state_changed`: before the coordinator journals any operation, including
   maintenance, shelving and rollback; use for saved-state reconciliation.
 
@@ -117,6 +126,36 @@ FightEntry snapshots and replayable callback results.
 The package's post-commit `membership_changed` signal is still useful for
 notifications. It cannot atomically apply a partner's damage, pool or
 reservation changes and must not be used for that purpose.
+
+## Explicit shared-resource requests
+
+`engine.declaration`, `engine.press`, `services.declare` and the `press`
+branch of `services.control` accept `partner_requests`, a mapping from
+registered provider key to finite JSON options. Each request names `target`
+as one of that hit's declared participant IDs. An empty target selects the
+sole target of a single-target hit; it is invalid on multi-target actions.
+The owning provider validates its remaining options. Auto-Act and ordinary
+commands pass no requests and never choose partner spending.
+
+Before freezing modifiers or automatically resolving, combat calls
+`reserve(detached_state, declaration, detached_request)`. It returns its
+own envelope or `Transition`, as above. This lets a provider reserve its
+pool and per-turn marker, then expose paid output through `snapshot`.
+An unavailable provider, wrong target, invalid request, failed affordability
+or invalid callback return refuses the operation. Pure engine entry points
+also use detached candidates for explicit requests, leaving their input
+unchanged on failure. A requested but unaffordable Burst press refuses
+instead of silently stopping. Ordinary unaffordable presses retain their
+normal stop behavior.
+
+The coordinator supplies NPC authorization, room/ignore consent, the Fight
+lock, journaling, retry identity and automatic resolution. A provider never
+owns a second transaction or changes other actors' resources. Refunds and
+execution markers belong to its event handler; removing the provider keeps
+its section untouched. Authors should reconcile saved cancellations/results
+on return, without applying past output or replaying historical earning.
+Request options are public journal identity, so they must contain no secret
+draw, bet or private policy data.
 
 ## Support recipients
 

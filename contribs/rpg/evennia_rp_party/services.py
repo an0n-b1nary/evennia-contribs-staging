@@ -176,6 +176,37 @@ def render(actor, *, subject=None):
     return "\n".join(combat.plain(line, 500) for line in providers.status(state, str(subject.pk)))
 
 
+def surge(actor, targets, key="balanced", *, boosted=None, subject=None, **options):
+    """Declare and reserve in combat's one transaction, including auto-reactions."""
+    require(actor, progress=True)
+    if not targets:
+        raise CombatError("Name at least one target for Team Surge.")
+    boosted = boosted or targets[0]
+    if boosted not in targets:
+        raise CombatError("The Team Surge target must be one of the declared targets.")
+    return combat.declare(
+        actor,
+        targets,
+        key,
+        subject=subject,
+        partner_requests={"party": {"kind": "surge", "target": str(boosted.pk)}},
+        **options,
+    )
+
+
+def surge_press(actor, *, subject=None, empower=False, rng=None, operation_id=None):
+    require(actor, progress=True)
+    return combat.control(
+        actor,
+        "press",
+        subject=subject,
+        argument="empower" if empower else "",
+        partner_requests={"party": {"kind": "surge", "target": ""}},
+        rng=rng,
+        operation_id=operation_id,
+    )
+
+
 def chat(actor, message, *, subject=None):
     """Transient OOC routing only: never execute/journal or call a posing hook."""
     subject = subject or actor

@@ -85,7 +85,7 @@ def fixture(game, phase):
         )
         with patch("evennia_rp_combat.services.snapshot", return_value=frozen):
             services.setup(first)
-            services.join(first, "one")
+            services.join(first, "one", boss=3)
             services.join(second, "two")
             services.join(supporter, "one")
         key = party.change(first, "create", "Retained team")
@@ -94,7 +94,13 @@ def fixture(game, phase):
         services.control(supporter, "posed")
         services.storyteller(first, "spirit", target=first, value=1000)
         services.control(first, "accept")
-        token = f"{services.declare(first, [second], rng=ROLL)}:1"
+        services.execute(
+            first,
+            "fixture Synergy balance",
+            lambda state: rules.party(state, key).update(synergy="200"),
+        )
+        token = f"{party.surge(first, [second], rng=ROLL)}:1"
+        canceled_token = f"{party.surge(supporter, [second], rng=ROLL)}:1"
         state = services.state_for(first)
         fight = services.open_fight(room)
         path.write_text(
@@ -105,6 +111,7 @@ def fixture(game, phase):
                     "second": second.pk,
                     "supporter": supporter.pk,
                     "token": token,
+                    "canceled_token": canceled_token,
                     "party": rules.data(state),
                     "builds": list(fight.builds.values_list("digest", flat=True)),
                 }
@@ -131,6 +138,8 @@ def fixture(game, phase):
             exchange = resumed["exchanges"][saved["token"].split(":")[0]]
             assert exchange["outcomes"] == candidate["exchanges"][exchange["id"]]["outcomes"]
             assert partners.modifiers(exchange, second.pk).damage_boost == "0"
+            assert partners.modifiers(exchange, second.pk).surge == "0"
+            services.control(second, "cancel", argument=saved["canceled_token"])
             services.control(first, "posed")
             supporter = ObjectDB.objects.get(pk=saved["supporter"])
             support_token = f"{services.declare(supporter, [second], rng=ROLL)}:1"
@@ -138,12 +147,34 @@ def fixture(game, phase):
             saved["absent_token"] = f"{services.declare(first, [second], rng=ROLL)}:1"
             path.write_text(json.dumps(saved), encoding="utf-8")
         else:
+            from evennia_rp_combat.data import CombatError
+            from evennia_rp_party import rules, synergy
+            from evennia_rp_party import services as party
+
             assert "party" in partners.registered()
             old = state["exchanges"][saved["token"].split(":")[0]]
             assert partners.modifiers(old, second.pk).damage_boost == "10"
+            assert partners.modifiers(old, second.pk).surge == "25"
             absent = engine.get_exchange(state, saved["absent_token"])
             assert partners.modifiers(absent, second.pk).damage_boost == "0"
             services.control(second, "cancel", argument=saved["absent_token"])
+            restored = services.state_for(first)
+            key = rules.party_id(restored, first.pk)
+            assert synergy.pool(restored, key) == 100
+            assert synergy.held(restored, key) == 0
+            assert rules.data(restored)["surges"][saved["token"]]["status"] == "executed"
+            assert rules.data(restored)["surges"][saved["canceled_token"]]["status"] == "refunded"
+            try:
+                party.surge(first, [second], rng=ROLL)
+            except CombatError as exc:
+                assert "this personal turn" in str(exc)
+            else:
+                raise AssertionError("Executed Surge lost its personal-turn marker while absent")
+            supporter = ObjectDB.objects.get(pk=saved["supporter"])
+            services.control(supporter, "posed")
+            retry = f"{party.surge(supporter, [second], rng=ROLL)}:1"
+            services.control(second, "cancel", argument=retry)
+            assert synergy.pool(services.state_for(first), key) == 100
             token = f"{services.declare(first, [second], rng=ROLL)}:1"
             current = services.state_for(first)
             # The fixed rolls leave Spirit 12 and 2. The boost is their average
