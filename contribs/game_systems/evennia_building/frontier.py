@@ -563,6 +563,26 @@ def set_steward(actor, record, steward=None, *, expected_steward, reason):
     return record
 
 
+def _set_mood(room, text, actor):
+    """Store a mood exactly as Social's +mood does, so both read the same state."""
+    from .services import _text
+
+    text = " ".join(_text(text, 10000).split())
+    if apps.is_installed("evennia_social"):
+        from evennia_social import SocialRoomMixin
+        from evennia_social.mood import set_mood
+
+        if isinstance(room, SocialRoomMixin):
+            try:
+                return set_mood(room, text, actor)
+            except ValueError as exc:
+                raise ValidationError(str(exc)) from exc
+    text = _text(text, 200)
+    room.attributes.add("room_mood", text)
+    room.attributes.add("room_mood_setter", actor.key)
+    return text
+
+
 @atomic_objects
 def edit_room(actor, room, *, description=None, mood=None):
     from .services import _text, audit
@@ -575,8 +595,7 @@ def edit_room(actor, room, *, description=None, mood=None):
     if description is not None:
         room.db.desc = _text(description, 50000)
     if mood is not None:
-        room.attributes.add("room_mood", _text(mood, 200))
-        room.attributes.add("room_mood_setter", actor.key)
+        mood = _set_mood(room, mood, actor)
     audit(
         actor,
         "frontier_room_edited",

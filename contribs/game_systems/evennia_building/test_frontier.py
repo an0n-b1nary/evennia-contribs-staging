@@ -159,6 +159,19 @@ class TestFrontier(EvenniaCommandTestMixin, EvenniaTest):
             self.assertEqual((tile.plane_id, tile.x, tile.y), (self.plane.pk, 1, 0))
         self.assertEqual(services.promote(result.promotion, self.char1), result)
 
+    def test_steward_mood_matches_social_normalisation_and_stays_steward_only(self):
+        self.approve()
+        room = self.entry.room
+        frontier.edit_room(self.char2, room, mood="  Quiet \n  footsteps.  ")
+        self.assertEqual(room.attributes.get("room_mood"), "Quiet footsteps.")
+        self.assertEqual(room.attributes.get("room_mood_setter"), self.char2.key)
+        for text in ("   ", "x" * 201):
+            with self.assertRaises(ValidationError):
+                frontier.edit_room(self.char2, room, mood=text)
+        with self.assertRaises(PermissionDenied):
+            frontier.edit_room(self.outsider, room, mood="Uninvited weather.")
+        self.assertEqual(room.attributes.get("room_mood"), "Quiet footsteps.")
+
     def test_invitation_acceptance_and_individual_authoring_scope(self):
         invitation = collaboration.invite(self.char2, self.project, self.collaborator)
         self.assertFalse(can_enter(self.collaborator, self.entry.room))
