@@ -36,7 +36,7 @@ Web/API surface (requires [web] extra):
     from evennia_xp.api.views import XPLogViewSet
 """
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 from evennia_xp.signals import xp_awarded, xp_batch_completed, xp_refunded, xp_spent
 

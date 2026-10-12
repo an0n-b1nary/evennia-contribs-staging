@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.2] - 2026-10-11
+
+- **Changed:** the `thread_bonus` source is labelled "Plot Bonus" (was "Thread
+  Bonus"), following evennia-plots 0.7, where a thread is now a question inside
+  a plot. The stored key is unchanged; migration `0003` only updates the
+  field's choices.
+
 ## [0.5.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `xp` (where XP comes from,
