@@ -806,6 +806,7 @@ def declare(
             domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
             waive=waive,
             public=public,
+            support_allowed=support_recipients(state, subject),
         )
         run_automatic(state, subject.location)
         return ex_id
@@ -860,6 +861,17 @@ def react(
         operation_id=operation_id,
         subject=subject,
     )
+
+
+def support_recipients(state, actor):
+    """Host consent filter for incidental support; never persisted or publicized."""
+    return {
+        str(subject.pk)
+        for subject in ObjectDB.objects.filter(
+            pk__in=state["participants"], db_location=actor.location
+        )
+        if not ignored_by(subject, actor) and not ignored_by(actor, subject)
+    }
 
 
 def run_automatic(state, room):
@@ -986,6 +998,7 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
             rng.randint(1, 100),
             bet=bet,
             domain_effects=conf.get("RP_COMBAT_DOMAIN_EFFECTS"),
+            support_allowed=support_recipients(state, subject),
         )
         run_automatic(state, actor.location)
         return ex_id
@@ -1206,7 +1219,16 @@ def control(
             exchange = engine.get_exchange(state, token)
             healer = engine.participant(state, exchange["actor"])["name"]
             if operation == "accept":
-                engine.accept_revival(state, subject.pk, token)
+                healer_object = ObjectDB.objects.filter(pk=exchange["actor"]).first()
+                if healer_object is None or healer_object.location != actor.location:
+                    raise CombatError("The healer has left; decline this revival offer.")
+                interaction(subject, healer_object)
+                engine.accept_revival(
+                    state,
+                    subject.pk,
+                    token,
+                    support_allowed=support_recipients(state, healer_object),
+                )
                 notice(state, f"{row['name']} accepted {healer}'s revival.")
             else:
                 engine.cancel(state, subject.pk, token)
@@ -1616,9 +1638,11 @@ def render_declaration(state, exchange):
             flavor = ""
     suffix = f" Weapon flavor: {flavor}." if flavor else ""
     fallbacks = []
-    if "long_range" in move.effects or exchange["domain_effect"] == "pinpoint":
+    if "party" not in partners.registered() and (
+        "long_range" in move.effects or exchange["domain_effect"] == "pinpoint"
+    ):
         fallbacks.append("Party cover/formation is unavailable; range/Pinpoint has no cover effect")
-    if exchange["domain_effect"] == "encore":
+    if "party" not in partners.registered() and exchange["domain_effect"] == "encore":
         fallbacks.append("Encore uses its single-target fallback without Party")
     if exchange.get("public_bet"):
         fallbacks.append(f"Calling the shot: a {exchange['bet']} bet, made public")
@@ -1778,9 +1802,6 @@ def help_for(actor):
 
 def odds(actor, token, *, subject=None):
     """Public neutral estimates; hidden RPS and committed draws stay hidden."""
-    from fractions import Fraction
-
-    from . import arithmetic
 
     subject = subject or actor
     authorize(actor, subject, cleanup=True)
@@ -1789,6 +1810,15 @@ def odds(actor, token, *, subject=None):
     if token not in row["incoming"]:
         raise CombatError("Choose a token in your own incoming queue.")
     view = engine.reaction_view(state, subject.pk, token)
+    return describe_odds(view, token)
+
+
+def describe_odds(view, token):
+    """Render public estimates for an ordinary or prospective intercepted packet."""
+    from fractions import Fraction
+
+    from . import arithmetic
+
     if not view.estimates:
         return "Misdirected: your next reaction has no estimate. Every reaction remains available."
     incoming = Build(tuple((key, "0") for key, score in view.build.scores))

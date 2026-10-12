@@ -1,13 +1,14 @@
-# Combat partner contract (0.1.1)
+# Combat partner contract (0.2.1)
 
 Combat owns transactions, queues, costs, accepted inputs, personal clocks,
 draws and rollback. A partner owns its own rules and versioned state. No
-Party, revival, Boss Check or new Ability subsystem is provided by this API.
+Party or Boss Check subsystem is provided by this API. Combat 0.2 owns
+revival, recovery and its Ability rules.
 
 ## Registration and state
 
 `RP_COMBAT_PARTNERS` maps a stable key to an installed app and a dotted
-`partners.Provider` instance. For example, a future Party provider may use:
+`partners.Provider` instance. The optional Party package uses:
 
 ```python
 RP_COMBAT_PARTNERS = {
@@ -43,13 +44,14 @@ its empty modifier snapshot. Old schema-1 packets also remain unmodified.
 
 A `Provider` requires `snapshot(state, declaration)` and `upgrade(section)`.
 Its optional callbacks are `transition(state, event)`, `status(state,
-subject_id)` and `help(state, subject_id)`. All receive detached inputs.
+subject_id)`, `help(state, subject_id)` and `support(state, declaration)`.
+All receive detached inputs.
 No callback may query models, sample randomness, read live presence or
 send messages. Transactions and authorization remain in the coordinator.
 These are trusted engine extensions, not player or automatic policies.
 
 `Declaration` contains actor/target identifiers, action, public Effects,
-domain behavior, exchange identifier and hit number. It deliberately has
+domain identity and behavior, exchange identifier and hit number. It deliberately has
 no draw, hidden RPS bet or accepted reaction. The callback receives saved
 fight state, so provider authors must keep public facts separate from any
 private data in that state. Only the following validated `PacketModifiers`
@@ -101,13 +103,14 @@ Callbacks must use `event.kind` explicitly:
 - `cancel`: an unaccepted target packet has been canceled.
 - `exchange_end`: the actor's personal clock and allowance have advanced
   once, including exactly once for a Burst.
+- `recovery`: the recovery action advanced its actor's allowance and clock;
+  no attack or support executed and no action reward is implied.
 - `state_changed`: before the coordinator journals any operation, including
   maintenance, shelving and rollback; use for saved-state reconciliation.
 
 These are not separate commits. Failed operations roll them back together.
 Service operation-id retries return their prior result without repeating
 events. An accepted reaction is not a completed action or reward event.
-Future recovery must have its own event rather than simulate exchange end.
 Fight-local chat and live presence must stay outside partner state,
 FightEntry snapshots and replayable callback results.
 
@@ -115,10 +118,27 @@ The package's post-commit `membership_changed` signal is still useful for
 notifications. It cannot atomically apply a partner's damage, pool or
 reservation changes and must not be used for that purpose.
 
+## Support recipients
+
+`support(state, declaration)` may return `None` or a `SupportSpread` with
+distinct participant IDs and an exact Spirit-output factor between zero and
+one. Only one provider may supply a spread for a packet. Combat applies it
+only to Assist: it intersects the recipients with participating same-side
+members and the coordinator's room/ignore filter. These are trusted saved
+identities, never instructions to accept a revival or change membership.
+
+The ordinary Spirit calculation, including Empower and each recipient's
+repeat history, is scaled for each eligible recipient. The primary retains
+its ordinary healing and riders; incidental recipients receive Spirit only,
+without healing, hostile effects, Surge, additional costs, reward events or
+resolved-target counts. The single-target Encore fallback is replaced when
+a spread applies. With no spread it remains unchanged. The resulting
+recipient IDs and outputs are saved with the exchange.
+
 ## Atomic interception
 
 `engine.redirect(state, token, original_id, replacement_id, reaction, ...)`
-is a supported primitive for a future Cover service. The caller must first
+is a supported primitive for a Cover service. The caller must first
 authorize the actor/NPC and check party membership, Formation, standing
 permission and all direct ignore crossings, then invoke it through
 `services.execute` so the operation takes the Fight row lock.
@@ -142,6 +162,13 @@ exchange. Ante/debt, hit count and existing Overextended carry forward.
 The attacker may stop after the hit without further extension. Normal
 opening/break rules and the three-hit limit apply. The primitive does not
 allow multi-target Bursts or let an ally extend another actor's chain.
+An exchange's retained redirect history also prevents a second Burst
+handoff, even if the coverer changes Formation between hits.
+
+`engine.interception_view(...)` validates the same detached handoff and
+returns its public `ReactionView` without accepting or spending anything.
+`services.describe_odds(view, token)` formats exact neutral odds, including
+public Calling the Shot inputs, without revealing an ordinary hidden bet.
 
 ## Plain-text display
 

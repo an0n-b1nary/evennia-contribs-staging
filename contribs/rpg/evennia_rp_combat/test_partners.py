@@ -141,6 +141,15 @@ class TestStateUpgrade(SimpleTestCase):
         with self.assertRaises(CombatError):
             partners.PacketModifiers(auto_resolve=1)
 
+    def test_support_spread_rejects_invalid_strength_and_duplicate_recipients(self):
+        for factor in (True, 0.5, "nan", "-1", "2"):
+            with self.subTest(factor=factor), self.assertRaises(CombatError):
+                partners.SupportSpread(("1",), factor)
+        with self.assertRaises(CombatError):
+            partners.SupportSpread(("1", "1"), "1/2")
+        with self.assertRaises(CombatError):
+            partners.SupportSpread((1,), "1/2")
+
 
 @override_settings(RP_COMBAT_PARTNERS=REGISTRY)
 class TestPartnerPackets(SimpleTestCase):

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-11
+
+### Added
+
+- Validated pure support-spread contract: incidental allies receive ordinary
+  Spirit with their own repeat tracking, without copied healing or riders.
+  Host ignore/room checks filter recipients inside the coordinator transaction.
+- Partner declarations include the selected domain; recovery emits its own
+  lifecycle event without claiming a completed exchange or granting rewards.
+- Party-aware fallback messages; revival acceptance rechecks direct consent.
+- Read-only public interception odds use the same detached handoff validation.
+  Retained Burst redirect history prevents another handoff after Formation changes.
+
+No model migration or core state-schema change is required.
+
 ## [0.2.0] - 2026-10-11
 
 ### Added

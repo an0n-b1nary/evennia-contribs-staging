@@ -664,6 +664,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_combat \
+         contribs/rpg/evennia_rp_party \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -831,6 +832,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/rpg/evennia_rp_chargen \
          contribs/rpg/evennia_rp_equipment \
          contribs/rpg/evennia_rp_combat \
+         contribs/rpg/evennia_rp_party \
          contribs/rpg/evennia_rp_contest; do
     pip install -e "$d"
 done
@@ -1545,10 +1547,36 @@ combat leaves the Signature library usable. The sandbox tests include
 with `evennia test --settings test_settings.py typeclasses commands world`
 and closed stdin; confirm a positive test count.
 
-Combat 0.1.1 exposes the optional `RP_COMBAT_PARTNERS` registry, empty by
-default here. Providers keep versioned fight data, freeze public packet
+Combat exposes the optional `RP_COMBAT_PARTNERS` registry, with Party
+registered here. Providers keep versioned fight data, freeze public packet
 modifiers and append plain-text status/help through the contracts in
 `contribs/rpg/evennia_rp_combat/PARTNERS.md`. The combat seam also checks
 retained data and pending packets with a provider disabled. No additional
 database migration, seed content or golden-database change is required for
 this API alone.
+
+## Party practice
+
+`evennia-rp-party` follows combat in the install and app order. It needs no
+typeclass mixin, new database table, URL or API mount. Its guide is available
+at `/guide/party/`. The Proving Grounds seeds an empty Practice Formation
+party on the practice side; no character is enrolled automatically. Join
+the fight with `+combat/join practice`, inspect `+party`, then join the
+displayed party identity. Another party or unpartied participation is valid.
+
+Members choose Front, Back or Flex. Use `+party/formation back=on` to permit
+Cover, then a same-party Front can `+party/cover defender=token,resist` or
+preview with `/coverodds`. Cover and ordinary combat use the same frozen
+packet inputs. Rally/Rattle entries are independent per supporter; Encore
+spreads Spirit without spreading healing or revival. `+party/chat message`
+is transient OOC delivery to connected members in the room, without Scene
+entries, poses or RP credit. Authorized NPCs use `/as NPC=...`.
+
+The settings block exposes provisional coefficients for host calibration.
+Synergy/Team Surge is deferred to a point release; Boss Checks are reserved
+for Party 0.2. `world.sandbox.test_party` exercises real sheets, NPC control,
+Calling the Shot previews, ignores, guides and chat. The independent CI job
+also installs combat/Party wheels without optional packages, removes Party
+while a populated fight is open, then reinstalls it and checks saved data
+and packet continuity. The synthetic golden database includes the empty
+practice party.
