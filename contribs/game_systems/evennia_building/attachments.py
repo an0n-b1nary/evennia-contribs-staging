@@ -355,17 +355,20 @@ def passage_allows(room, actor):
 
 def departure_allows(exit):
     """Anyone already on an agreed route can leave, including after revocation."""
+    # Every traversal asks this. Agreed routes lie wholly inside their parent, so
+    # only that parent's agreements apply, and only a matching exit is revalidated.
+    record = ownership(exit.location) if exit.db_location_id else None
+    if not record:
+        return False
     for agreement in AttachmentAgreement.objects.select_related("parent", "child").filter(
-        parent__state="live"
+        parent_id=record.property_id, parent__state="live"
     ):
-        if not route_valid(agreement, require_child_live=False):
-            continue
         rooms = agreement.route["rooms"]
         reverse_pairs = {(target, source) for source, target in pairwise(rooms)}
         if (
             exit.pk == agreement.route["departure"]["id"]
             or (exit.db_location_id, exit.db_destination_id) in reverse_pairs
-        ):
+        ) and route_valid(agreement, require_child_live=False):
             return True
     return False
 

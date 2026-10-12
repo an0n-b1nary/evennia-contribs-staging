@@ -214,6 +214,17 @@ class TestApartments(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(can_enter(self.guest, self.entry.room))
         self.assertTrue(attachments.departure_allows(self.parent.departure))
 
+    def test_unrelated_traversal_does_not_revalidate_agreed_routes(self):
+        self.apartment()
+        bedroom_door = ObjectDB.objects.get(
+            db_location=self.hall.room, db_destination=self.bedroom.room
+        )
+        with patch.object(attachments, "route_valid", wraps=attachments.route_valid) as checked:
+            self.assertFalse(attachments.departure_allows(self.exit))
+            self.assertFalse(attachments.departure_allows(bedroom_door))
+        checked.assert_not_called()
+        self.assertTrue(attachments.departure_allows(self.parent.departure))
+
     def test_map_only_invitation_and_unlocked_child_do_not_grant_passage(self):
         child = self.apartment()
         services.set_locked(self.char2, self.parent, True)
