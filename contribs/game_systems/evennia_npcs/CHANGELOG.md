@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-10-11
+
+- Say "plot" where messages and the guide said "plot thread" (`+npc/plot Name=#plot`), following evennia-plots 0.7, where a thread is now a question inside a plot.
+
 ## 0.1.0 — 2026-10-10
 
 - Add templates, unique identities, sharing, permission requests, ownership transfer and archiving.
