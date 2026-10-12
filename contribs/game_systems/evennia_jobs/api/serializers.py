@@ -77,10 +77,32 @@ class RequestSubmissionSerializer(serializers.ModelSerializer):
     """Read-only proposal history; the API has no approval or submission writes."""
 
     decision = serializers.SerializerMethodField()
+    effective_state = serializers.CharField(read_only=True)
+    withdrawal = serializers.SerializerMethodField()
 
     class Meta:
         model = RequestSubmission
-        fields = ["id", "revision", "form_key", "schema", "answers", "created_at", "decision"]  # noqa: RUF012
+        fields = (
+            "id",
+            "revision",
+            "form_key",
+            "schema",
+            "answers",
+            "created_at",
+            "decision",
+            "effective_state",
+            "withdrawal",
+        )
+
+    def get_withdrawal(self, obj):
+        if not hasattr(obj, "withdrawal"):
+            return None
+        record = obj.withdrawal
+        return {
+            "actor_name": record.actor_name,
+            "reason": record.reason,
+            "created_at": record.created_at.isoformat(),
+        }
 
     def get_decision(self, obj):
         """Review attribution survives reviewer character deletion."""

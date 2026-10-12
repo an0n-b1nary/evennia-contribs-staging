@@ -9,10 +9,21 @@ from evennia.utils.eveditor import EvEditor
 
 from evennia_jobs.models import Job, RequestOutcome
 from evennia_jobs.requests import clean_answer, get_request_form, request_forms
-from evennia_jobs.review import review_request, submit_request
+from evennia_jobs.review import review_request, submit_request, withdraw_request
 
 _DRAFT = "jobs_request_draft"
-_SWITCHES = {"forms", "form", "answer", "edit", "preview", "submit", "cancel", "resume", "revise"}
+_SWITCHES = {
+    "forms",
+    "form",
+    "answer",
+    "edit",
+    "preview",
+    "submit",
+    "cancel",
+    "resume",
+    "revise",
+    "withdraw",
+}
 _EDITOR = "jobs_request_editor"
 
 
@@ -81,6 +92,18 @@ def handle_request(command):
         return False
     caller = command.caller
     try:
+        if "withdraw" in switches:
+            parts = command.lhs.split()
+            if len(parts) != 2 or not all(part.isdigit() for part in parts):
+                raise ValidationError("Usage: +request/withdraw <ticket> <revision>=<reason>")
+            job = Job.objects.filter(job_number=int(parts[0])).first()
+            if not job:
+                raise ValidationError("No such ticket.")
+            withdraw_request(
+                job=job, author=caller, expected_revision=int(parts[1]), reason=command.rhs or ""
+            )
+            caller.msg("Request withdrawn. Its history is preserved; you may revise it.")
+            return True
         if "forms" in switches:
             lines = ["Request forms:"]
             for key, form in request_forms().items():
@@ -103,11 +126,7 @@ def handle_request(command):
                     job_number=int(command.args.strip()), author=caller
                 ).first()
                 latest = job.submissions.last() if job else None
-                if (
-                    not latest
-                    or not hasattr(latest, "decision")
-                    or (latest.decision.outcome != RequestOutcome.CHANGES_REQUESTED)
-                ):
+                if not latest or not latest.can_revise:
                     raise ValidationError("No request awaiting your revision was found.")
                 form_key, title, revision = latest.form_key, job.title, latest.revision
                 schema = get_request_form(form_key)
@@ -242,7 +261,10 @@ def format_submissions(job):
         lines.append(f"\n{submission.schema['label']} — revision {submission.revision}")
         for row in submission.answer_rows:
             lines.append(f"{row['label']}: {row['value']}")
-        if hasattr(submission, "decision"):
+        if hasattr(submission, "withdrawal"):
+            withdrawal = submission.withdrawal
+            lines.append(f"Withdrawn by {withdrawal.actor_name}: {withdrawal.reason}")
+        elif hasattr(submission, "decision"):
             decision = submission.decision
             lines.append(
                 f"{decision.get_outcome_display()} by {decision.reviewer_name} "
