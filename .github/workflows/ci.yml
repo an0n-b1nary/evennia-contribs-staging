@@ -193,6 +193,9 @@ jobs:
           - profile: no-jobs
             excludes: "--exclude evennia-jobs"
             absent: "--absent evennia_jobs"
+            - profile: no-building
+              excludes: "--exclude evennia-building"
+              absent: "--absent evennia_building"
           - profile: no-equipment
             excludes: "--exclude evennia-rp-equipment"
             absent: "--absent evennia_rp_equipment"

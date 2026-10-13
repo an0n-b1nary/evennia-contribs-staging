@@ -114,7 +114,7 @@ middleware as documented by Links. Admin is inspection-only.
 
 `property_promoted` runs inside the transaction with `property`, `submission`
 and `actor`. Required listener errors roll back everything, including a Jobs
-decision. Use the unique `property.promotion_id` for idempotent later shop
+decision. Use the individual `property.pk` for idempotent later shop
 reconciliation. `property_changed` runs after commit for cache invalidation;
 it is not durable external delivery. Ownership is per room and per property,
 including separate apartment boundaries. Deleted owners/anchors deny

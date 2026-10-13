@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from evennia.accounts.models import AccountDB
+from evennia_building.models import BuildProject, BuildSubmission, Property
 from evennia_economy.models import (
     LedgerEntry,
     Listing,
@@ -12,12 +13,13 @@ from evennia_economy.models import (
     UBIPayment,
 )
 from evennia_npcs.models import NPCBlueprint, NPCSpawnRecord
+from evennia_plots.models import PlotThread
 from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
 from evennia_rp_contest.models import Challenge, CheckRecord
 from evennia_rp_crafting.models import CraftRecord, EventUse, NicheUnlock, Workshop
-from evennia_rp_resources.models import ResourceGrant, ResourceHolding
+from evennia_rp_resources.models import PlotPayoutRun, ResourceGrant, ResourceHolding
 from evennia_rptracker.models import RPSession
 from evennia_scenes.models import LogEntry, Scene
 from evennia_xp.models import CharacterXP, XPLog, XPSpend
@@ -59,6 +61,29 @@ def snapshot():
             ),
         }
     return {
+        "plots": rows(
+            PlotThread.objects.filter(creator_id__in=ids), "id", "plot_number", "name", "status"
+        ),
+        "plot_awards": rows(
+            PlotPayoutRun.objects.all(), "id", "thread_id", "amounts", "recipients"
+        ),
+        "building_projects": rows(
+            BuildProject.objects.filter(owner_id__in=ids), "id", "name", "version", "state"
+        ),
+        "building_submissions": rows(
+            BuildSubmission.objects.filter(project__owner_id__in=ids),
+            "id",
+            "project_id",
+            "revision",
+        ),
+        "building_properties": rows(
+            Property.objects.filter(owner_id__in=ids), "id", "name", "owner_id"
+        ),
+        "build_acknowledgement": getattr(
+            settings,
+            "BUILDING_REUSE_ACKNOWLEDGEMENT",
+            "I acknowledge that this submitted content may be reused by this game.",
+        ),
         "npc_blueprints": rows(
             NPCBlueprint.objects.filter(creator_id__in=ids), "id", "name", "kind", "archived"
         ),
@@ -79,6 +104,8 @@ def snapshot():
             "id",
             "owner_id",
             "room_id",
+            "kind",
+            "property_id",
             "status",
             "last_active",
         ),

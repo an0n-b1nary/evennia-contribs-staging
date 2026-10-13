@@ -114,6 +114,15 @@ class ActionForm(forms.Form):
     entry = forms.BooleanField(required=False, initial=True, label="Guest may enter locked rooms")
     maps = forms.BooleanField(required=False, initial=True, label="Guest may view interior maps")
     retain_grants = forms.BooleanField(required=False, label="Retain grants during staff transfer")
+    stock_disposition = forms.ChoiceField(
+        required=False,
+        label="Shop stock on transfer",
+        choices=[
+            ("", "Choose if this property has a shop"),
+            ("return", "Return stock to old owner"),
+            ("transfer", "Transfer stock with shop"),
+        ],
+    )
     expected_owner = forms.IntegerField(min_value=1, required=False)
     confirmation = forms.CharField(required=False, widget=forms.HiddenInput)
     passage = forms.CharField(
@@ -161,7 +170,13 @@ class ActionForm(forms.Form):
             "uninvite": ("target",),
             "override": ("room", "value"),
             "reset_override": ("room",),
-            "transfer": ("target", "expected_owner", "reason", "retain_grants"),
+            "transfer": (
+                "target",
+                "expected_owner",
+                "reason",
+                "retain_grants",
+                "stock_disposition",
+            ),
             "policy": ("target", "value"),
             "region_policy": ("target", "value"),
         }.get(action, ())
@@ -175,6 +190,7 @@ class ActionForm(forms.Form):
                 "reason",
                 "can_install",
                 "retain_grants",
+                "stock_disposition",
                 "entry",
                 "maps",
                 "value",
@@ -608,6 +624,7 @@ def property_detail(request, pk):
                     expected_owner=values["expected_owner"],
                     reason=values["reason"],
                     retain_grants=values["retain_grants"],
+                    stock_disposition=values.get("stock_disposition") or None,
                 )
             elif action in {"policy", "region_policy"}:
                 set_policy(

@@ -49,7 +49,7 @@ class CmdBuild(MuxCommand):
     +build/override <room dbref>=<character dbrefs, or empty for owner only>
     +build/override/reset <room dbref>
     +build/discard <project>[=<confirmation token>]
-    +build/transfer <property> <expected owner> <new owner>=<reason> (staff)
+    +build/transfer <property> <expected owner> <new owner>=<reason>[;return|transfer] (staff)
     +build/policy <room dbref>=open|residential|commercial|closed|reset (staff)
     +build/policy/region <region>=open|residential|commercial|closed|reset (staff)
     +build/attach <project> <anchor dbref>=<entrance name>[;<passage room dbrefs>]
@@ -607,12 +607,14 @@ class CmdBuild(MuxCommand):
                 )
                 services.set_override(actor, ObjectDB.objects.get(pk=number()), allowed)
             elif "transfer" in switches:
+                reason, separator, stock = (self.rhs or "").partition(";")
                 services.transfer(
                     actor,
                     Property.objects.get(pk=number()),
                     character(2),
                     expected_owner=number(1),
-                    reason=self.rhs or "",
+                    reason=reason,
+                    stock_disposition=stock.strip() if separator else None,
                 )
             elif "policy" in switches:
                 target = number() if "region" in switches else ObjectDB.objects.get(pk=number())

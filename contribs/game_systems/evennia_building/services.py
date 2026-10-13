@@ -1045,7 +1045,16 @@ def set_override(actor, room, allowed_character_ids=None):
 
 
 @atomic_objects
-def transfer(actor, property, new_owner, *, expected_owner, reason, retain_grants=False):
+def transfer(
+    actor,
+    property,
+    new_owner,
+    *,
+    expected_owner,
+    reason,
+    retain_grants=False,
+    stock_disposition=None,
+):
     property = _property(property, actor, staff=True)
     if property.owner_id != expected_owner:
         raise ValidationError("The property owner changed; reload before transfer.")
@@ -1054,6 +1063,13 @@ def transfer(actor, property, new_owner, *, expected_owner, reason, retain_grant
     if type(retain_grants) is not bool:
         raise ValidationError("Choose a new owning character and grant disposition.")
     previous = property.owner_id
+    signals.property_transferring.send(
+        sender=Property,
+        property=property,
+        actor=actor,
+        new_owner=new_owner,
+        stock_disposition=stock_disposition,
+    )
     property.owner = new_owner
     property.owner_name = new_owner.key
     property.save(update_fields=["owner", "owner_name"])

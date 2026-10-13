@@ -84,9 +84,10 @@ class Character(
             note_login(self)
 
         if apps.is_installed("evennia_rp_resources"):
-            from evennia_rp_resources.summary import notify_resource_summary
+            from evennia_rp_resources.summary import notify_plot_summary, notify_resource_summary
 
             notify_resource_summary(self)
+            notify_plot_summary(self)
 
         if apps.is_installed("evennia_xp"):
             from evennia_xp.summary import notify_xp_summary

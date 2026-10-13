@@ -145,8 +145,7 @@ With social 0.3+, configure:
 SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
 ```
 
-Plot Thread payouts arrive in a later release; no plots signal is connected
-yet. Without maps, the tag fallback and common pool work without imports of any
+Without maps, the tag fallback and common pool work without imports of any
 optional partner.
 
 With evennia-maps 0.9+, clicking a room on the live map shows a "Gathering here"
@@ -159,6 +158,37 @@ away what it will hold. Staff see a closed terrain's list, marked as not open ye
 The common pool is found everywhere, so it isn't listed. With
 `RP_RESOURCES_OPEN_TERRAINS` unset, any terrain a room has counts as open, and the
 panel doesn't scan the room typeclasses.
+
+## Plot payouts
+
+Install the `plots` extra (Plots 0.7.1+). Payouts attach to a **Plot**, not its
+smaller Threads; Python keeps the `PlotThread` and `plot_thread_concluded`
+names until Plots 1.0.
+
+Owners or staff propose a per-participant budget:
+`+resources/payout #<plot number>=rare-crystal,2`. Inspect with
+`/payouts #<plot>`, remove a resource with `/payoutremove #<plot>=rare-crystal`.
+Only staff authorize it with `/payoutapprove #<plot>`. Editing a resource clears
+its approval. Conclusion refuses unapproved or archived budget resources.
+
+Conclusion freezes approved amounts and the active `PlotParticipant` roster,
+filtered through the same eligibility policy as accrual. Offline participants
+qualify; ownership or Thread leadership alone does not. Awards ignore lean and
+the holdings soft cap. Hidden systems pay dark; the Resource character mixin
+shows each delivered award once at login after reveal.
+
+Each recipient is paid atomically and has a durable receipt. Staff run
+`+resources/payoutretry #<plot>` to finish interrupted awards. Repeats cannot
+duplicate grants, late scene links cannot add recipients, and later eligibility
+changes do not revoke an earned award. Archived resources still fulfill an
+already frozen promise. Missing characters are skipped without redistribution.
+Installation never backfills historical plots. Corrections use logged staff
+grants/spends, not edits to a frozen award. Without Plots, accrual, holdings
+and trading continue without importing or connecting its signal.
+
+The catalogue's optional `basic` flag defaults to false. Economy's system
+seller also checks `in_trickle`, archive status and explicit host prices;
+it never sells payout-only rarity.
 
 ## Tests
 

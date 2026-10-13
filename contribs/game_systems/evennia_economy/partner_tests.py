@@ -262,3 +262,17 @@ class EconomyPartnerTests(EvenniaTest):
             from evennia_jobs.models import Job
 
             self.assertTrue(Job.objects.filter(title="Economy: possible asset round trip").exists())
+
+    def test_shop_and_seller_fail_closed_when_optional_partner_is_absent(self):
+        from . import seller, shops
+        from .models import Storefront
+
+        if not apps.is_installed("evennia_rp_resources"):
+            with override_settings(RP_ECONOMY_SYSTEM_SELLER=True):
+                self.assertEqual(seller.catalog(self.char2), [])
+        if not apps.is_installed("evennia_building"):
+            self.assertFalse(
+                shops.operational(Storefront(kind="shop", property_id=123), self.char2)
+            )
+            with self.assertRaises(EconomyError):
+                shops.reconcile(self.char1, 123)

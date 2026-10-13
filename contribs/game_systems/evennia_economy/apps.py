@@ -31,3 +31,14 @@ class EconomyConfig(AppConfig):
         pre_delete.connect(guard_stock_deletion, dispatch_uid="economy_stock_delete")
         cap_contributions.connect(cap_contribution, dispatch_uid="economy_stall_caps")
         economy_figures.connect(figures, dispatch_uid="economy_stall_figures")
+        if self.apps.is_installed("evennia_building"):
+            from evennia_building.signals import property_promoted, property_transferring
+
+            from .shops import on_promoted, on_transferring
+
+            property_promoted.connect(
+                on_promoted, dispatch_uid="economy_shop_promotion", weak=False
+            )
+            property_transferring.connect(
+                on_transferring, dispatch_uid="economy_shop_transfer", weak=False
+            )

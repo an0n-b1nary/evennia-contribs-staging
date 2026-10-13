@@ -253,6 +253,73 @@ class Suite:
             == "closed"
         )
 
+    def payouts_shops_and_seller(self):
+        self.command(
+            "alice", "+plot/create Live supply expedition=A shared resource award", "Created plot"
+        )
+        plot = self.state()["plots"][-1]
+        number = plot["plot_number"]
+        self.command("alice", f"+plot/activate #{number}", "now active")
+        self.command(
+            "alice", f"+plot/update #{number}=We returned with supplies.", "Update|added|posted"
+        )
+        self.command("alice", f"+resources/payout #{number}=rare-crystal,2", "approval is required")
+        self.command("alice", f"+plot/conclude #{number}", "Approve all payout resources")
+        self.command("staff", f"+resources/payoutapprove #{number}", "Approved 1")
+        self.session.disconnect("alice")
+        self.command("staff", f"+plot/conclude #{number}", "concluded")
+        self.command("staff", f"+resources/payoutretry #{number}", "Payout retry")
+        alice_id = self.state()["actors"]["alice"]["id"]
+        awards = [
+            row
+            for row in self.state()["resource_grants"]
+            if row["character_id"] == alice_id and row["source"] == "payout"
+        ]
+        assert len(awards) == 1 and awards[0]["quantity"] == 2, awards
+        self.session.connect("alice")
+
+        self.command("alice", "+build/new interior=Live Supply Shop", "created")
+        project = self.state()["building_projects"][-1]
+        self.command("alice", f"+build/purpose {project['id']}=shop", "updated|Done|purpose")
+        anchor = self.state()["actors"]["alice"]["room"]
+        self.command(
+            "alice",
+            f"+build/attach {project['id']} {anchor}=live supply shop",
+            "attached|Done|updated",
+        )
+        project = self.state()["building_projects"][-1]
+        self.command(
+            "alice",
+            f"+build/submit {project['id']} {project['version']}="
+            + self.state()["build_acknowledgement"],
+            "Submission|submitted",
+        )
+        submission = self.state()["building_submissions"][-1]
+        self.command(
+            "staff",
+            f"+build/review {submission['id']} {submission['revision']} approved=Live review",
+            "approved|Done|Review",
+        )
+        store = next(row for row in self.state()["economy_stalls"] if row["kind"] == "shop")
+        self.command("alice", "live supply shop")
+        self.command("bob", "live supply shop")
+        self.command("alice", f"+shop/list {store['id']}/resource:grain:1=3", "Listing #")
+        listing = self.state()["economy_listings"][-1]
+        self.command("alice", "outside", "Playtest.*laboratory")
+        self.session.disconnect("alice")
+        self.command("bob", "+browse", "Shop.*Live Supply Shop")
+        self.command("bob", f"+buy {listing['id']}", "Bought listing")
+        self.command("bob", "outside", "Playtest.*laboratory")
+        self.session.connect("alice")
+
+        self.command("staff", "+runtime RP_ECONOMY_SYSTEM_SELLER=true", "True")
+        try:
+            self.command("bob", "+browse/system", "timber")
+            self.command("bob", "+buy/system timber=1", "Bought 1 timber")
+            self.command("bob", "+buy/system rare-crystal=1", "not available")
+        finally:
+            self.command("staff", "+runtime/reset RP_ECONOMY_SYSTEM_SELLER", "False")
+
     def crafting(self):
         state = self.state()
         alice_id = state["actors"]["alice"]["id"]
@@ -594,6 +661,10 @@ def run_rp(session, smoke=False):
         ("resource holdings, lean, staff grants and runtime reveal", suite.resources),
         ("atomic economy trade, same-account rule, freeze and reveal", suite.economy),
         ("reserved stall stock, offline purchase, freeze and stock recovery", suite.stalls),
+        (
+            "approved plot awards, property shop offline sale and local system seller",
+            suite.payouts_shops_and_seller,
+        ),
         ("invested niches, persistent crafts, hallmarks and offline crafted sale", suite.crafting),
         ("consumed EVENTs, adjacent Broadcast mute and durable audience limits", suite.events),
         ("draft validation, allocation and finalization", suite.sheets),

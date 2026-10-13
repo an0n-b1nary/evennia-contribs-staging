@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-resources"
-version = "0.1.4"
+version = "0.2.0"
 description = "Passive resource accrual, atomic holdings and gathering choices for Evennia RP games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -23,6 +23,7 @@ dependencies = ["evennia>=6.0", "evennia-links>=0.7,<0.9"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
+plots = ["evennia-plots>=0.7.1,<1"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"

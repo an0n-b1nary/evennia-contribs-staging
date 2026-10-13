@@ -7,7 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## 0.7.1 ? 2026-10-12
+## 0.7.1 — 2026-10-13
 
 - Make conclusion and its required partner snapshots atomic, restoring the plot after a listener failure.
 - Show partner validation errors in the conclude command.

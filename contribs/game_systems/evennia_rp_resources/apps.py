@@ -12,6 +12,14 @@ class ResourcesConfig(AppConfig):
         from .conf import register_controls
 
         register_controls()
+        if self.apps.is_installed("evennia_plots"):
+            from evennia_plots.signals import plot_thread_concluded
+
+            from .payouts import on_concluded
+
+            plot_thread_concluded.connect(
+                on_concluded, dispatch_uid="resources_plot_payout", weak=False
+            )
         if self.apps.is_installed("evennia_economy"):
             from evennia_economy.signals import asset_providers, economy_figures
 

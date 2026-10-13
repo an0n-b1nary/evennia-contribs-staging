@@ -9,3 +9,6 @@ class ResourceSummaryCharacterMixin:
     def at_post_puppet(self, **kwargs):
         super().at_post_puppet(**kwargs)
         notify_resource_summary(self)
+        from .summary import notify_plot_summary
+
+        notify_plot_summary(self)
