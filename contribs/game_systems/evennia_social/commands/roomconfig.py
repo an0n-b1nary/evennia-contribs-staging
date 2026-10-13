@@ -109,6 +109,9 @@ class CmdRoomConfig(MuxCommand):
             byline = f" |x(set by {setter})|n" if setter else ""
             lines.append(f" |wMood:|n {mood}{byline}")
 
+        details = getattr(room, "get_extra_room_details", None)
+        for label, value in details(caller) if details else ():
+            lines.append(f" |w{label}:|n {value}")
         lines.append(f"|w+{'=' * (width - 2)}+|n")
         caller.msg("\n".join(lines))
 

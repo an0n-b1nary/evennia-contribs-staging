@@ -18,3 +18,8 @@ def room_visible(room, viewer=None):
     if "secret" in teleport_rules and "ooc" in room_types:
         return bool(viewer and room.access(viewer, "control"))
     return "secret" not in teleport_rules
+
+
+def last_played(character):
+    """Existing host puppet/unpuppet timestamp; another alt's login is irrelevant."""
+    return character.attributes.get("sandbox_last_seen") if character else None

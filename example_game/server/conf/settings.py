@@ -709,6 +709,13 @@ REGIONS_ROOM_VISIBILITY = MAPS_ROOM_VISIBILITY
 BUILDING_REVEALED = True  # The reference game demonstrates revealed mechanics.
 BUILDING_DEFAULT_POLICY = "open"
 BUILDING_SAFE_ROOM = "#2"
+BUILDING_ACTIVITY_PROVIDER = "world.sandbox.building.last_played"
+BUILDING_QUIET_DAYS = 35
+SOCIAL_ROOM_MOOD_PERMISSION = "evennia_building.access.steward_mood_permission"
+GLOBAL_SCRIPTS = {
+    **GLOBAL_SCRIPTS,
+    "building_quiet_review": {"typeclass": "evennia_building.scripts.QuietReview"},
+}
 LOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")
 LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
 LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"

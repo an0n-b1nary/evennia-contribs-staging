@@ -1,0 +1,10 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Attachment consent: {{ consent.project.name }}</h1>
+<p>Parent owner: {{ consent.owner_name }}. Status: {{ consent.state }}. Agreement version: {{ consent.wording_version }}.</p>
+<h2>Passage agreement</h2><p>{{ consent.wording }}</p>
+<h2>Exact proposed content and route</h2><pre>{{ snapshot }}</pre>
+<p>Inspection grants no editing, entry or map rights. Changes require a new request. Consent may be revoked before approval; established passage is durable.</p>
+{% if may_answer %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Record answer</button></form>{% endif %}
+<p><a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% endblock %}

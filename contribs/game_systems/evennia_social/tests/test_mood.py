@@ -19,6 +19,10 @@ from evennia_social.tests.base import SocialCommandTestCase, SocialTestCase
 HAS_SCENES = apps.is_installed("evennia_scenes")
 
 
+def grant_test_mood(character, room):
+    return True
+
+
 class TestRoomMoodDisplay(SocialTestCase):
     def test_no_mood_leaves_the_description_alone(self):
         self.assertNotIn("[Mood]", self.room1.get_display_desc(self.char1))
@@ -50,6 +54,25 @@ class TestRoomMoodDisplay(SocialTestCase):
 
 
 class TestCmdMood(SocialCommandTestCase):
+    @override_settings(SOCIAL_ROOM_MOOD_PERMISSION="evennia_social.tests.test_mood.grant_test_mood")
+    def test_host_can_grant_temporary_mood_without_lasting_configuration(self):
+        from evennia_links.rooms import can
+
+        self.assertFalse(can(self.char2, self.room1, "configure"))
+        self.call(CmdMood(), "A passing breeze.", "Mood set: A passing breeze.", caller=self.char2)
+        self.assertFalse(can(self.char2, self.room1, "configure"))
+
+    def test_mood_provider_can_defer_deny_and_fail_closed(self):
+        with override_settings(SOCIAL_ROOM_MOOD_PERMISSION=lambda actor, room: None):
+            self.assertTrue(can_set_mood(self.char1, self.room1))
+            self.assertFalse(can_set_mood(self.char2, self.room1))
+        with override_settings(SOCIAL_ROOM_MOOD_PERMISSION=lambda actor, room: False):
+            self.assertFalse(can_set_mood(self.char1, self.room1))
+        with override_settings(SOCIAL_ROOM_MOOD_PERMISSION=lambda actor, room: "yes"):
+            self.assertFalse(can_set_mood(self.char1, self.room1))
+        with override_settings(SOCIAL_ROOM_MOOD_PERMISSION="missing.module.provider"):
+            self.assertFalse(can_set_mood(self.char1, self.room1))
+
     def test_bare_with_no_mood(self):
         self.call(CmdMood(), "", "No mood is set here.")
 

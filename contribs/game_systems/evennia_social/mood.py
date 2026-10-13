@@ -22,6 +22,7 @@ only owners and staff can set a mood.
 
 from django.apps import apps
 from django.conf import settings
+from django.utils.module_loading import import_string
 
 from evennia_links.rooms import can
 from evennia_social.social import is_staff
@@ -60,6 +61,20 @@ def live_scene(room):
 
 def can_set_mood(character, room):
     """True if *character* may set or clear *room*'s mood. See module docstring."""
+    if not character or not room:
+        return False
+    provider = getattr(settings, "SOCIAL_ROOM_MOOD_PERMISSION", None)
+    if provider:
+        try:
+            callback = import_string(provider) if isinstance(provider, str) else provider
+            result = callback(character, room)
+        except Exception:
+            from evennia.utils import logger
+
+            logger.log_warn("Room mood permission provider failed; denying the change.")
+            return False
+        if result is not None:
+            return result if type(result) is bool else False
     if can(character, room, "configure") or is_staff(character):
         return True
     scene = live_scene(room)

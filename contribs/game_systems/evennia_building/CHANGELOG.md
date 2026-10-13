@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — 2026-10-12
+
+- Add public frontier and atomic mixed settlements with independently owned interiors.
+- Add accepted collaborators, lead-only management and exact contributor/recipient agreements.
+- Freeze explicit grid connections; validate mapped geometry or require manual staff certification.
+- Add public stewardship, temporary mood permission, inactivity flags without automatic action,
+  coordinated retirement, replacement connections and connectivity-preserving restore.
+- Add selected-character web/command controls, public growth map/API/overlay and reference seams.
+- Preserve 0.2 migrations, ordinary pending snapshots and apartment passage inside mixed homes.
+
+## 0.2.0 — 2026-10-11
+
+- Add exact-candidate attachment consent, independent one-level apartments and
+  durable agreed passage for apartment owners, residents and accepted entry guests.
+- Protect passage through parent locks, room overrides and transfers without
+  granting parent editing, installation, remote presence or floor-plan rights.
+- Add staff archive/restore preserving geometry, belongings and audit history;
+  refuse child stranding and require both current owners for replacement passage.
+- Add character-specific, deduplicated quiet-property review flags with a
+  configurable 35-day threshold and reveal grace; never reclaim automatically.
+- Add command/web/admin surfaces, generic apartment seeds and partner seams.
+
 ## 0.1.0 — 2026-10-11
 
 - Add private interior drafts, frozen review snapshots, Jobs/native review and

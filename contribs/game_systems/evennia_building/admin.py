@@ -31,5 +31,18 @@ for model in (
     models.Resident,
     models.GuestInvitation,
     models.RoomOverride,
+    models.AttachmentConsent,
+    models.AttachmentAgreement,
+    models.PassageChange,
+    models.QuietFlag,
+    models.BuildingClock,
+    models.BuildPart,
+    models.ProjectContributor,
+    models.ProjectAgreement,
+    models.Frontier,
+    models.FrontierRoom,
+    models.FrontierConnection,
+    models.GeometryApproval,
+    models.StewardQuietFlag,
 ):
     admin.site.register(model, AuditAdmin)

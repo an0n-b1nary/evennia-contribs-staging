@@ -1,9 +1,11 @@
 # evennia-building
 
-Version 0.1.0 supplies individually owned, reviewed interiors. Players draft
-isolated rooms, submit immutable revisions, withdraw to edit, and receive an
-atomic staff approval. Homes begin unlocked; maps remain private. Apartment
-consent, archival and quiet-property flags are reserved for a later release.
+Version 0.3.0 supplies reviewed private homes, public frontier and mixed
+settlements. Shared authors draft together under the lead's quotas; every
+contributor acknowledges the exact candidate and content reuse terms. Each
+proposed home owner accepts their own boundary. Staff approve the entire frozen
+project atomically. Public streets have stewards, individual homes have owners,
+and neither role gives general Builder powers.
 
 Install `evennia-links` first, then `pip install -e contribs/game_systems/evennia_building`.
 Only Links and Evennia are hard dependencies. Maps, Regions, Jobs, Economy and
@@ -31,6 +33,8 @@ Links travel provider configured below.
 ```python
 LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
 LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"
+# Optional Social >=0.7.2: temporary mood only, without configure rights.
+SOCIAL_ROOM_MOOD_PERMISSION = "evennia_building.access.steward_mood_permission"
 ```
 
 The host owns Maps/Regions visibility. Consult Building first and preserve
@@ -75,8 +79,8 @@ queue and histories intact. Review and promotion use the same services.
 The content reuse wording/version belong to host settings:
 `BUILDING_REUSE_ACKNOWLEDGEMENT` and `BUILDING_REUSE_VERSION`. Each submission
 records the exact acknowledgement and actor; acknowledgements do not grant
-another owner's consent. Attaching inside another character's property and
-frontier creation are explicitly unavailable in this release.
+another owner's consent. Apartment attachment uses a separate owner consent
+workflow; shared frontier projects use per-candidate agreements (below).
 
 Room `build_policy` tags override active primary-region `RegionBuildPolicy`
 defaults, then `BUILDING_DEFAULT_POLICY` (`open`). Policies are `open`,
@@ -113,7 +117,120 @@ and `actor`. Required listener errors roll back everything, including a Jobs
 decision. Use the unique `property.promotion_id` for idempotent later shop
 reconciliation. `property_changed` runs after commit for cache invalidation;
 it is not durable external delivery. Ownership is per room and per property,
-ready for future separate apartment boundaries. Deleted owners/anchors deny
+including separate apartment boundaries. Deleted owners/anchors deny
 access pending staff repair; audit records preserve character names and IDs.
 
 See [the player guide](guides/building.md) and `services.py` for the shared API.
+
+## Apartments and consent
+
+`attach(..., passage=[room_id, ...])` names a route from the parent's entrance
+to the apartment attachment. Omit it to use the parent's generated outward tree.
+Applicants need existing entry or preview rights to the proposed passage;
+requesting consent cannot discover a restricted parent route by guessing IDs.
+All route rooms must belong to one live top-level parent, with usable doors in
+both directions. Nested apartments and routes crossing another property are
+refused. Request consent with `attachments.request_consent`, inspect the exact
+candidate and wording, then the current parent owner calls `answer_consent`.
+Only that owner may grant/decline/revoke; staff and residents cannot substitute.
+Self-owned attachments record their own receipt. Consent freezes names,
+descriptions, geometry, owner, anchor, route, policy report and agreement wording.
+Editing invalidates outstanding grants. Approval rechecks the candidate and
+consumes its receipt into `AttachmentAgreement`; pre-approval revocation blocks
+promotion and rolls back a Jobs decision as well.
+
+The parent gives durable passage to the apartment owner, its residents and
+accepted guests with entry scope. Parent locks, bedroom overrides, resident
+removal and transfer cannot defeat that specific passage. It confers no parent
+floor-plan, remote presence, teleport, ownership, editing or installation rights.
+An unlocked child alone grants no passage through a locked parent. The child
+controls its door and guests. Neither owner can delete an established route.
+Only staff may propose/apply replacement passage; both current owners explicitly
+acknowledge the exact route and wording through `PassageChange` first.
+
+## Archive, restore and quiet review
+
+`lifecycle.archive(actor, property, reason=..., include_children=False)` detaches
+the preserved entrance, hides ordinary access/discovery and returns characters
+to safe rooms. Loose/carried belongings and all room/exit/ownership IDs survive.
+Active children block parent archival unless staff explicitly archives them
+together. Restore the parent first, then each child. `restore` rechecks the live
+anchor, policy, door names/limits, actual geometry and passage. Changed owners
+since archival require renewed agreement from both current owners; changed
+routes require agreed replacement passage. No timeout changes rights.
+
+Quiet review uses character play, never account login. Configure
+`BUILDING_ACTIVITY_PROVIDER` as a callable returning an aware datetime or None.
+The reference game uses its existing puppet/unpuppet `sandbox_last_seen` hook.
+The default reads `building_last_played`: compose `BuildingCharacterMixin`
+before DefaultCharacter with cooperative `super()` to maintain it. Online
+characters are active; missing history starts at property creation. The runtime
+`BUILDING_QUIET_DAYS` defaults to 35. A persisted first revealed check starts a
+minimum reveal grace of the same duration. New activity resolves open flags;
+repeated checks deduplicate, and flags grant/revoke no rights. Staff see them
+via `+build/quiet`, the Building page and inspection-only admin, even without Jobs.
+
+Schedule automatic checks with a persistent global script:
+
+```python
+GLOBAL_SCRIPTS = {
+    **GLOBAL_SCRIPTS,
+    "building_quiet_review": {"typeclass": "evennia_building.scripts.QuietReview"},
+}
+```
+
+Upgrading 0.1 preserves migrations, objects, ownership, reviews and snapshots.
+Existing top-level pending submissions keep their fingerprint. New apartment
+proposals require consent; an old self-owned internal proposal must be withdrawn
+and resubmitted with its passage receipt before approval.
+
+## Shared frontier and mixed settlements
+
+Create a frontier with `services.new_project(actor, name, kind="frontier")`.
+The lead chooses a public anchor and a compass direction with `attach`.
+`collaboration.invite` and `answer` grant accepted individual collaborators
+draft entry, digging and room text editing. Only the lead manages invitations,
+attachment, proposed owners, submission, withdrawal and discard. Group membership
+grants no rights. All rooms count against the lead's draft quota.
+
+`frontier.add_interior` defines a private home or shop boundary attached by a
+named entrance to a proposed public street. Each interior has its own local
+coordinates and future owner. `assign_owner` also supports standalone interiors.
+Recipients may inspect the exact candidate without entering or editing its draft.
+Every active collaborator and every retained contributor must acknowledge the
+current candidate hash and reuse wording through `collaboration.acknowledge`.
+Every proposed recipient must separately accept ownership. Changes invalidate
+receipts; removing a contributor cannot erase their requirement. Agreements may
+be revoked until promotion. Consumed receipts and live home ownership survive
+membership departure. Existing apartment consent is still required where relevant.
+
+Only explicitly proposed grid connections are promoted. Adjacency is a review
+warning and creates no exit. Maps validates placement, direction, stack and
+occupied ports/cells; without Maps staff must certify geometry on the exact
+submission via `/geometry`. Promotion rechecks actual geometry, access policy,
+agreements and door limits inside the same transaction. Frontier inherits terrain
+and region; each home remains an independent Property. No group property exists.
+
+Stewards may maintain public room descriptions and temporary moods, and relinquish
+stewardship to staff. They cannot lock, admit, install, transfer or configure.
+Staff assignment/departure requires the recorded current steward and a reason.
+Character inactivity uses the same `BUILDING_ACTIVITY_PROVIDER` and runtime
+`BUILDING_QUIET_DAYS` as homes, with reveal grace. It only creates a deduplicated
+staff flag in `/quiet`, the staff Building page and admin. No automatic stewardship
+or ownership change occurs; Jobs is not needed for this review channel.
+
+`frontier_lifecycle.archive` requires explicit affected frontier/property lists
+or replacement public connections. It refuses to strand active homes or break
+existing public connectivity. Coordinated retirement preserves identities,
+contents, geometry, rights and audit history. Restore the preserved frontier
+group before its homes; restoration rechecks policy, ports and geometry.
+
+The web controls are at `/building/projects/<id>/collaboration/` and
+`/building/frontier/<id>/`. `/building/frontier/` highlights public growth by
+promotion date and plane. The read-only `/api/v1/building/frontier/` exposes public
+rooms and stewardship, excluding private interiors and unpublished proposals.
+Maps' `frontier` overlay carries public provenance and approval metadata.
+
+Upgrade 0.2 with normal migrations. Historical migrations, ordinary interior
+snapshot shape and the stable `building_interior` request form identifier are
+preserved; existing pending interior/apartment candidates remain reviewable.

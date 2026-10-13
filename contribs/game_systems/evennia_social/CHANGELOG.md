@@ -2,6 +2,13 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.7.2 — 2026-10-12
+
+- Add optional `SOCIAL_ROOM_MOOD_PERMISSION` for narrowly scoped temporary mood rights.
+  True/False is authoritative; None preserves existing staff, scene and configure rules.
+  Provider errors and invalid results deny; this grants no lasting room configuration.
+- Display optional cooperative room metadata in `+roomconfig` for authorized viewers.
+
 ## 0.7.1 ? 2026-10-11
 
 - Respect authoritative property travel and visibility in discovery, home, teleport, summon and join.

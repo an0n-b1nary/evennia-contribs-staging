@@ -9,6 +9,14 @@ class BuildingConfig(AppConfig):
         from .runtime import register
 
         register()
+        if apps.is_installed("evennia_maps"):
+            from evennia_maps.signals import collect_tile_overlays
+
+            from .overlays import provide
+
+            collect_tile_overlays.connect(
+                provide, dispatch_uid="building.maps.frontier", weak=False
+            )
         if apps.is_installed("evennia_regions"):
             from evennia_links import connect_soft_ref_cleanup
 

@@ -7,6 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
@@ -15,21 +16,37 @@ from evennia.objects.models import ObjectDB
 
 from evennia_links.characters import web_character
 
-from . import services
+from . import attachments, collaboration, frontier_lifecycle, lifecycle, services
 from .access import is_staff, require_revealed
-from .models import BuildProject, BuildSubmission, GuestInvitation, Property
+from .models import (
+    AttachmentAgreement,
+    BuildProject,
+    BuildSubmission,
+    GuestInvitation,
+    PassageChange,
+    ProjectContributor,
+    Property,
+)
 from .policy import set_policy
 from .visibility import room_visibility
 
 
 class ProjectForm(forms.Form):
     name = forms.CharField(max_length=255)
+    kind = forms.ChoiceField(
+        choices=[("interior", "Interior"), ("frontier", "Public frontier / settlement")],
+        required=False,
+    )
     purpose = forms.ChoiceField(
         choices=[
             ("home", "Home"),
+            ("public", "Public frontier"),
             ("shop", "Shop proposal (selling requires a separate shop integration)"),
         ]
     )
+
+    def clean_kind(self):
+        return self.cleaned_data["kind"] or "interior"
 
 
 class ActionForm(forms.Form):
@@ -59,8 +76,13 @@ class ActionForm(forms.Form):
                 ("discard", "Confirm discard"),
                 ("environment", "Request environment changes"),
                 ("approve_environment", "Approve requested environment (staff)"),
+                ("approve_geometry", "Certify manually reviewed frontier geometry (staff)"),
                 ("policy", "Set room building policy (staff)"),
                 ("region_policy", "Set region building policy (staff)"),
+                ("consent_request", "Request attachment consent"),
+                ("archive", "Archive property (staff)"),
+                ("restore", "Restore property (staff)"),
+                ("passage", "Propose replacement passage (staff)"),
             )
         ]
     )
@@ -94,6 +116,13 @@ class ActionForm(forms.Form):
     retain_grants = forms.BooleanField(required=False, label="Retain grants during staff transfer")
     expected_owner = forms.IntegerField(min_value=1, required=False)
     confirmation = forms.CharField(required=False, widget=forms.HiddenInput)
+    passage = forms.CharField(
+        required=False,
+        label="Passage room numbers, from parent entrance to apartment attachment, separated by commas",
+    )
+    include_children = forms.BooleanField(
+        required=False, label="Archive affected apartments together with this parent"
+    )
 
     def __init__(self, data=None, *, actions, selected=None, rooms=(), **kwargs):
         super().__init__(data, **kwargs)
@@ -112,11 +141,16 @@ class ActionForm(forms.Form):
             "description": ("version", "room", "value"),
             "dig": ("version", "room", "value", "door", "back", "floor", "x", "y"),
             "door": ("version", "room", "target", "value"),
-            "attach": ("version", "target", "value"),
+            "attach": ("version", "target", "value", "passage"),
+            "consent_request": ("version",),
+            "archive": ("reason", "include_children"),
+            "restore": ("reason",),
+            "passage": ("passage", "reason"),
             "submit": ("version", "acknowledgement"),
             "discard": ("version", "confirmation"),
             "environment": ("version", "value"),
             "approve_environment": ("version", "reason"),
+            "approve_geometry": ("version", "reason"),
             "withdraw": ("version", "reason"),
             "review": ("version", "value", "reason"),
             "lock": (),
@@ -137,7 +171,16 @@ class ActionForm(forms.Form):
         if "version" in self.fields and "version" not in self.initial:
             del self.fields["version"]
         for key, field in self.fields.items():
-            if key not in {"reason", "can_install", "retain_grants", "entry", "maps", "value"}:
+            if key not in {
+                "reason",
+                "can_install",
+                "retain_grants",
+                "entry",
+                "maps",
+                "value",
+                "passage",
+                "include_children",
+            }:
                 field.required = True
         if "value" in self.fields:
             self.fields["value"].label = {
@@ -201,7 +244,7 @@ def actor_for(request):
 
 def project_for(actor, pk):
     project = get_object_or_404(BuildProject, pk=pk)
-    if project.owner_id != actor.pk and not is_staff(actor):
+    if not collaboration.can_inspect(actor, project):
         raise Http404
     return project
 
@@ -234,13 +277,13 @@ def index(request):
             return redirect("evennia_building:project", pk=project.pk)
         except (ValidationError, PermissionDenied) as exc:
             _error(form, exc)
-    projects = (
-        BuildProject.objects.all() if is_staff(actor) else BuildProject.objects.filter(owner=actor)
-    )
+    projects = collaboration.visible_projects(actor)
     properties = [
         property
-        for property in Property.objects.filter(state="live")
-        if property_rooms(property, actor)
+        for property in (
+            Property.objects.all() if is_staff(actor) else Property.objects.filter(state="live")
+        )
+        if is_staff(actor) or property_rooms(property, actor)
     ]
     return render(
         request,
@@ -255,6 +298,17 @@ def index(request):
             "properties": properties,
             "invitations": GuestInvitation.objects.filter(character=actor, state="pending"),
             "form": form,
+            "consents": attachments.visible_consents(actor),
+            "passage_changes": PassageChange.objects.filter(state="pending")
+            if is_staff(actor)
+            else PassageChange.objects.filter(
+                Q(parent_owner=actor) | Q(child_owner=actor), state="pending"
+            ),
+            "quiet_flags": lifecycle.quiet_list(actor) if is_staff(actor) else (),
+            "steward_flags": frontier_lifecycle.quiet_list(actor) if is_staff(actor) else (),
+            "collaboration_invitations": ProjectContributor.objects.filter(
+                character=actor, state="invited"
+            ).select_related("project"),
         },
     )
 
@@ -277,17 +331,30 @@ def project_detail(request, pk):
             "submit",
             "discard",
             "environment",
+            "consent_request",
         }
         if project.state == "draft" and actor.pk == project.owner_id
         else {"submit"}
     )
-    form = ActionForm(
-        request.POST if request.method == "POST" else None,
-        actions=actions,
-        selected=request.GET.get("action"),
-        initial={"version": project.version},
-        rooms=[(row.pk, row.room.key if row.room else "Missing room") for row in rooms],
+    if actor.pk != project.owner_id:
+        actions = (
+            {"room_name", "description", "dig", "door"}
+            if project.state == "draft" and collaboration.can_author(actor, project)
+            else set()
+        )
+    form = (
+        ActionForm(
+            request.POST if request.method == "POST" else None,
+            actions=actions,
+            selected=request.GET.get("action"),
+            initial={"version": project.version},
+            rooms=[(row.pk, row.room.key if row.room else "Missing room") for row in rooms],
+        )
+        if actions
+        else None
     )
+    if request.method == "POST" and form is None:
+        raise PermissionDenied("This candidate is available for inspection and agreement only.")
     if request.method == "POST" and form.is_valid():
         try:
             values = form.cleaned_data
@@ -337,7 +404,15 @@ def project_detail(request, pk):
                     ObjectDB.objects.get(pk=values["target"]),
                     values["value"],
                     expected_version=values["version"],
+                    passage=[int(pk.strip()) for pk in values["passage"].split(",")]
+                    if values.get("passage")
+                    else None,
                 )
+            elif action == "consent_request":
+                consent = attachments.request_consent(
+                    actor, project, expected_version=values["version"]
+                )
+                return redirect("evennia_building:consent", pk=consent.pk)
             elif action == "submit":
                 services.submit(
                     actor,
@@ -369,7 +444,7 @@ def project_detail(request, pk):
         if project.state == "draft" and actor.pk == project.owner_id
         else ""
     )
-    if "confirmation" in form.fields:
+    if form and "confirmation" in form.fields:
         form.fields["confirmation"].initial = confirmation
     return render(
         request,
@@ -398,7 +473,9 @@ def submission_detail(request, pk):
     project_for(actor, submission.project_id)
     form = ActionForm(
         request.POST if request.method == "POST" else None,
-        actions={"withdraw", "review", "approve_environment"} if is_staff(actor) else {"withdraw"},
+        actions={"withdraw", "review", "approve_environment", "approve_geometry"}
+        if is_staff(actor)
+        else {"withdraw"},
         selected=request.GET.get("action"),
         initial={"version": submission.revision},
     )
@@ -419,6 +496,12 @@ def submission_detail(request, pk):
                 )
             elif values["action"] == "approve_environment":
                 services.approve_environment(
+                    actor, submission, expected_revision=values["version"], reason=values["reason"]
+                )
+            elif values["action"] == "approve_geometry":
+                from .frontier import approve_geometry
+
+                approve_geometry(
                     actor, submission, expected_revision=values["version"], reason=values["reason"]
                 )
             else:
@@ -443,9 +526,11 @@ def json_snapshot(submission):
 @require_http_methods(["GET", "POST"])
 def property_detail(request, pk):
     actor = actor_for(request)
-    property = get_object_or_404(Property, pk=pk, state="live")
+    property = get_object_or_404(Property, pk=pk)
+    if property.state != "live" and not is_staff(actor):
+        raise Http404
     rooms = property_rooms(property, actor)
-    if not rooms:
+    if not rooms and not is_staff(actor):
         raise Http404
     manager = actor.pk == property.owner_id or is_staff(actor)
     actions = {
@@ -461,7 +546,9 @@ def property_detail(request, pk):
         "description",
     }
     if is_staff(actor):
-        actions |= {"transfer", "policy", "region_policy"}
+        actions |= {"transfer", "policy", "region_policy", "archive", "restore"}
+        if AttachmentAgreement.objects.filter(child=property).exists():
+            actions.add("passage")
     form = ActionForm(
         request.POST if request.method == "POST" else None,
         actions=actions,
@@ -529,6 +616,23 @@ def property_detail(request, pk):
                     values["value"],
                     region=action == "region_policy",
                 )
+            elif action == "archive":
+                lifecycle.archive(
+                    actor,
+                    property,
+                    reason=values["reason"],
+                    include_children=values["include_children"],
+                )
+            elif action == "restore":
+                lifecycle.restore(actor, property, reason=values["reason"])
+            elif action == "passage":
+                change = attachments.propose_passage(
+                    actor,
+                    property.attachment,
+                    [int(pk.strip()) for pk in values["passage"].split(",")],
+                    reason=values["reason"],
+                )
+                return redirect("evennia_building:passage", pk=change.pk)
             else:
                 raise ValidationError("Choose a property action.")
             return redirect("evennia_building:property", pk=pk)
@@ -574,3 +678,76 @@ def invitation_answer(request, pk):
             status=400,
         )
     return redirect("evennia_building:index")
+
+
+class ConsentAnswerForm(forms.Form):
+    action = forms.ChoiceField(
+        choices=[("grant", "Grant"), ("decline", "Decline"), ("revoke", "Revoke before promotion")]
+    )
+    acknowledgement = forms.BooleanField(
+        required=False, label="I have read and agree to the exact passage wording shown above."
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def consent_detail(request, pk):
+    import json
+
+    actor = actor_for(request)
+    consent = get_object_or_404(attachments.visible_consents(actor), pk=pk)
+    form = ConsentAnswerForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            attachments.answer_consent(
+                actor,
+                consent,
+                action=form.cleaned_data["action"],
+                acknowledgement=consent.wording if form.cleaned_data["acknowledgement"] else "",
+            )
+            return redirect("evennia_building:consent", pk=pk)
+        except (ValidationError, PermissionDenied) as exc:
+            _error(form, exc)
+    return render(
+        request,
+        "evennia_building/consent.html",
+        {
+            "consent": consent,
+            "snapshot": json.dumps(consent.candidate, indent=2),
+            "form": form,
+            "may_answer": actor.pk == consent.owner_id,
+        },
+    )
+
+
+class PassageAnswerForm(forms.Form):
+    action = forms.ChoiceField(
+        choices=[("accept", "Acknowledge replacement passage"), ("apply", "Apply (staff)")]
+    )
+    acknowledgement = forms.BooleanField(
+        required=False, label="I agree to the exact replacement route and passage wording above."
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def passage_detail(request, pk):
+    actor = actor_for(request)
+    change = get_object_or_404(PassageChange, pk=pk)
+    if not is_staff(actor) and actor.pk not in {change.parent_owner_id, change.child_owner_id}:
+        raise Http404
+    form = PassageAnswerForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            if form.cleaned_data["action"] == "apply":
+                attachments.apply_passage(actor, change)
+            else:
+                attachments.accept_passage(
+                    actor,
+                    change,
+                    acknowledgement=change.wording if form.cleaned_data["acknowledgement"] else "",
+                )
+            return redirect("evennia_building:passage", pk=pk)
+        except (ValidationError, PermissionDenied) as exc:
+            _error(form, exc)
+    return render(request, "evennia_building/passage.html", {"change": change, "form": form})

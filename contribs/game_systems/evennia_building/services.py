@@ -38,13 +38,14 @@ from .models import (
 from .policy import primary_region, resolve_policy
 
 
-def audit(actor, action, *, project=None, property=None, **data):
+def audit(actor, action, *, project=None, property=None, frontier=None, **data):
     return BuildAudit.objects.create(
         actor=actor,
         actor_name=getattr(actor, "key", "Unknown"),
         action=action,
         project=project,
         property=property,
+        frontier=frontier,
         data={"actor_id": getattr(actor, "pk", None), **data},
     )
 
@@ -77,11 +78,15 @@ def _read_attr(room, key, default=None):
     return from_pickle(row) if row is not None else default
 
 
-def _project(project, actor, *, editable=False, expected_version=None):
+def _project(project, actor, *, editable=False, expected_version=None, author=False):
     BuildProject.objects.filter(pk=project.pk).update(version=F("version"))
     require_revealed(actor)
     project = BuildProject.objects.select_for_update().get(pk=project.pk)
-    if not project.owner_id or project.owner_id != actor.pk:
+    from .collaboration import can_author
+
+    if not project.owner_id or not (
+        can_author(actor, project) if author else project.owner_id == actor.pk
+    ):
         raise PermissionDenied("Only the project owner may change this draft.")
     if editable and project.state != "draft":
         raise ValidationError("Withdraw the submitted draft before editing it.")
@@ -96,6 +101,11 @@ def _touch(project):
     ):
         raise ValidationError("This project has changed; reload it first.")
     project.version += 1
+    project.agreements.filter(state="accepted").update(state="invalidated")
+    for consent in project.consents.filter(state__in=["requested", "granted"]):
+        consent.state = "invalidated"
+        consent.save(update_fields=["state"])
+        audit(project.owner, "consent_invalidated", project=project, consent=consent.pk)
 
 
 def _quota(owner, *, project=False):
@@ -111,14 +121,16 @@ def _quota(owner, *, project=False):
         raise ValidationError("You have reached the draft-room limit.")
 
 
-def _flags(room, draft):
+def _flags(room, draft, *, frontier=False):
     room.attributes.add("room_type", "ooc" if draft else "ic")
-    room.attributes.add("allow_teleport", "secret" if draft else "private")
+    room.attributes.add(
+        "allow_teleport", "secret" if draft else "public" if frontier else "private"
+    )
     room.attributes.add("hangout_type", None)
     room.locks.add("control:false();edit:false();delete:false();teleport:building_entry()")
 
 
-def _make_room(project, *, name, parent=None, floor=0, x=0, y=0):
+def _make_room(project, *, name, parent=None, floor=0, x=0, y=0, part=None):
     room = create_object(
         getattr(settings, "BASE_ROOM_TYPECLASS", "evennia.objects.objects.DefaultRoom"),
         key=_text(name),
@@ -133,20 +145,31 @@ def _make_room(project, *, name, parent=None, floor=0, x=0, y=0):
         x=x,
         y=y,
         entry=parent is None,
+        part=part,
+        space=part.pk if part else 0,
     )
     if apps.is_installed("evennia_maps"):
         from evennia_maps.models import RoomTile
         from evennia_maps.placement import create_private_stack, place_tile, resolve_stacked_plane
 
-        if parent is None:
+        if parent is None or (part and not part.entry_id):
             create_private_stack(
-                room, f"{project.name[:65]} (interior {project.pk})", actor=project.owner
+                room,
+                f"{part.name[:50]} (project {project.pk}, interior {part.pk})"
+                if part
+                else f"{project.name[:65]} (interior {project.pk})",
+                actor=project.owner,
             )
         else:
-            entry = project.rooms.get(entry=True)
+            entry = (
+                project.rooms.get(room_id=part.entry_id) if part else project.rooms.get(entry=True)
+            )
             tile = RoomTile.objects.get(room=entry.room)
             plane = resolve_stacked_plane(tile.plane, floor - tile.plane.elevation)
             place_tile(room, plane, x, y, actor=project.owner)
+    if part and not part.entry_id:
+        part.entry = room
+        part.save(update_fields=["entry"])
     return record
 
 
@@ -186,6 +209,12 @@ def _exit_data(exit):
 
 
 def _door(project, source, target, name, *, outward=False):
+    if (
+        source.project_id != project.pk
+        or target.project_id != project.pk
+        or source.part_id != target.part_id
+    ):
+        raise ValidationError("Internal doors must stay inside one draft space.")
     if source.entry and _text(name, 100).casefold() == "outside":
         raise ValidationError("The entrance room reserves 'outside' for departure after approval.")
     exit = _exit(source.room, target.room, name, outward=outward)
@@ -198,14 +227,14 @@ def _door(project, source, target, name, *, outward=False):
 def new_project(actor, name, *, kind="interior", purpose="home"):
     _quota(actor, project=True)
     require_revealed(actor)
-    if kind != "interior":
-        raise ValidationError(
-            "Only interior projects are available; frontier creation is not supported yet."
-        )
-    if purpose not in {"home", "shop"}:
+    if kind not in {"interior", "frontier"}:
+        raise ValidationError("Choose interior or frontier.")
+    if kind == "frontier":
+        purpose = "public"
+    if purpose not in {"home", "shop", "public"} or (purpose == "public" and kind != "frontier"):
         raise ValidationError("Choose home or shop.")
     project = BuildProject.objects.create(
-        owner=actor, owner_name=actor.key, name=_text(name), purpose=purpose
+        owner=actor, owner_name=actor.key, name=_text(name), purpose=purpose, kind=kind
     )
     _make_room(project, name=name)
     audit(actor, "created", project=project)
@@ -226,24 +255,33 @@ def dig(
     y=0,
     expected_version=None,
 ):
-    project = _project(project, actor, editable=True, expected_version=expected_version)
-    _quota(actor)
+    project = _project(
+        project, actor, editable=True, expected_version=expected_version, author=True
+    )
+    _quota(project.owner)
     source = project.rooms.get(pk=source.pk)
     if not source.room_id:
         raise ValidationError("A draft room is missing; ask staff to repair it.")
-    if project.rooms.filter(floor=floor, x=x, y=y).exists():
+    if project.rooms.filter(part=source.part, floor=floor, x=x, y=y).exists():
         raise ValidationError("That draft map cell is occupied.")
     _touch(project)
-    room = _make_room(project, name=name, parent=source, floor=int(floor), x=int(x), y=int(y))
+    room = _make_room(
+        project, name=name, parent=source, floor=int(floor), x=int(x), y=int(y), part=source.part
+    )
     _door(project, source, room, door)
     _door(project, room, source, back, outward=True)
     audit(actor, "dug", project=project, room=room.object_id)
+    from .collaboration import note_contribution
+
+    note_contribution(actor, project)
     return room
 
 
 @atomic_objects
 def add_door(actor, project, source, target, name, *, expected_version=None):
-    project = _project(project, actor, editable=True, expected_version=expected_version)
+    project = _project(
+        project, actor, editable=True, expected_version=expected_version, author=True
+    )
     source = project.rooms.get(pk=source.pk)
     target = project.rooms.get(pk=target.pk)
     if source == target or not source.room_id or not target.room_id:
@@ -251,6 +289,9 @@ def add_door(actor, project, source, target, name, *, expected_version=None):
     _touch(project)
     result = _door(project, source, target, name)
     audit(actor, "door", project=project, door=result.object_id)
+    from .collaboration import note_contribution
+
+    note_contribution(actor, project)
     return result
 
 
@@ -258,7 +299,9 @@ def add_door(actor, project, source, target, name, *, expected_version=None):
 def edit_project(
     actor, project, *, name=None, purpose=None, room=None, description=None, expected_version=None
 ):
-    project = _project(project, actor, editable=True, expected_version=expected_version)
+    project = _project(
+        project, actor, editable=True, expected_version=expected_version, author=room is not None
+    )
     _touch(project)
     if room is not None:
         record = project.rooms.get(pk=room.pk)
@@ -285,6 +328,9 @@ def edit_project(
         description=description,
         purpose=purpose,
     )
+    from .collaboration import note_contribution
+
+    note_contribution(actor, project)
     return project
 
 
@@ -301,15 +347,20 @@ def _anchor(project):
         raise ValidationError("The attachment must be a live room.")
     draft = DraftRoom.objects.filter(object_id=anchor.pk).first()
     owner = ownership(anchor)
-    if draft and not owner:
+    from .models import FrontierRoom
+
+    if (
+        draft
+        and not owner
+        and not FrontierRoom.objects.filter(room=anchor, frontier__state="live").exists()
+    ):
         raise ValidationError("A draft cannot be an attachment room.")
     if owner:
         if owner.property.state != "live" or not owner.owner_id:
             raise ValidationError("The attachment property is unavailable.")
-        if owner.owner_id != project.owner_id:
-            raise ValidationError(
-                "Attaching inside another character's property is not yet available."
-            )
+        from .attachments import parent_for
+
+        parent_for(project)
     if (
         _read_attr(anchor, "room_type", "ic") != "ic"
         or _read_attr(anchor, "allow_teleport") == "secret"
@@ -321,8 +372,12 @@ def _anchor(project):
 
 
 @atomic_objects
-def attach(actor, project, anchor, entrance_name, *, expected_version=None):
+def attach(actor, project, anchor, entrance_name, *, expected_version=None, passage=None):
     project = _project(project, actor, editable=True, expected_version=expected_version)
+    if project.kind == "frontier":
+        from .frontier import attach_frontier
+
+        return attach_frontier(actor, project, anchor, entrance_name)
     _touch(project)
     name = _text(entrance_name, 100)
     if name.casefold() in {
@@ -351,7 +406,16 @@ def attach(actor, project, anchor, entrance_name, *, expected_version=None):
     project.anchor = anchor
     project.entrance_name = name
     _anchor(project)
-    project.save(update_fields=["anchor", "entrance_name"])
+    from .attachments import attachment_snapshot, default_route, parent_for, require_route_selection
+
+    parent = parent_for(project)
+    project.passage = (
+        default_route(parent, anchor) if parent and passage is None else (passage or [])
+    )
+    attachment_snapshot(project)
+    if parent:
+        require_route_selection(actor, project.passage)
+    project.save(update_fields=["anchor", "entrance_name", "passage"])
     audit(actor, "attached", project=project, anchor=anchor.pk, entrance=name)
     return project
 
@@ -496,11 +560,16 @@ def check_project(project):
         ):
             raise ValidationError("A generated door was removed or redirected.")
     for room in rooms:
-        if not room.entry and (
-            not room.parent_id
-            or not any(
-                door.source_id == room.pk and door.target_id == room.parent_id and door.outward
-                for door in doors
+        part_entry = bool(room.part_id and room.room_id == room.part.entry_id)
+        if (
+            not room.entry
+            and not part_entry
+            and (
+                not room.parent_id
+                or not any(
+                    door.source_id == room.pk and door.target_id == room.parent_id and door.outward
+                    for door in doors
+                )
             )
         ):
             raise ValidationError("Every inner room needs a safe outward door.")
@@ -512,7 +581,13 @@ def check_project(project):
                 raise ValidationError("The outward route must reach the entrance without cycles.")
             route.add(current.pk)
             current = by_id[current.parent_id]
-    return {"policy": policy, "doors": len(exits) + 1, "warnings": warnings}
+    report = {"policy": policy, "doors": len(exits) + 1, "warnings": warnings}
+    if project.kind == "frontier":
+        from .frontier import check_frontier
+
+        report.update(check_frontier(project))
+        report["warnings"].extend(report.pop("frontier_warnings"))
+    return report
 
 
 @atomic_objects
@@ -568,7 +643,7 @@ def snapshot(project):
         }
         for door in project.doors.select_related("exit").order_by("pk")
     ]
-    return {
+    candidate = {
         "project": project.pk,
         "version": project.version,
         "name": project.name,
@@ -584,6 +659,22 @@ def snapshot(project):
         "doors": doors,
         "report": report,
     }
+    from .attachments import attachment_snapshot
+
+    attachment = attachment_snapshot(project)
+    if attachment:
+        candidate["attachment"] = attachment
+    if project.kind == "frontier":
+        from .frontier import extend_snapshot
+
+        extend_snapshot(project, candidate)
+    from .collaboration import extend_snapshot as collaboration_snapshot
+
+    collaboration_snapshot(project, candidate)
+    if project.proposed_owner_id:
+        candidate["lead"] = project.owner_id
+        candidate["owner"] = project.proposed_owner_id
+    return candidate
 
 
 def fingerprint(candidate):
@@ -605,6 +696,16 @@ def submit(actor, project, *, expected_version, acknowledgement):
             "Read and acknowledge the current content reuse wording before submitting."
         )
     candidate = snapshot(project)
+    from .collaboration import validate as validate_agreements
+
+    agreement_ids = validate_agreements(project, candidate)
+    from .attachments import validate_consent
+
+    consent = validate_consent(project, candidate)
+    if consent:
+        candidate["consent"] = consent.pk
+    if agreement_ids:
+        candidate["project_agreements"] = agreement_ids
     candidate["acknowledgement"] = {
         "wording": wording,
         "version": getattr(settings, "BUILDING_REUSE_VERSION", "1"),
@@ -721,11 +822,26 @@ def promote(submission, actor):
     BuildProject.objects.filter(pk=submission.project_id).update(version=F("version"))
     if not is_staff(actor):
         raise PermissionDenied("Only staff can promote reviewed interiors.")
-    receipt = Property.objects.filter(promotion=submission).first()
+    from .models import Frontier
+
+    receipt = (
+        Frontier.objects.filter(promotion=submission).first()
+        or Property.objects.filter(promotion=submission).first()
+    )
     if receipt:
         return receipt
     project, submission = _current(submission)
     candidate = snapshot(project)
+    from .collaboration import validate as validate_agreements
+
+    agreement_ids = validate_agreements(project, candidate)
+    from .attachments import consume, validate_consent
+
+    consent = validate_consent(project, candidate)
+    if consent:
+        candidate["consent"] = consent.pk
+    if agreement_ids:
+        candidate["project_agreements"] = agreement_ids
     candidate["acknowledgement"] = submission.snapshot["acknowledgement"]
     if fingerprint(candidate) != submission.fingerprint:
         raise ValidationError(
@@ -748,12 +864,16 @@ def promote(submission, actor):
     ).update(state="promoted"):
         raise ValidationError("This proposal is no longer awaiting approval.")
     anchor = _anchor(project)
+    if project.kind == "frontier":
+        from .frontier import promote_frontier
+
+        return promote_frontier(submission, actor, project, candidate, terrain, region_id)
     entry = project.rooms.get(entry=True).room
     entrance = _exit(anchor, entry, project.entrance_name)
     departure = _exit(entry, anchor, "outside", outward=True)
     property = Property.objects.create(
-        owner=project.owner,
-        owner_name=project.owner_name,
+        owner=project.proposed_owner or project.owner,
+        owner_name=(project.proposed_owner or project.owner).key,
         name=project.name,
         promotion=submission,
         anchor=anchor,
@@ -772,7 +892,7 @@ def promote(submission, actor):
     for record in project.rooms.select_related("room"):
         room = record.room
         RoomOwnership.objects.create(
-            room=room, object_id=room.pk, property=property, owner=project.owner
+            room=room, object_id=room.pk, property=property, owner=property.owner
         )
         _flags(room, False)
         room.attributes.add("terrain_tags", set(terrain))
@@ -794,6 +914,8 @@ def promote(submission, actor):
             RoomTile.objects.filter(room=room).update(
                 terrain=resolve_terrain(room), room_name=room.key
             )
+    consume(submission, property)
+    project.agreements.filter(pk__in=agreement_ids).update(state="consumed")
     audit(actor, "promoted", project=project, property=property, submission=submission.pk)
     signals.property_promoted.send(
         sender=Property, property=property, submission=submission, actor=actor
@@ -810,7 +932,7 @@ def _property(property, actor, *, staff=False):
     Property.objects.filter(pk=property.pk).update(locked=F("locked"))
     require_revealed(actor)
     property = Property.objects.select_for_update().get(pk=property.pk)
-    if property.state != "live" or not property.owner_id:
+    if property.state not in ({"live", "archived"} if staff else {"live"}) or not property.owner_id:
         raise ValidationError("This property needs staff repair.")
     if (staff and not is_staff(actor)) or (not staff and property.owner_id != actor.pk):
         raise PermissionDenied("Only the property owner may manage these rights.")
@@ -949,6 +1071,23 @@ def transfer(actor, property, new_owner, *, expected_owner, reason, retain_grant
         reason=reason,
         retain_grants=retain_grants,
     )
+    from django.utils import timezone
+
+    from .models import QuietFlag
+
+    QuietFlag.objects.filter(property=property, resolved_at__isnull=True).update(
+        resolved_at=timezone.now()
+    )
+    for consent in property.consent_requests.filter(state__in=["requested", "granted"]):
+        consent.state = "invalidated"
+        consent.save(update_fields=["state"])
+        audit(
+            actor,
+            "consent_invalidated",
+            project=consent.project,
+            consent=consent.pk,
+            reason="Parent ownership transferred",
+        )
     return property
 
 
@@ -1059,8 +1198,13 @@ def discard(actor, project, token):
     for obj, destination in relocation:
         obj.location = destination
     for door in project.doors.select_related("exit"):
-        if door.exit and not door.exit.delete():
-            raise ValidationError("A door could not be removed; cleanup rolled back.")
+        if door.exit:
+            door.exit.ndb.building_cleanup = True
+            try:
+                if not door.exit.delete():
+                    raise ValidationError("A door could not be removed; cleanup rolled back.")
+            finally:
+                door.exit.ndb.building_cleanup = None
     if apps.is_installed("evennia_maps"):
         from evennia_maps.models import MapPlane
 
@@ -1075,6 +1219,7 @@ def discard(actor, project, token):
     project.state = "discarded"
     _touch(project)
     project.save(update_fields=["state"])
+    project.consents.filter(state__in=["requested", "granted"]).update(state="invalidated")
     audit(
         actor,
         "discarded",
@@ -1089,8 +1234,10 @@ def discard(actor, project, token):
 def enter(actor, project):
     require_revealed(actor)
     project = BuildProject.objects.get(pk=project.pk)
-    if project.state not in {"draft", "submitted"} or (
-        project.owner_id != actor.pk and not is_staff(actor)
+    from .collaboration import can_author
+
+    if project.state not in {"draft", "submitted"} or not (
+        can_author(actor, project) or is_staff(actor)
     ):
         raise PermissionDenied("This preview is private.")
     if (

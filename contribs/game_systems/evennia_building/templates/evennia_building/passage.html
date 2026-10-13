@@ -1,0 +1,11 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>Replacement passage</h1>
+<p>{{ change.reason }}. Status: {{ change.state }}.</p>
+<p>Parent owner accepted: {{ change.parent_accepted|yesno }}. Apartment owner accepted: {{ change.child_accepted|yesno }}.</p>
+<h2>Agreement</h2><p>{{ change.wording }}</p>
+<h2>Exact route</h2><pre>{{ change.route }}</pre>
+<p>Both current owners must acknowledge this route. Staff applies it after checking ownership and the actual doors again.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Record action</button></form>
+<p><a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% endblock %}

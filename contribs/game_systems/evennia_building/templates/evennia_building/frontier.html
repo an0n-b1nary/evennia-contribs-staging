@@ -1,0 +1,10 @@
+{% extends "website/base.html" %}
+{% block content %}
+<h1>{{ frontier.name }}</h1><p>{{ frontier.state }}. Promoted {{ frontier.created_at }}; reclaimed by character #{{ frontier.provenance.reclaimed_by }}, approved by character #{{ frontier.provenance.actor }}.</p>
+<p>These streets are public. Stewardship permits description and mood maintenance, and grants no ownership, lock, admission or installation rights.</p>
+<table><thead><tr><th>Room</th><th>Steward</th><th>Description</th></tr></thead><tbody>{% for row in rooms %}<tr><td>{{ row.room.key }} (#{{ row.object_id }})</td><td>{{ row.steward_name|default:"Staff" }}{% if row.steward_id %} (#{{ row.steward_id }}){% endif %}</td><td>{{ row.room.db.desc|linebreaksbr }}</td></tr>{% endfor %}</tbody></table>
+{% if form %}<h2>Maintain or review this area</h2>{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply selected action</button></form>{% endif %}
+<p>Quiet stewards are flagged for staff review. Inactivity never changes stewardship or access. Retirement must preserve usable routes to surviving streets and homes; staff may provide replacement connections or retire affected areas together.</p>
+{% if audit %}<h2>Staff history</h2><ul>{% for row in audit %}<li>{{ row.created_at }} — {{ row.action }} by {{ row.actor_name }}</li>{% endfor %}</ul>{% endif %}
+<p><a href="{% url 'evennia_building:frontier-list' %}">Frontier growth</a> · <a href="{% url 'evennia_building:index' %}">Building</a></p>
+{% endblock %}

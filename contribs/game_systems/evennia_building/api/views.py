@@ -4,8 +4,39 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from evennia_building.models import Property
+from evennia_building.models import Frontier, Property
 from evennia_building.views import actor_for, property_rooms
+
+
+@api_view(["GET"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def frontiers(request, pk=None):
+    actor_for(request)
+    queryset = Frontier.objects.filter(state="live").prefetch_related("rooms__room")
+    if pk is not None:
+        queryset = [get_object_or_404(queryset, pk=pk)]
+    result = [
+        {
+            "id": item.pk,
+            "name": item.name,
+            "promoted_at": item.created_at.isoformat(),
+            "reclaimed_by": item.provenance.get("reclaimed_by"),
+            "approved_by": item.provenance.get("actor"),
+            "rooms": [
+                {
+                    "id": row.object_id,
+                    "name": row.room.key,
+                    "description": row.room.db.desc or "",
+                    "steward": row.steward_name,
+                }
+                for row in item.rooms.all()
+                if row.room_id
+            ],
+        }
+        for item in queryset
+    ]
+    return Response(result[0] if pk is not None else result)
 
 
 @api_view(["GET"])

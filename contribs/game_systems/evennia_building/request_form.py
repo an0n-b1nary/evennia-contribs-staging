@@ -3,7 +3,7 @@
 FORM_KEY = "building_interior"
 FORM = {
     "owner": "evennia_building",
-    "label": "Interior proposal",
+    "label": "Building proposal",
     "description": "Review the exact immutable snapshot on the Building submission page.",
     "questions": [
         {"key": "snapshot", "label": "Snapshot fingerprint", "type": "text"},
