@@ -7,6 +7,7 @@ from django.utils import timezone
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 
+from evennia_links.guests import is_guest
 from evennia_links.runtime import get
 
 from . import assets, conf
@@ -22,6 +23,7 @@ from .services import (
     require_open,
     same_account,
 )
+from .shops import lock_property, operational
 
 
 def place(character):
@@ -33,7 +35,7 @@ def _visible(character):
         raise EconomyError("The market is not available.")
 
 
-def _store(actor, store_id, *, staff=False, here=True):
+def _store(actor, store_id, *, staff=False, here=True, recovering=False):
     store = Storefront.objects.select_for_update().filter(pk=store_id, status="open").first()
     if (
         not store
@@ -43,10 +45,15 @@ def _store(actor, store_id, *, staff=False, here=True):
         raise EconomyError("No open stall belonging to you.")
     if here and place(actor) != store.room_id:
         raise EconomyError("Visit the stall's room first.")
+    if not recovering and not operational(store, actor, managing=True):
+        raise EconomyError("This shop is suspended or you cannot manage its property.")
     return store
 
 
 def _lock_owner(actor, store_id):
+    initial = Storefront.objects.filter(pk=store_id).first()
+    if initial:
+        lock_property(initial)
     owner = Storefront.objects.filter(pk=store_id).values_list("owner_id", flat=True).first()
     owners = list(ObjectDB.objects.filter(pk=owner)) if owner else []
     lock_characters(actor, *owners)
@@ -172,6 +179,8 @@ def directory(character, search="", *, room=None):
     staff = conf.is_staff(character)
     result = []
     for store in stores:
+        if not operational(store, character):
+            continue
         # Discovery is global, but must not reveal a room the viewer cannot see.
         if not staff and not store.room.access(character, "view"):
             continue
@@ -199,17 +208,24 @@ def directory(character, search="", *, room=None):
 
 def buy(buyer, listing_id):
     _visible(buyer)
+    if is_guest(buyer):
+        raise EconomyError("Guests cannot exchange assets.")
     initial = Listing.objects.filter(pk=listing_id).select_related("storefront__owner").first()
     if not initial or not initial.storefront.owner:
         raise EconomyError("No such listing.")
     owner = initial.storefront.owner
+    if is_guest(owner):
+        raise EconomyError("Guests cannot exchange assets.")
     with transaction.atomic():
         require_open()
+        lock_property(initial.storefront)
         lock_characters(buyer, owner)
         store = Storefront.objects.select_for_update().get(pk=initial.storefront_id)
         listing = Listing.objects.select_for_update().get(pk=listing_id)
         if listing.status != "active" or store.status != "open" or store.owner_id != owner.pk:
             raise EconomyError("That listing is no longer available.")
+        if not operational(store, buyer):
+            raise EconomyError("This shop is suspended.")
         if place(buyer) != store.room_id:
             raise EconomyError("Visit the stall's room to buy.")
         if buyer.pk == owner.pk or same_account(buyer, owner):
@@ -285,7 +301,7 @@ def unlist(character, listing_id):
     with transaction.atomic():
         require_open()
         _lock_owner(character, initial.storefront_id)
-        store = _store(character, initial.storefront_id)
+        store = _store(character, initial.storefront_id, recovering=True)
         listing = Listing.objects.select_for_update().get(pk=listing_id)
         if listing.status != "active":
             raise EconomyError("That listing is no longer available.")
@@ -302,7 +318,9 @@ def close(character, store_id):
         if not conf.is_staff(character):
             require_open()
         _lock_owner(character, store_id)
-        store = _store(character, store_id, staff=True, here=not conf.is_staff(character))
+        store = _store(
+            character, store_id, staff=True, here=not conf.is_staff(character), recovering=True
+        )
         return _close(store, by=character)
 
 
@@ -326,6 +344,10 @@ def recover(store_id):
     if not initial.owner:
         raise EconomyError("No open storefront to recover.")
     with transaction.atomic():
+        lock_property(initial)
+        initial.refresh_from_db()
+        if not initial.owner:
+            raise EconomyError("No open storefront to recover.")
         lock_characters(initial.owner)
         store = Storefront.objects.select_for_update().get(pk=store_id)
         if store.status != "open" or not store.owner:
@@ -346,28 +368,36 @@ def run_upkeep(period=None):
         return
     period = period or period_key()
     for initial in (
-        Storefront.objects.filter(status="open", kind="stall", owner__isnull=False)
+        Storefront.objects.filter(status="open", owner__isnull=False)
         .exclude(upkeep_period=period)
         .select_related("owner")
     ):
         try:
             with transaction.atomic():
+                lock_property(initial)
+                initial.refresh_from_db()
+                if not initial.owner:
+                    continue
                 lock_characters(initial.owner)
                 store = Storefront.objects.select_for_update().get(pk=initial.pk)
                 if store.status != "open" or store.upkeep_period == period:
                     continue
+                if not operational(store, store.owner):
+                    continue
                 charge_fee(
-                    "stall_upkeep", store.owner, {"storefront_id": store.pk, "period": period}
+                    "shop_upkeep" if store.kind == "shop" else "stall_upkeep",
+                    store.owner,
+                    {"storefront_id": store.pk, "period": period},
                 )
                 store.upkeep_period = period
                 store.save(update_fields=["upkeep_period"])
         except EconomyError as exc:
             with transaction.atomic():
                 flag_event(
-                    "stall_upkeep",
+                    f"{initial.kind}_upkeep",
                     f"upkeep:{initial.pk}:{period}",
-                    "Economy: stall upkeep shortfall",
-                    f"Stall #{initial.pk}, owner #{initial.owner_id}, period {period}: {exc}. Stock retained; review only.",
+                    f"Economy: {initial.kind} upkeep shortfall",
+                    f"{initial.kind.title()} #{initial.pk}, owner #{initial.owner_id}, period {period}: {exc}. Stock retained; review only.",
                 )
 
 

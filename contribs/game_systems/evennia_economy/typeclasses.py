@@ -45,7 +45,14 @@ class MarketRoomMixin:
         if not conf.visible(looker):
             return footer
         from .models import Storefront
+        from .shops import operational
 
-        stalls = Storefront.objects.filter(room=self, status="open").order_by("slot")
+        stalls = [
+            store
+            for store in Storefront.objects.filter(room=self, status="open").order_by("slot")
+            if operational(store, looker)
+        ]
         roster = ", ".join(f"#{s.pk} {s.name}" for s in stalls)
-        return "\n".join(part for part in (footer, f"Stalls: {roster}" if roster else "") if part)
+        kinds = {store.kind for store in stalls}
+        label = "Shops" if kinds == {"shop"} else "Stalls" if kinds == {"stall"} else "Storefronts"
+        return "\n".join(part for part in (footer, f"{label}: {roster}" if roster else "") if part)

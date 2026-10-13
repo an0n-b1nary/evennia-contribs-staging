@@ -29,6 +29,8 @@ def at_initial_setup():
         room.room_type = "ic"
         room.db.desc = "[Placeholder] An isolated room for live command verification."
         room.tags.add("market", category="rp_economy")
+        room.tags.add("system_seller", category="rp_economy")
+        room.db.allow_teleport = "public"
         room.db.rp_economy_stall_slots = 8
         rooms[name] = room
     gallery = create_object(settings.BASE_ROOM_TYPECLASS, key="Playtest ambient gallery")

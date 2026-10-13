@@ -16,6 +16,7 @@ class ResourceDefinition(models.Model):
     terrains = models.JSONField(default=list, blank=True)
     weight = models.PositiveIntegerField(default=1)
     in_trickle = models.BooleanField(default=True)
+    basic = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
 
     class Meta:
@@ -81,4 +82,46 @@ class ResourceGrant(models.Model):
                 condition=Q(resource__isnull=False) | Q(source="trickle", quantity=0),
                 name="resources_receipt_or_resource",
             ),
+        ]
+
+
+class PlotThreadResourcePayout(models.Model):
+    """A proposed per-participant budget. Editing requires fresh staff approval."""
+
+    thread_id = models.PositiveBigIntegerField(db_index=True)
+    resource = models.ForeignKey(ResourceDefinition, on_delete=models.PROTECT)
+    quantity = models.PositiveBigIntegerField()
+    set_by_id = models.PositiveBigIntegerField()
+    approved_by_id = models.PositiveBigIntegerField(null=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.UniqueConstraint(fields=["thread_id", "resource"], name="resources_plot_budget"),
+            models.CheckConstraint(condition=Q(quantity__gt=0), name="resources_positive_payout"),
+        ]
+
+
+class PlotPayoutRun(models.Model):
+    """Frozen conclusion award; no historical backfill or mutable membership."""
+
+    thread_id = models.PositiveBigIntegerField(unique=True)
+    plot_name = models.CharField(max_length=255)
+    amounts = models.JSONField(default=dict)
+    recipients = models.JSONField(default=list)
+    approvals = models.JSONField(default=dict)
+    created = models.DateTimeField(auto_now_add=True)
+
+
+class PlotPayoutReceipt(models.Model):
+    run = models.ForeignKey(PlotPayoutRun, on_delete=models.PROTECT, related_name="receipts")
+    character_id = models.PositiveBigIntegerField()
+    character_name = models.CharField(max_length=255)
+    paid_at = models.DateTimeField(null=True)
+    notified_at = models.DateTimeField(null=True)
+    skipped = models.BooleanField(default=False)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.UniqueConstraint(fields=["run", "character_id"], name="resources_plot_receipt"),
         ]

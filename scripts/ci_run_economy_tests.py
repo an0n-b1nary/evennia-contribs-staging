@@ -19,7 +19,12 @@ def main(argv=None):
         "--absent",
         action="append",
         default=[],
-        choices=("evennia_rp_resources", "evennia_jobs", "evennia_rp_equipment"),
+        choices=(
+            "evennia_rp_resources",
+            "evennia_jobs",
+            "evennia_rp_equipment",
+            "evennia_building",
+        ),
     )
     args = parser.parse_args(argv)
     for name in args.absent:

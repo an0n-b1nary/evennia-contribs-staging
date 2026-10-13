@@ -11,6 +11,7 @@ def catalog():
             "category": "materials",
             "terrains": ["forest"],
             "weight": 2,
+            "basic": True,
         },
         {
             "key": "stone",
@@ -19,7 +20,13 @@ def catalog():
             "terrains": ["hills"],
             "weight": 2,
         },
-        {"key": "scrap", "name": "Scrap", "category": "materials", "terrains": ["urban"]},
+        {
+            "key": "scrap",
+            "name": "Scrap",
+            "category": "materials",
+            "terrains": ["urban"],
+            "basic": True,
+        },
         {"key": "grain", "name": "Grain", "category": "provisions", "terrains": []},
         {"key": "fish", "name": "Fish", "category": "provisions", "terrains": ["water"]},
         {"key": "ember", "name": "Ember essence", "category": "essences", "terrains": ["hills"]},

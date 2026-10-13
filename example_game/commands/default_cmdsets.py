@@ -94,6 +94,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdGive",
             "CmdEconomy",
             "CmdStall",
+            "CmdShop",
             "CmdBrowse",
             "CmdBuy",
             "CmdMarket",

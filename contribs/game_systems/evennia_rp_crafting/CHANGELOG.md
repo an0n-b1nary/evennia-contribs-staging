@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-10-13
+
+- Accept the compatible resources 0.2 and economy 0.3 releases.
+
 ## 0.2.0 — 2026-10-10
 
 - Added: Consumable and Broadcast drafts with one to three paid EVENT beats,

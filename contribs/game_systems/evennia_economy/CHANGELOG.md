@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — 2026-10-13
+
+- Add property-bound shops, explicit stock disposition on transfer, archive suspension and reconciliation.
+- Add an off-by-default local basic-resource seller with premium prices and audited currency sinks.
+- Keep shop ownership, storefront purchases and system purchases inside the shared guest boundary.
+
 ## 0.2.4 — 2026-10-12
 
 - Refuse asset exchanges involving guests; reward eligibility follows the guest-safe shared playable-character policy.

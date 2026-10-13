@@ -116,6 +116,7 @@ class Storefront(models.Model):
     kind = models.CharField(
         max_length=8, default="stall", choices=[("stall", "Stall"), ("shop", "Shop")]
     )
+    property_id = models.PositiveBigIntegerField(null=True, blank=True, unique=True)
     owner = models.ForeignKey(
         "objects.ObjectDB", on_delete=models.SET_NULL, null=True, related_name="economy_stores"
     )

@@ -8,7 +8,7 @@ coupling economy to their packages.
 
 ## Install
 
-Install `evennia-links>=0.7,<0.9`, then `pip install -e .`. Add
+Install `evennia-links>=0.8.4,<0.9`, then `pip install -e .`. Add
 `"evennia_links"` followed by `"evennia_economy"` to `INSTALLED_APPS` and run
 `evennia migrate --noinput`. Links is the only hard contrib dependency.
 
@@ -271,9 +271,57 @@ adds reference-game seams, isolated partner profiles and live two-session
 exchange scenarios. Migrations support both fresh installs and adding economy
 to an existing resources database.
 
-Stalls, shop/listing models, storefront purchases, stall cap contributions and
-system sellers belong to later releases. This release provides their fee and
-accounting interfaces without exposing unfinished commands.
+Shops and the optional system seller are described below. Stalls, listings,
+purchases and stall cap contributions share the same ledger and stock services.
+
+## Approved property shops
+
+Install the `shops` extra (Building 0.3.1+) to create a shop when staff promote
+an interior with purpose `shop`. Each property gets one storefront in its
+entrance room, including separate shops in one mixed settlement. Property IDs
+are integer soft references. Without Jobs, Building's native review still
+approves shops. Without Building, shop stock and history remain, but selling
+and management suspend; ordinary stalls work.
+
+Owners use `+shop/name`, `/desc`, `/list`, `/unlist`, `/close` and `/reopen`
+with the same syntax as `+stall`. Shops may coexist with stalls. Residents and
+stewards gain no merchandise rights. Staff explicitly open previously approved
+shop properties with `+shop/reconcile <property number>`. Reconciliation is
+idempotent and never reopens a deliberately closed shop.
+
+Purchases use `+browse`, `+market` and `+buy`. Archive suspends discovery and
+sales while preserving reserved stock; restore makes the same shop available.
+Every operation rechecks live property ownership and access. Staff transfer
+requires an explicit merchandise choice:
+`+build/transfer <property> <old owner> <new owner>=reason;return` returns stock
+to the old owner; `;transfer` includes stock. The Building web form offers the
+same choices. Stock transfer rejects same-account recipients and respects
+item transfer hooks. Failures roll back property and merchandise together.
+
+`shop_approval` and `shop_upkeep` are separate zero-default fee boundaries.
+Upkeep skips suspended shops and flags shortfalls without confiscation. A shop
+grants no automatic cap raise; furnishing remains the housing contribution.
+
+## Optional basic-resource seller
+
+Install the `resources` extra. The system seller starts **off**:
+
+```python
+RP_ECONOMY_SYSTEM_SELLER = False
+RP_ECONOMY_BASIC_PRICES = {"timber": 5}
+RP_ECONOMY_SELLER_PREMIUM = 2
+```
+
+Tag a local room `system_seller`, category `rp_economy`. Staff enable it with
+`+runtime RP_ECONOMY_SYSTEM_SELLER=true`. Players visit and use `+browse/system`
+and `+buy/system timber=2`. The runtime premium multiplier must exceed one;
+unit prices round upward. Supply is unlimited. Only explicitly `basic=True`,
+active, trickle-eligible resources with positive configured base prices are
+sold. Payout-only rarity stays excluded even if mistakenly marked basic.
+
+Purchases atomically debit money, grant resources and journal a
+`system_purchase` sink; no NPC receives the money. Freeze, reveal and absent
+Resources disable purchases. There is no system buyer or resale price.
 
 ## Disposable guests
 

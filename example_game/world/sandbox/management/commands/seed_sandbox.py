@@ -384,6 +384,9 @@ class Command(BaseCommand):
                 )
             owner.location = original_room
             counts["stalls"] = 1
+            from world.sandbox.m6 import seed as seed_m6
+
+            counts.update(seed_m6(market))
         if apps.is_installed("evennia_rp_crafting"):
             counts.update(self._create_crafting(authors, rooms))
         if apps.is_installed("evennia_npcs"):

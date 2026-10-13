@@ -65,6 +65,11 @@ class CmdResources(_ResourceCommand):
       +resources/grant <character>=<key>,<quantity>[,<note>]   (staff)
       +resources/spend <character>=<key>,<quantity>[,<note>]   (staff)
       +resources/audit [character]            (staff; last 30 ledger rows)
+      +resources/payout <plot>=<resource>,<quantity> (owner/staff proposal)
+      +resources/payoutremove <plot>=<resource>      (owner/staff)
+      +resources/payouts <plot>                    (owner/staff inspection)
+      +resources/payoutapprove <plot>              (staff)
+      +resources/payoutretry <plot>                (staff; frozen award only)
     """
 
     key = "+resources"
@@ -82,6 +87,53 @@ class CmdResources(_ResourceCommand):
             if len(self.switches) != 1:
                 raise ResourceError("Use one switch at a time.")
             switch = self.switches[0]
+            if switch in {"payout", "payoutremove", "payouts", "payoutapprove", "payoutretry"}:
+                from django.apps import apps
+                from django.db import transaction
+
+                from . import payouts
+                from .models import PlotPayoutRun, PlotThreadResourcePayout
+
+                if not apps.is_installed("evennia_plots"):
+                    raise ResourceError("Plots is not installed.")
+                plot = (
+                    apps.get_model("evennia_plots", "PlotThread")
+                    .objects.filter(plot_number=int(self.lhs.strip().lstrip("#")))
+                    .first()
+                )
+                if plot is None:
+                    raise ResourceError("No such plot.")
+                plot_id = plot.pk
+                if switch == "payout":
+                    key, _, amount = (self.rhs or "").partition(",")
+                    payouts.propose(self.caller, plot_id, key.strip(), int(amount))
+                    self.msg("Payout proposed; staff approval is required.")
+                elif switch == "payoutremove":
+                    payouts.remove(self.caller, plot_id, (self.rhs or "").strip())
+                    self.msg("Payout resource removed.")
+                elif switch == "payoutapprove":
+                    self.msg(f"Approved {payouts.approve(self.caller, plot_id)} payout resources.")
+                elif switch == "payoutretry":
+                    self.msg(f"Payout retry: {payouts.retry(self.caller, plot_id)}")
+                else:
+                    with transaction.atomic():
+                        payouts.plot_for(self.caller, plot_id)
+                        run = PlotPayoutRun.objects.filter(thread_id=plot_id).first()
+                        rows = PlotThreadResourcePayout.objects.filter(
+                            thread_id=plot_id
+                        ).select_related("resource")
+                        self.msg(
+                            "\n".join(
+                                f"{row.resource.key}: {row.quantity} each; {'approved' if row.approved_by_id else 'awaiting approval'}"
+                                for row in rows
+                            )
+                            or "No payout budget."
+                        )
+                        if run:
+                            self.msg(
+                                f"Frozen award: {run.amounts}; {len(run.recipients)} recipients; {run.receipts.filter(paid_at__isnull=True, skipped=False).count()} pending."
+                            )
+                return
             if switch == "catalog":
                 self.msg(
                     "\n".join(

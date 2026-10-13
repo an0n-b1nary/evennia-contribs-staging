@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 — 2026-10-13
+
+- Add staff-approved plot payout budgets, frozen conclusion awards, retry receipts and login summaries.
+- Mark basic resources explicitly for the optional system seller.
+- Exclude guests from payout eligibility and budget management; reject resource counter overflow atomically.
+
 ## 0.1.4 — 2026-10-10
 
 - **Added:** a "Gathering here" section in evennia-maps' room panel (0.9+): the

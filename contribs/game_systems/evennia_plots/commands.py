@@ -1409,7 +1409,11 @@ class CmdPlot(MuxCommand):
         if thread.status not in ("active", "proposed"):
             caller.msg(f"Plot #{thread.plot_number} is already {thread.get_status_display()}.")
             return
-        bonus = thread.conclude(concluded_by=caller)
+        try:
+            bonus = thread.conclude(concluded_by=caller)
+        except ValueError as exc:
+            caller.msg(str(exc))
+            return
         bonus_desc = []
         if thread.calendar_links.filter(advance_notice_met=True).exists():
             bonus_desc.append("+3 XP: calendar event with 1+ week advance notice")

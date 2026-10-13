@@ -340,6 +340,47 @@ class TestFrontier(EvenniaCommandTestMixin, EvenniaTest):
             Property.objects.get(part=first).owner_id, Property.objects.get(part=second).owner_id
         )
 
+    def test_multiple_shops_in_one_promotion_receive_independent_storefronts(self):
+        if not apps.is_installed("evennia_economy"):
+            self.skipTest("Optional Economy is absent")
+        from evennia_economy.models import Storefront
+
+        first = frontier.add_interior(
+            self.char2,
+            self.project,
+            self.entry,
+            "First shop",
+            owner=self.char2,
+            entrance_name="first shop",
+            purpose="shop",
+        )
+        second = frontier.add_interior(
+            self.char2,
+            self.project,
+            self.entry,
+            "Second shop",
+            owner=self.collaborator,
+            entrance_name="second shop",
+            purpose="shop",
+        )
+        self.acknowledge_all()
+        result = self.approve()
+        stores = Storefront.objects.filter(
+            property_id__in=result.promotion.properties.values_list("pk", flat=True)
+        )
+        self.assertEqual(stores.count(), 2)
+        self.assertEqual(
+            set(stores.values_list("room_id", flat=True)), {first.entry_id, second.entry_id}
+        )
+        self.assertEqual(
+            set(stores.values_list("owner_id", flat=True)), {self.char2.pk, self.collaborator.pk}
+        )
+        # Fixture cleanup must preserve stock/history before deleting owners.
+        from evennia_economy.stalls import close
+
+        for store in stores:
+            close(self.char1, store.pk)
+
     def test_mixed_promotion_failure_rolls_back_all_parts_and_map_moves(self):
         self.interior()
         self.acknowledge_all()

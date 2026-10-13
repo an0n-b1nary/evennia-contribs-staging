@@ -37,6 +37,12 @@ def weeks(value):
     return type(value) in (int, float) and 0 < value <= 10000
 
 
+def premium(value):
+    import math
+
+    return type(value) in (int, float) and math.isfinite(value) and 1 < value <= 10000
+
+
 def register_controls():
     for name, default, validator in (
         ("REVEALED", True, boolean),
@@ -53,6 +59,8 @@ def register_controls():
         ("STALL_SLOTS", 8, positive),
         ("STALL_CAP_RAISE", 100, nonnegative),
         ("QUIET_STALL_WEEKS", 5, weeks),
+        ("SYSTEM_SELLER", False, boolean),
+        ("SELLER_PREMIUM", 2, premium),
     ):
         register(f"RP_ECONOMY_{name}", default, validator=validator)
     for kind in FEE_KINDS:

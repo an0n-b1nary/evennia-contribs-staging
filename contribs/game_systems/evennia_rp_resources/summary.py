@@ -11,6 +11,46 @@ from .models import ResourceGrant
 logger = logging.getLogger("evennia")
 
 
+def notify_plot_summary(character):
+    try:
+        return _notify_plot_summary(character)
+    except Exception:
+        logger.exception("Resource plot summary failed for #%s", character.pk)
+        return False
+
+
+def _notify_plot_summary(character):
+    if not get("RP_RESOURCES_REVEALED"):
+        return False
+    from .models import PlotPayoutReceipt
+
+    receipts = list(
+        PlotPayoutReceipt.objects.filter(
+            character_id=character.pk,
+            notified_at__isnull=True,
+            paid_at__isnull=False,
+            skipped=False,
+        )
+        .select_related("run")
+        .order_by("pk")
+    )
+    if not receipts:
+        return False
+    for receipt in receipts:
+        if receipt.run.amounts:
+            character.msg(
+                f"Plot award ({receipt.run.plot_name}): "
+                + ", ".join(f"{quantity} {key}" for key, quantity in receipt.run.amounts.items())
+                + ". Use +resources to view your stores."
+            )
+    from django.utils import timezone
+
+    PlotPayoutReceipt.objects.filter(pk__in=[receipt.pk for receipt in receipts]).update(
+        notified_at=timezone.now()
+    )
+    return True
+
+
 def latest_receipt(character):
     return (
         ResourceGrant.objects.filter(character=character, source="trickle", resource__isnull=True)
