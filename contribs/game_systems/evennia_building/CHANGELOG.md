@@ -3,6 +3,7 @@
 ## 0.3.1 — 2026-10-13
 
 - Expose an atomic property-transfer partner signal and explicit shop stock choice in commands and web forms.
+  Only a trailing `;return` or `;transfer` selects stock; other semicolons stay in the transfer reason.
 - Correct shop reconciliation guidance to use individual property identities.
 
 ## 0.3.0 — 2026-10-12

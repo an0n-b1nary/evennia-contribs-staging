@@ -607,14 +607,18 @@ class CmdBuild(MuxCommand):
                 )
                 services.set_override(actor, ObjectDB.objects.get(pk=number()), allowed)
             elif "transfer" in switches:
-                reason, separator, stock = (self.rhs or "").partition(";")
+                # Only a trailing ;return or ;transfer is a stock choice; other
+                # semicolons belong to the audited reason.
+                reason, _, stock = (self.rhs or "").rpartition(";")
+                if stock.strip() not in {"return", "transfer"}:
+                    reason, stock = self.rhs or "", None
                 services.transfer(
                     actor,
                     Property.objects.get(pk=number()),
                     character(2),
                     expected_owner=number(1),
                     reason=reason,
-                    stock_disposition=stock.strip() if separator else None,
+                    stock_disposition=stock.strip() if stock else None,
                 )
             elif "policy" in switches:
                 target = number() if "region" in switches else ObjectDB.objects.get(pk=number())

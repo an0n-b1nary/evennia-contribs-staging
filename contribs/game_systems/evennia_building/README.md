@@ -115,7 +115,10 @@ middleware as documented by Links. Admin is inspection-only.
 `property_promoted` runs inside the transaction with `property`, `submission`
 and `actor`. Required listener errors roll back everything, including a Jobs
 decision. Use the individual `property.pk` for idempotent later shop
-reconciliation. `property_changed` runs after commit for cache invalidation;
+reconciliation. `property_transferring` runs inside a staff transfer, before
+the owner changes, with `property`, `actor`, `new_owner` and
+`stock_disposition` (`"return"`, `"transfer"` or `None`); listener errors abort
+the transfer. `property_changed` runs after commit for cache invalidation;
 it is not durable external delivery. Ownership is per room and per property,
 including separate apartment boundaries. Deleted owners/anchors deny
 access pending staff repair; audit records preserve character names and IDs.
