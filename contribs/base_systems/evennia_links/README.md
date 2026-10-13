@@ -498,5 +498,9 @@ these guards as a substitute for restricting guest commands: mutation services
 and other players' transfers need their own policy too.
 
 Because Evennia's `no_objs` also hides exits, the character mixin explicitly
-supplies local stock exit traversal commands. Other object commands remain
-unavailable. Custom exit command classes require an explicit host policy.
+supplies local stock exit traversal commands when the guest's merged cmdset sets
+`no_objs` (and not `no_exits`). Other object commands remain unavailable.
+Custom exit command classes require an explicit host policy.
+
+Override `GuestAccountMixin.guest_welcome` to name the host's guest commands;
+the default mentions none.

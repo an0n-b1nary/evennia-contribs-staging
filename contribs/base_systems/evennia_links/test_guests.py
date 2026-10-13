@@ -1,6 +1,6 @@
 """Guest identity and movement policy without a host's command composition."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from evennia import CmdSet, Command
 from evennia.accounts.accounts import DefaultGuest
@@ -8,6 +8,7 @@ from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_account
 from evennia.utils.test_resources import EvenniaTest
 
+from evennia_links import characters
 from evennia_links.characters import is_playable
 from evennia_links.guests import GuestCharacterMixin, is_guest
 
@@ -30,6 +31,18 @@ class TestGuestIdentity(EvenniaTest):
         self.char1.account = None
         self.assertTrue(is_guest(self.char1))
         self.assertFalse(is_playable(self.char1))
+
+    def test_offline_guest_check_does_not_resweep_every_account(self):
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        self.char1.account = None
+        self.char2.account = None
+        with patch.object(
+            characters, "playable_accounts", wraps=characters.playable_accounts
+        ) as sweep:
+            swept = list(characters.playable_characters())
+        self.assertIn(self.char1, swept)
+        self.assertEqual(sweep.call_count, 1)
 
     def test_tagged_guest_boundary_cannot_be_disabled_with_move_hooks(self):
         self.char1.tags.add("character", category="guest")
@@ -68,3 +81,10 @@ class TestGuestIdentity(EvenniaTest):
         merged = get_and_merge_cmdsets(self.char1, [self.char1], "object", "out").result
         keys = {command.key for command in merged.commands}
         self.assertEqual(keys, {"look", "out"})
+
+    def test_unrestricted_guest_discovery_lists_each_exit_once(self):
+        from evennia.commands.cmdhandler import get_and_merge_cmdsets
+
+        self.char1.tags.add("character", category="guest")
+        merged = get_and_merge_cmdsets(self.char1, [self.char1], "object", "out").result
+        self.assertEqual([command.key for command in merged.commands].count("out"), 1)

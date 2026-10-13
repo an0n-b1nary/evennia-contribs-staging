@@ -147,4 +147,7 @@ class Guest(GuestAccountMixin, DefaultGuest):
     characters are deleted after disconnection.
     """
 
-    pass
+    guest_welcome = (
+        "Welcome, guest. Use guest <message> to chat, +stats to try a sheet, "
+        "and +stats/reset to start again. Pages may be sent to staff only."
+    )

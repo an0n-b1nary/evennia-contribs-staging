@@ -4,6 +4,8 @@
 
 - Added disposable guest identification, movement and inventory boundaries, seeded arrival and restricted account lifecycle. Shared playable-character and web-character helpers exclude guests.
 - Supply stock exit traversal to restricted guests without enabling other local object commands.
+- Offline guest identity reads only guest accounts' rosters, so playable-character sweeps stay a single pass. `playable_accounts()` accepts an optional account queryset.
+- The guest welcome is the overridable `GuestAccountMixin.guest_welcome`; exits are supplied only when the guest's cmdset sets `no_objs`, avoiding duplicate exit commands.
 
 ## 0.8.3 ? 2026-10-11
 

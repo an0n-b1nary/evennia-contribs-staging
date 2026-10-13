@@ -39,9 +39,35 @@ def is_guest(obj):
         return False
     if account is not None and is_guest(account):
         return True
-    from evennia_links.characters import account_ids
+    # Sweep only guest accounts' rosters: a full account_ids() sweep here would
+    # turn every playable_characters() pass into one sweep per character.
+    paths = _guest_typeclass_paths()
+    if not paths:
+        return False
+    from evennia_links.characters import playable_accounts
 
-    return any(is_guest(owner) for owner in AccountDB.objects.filter(pk__in=account_ids(obj)))
+    guests = AccountDB.objects.filter(db_typeclass_path__in=paths)
+    return any(
+        obj.pk in {character.pk for character in characters}
+        for _, characters in playable_accounts(guests)
+    )
+
+
+def _guest_typeclass_paths():
+    """Stored account typeclass paths that resolve to a DefaultGuest subclass."""
+    from evennia.accounts.accounts import DefaultGuest
+    from evennia.accounts.models import AccountDB
+    from evennia.utils.utils import class_from_module
+
+    guest_paths = []
+    for path in AccountDB.objects.order_by().values_list("db_typeclass_path", flat=True).distinct():
+        try:
+            typeclass = class_from_module(path)
+        except ImportError:
+            continue
+        if isinstance(typeclass, type) and issubclass(typeclass, DefaultGuest):
+            guest_paths.append(path)
+    return guest_paths
 
 
 def in_guest_wing(room):
@@ -63,7 +89,9 @@ class GuestCharacterMixin:
 
     def get_cmdsets(self, caller, current, **kwargs):
         current, cmdsets = super().get_cmdsets(caller, current, **kwargs)
-        if not is_guest(self) or not self.location:
+        # Unrestricted discovery already gathers exits; adding them again would
+        # duplicate every exit command (exit cmdsets merge with duplicates).
+        if current.no_exits or not current.no_objs or not self.location or not is_guest(self):
             return current, cmdsets
         from evennia.objects.objects import DefaultExit, ExitCommand
 
@@ -110,6 +138,9 @@ class GuestCharacterMixin:
 class GuestAccountMixin:
     """Seeded guest arrival, restricted commands, and a single guest channel."""
 
+    # Hosts override this to name their own guest commands.
+    guest_welcome = "Welcome, guest. Pages may be sent to staff only."
+
     @classmethod
     def authenticate(cls, **kwargs):
         if settings.GUEST_ENABLED:
@@ -154,7 +185,4 @@ class GuestAccountMixin:
         else:
             channels[0].connect(self)
         super().at_post_login(session=session, **kwargs)
-        self.msg(
-            "Welcome, guest. Use guest <message> to chat, +stats to try a sheet, "
-            "and +stats/reset to start again. Pages may be sent to staff only."
-        )
+        self.msg(self.guest_welcome)

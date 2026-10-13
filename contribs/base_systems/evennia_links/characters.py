@@ -23,14 +23,16 @@ PLAYABLE_ATTRIBUTE = "_playable_characters"  # Evennia's CharactersHandler stora
 _web_choice = ContextVar("evennia_links_web_choice", default=None)
 
 
-def playable_accounts():
-    """Yield `(account_id, [character, ...])`, oldest account first."""
+def playable_accounts(accounts=None):
+    """Yield `(account_id, [character, ...])`, oldest account first.
+
+    `accounts`, an optional AccountDB queryset, narrows the sweep.
+    """
     from evennia.utils.dbserialize import from_pickle
 
     rows = (
-        AccountDB.objects.filter(
-            db_attributes__db_key=PLAYABLE_ATTRIBUTE, db_attributes__db_category__isnull=True
-        )
+        (AccountDB.objects if accounts is None else accounts)
+        .filter(db_attributes__db_key=PLAYABLE_ATTRIBUTE, db_attributes__db_category__isnull=True)
         .order_by("pk")
         .values_list("pk", "db_attributes__db_value")
     )
