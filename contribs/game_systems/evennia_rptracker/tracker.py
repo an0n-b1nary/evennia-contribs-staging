@@ -99,19 +99,19 @@ def _get_active_partner_ids(character, room, now):
     Returns:
         set: Character IDs of active partners.
     """
+    from evennia_links.guests import is_guest
+
     cutoff = now - PARTNER_ACTIVE_WINDOW
     partner_ids = set()
     for obj in room.contents:
-        from evennia_links.guests import is_guest
-
-        if obj is character or is_guest(obj):
+        if obj is character:
             continue
         if not hasattr(obj, "last_pose_time"):
             continue
         if obj.tags.get("npc", category="npc_system"):
             continue
         last_pose = getattr(obj, "last_pose_time", None)
-        if last_pose and last_pose > cutoff:
+        if last_pose and last_pose > cutoff and not is_guest(obj):
             partner_ids.add(obj.id)
     return partner_ids
 
