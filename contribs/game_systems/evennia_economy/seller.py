@@ -87,7 +87,7 @@ def buy(actor, key, amount):
         key,
         amount,
         "exchange",
-        exchange_id=entry.pk,
+        details={"system_purchase": entry.pk},
         by=actor,
         note="System seller purchase.",
     )

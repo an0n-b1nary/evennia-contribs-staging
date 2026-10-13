@@ -102,3 +102,12 @@ class SellerTests(EvenniaCommandTestMixin, EvenniaTest):
         with self.assertRaises(EconomyError):
             seller.buy(self.char2, "wood", 1)
         self.assertEqual(balance(self.char2), 100)
+
+    def test_system_purchase_audit_does_not_reuse_offer_identifiers(self):
+        from evennia_rp_resources.models import ResourceGrant
+
+        seller.buy(self.char2, "wood", 1)
+        receipt = LedgerEntry.objects.get(kind="system_purchase")
+        grant_row = ResourceGrant.objects.get(source="exchange")
+        self.assertIsNone(grant_row.exchange_id)
+        self.assertEqual(grant_row.details, {"system_purchase": receipt.pk})
