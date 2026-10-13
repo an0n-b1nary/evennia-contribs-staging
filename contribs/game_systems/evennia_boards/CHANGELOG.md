@@ -1,15 +1,15 @@
 # Changelog — evennia-boards
 
-## 0.5.2 — 2026-10-12
-
-- Refuse guest posts and replies before creating shared board content.
-
 All notable changes to `evennia-boards` will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## 0.5.2 — 2026-10-12
+
+- Refuse guest posts and replies before creating shared board content.
 
 ## [0.5.1] - 2026-10-10
 

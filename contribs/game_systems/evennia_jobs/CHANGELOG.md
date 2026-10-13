@@ -1,15 +1,15 @@
 # Changelog — evennia-jobs
 
-## 0.7.1 — 2026-10-12
-
-- Guests retain plain private requests and bug reports; player questionnaires remain unavailable until a dedicated admissions flow is installed.
-
 All notable changes to `evennia-jobs` will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## 0.7.1 — 2026-10-12
+
+- Guests retain plain private requests and bug reports; player questionnaires remain unavailable until a dedicated admissions flow is installed.
 
 ## 0.7.0 ? 2026-10-11
 

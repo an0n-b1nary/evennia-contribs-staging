@@ -1,16 +1,16 @@
 # Changelog — evennia-rp-chargen
 
-## 0.4.1 — 2026-10-12
-
-- Optional disposable guest trials support finalized checks without approval inside tagged trial rooms, and +stats/reset for repeated builds. Ordinary approval policy is unchanged.
-- Trial resets clear ratings, abilities and purchase history; guest deletion also removes purchase history. Trials spend their resettable starting allowance only.
-
 All notable changes to `evennia-rp-chargen` will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## 0.4.1 — 2026-10-12
+
+- Optional disposable guest trials support finalized checks without approval inside tagged trial rooms, and +stats/reset for repeated builds. Ordinary approval policy is unchanged.
+- Trial resets clear ratings, abilities and purchase history; guest deletion also removes purchase history. Trials spend their resettable starting allowance only.
 
 ## [0.4.0] - 2026-10-10
 
