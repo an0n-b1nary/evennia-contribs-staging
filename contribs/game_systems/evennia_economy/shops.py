@@ -9,6 +9,7 @@ from django.utils import timezone
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 
+from evennia_links.guests import is_guest
 from evennia_links.rooms import can
 from evennia_links.runtime import get
 from evennia_links.transactions import atomic_objects
@@ -34,6 +35,8 @@ def lock_property(store):
 def operational(store, actor=None, *, managing=False):
     if store.kind != "shop":
         return True
+    if is_guest(actor) or is_guest(store.owner):
+        return False
     prop = property_for(store)
     if (
         not prop
@@ -79,6 +82,8 @@ def create_for_property(property, actor):
         or not prop.rooms.filter(room=room).exists()
     ):
         raise EconomyError("Repair the approved shop's owner or entrance before opening it.")
+    if is_guest(prop.owner):
+        raise EconomyError("Guests cannot own shops.")
     lock_characters(prop.owner)
     ObjectDB.objects.select_for_update().get(pk=room.pk)
     charge_fee("shop_approval", prop.owner, {"property_id": prop.pk})
@@ -134,6 +139,8 @@ def on_transferring(sender, property, actor, new_owner, stock_disposition, **kwa
     initial = Storefront.objects.filter(property_id=property.pk).first()
     if not initial:
         return
+    if is_guest(new_owner):
+        raise ValidationError("Guests cannot own shops.")
     if stock_disposition not in {"return", "transfer"}:
         raise ValidationError(
             "Choose shop stock disposition: return to the old owner, or transfer with the shop."

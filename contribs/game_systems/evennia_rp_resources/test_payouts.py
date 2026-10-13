@@ -89,6 +89,14 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(run.recipients, [])
         self.assertEqual(total_held(self.char2), 0)
 
+    def test_guest_is_excluded_even_when_marked_an_active_participant(self):
+        self.budget()
+        self.char2.tags.add("character", category="guest")
+        with self.assertRaises(ResourceError):
+            payouts.propose(self.char2, self.plot.pk, "wood", 2)
+        self.assertEqual(self.conclude().recipients, [])
+        self.assertEqual(total_held(self.char2), 0)
+
     def test_active_eligible_offline_participant_gets_full_award_above_cap(self):
         grant(self.char2, "wood", 100)
         self.budget()

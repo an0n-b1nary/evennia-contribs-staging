@@ -7,6 +7,7 @@ from django.utils import timezone
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 
+from evennia_links.guests import is_guest
 from evennia_links.runtime import get
 
 from . import assets, conf
@@ -207,10 +208,14 @@ def directory(character, search="", *, room=None):
 
 def buy(buyer, listing_id):
     _visible(buyer)
+    if is_guest(buyer):
+        raise EconomyError("Guests cannot exchange assets.")
     initial = Listing.objects.filter(pk=listing_id).select_related("storefront__owner").first()
     if not initial or not initial.storefront.owner:
         raise EconomyError("No such listing.")
     owner = initial.storefront.owner
+    if is_guest(owner):
+        raise EconomyError("Guests cannot exchange assets.")
     with transaction.atomic():
         require_open()
         lock_property(initial.storefront)

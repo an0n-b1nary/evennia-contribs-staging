@@ -9,6 +9,8 @@ from django.db import transaction
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
 
+from evennia_links.guests import is_guest
+
 from . import conf
 from .batch import eligible_characters
 from .models import PlotPayoutReceipt, PlotPayoutRun, PlotThreadResourcePayout
@@ -18,6 +20,8 @@ logger = logging.getLogger("evennia")
 
 
 def plot_for(actor, plot_id, *, staff=False, mutable=False):
+    if is_guest(actor):
+        raise ResourceError("Guests cannot manage plot rewards.")
     if not apps.is_installed("evennia_plots"):
         raise ResourceError("Plots is not installed.")
     model = apps.get_model("evennia_plots", "PlotThread")

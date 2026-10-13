@@ -95,3 +95,10 @@ class SellerTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_command_paths(self):
         self.call(CmdBrowse(), "/system", "wood: Wood — 6 coins per unit", caller=self.char2)
         self.call(CmdBuy(), "/system wood=2", "Bought 2 wood for 12 coins.", caller=self.char2)
+
+    def test_guest_cannot_buy_system_resources(self):
+        self.char2.tags.add("character", category="guest")
+        self.assertEqual(seller.catalog(self.char2), [])
+        with self.assertRaises(EconomyError):
+            seller.buy(self.char2, "wood", 1)
+        self.assertEqual(balance(self.char2), 100)

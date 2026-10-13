@@ -7,7 +7,7 @@ does not require RP, sessions, login time or partner counts.
 
 ## Install and wire
 
-Install `evennia-links>=0.7` first, then `pip install -e .`. Add
+Install `evennia-links>=0.8.4,<0.9` first, then `pip install -e .`. Add
 `"evennia_links"` and `"evennia_rp_resources"` to `INSTALLED_APPS` in that order.
 Links is the only hard contrib dependency. Maps, social, plots and economy
 are optional; resources imports none of their models.

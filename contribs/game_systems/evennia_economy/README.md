@@ -8,7 +8,7 @@ coupling economy to their packages.
 
 ## Install
 
-Install `evennia-links>=0.7,<0.9`, then `pip install -e .`. Add
+Install `evennia-links>=0.8.4,<0.9`, then `pip install -e .`. Add
 `"evennia_links"` followed by `"evennia_economy"` to `INSTALLED_APPS` and run
 `evennia migrate --noinput`. Links is the only hard contrib dependency.
 

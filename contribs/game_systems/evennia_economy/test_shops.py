@@ -238,3 +238,37 @@ class ShopTests(EvenniaCommandTestMixin, EvenniaTest):
             stalls.buy(self.char1, listing.pk)
         with self.assertRaises(EconomyError):
             stalls.edit(self.char2, self.store.pk, name="Stale rights")
+
+    def test_guest_cannot_receive_shop_ownership(self):
+        from evennia_building import services
+
+        self.char1.tags.add("character", category="guest")
+        with self.assertRaisesRegex(ValidationError, "Guests cannot own shops"):
+            services.transfer(
+                self.char1,
+                self.property,
+                self.char1,
+                expected_owner=self.char2.pk,
+                reason="Invalid owner",
+                stock_disposition="return",
+            )
+        self.property.refresh_from_db()
+        self.assertEqual(self.property.owner_id, self.char2.pk)
+
+    def test_guest_cannot_buy_a_resource_lot(self):
+        if not apps.is_installed("evennia_rp_resources"):
+            self.skipTest("Resources is absent")
+        from evennia_rp_resources.models import ResourceDefinition
+        from evennia_rp_resources.services import grant
+
+        ResourceDefinition.objects.get_or_create(
+            key="wood", defaults={"name": "Wood", "category": "materials"}
+        )
+        grant(self.char2, "wood", 2)
+        listing = stalls.list_stock(
+            self.char2, self.store.pk, [{"kind": "resource", "key": "wood", "quantity": 2}], 10
+        )
+        self.char1.tags.add("character", category="guest")
+        with self.assertRaisesRegex(EconomyError, "Guests cannot exchange"):
+            stalls.buy(self.char1, listing.pk)
+        self.assertEqual(balance(self.char1), 100)

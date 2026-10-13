@@ -8,6 +8,7 @@ from django.apps import apps
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 
+from evennia_links.guests import is_guest
 from evennia_links.runtime import get
 
 from . import conf
@@ -16,6 +17,8 @@ from .stalls import place
 
 
 def catalog(actor):
+    if is_guest(actor):
+        return []
     if not conf.visible(actor) or not get("RP_ECONOMY_SYSTEM_SELLER"):
         return []
     if not apps.is_installed("evennia_rp_resources"):
