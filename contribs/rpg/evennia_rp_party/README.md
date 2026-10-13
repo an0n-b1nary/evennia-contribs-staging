@@ -1,6 +1,6 @@
 # evennia-rp-party
 
-Optional tactical parties within a combat side. Preview release **0.2.0**;
+Optional tactical parties within a combat side. Preview release **0.2.1**;
 Python 3.12+ and Evennia 6.0+. Combat 0.2.3+ is required for atomic resource
 reservations and public transition notices. No new models, migrations or typeclass mixins.
 
@@ -157,6 +157,9 @@ members do not acquire obligations by recovering. No eligible targets means
 suspend/cancel, never an automatic success. Committed consequences require
 staff recovery; cancellation cannot refund an executed ordinary Surge or attack.
 
+Status details your own pending Checks (a boss sees every Check it issued),
+gives other Parties' pending Checks one line each and summarizes finished
+ones; `+combat/journal` keeps each issue, cancellation and result.
 Use `/preview id` to inspect the current requirement, roster/progress,
 potential damage and resolution token, then `/resolve id=token` to commit.
 Changes invalidate the preview. Uneven/incomplete progress, missing Contest

@@ -1,5 +1,12 @@
 # Migration notes
 
+## 0.2.0 to 0.2.1
+
+No schema change, model migration or configuration change. Saved fights keep
+their Checks; stale issuance markers are pruned the next time that boss
+issues. Hosts that parse Boss Check status or journal text should expect
+the shorter wording described in the changelog.
+
 ## 0.1.1 to 0.2.0
 
 Install links 0.8.4+ and combat 0.2.3+ before Party 0.2.0. Contest Checks additionally need

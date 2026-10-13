@@ -134,6 +134,8 @@ costs no combat action. The boss should choose a surmountable challenge and
 explain its stakes. `+bosscheck/preview id` shows progress and consequences;
 `/resolve id=token` commits the preview. Warnings about uneven responses can
 be acknowledged with a public reason, but committed exchanges must finish.
+Combat status shows your own pending Check in full and summarizes finished
+ones; `+combat/journal` keeps the full history.
 
 The Party roster locks during a Check. Formation remains flexible, so Tank
 is an opportunity to reorganize the Front and spread its mandatory Resist

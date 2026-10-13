@@ -171,6 +171,13 @@ def issue(
     profile = {key: str(number(value)) for key, value in presets()[difficulty].items()}
     result = []
     data = rules.data(state)
+    # Only this personal turn's markers can block; turns never decrease and
+    # rollback restores whole snapshots, so earlier ones are dead weight.
+    data["check_issued"] = {
+        marker: True
+        for marker in data["check_issued"]
+        if not marker.startswith(f"{boss}/") or int(marker.split("/")[1]) >= actor["turns"]
+    }
     engine.opening(state)
     for key in parties:
         party = rules.party(state, key)
@@ -259,8 +266,19 @@ def reconcile(state):
         if check["status"] != "pending":
             continue
         actor = state["participants"].get(check["boss"])
-        if state["ended"] or not actor or actor["hp"] <= 0 or actor["status"] == "withdrawn":
-            check["status"], check["reason"] = "canceled", "Boss unavailable or fight ended"
+        reason = (
+            "Fight ended"
+            if state["ended"]
+            else "Boss left the fight"
+            if not actor
+            else "Boss incapacitated"
+            if actor["hp"] <= 0
+            else "Boss withdrew"
+            if actor["status"] == "withdrawn"
+            else ""
+        )
+        if reason:
+            check["status"], check["reason"] = "canceled", reason
             notices.append(
                 f"Boss Check {check['id']} canceled without consequences: {check['reason']}."
             )
@@ -333,6 +351,13 @@ def warnings(state, check):
         )
     if check["kind"] == "contest" and any(ident not in check["attempts"] for ident in ids):
         notes.append("Missing Contest responses will count as failures if resolved now.")
+    return notes + hazards(state, check, ids)
+
+
+def hazards(state, check, ids=None):
+    """Setup problems already visible at issuance, unlike response pacing."""
+    ids = eligible(state, check) if ids is None else ids
+    notes = []
     if check["kind"] in ("dps", "support", "pressure") and any(
         not budget(state["participants"][i]) for i in ids
     ):
@@ -521,23 +546,57 @@ def resolve(
     return deepcopy(result)
 
 
-def lines(state):
+def lines(state, viewer):
+    """Detail the viewer's pending Checks; summarize the rest for everyone."""
+    viewer = str(viewer)
+    data = rules.data(state)
+    own, other, ended = [], [], []
+    for check in data["checks"].values():
+        if check["status"] != "pending":
+            ended.append(check)
+        elif viewer == check["boss"] or viewer in check["roster"]:
+            own.append(check)
+        else:
+            other.append(check)
     result = []
-    for check in rules.data(state)["checks"].values():
-        label = rules.data(state)["parties"][check["party"]]["name"]
+    for check in own + other:
         result.append(
-            f"Boss Check {check['id']}: {check['kind']} / {check['difficulty']} -> {label}; {check['status']}; {len(eligible(state, check))}/{len(check['cohort'])} eligible."
+            f"Boss Check {check['id']}: {check['kind']} / {check['difficulty']} -> {data['parties'][check['party']]['name']}; pending; {len(eligible(state, check))}/{len(check['cohort'])} eligible."
         )
-        if check["status"] == "pending":
-            result.append(
-                "  +bosscheck/withdraw cancels only your participation; /cancel cancels your Party's Check. Committed consequences require staff recovery."
-            )
-            if check["kind"] == "special":
-                result.extend(
-                    (
-                        f"  Requirement: {check['options']['requirement']}",
-                        f"  Hint: {check['options']['hint']}",
-                    )
+        if check not in own:
+            continue
+        if check["kind"] == "special":
+            result.extend(
+                (
+                    f"  Requirement: {check['options']['requirement']}",
+                    f"  Hint: {check['options']['hint']}",
                 )
-            result.extend(f"  {note}" for note in warnings(state, check))
+            )
+        result.extend(f"  {note}" for note in warnings(state, check))
+    if own:
+        result.append(
+            "  Members may +bosscheck/withdraw their own participation; members or the boss may /cancel a Party's Check. Committed consequences require staff recovery."
+        )
+    if ended:
+        counts = dict.fromkeys(("passed", "failed", "canceled"), 0)
+        for check in ended:
+            counts[outcome(check)] = counts.get(outcome(check), 0) + 1
+        result.append(
+            f"Earlier Boss Checks: {', '.join(f'{n} {label}' for label, n in counts.items() if n)}; details in +combat/journal."
+        )
+        latest = [check for check in ended if viewer == check["boss"] or viewer in check["roster"]]
+        if latest:
+            check = latest[-1]
+            reason = (
+                f": {check['reason']}" if check["status"] == "canceled" and check["reason"] else ""
+            )
+            result.append(
+                f"  Your latest: {check['id']} {check['kind']} -> {data['parties'][check['party']]['name']}; {outcome(check)}{reason}."
+            )
     return tuple(line[:500] for line in result)
+
+
+def outcome(check):
+    if check["status"] == "resolved":
+        return "passed" if check["result"]["passed"] else "failed"
+    return check["status"]
