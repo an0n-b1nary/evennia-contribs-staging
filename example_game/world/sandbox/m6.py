@@ -10,7 +10,7 @@ from evennia_rp_resources import payouts
 from evennia_rp_resources.models import PlotThreadResourcePayout
 from evennia_rp_resources.services import grant
 
-from .building_seed import _object
+from .building_seed import TAG, _object
 
 
 @transaction.atomic
@@ -58,6 +58,9 @@ def seed(market):
             reason="Reference supply shop.",
         )
     property = Property.objects.get(promotion__project=project)
+    for record in project.rooms.select_related("room"):
+        if record.room:
+            record.room.tags.add(TAG, category="sandbox")
     store = shops.reconcile(reviewer, property.pk)
     if (
         store.status == "open"
