@@ -7,7 +7,7 @@ from fractions import Fraction as F
 
 from evennia_rp_combat import engine, partners
 
-from . import conf, rules, synergy
+from . import boss, conf, rules, subjects, synergy
 
 
 def snapshot(state, declaration):
@@ -94,6 +94,7 @@ def transition(state, event):
             }
             data["support"][event.actor_id] = entry
     notices = synergy.transition(state, event)
+    notices.extend(boss.transition(state, event))
     return partners.Transition(section, tuple(notices))
 
 
@@ -141,6 +142,7 @@ def status(state, subject_id):
         lines.append(
             f"Your Team Surge this personal turn: {used[0] if used else 'available (requires Synergy and a legal action)'}."
         )
+    lines.extend(boss.lines(state))
     return tuple(lines) or ("No tactical parties. Unpartied combat remains available.",)
 
 
@@ -154,4 +156,5 @@ PROVIDER = partners.Provider(
     ),
     support=support,
     reserve=synergy.reserve,
+    subject_snapshot=subjects.snapshot,
 )

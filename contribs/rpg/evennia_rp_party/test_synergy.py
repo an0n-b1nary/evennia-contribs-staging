@@ -44,7 +44,7 @@ class TestSynergy(SimpleTestCase):
         before = deepcopy(old)
         upgraded = rules.upgrade(old)
         self.assertEqual(old, before)
-        self.assertEqual(upgraded["schema"], 2)
+        self.assertEqual(upgraded["schema"], 3)
         self.assertEqual(upgraded["data"]["parties"][first]["synergy"], "0")
         self.assertEqual(rules.upgrade(upgraded), upgraded)
 
@@ -549,7 +549,7 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         fight.save(update_fields=["state"])
         hashes = list(fight.builds.values_list("digest", flat=True))
         state = combat.load(fight)
-        self.assertEqual(state["partners"]["party"]["schema"], 2)
+        self.assertEqual(state["partners"]["party"]["schema"], 3)
         self.assertEqual(synergy.pool(state, self.key), 0)
         self.assertEqual(fight.state, legacy)
         combat.execute(self.char1, "upgrade fixture checkpoint", lambda state: None)

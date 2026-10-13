@@ -122,6 +122,7 @@ def resolve(
     rps_shift=(0, 0),
     damage_boost=0,
     surge=0,
+    damage_override=None,
 ):
     """Resolve one packet; damage is before remaining-Vitality truncation.
 
@@ -223,6 +224,10 @@ def resolve(
     raw = raw_damage(
         attack.score(move.action), defensive, power, strain=strain, multiplier=multiplier
     )
+    if damage_override is not None:
+        raw = F(damage_override)
+        if raw < 0:
+            raise CombatError("Declared test damage cannot be negative.")
     # Party damage cannot feed its own Spirit-transfer loop. Surge is a
     # separate paid output benefit and remains in the transfer basis.
     burst_damage = rounded(raw * (1 + F(surge) / 100) * fraction)

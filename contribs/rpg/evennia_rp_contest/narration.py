@@ -32,7 +32,7 @@ def test_values(record):
         "outcome": record.detail["outcome"]["label"],
         "comment": f" — {record.comment}" if record.comment else "",
         "ratings": f" [{record.rating_display} vs {record.difficulty}]"
-        if conf.get("RP_CONTEST_SHOW_RATINGS_TO_ROOM")
+        if conf.get("RP_CONTEST_SHOW_RATINGS_TO_ROOM") and not record.detail.get("binding")
         else "",
     }
 

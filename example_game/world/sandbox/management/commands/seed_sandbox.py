@@ -596,7 +596,12 @@ class Command(BaseCommand):
                     "\n\nParty practice: after +combat/join practice, +party lists an empty "
                     "Practice Formation team you may join yourself. Choose Front/Back/Flex "
                     "with +party/formation; Back Cover requires explicit permission. "
-                    "See help +party and the Party guide."
+                    "See help +party and the Party guide. For Boss Check practice, an "
+                    "opposing controller explicitly joins Boss Mode with +combat/join "
+                    "opposition=3,4, then uses +bosscheck Practice Formation=tank. "
+                    "Inspect /preview before /resolve; targets may /withdraw individually "
+                    "or /cancel their Party's Check. Nobody is enrolled automatically. "
+                    "See help +bosscheck for raids, Special and Contest challenges."
                 )
             for author in authors:
                 tactics.save(author, "Balanced", appetite="balanced", rps_appetite="balanced")

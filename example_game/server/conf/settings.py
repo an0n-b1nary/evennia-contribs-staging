@@ -813,6 +813,9 @@ RP_PARTY_SURGE_POINTS = "25"
 RP_PARTY_EXCHANGE_SYNERGY = "10"
 RP_PARTY_DAMAGE_SYNERGY = "1/4"
 RP_PARTY_EMPOWER_SYNERGY = "40"
+RP_PARTY_STAGGER_POINTS = "30"
+# Boss Check easy/balanced/hard presets default to the owning Party package's
+# calibrated RP_PARTY_CHECK_PRESETS mapping. Override deliberately per ruleset.
 
 ######################################################################
 # Disposable guest trials

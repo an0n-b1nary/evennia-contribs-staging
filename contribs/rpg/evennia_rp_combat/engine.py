@@ -58,6 +58,7 @@ def new_state():
             "invitations": {},
             "next_request": 1,
             "end_proposal": None,
+            "effect_results": {},
         }
     )
 
@@ -174,6 +175,9 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
         "recovering": False,
         "revive": "ask",
         "tempo": 0,
+        "turn_skip": None,
+        "partner_subjects": {},
+        "actions_spent": 0,
     }
     state["participants"][key] = row
     return row
@@ -252,7 +256,7 @@ def exposure(row, build, reaction):
     braced = rules(build).get("braced_support")
     if braced and vulnerable:
         vulnerable = 0 if reaction == "resist" else vulnerable + math.rounded(braced["amount"])
-    return vulnerable + value(row, "overextended")
+    return vulnerable + value(row, "overextended") + value(row, "staggered")
 
 
 def extension(build, amount):
@@ -587,15 +591,20 @@ def recover(state, ident):
         raise CombatError(
             "Your personal Turn Limit is exhausted, so you cannot recover in this fight."
         )
+    from .effects import consume_skip, initiating_executed
+
+    initiating_executed(row)
     row["recovering"] = False
     row["clock"] += 1
     if value(row, "poisoned"):
         harm(row, value(row, "poisoned"))
     row["conditions"] = {k: v for k, v in row["conditions"].items() if v["expires"] > row["clock"]}
     row["actions_left"] -= 1
+    row["actions_spent"] += 1
     if row["actions_left"] <= 0:
         row["turns"] += 1
         row["actions_left"] = row["allowance"]
+        consume_skip(row)
     row["pose"] = not row["auto"]
     partners.emit(state, partners.Event("recovery", row["id"], "", 0))
     settle(state)
@@ -871,6 +880,8 @@ def reaction_view(state, ident, token):
 
 
 def resolve_exchange(state, exchange):
+    from .effects import initiating_executed
+
     actor = participant(state, exchange["actor"])
     # Queued participants cannot relock, so their frozen builds are this
     # exchange's inputs; exchanges and reactions keep no private copies.
@@ -881,6 +892,7 @@ def resolve_exchange(state, exchange):
     for target_id in exchange["targets"]:
         if target_id in exchange["canceled"]:
             continue
+        initiating_executed(actor)
         defender = participant(state, target_id)
         choice = exchange["reactions"][target_id]
         defense_build = Build.from_dict(defender["build"])
@@ -1278,6 +1290,8 @@ def support_spirit(state, exchange, target, *, empowered=False, surge=0):
 
 
 def support_exchange(state, exchange, *, allowed=None):
+    from .effects import initiating_executed
+
     actor = participant(state, exchange["actor"])
     actor_build = Build.from_dict(actor["build"])
     move = Move.from_dict(exchange["move"])
@@ -1306,6 +1320,7 @@ def support_exchange(state, exchange, *, allowed=None):
         spirit, healing, success = support_spirit(
             state, exchange, target, empowered=empowered, surge=F(packet.surge)
         )
+        initiating_executed(actor)
         if spread is not None:
             spirit = math.rounded(spirit * F(spread.factor)) if target_id in recipients else 0
         actual_spirit = change_spirit(target, spirit)
@@ -1503,9 +1518,13 @@ def finish_exchange(state, exchange):
     }
     spent = 1 if exchange["burst"] else len(exchange["targets"]) - len(exchange["canceled"])
     actor["actions_left"] -= spent
+    actor["actions_spent"] += spent
     if actor["actions_left"] <= 0:
         actor["turns"] += 1
         actor["actions_left"] = actor["allowance"]
+        from .effects import consume_skip
+
+        consume_skip(actor)
     actor["outgoing"] = None
     actor["pose"] = not actor["auto"]
     exchange["phase"] = "done"

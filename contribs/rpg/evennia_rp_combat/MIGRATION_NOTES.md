@@ -1,5 +1,15 @@
 # Adoption and upgrades
 
+## Upgrade from 0.2.2 to 0.2.3
+
+No model migration is added. Read-time core schema 3 → 4 supplies empty
+encounter-effect identities, no pending turn skip, empty partner subject
+snapshots and a baseline action count derived from the existing allowance.
+Existing resources, builds, accepted exchanges and journal history are retained.
+Old participants acquire optional frozen subject data only through explicit
+relock. New fields and effect results belong to the same Fight checkpoints,
+including staff rollback; no second journal or dummy exchange is introduced.
+
 ## Upgrade from 0.2.1 to 0.2.2
 
 No model migration or core state-schema change. Existing providers remain

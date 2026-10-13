@@ -119,4 +119,47 @@ and use markers survive reload and rollback. Shelving normally cancels
 unaccepted packets with refunds, while keeping pool and use history. Old parties start
 earning at zero on upgrade. If Party is uninstalled, its modifiers switch
 off and data stays saved; reinstalling settles executed/canceled reservations
-without replaying rewards or results. Boss Checks are planned for Party 0.2.
+without replaying rewards or results.
+
+## Boss Checks
+
+Checks are dramatic challenges offered by a boss's controller to named
+Parties. They are optional storytelling beats with no automatic deadline.
+One boss can challenge several raid Parties simultaneously; each squad has
+its own progress and outcome. Boss Checks never target a whole side.
+
+Use `+bosscheck Party=type` to issue, choosing Tank, DPS, Support, Pressure,
+Special or Contest and an optional easy/balanced/hard difficulty. Issuance
+costs no combat action. The boss should choose a surmountable challenge and
+explain its stakes. `+bosscheck/preview id` shows progress and consequences;
+`/resolve id=token` commits the preview. Warnings about uneven responses can
+be acknowledged with a public reason, but committed exchanges must finish.
+
+The Party roster locks during a Check. Formation remains flexible, so Tank
+is an opportunity to reorganize the Front and spread its mandatory Resist
+damage. Every Front member must survive for the reward; only a complete
+Front collapse adds party-wide failure damage. DPS counts the squad's direct
+damage, including Burst hits and Overpower. Support measures final party
+boost, including Rally/Rattle; Pressure measures boss Spirit at resolution.
+Special uses an explicit requirement and helpful hint, interpreted generously.
+The boss explicitly previews pass/fail and gives a public explanation when resolving.
+
+`+bosscheck/withdraw id` cancels only your participation. You can remain in
+the Party or leave once ordinary queues are clear; you cannot re-enter or
+be replaced during that Check. `+bosscheck/cancel id` cancels the whole
+Party instance. Neither applies failure damage or rewinds ordinary actions.
+Committed consequences can only be rolled back through staff recovery.
+
+Contest Checks declare allowed approaches and use one free
+`+bosscheck/roll id=stat` per participant, from their frozen combat-era stats.
+Individual failures take damage; enough successes earn group Backlash and
+Stagger. Ordinary room tests do not count. Bosses may approve alternative
+approaches before a roll, never after seeing it. Without the optional
+Contest package, the other Check types still work.
+
+Successful Checks open the boss to Bursts through Stagger: a substantial
+reaction penalty and loss of the next entire personal turn. The boss may
+finish a current partial turn. Its first executed action after the skipped
+turn ends the opening. Several raid successes cannot stack or repeatedly
+extend Stagger, but each Party keeps its own earned Backlash. Normal damage
+still awards Transcendence/Synergy and contributes to combat assessment.

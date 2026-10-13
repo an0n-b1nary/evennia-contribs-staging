@@ -18,6 +18,7 @@ from pathlib import Path
 from ci_run_partner_tests import test_exit_code
 
 OPTIONAL = (
+    "evennia_rp_contest",
     "evennia_rp_chargen",
     "evennia_npcs",
     "evennia_scenes",
@@ -46,6 +47,13 @@ def fixture(game, phase):
     import evennia
 
     evennia._init()
+    if phase == "migrate":
+        from django.core.management import call_command
+
+        call_command("migrate", interactive=False)
+        return
+    if phase.startswith("contest-"):
+        return contest_fixture(game, phase)
     from copy import deepcopy
     from unittest.mock import patch
 
@@ -86,7 +94,7 @@ def fixture(game, phase):
         with patch("evennia_rp_combat.services.snapshot", return_value=frozen):
             services.setup(first)
             services.join(first, "one", boss=3)
-            services.join(second, "two")
+            services.join(second, "two", boss=3)
             services.join(supporter, "one")
         key = party.change(first, "create", "Retained team")
         party.change(supporter, "join", key)
@@ -99,6 +107,9 @@ def fixture(game, phase):
             "fixture Synergy balance",
             lambda state: rules.party(state, key).update(synergy="200"),
         )
+        from evennia_rp_party import boss_services
+
+        check = boss_services.issue(second, [key], "dps")[0]
         token = f"{party.surge(first, [second], rng=ROLL)}:1"
         canceled_token = f"{party.surge(supporter, [second], rng=ROLL)}:1"
         state = services.state_for(first)
@@ -113,6 +124,7 @@ def fixture(game, phase):
                     "token": token,
                     "canceled_token": canceled_token,
                     "party": rules.data(state),
+                    "check": check,
                     "builds": list(fight.builds.values_list("digest", flat=True)),
                 }
             ),
@@ -152,6 +164,12 @@ def fixture(game, phase):
             from evennia_rp_party import services as party
 
             assert "party" in partners.registered()
+            from evennia_rp_party import boss, boss_services
+
+            assert boss.get(state, saved["check"])["status"] == "pending"
+            # No backfill of damage/progress from the provider-absent phase.
+            assert boss.get(state, saved["check"])["damage"] == {}
+            boss_services.cancel(first, saved["check"])
             old = state["exchanges"][saved["token"].split(":")[0]]
             assert partners.modifiers(old, second.pk).damage_boost == "10"
             assert partners.modifiers(old, second.pk).surge == "25"
@@ -191,12 +209,141 @@ def fixture(game, phase):
     print(f"Party populated fixture {phase}: passed")
 
 
+def contest_fixture(game, phase):
+    """Bound attempts survive physical Contest removal, without replay."""
+    from unittest.mock import patch
+
+    from evennia.objects.models import ObjectDB
+    from evennia.utils.create import create_object
+    from evennia_rp_combat import services as combat
+    from evennia_rp_combat.data import Build, CombatError
+    from evennia_rp_party import boss, boss_services, services
+
+    from evennia_rp_rules.dice import ScriptedRoller
+
+    path = game / "party-contest-fixture.json"
+    if phase == "contest-create":
+        room = create_object(
+            "evennia.objects.objects.DefaultRoom", key="Bound Check room", nohome=True
+        )
+        actors = [
+            create_object(
+                "evennia.objects.objects.DefaultCharacter", key=name, location=room, home=room
+            )
+            for name in ("Check boss", "First responder", "Second responder")
+        ]
+        for actor in actors:
+            actor.attributes.add(
+                "contest_test_stats", {"brawn": "Mid", "brains": "Mid", "charm": "Mid"}
+            )
+        frozen = Build(
+            tuple(
+                (role, "0")
+                for role in (
+                    "attack",
+                    "attack_defense",
+                    "spell",
+                    "spell_defense",
+                    "dispirit",
+                    "will",
+                    "agility",
+                )
+            )
+        )
+        with patch("evennia_rp_combat.services.snapshot", return_value=frozen):
+            combat.setup(actors[0])
+            combat.join(actors[0], "boss", boss=3)
+            for actor in actors[1:]:
+                combat.join(actor, "heroes")
+        key = services.change(actors[1], "create", "Bound squad")
+        services.change(actors[2], "join", key)
+        ident = boss_services.issue(actors[0], [key], "contest", approaches=("brains",))[0]
+        attempt = boss_services.roll(actors[1], ident, "brains", roller=ScriptedRoller([0]))
+        path.write_text(
+            json.dumps(
+                {"actors": [actor.pk for actor in actors], "check": ident, "attempt": attempt}
+            ),
+            encoding="utf-8",
+        )
+    else:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        actors = [ObjectDB.objects.get(pk=pk) for pk in saved["actors"]]
+        ident = saved["check"]
+        state = combat.state_for(actors[0])
+        check = boss.get(state, ident)
+        assert check["status"] == "pending"
+        assert check["attempts"][str(actors[1].pk)] == saved["attempt"]
+        if phase == "contest-absent":
+            assert find_spec("evennia_rp_contest") is None
+            try:
+                boss_services.preview(actors[0], ident)
+            except CombatError as exc:
+                assert "unavailable" in str(exc)
+            else:
+                raise AssertionError("Absent Contest must suspend resolution")
+            boss_services.cancel(actors[1], ident, individual=True)
+            after = combat.state_for(actors[0])
+            assert boss.get(after, ident)["status"] == "pending"
+            for actor in actors:
+                assert (
+                    after["participants"][str(actor.pk)]["hp"]
+                    == state["participants"][str(actor.pk)]["hp"]
+                )
+        else:
+            from evennia_rp_contest.models import CheckRecord
+
+            assert check["withdrawn"] == [str(actors[1].pk)]
+            assert (
+                CheckRecord.objects.filter(
+                    detail__binding__check=ident, room=actors[0].location
+                ).count()
+                == 1
+            )
+            boss_services.roll(actors[2], ident, "brains", roller=ScriptedRoller([0]))
+            view = boss_services.preview(actors[0], ident)
+            result = boss_services.resolve(
+                actors[0],
+                ident,
+                view["token"],
+                acknowledgment="Opt-out respected after provider return",
+                operation_id="restore-bound-check",
+            )
+            assert result["passed"] and result["backlash"] == 18
+            assert result["eligible"] == [str(actors[2].pk)]
+            after = combat.state_for(actors[0])
+            assert after["participants"][str(actors[0].pk)]["hp"] == 282
+            assert after["participants"][str(actors[0].pk)]["actions_spent"] == 0
+            assert (
+                boss_services.resolve(
+                    actors[0],
+                    ident,
+                    view["token"],
+                    acknowledgment="Opt-out respected after provider return",
+                    operation_id="restore-bound-check",
+                )
+                == result
+            )
+            assert combat.state_for(actors[0]) == after
+    print(f"Party bound Contest fixture {phase}: passed")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("game_dir", type=Path)
     parser.add_argument("--absent", action="append", choices=OPTIONAL, default=[])
     parser.add_argument(
-        "--phase", choices=("suite", "create", "absent", "restored"), default="suite"
+        "--phase",
+        choices=(
+            "suite",
+            "migrate",
+            "create",
+            "absent",
+            "restored",
+            "contest-create",
+            "contest-absent",
+            "contest-restored",
+        ),
+        default="suite",
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -210,19 +357,26 @@ def main(argv=None):
     conf = game / "server/conf"
     if not (conf / "settings.py").is_file():
         parser.error("Supply an initialized disposable game")
-    absent = find_spec("evennia_rp_party") is None
+    absent = [
+        name for name in ("evennia_rp_party", "evennia_rp_contest") if find_spec(name) is None
+    ]
     (conf / "party_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         "PASSWORD_HASHERS = ('django.contrib.auth.hashers.MD5PasswordHasher',)\n"
         "RP_COMBAT_REVEALED = True\nRP_PARTY_REVEALED = True\n"
         "RP_COMBAT_PARTNERS = {'party': {'app': 'evennia_rp_party', 'provider': 'evennia_rp_party.providers.PROVIDER'}}\n"
         + (
-            "INSTALLED_APPS = [app for app in INSTALLED_APPS if app != 'evennia_rp_party']\n"
+            f"INSTALLED_APPS = [app for app in INSTALLED_APPS if app not in {absent!r}]\n"
             if absent
             else ""
         ),
         encoding="utf-8",
     )
+    if args.phase.startswith("contest-"):
+        with (conf / "party_test_settings.py").open("a", encoding="utf-8") as handle:
+            handle.write(
+                "from evennia_rp_rules.testing import TEST_RULESET\nRP_RULES_RULESET = TEST_RULESET\nRP_RULES_SUBJECT_ADAPTER = 'evennia_rp_party.test_boss.stat_block_adapter'\nRP_RULES_VOCABULARY = None\nRP_RULES_MODIFIER_PROVIDERS = []\n"
+            )
     if args.phase != "suite":
         return subprocess.run(
             [
@@ -238,7 +392,7 @@ def main(argv=None):
     launcher = shutil.which("evennia")
     if launcher is None:
         parser.error("evennia is not on PATH")
-    labels = ["evennia_rp_combat"] + ([] if absent else ["evennia_rp_party"])
+    labels = ["evennia_rp_combat"] + ([] if "evennia_rp_party" in absent else ["evennia_rp_party"])
     result = subprocess.run(
         [launcher, "test", "--settings=party_test_settings.py", *labels],
         cwd=game,

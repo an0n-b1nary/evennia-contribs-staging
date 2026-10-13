@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
+### Added
+
+- Manual Tank, DPS, Support, Pressure, Special and optional Contest Boss
+  Checks, including simultaneous independent raid Party targets, frozen
+  cohorts, bounded size adjustment, membership locks and two cancellation scopes.
+- Tokened consequence previews, explicit warning acknowledgment and
+  permission-checked NPC control. Committed consequences require staff recovery.
+- Ordinary damage/resource accounting, complete-Front-collapse failure waves,
+  direct DPS attribution and a nonstacking full-turn Stagger/Burst opening.
+- Frozen, once-only, transaction-bound Contest attempts without room-test
+  matching, with individual failure damage and group Backlash/Stagger.
+- Schema 3 read upgrades, guides/reference seams, seeded calibration and
+  populated provider removal/reinstallation coverage with a pending Check.
+
 ## [0.1.1] - 2026-10-11
 
 ### Added
