@@ -143,6 +143,20 @@ grants and runtime reveal. `world/sandbox/test_resources.py` checks actual maps,
 social and login seams. Fresh CI profiles exclude maps, plots, social, tracker
 or economy and verify the excluded package cannot be imported.
 
+The **Supply Court** off the market holds **Sample Supply Shop**, with a timber
+lot available through `+browse` and `+buy`. `The Supply Expedition` demonstrates
+a staff-approved rare-crystal payout budget. Eligible active participants
+receive rewards when the Plot concludes. Owners propose with
+`+resources/payout #<plot>=key,quantity`; staff use `/payoutapprove` and
+`/payoutretry` for authorization and recovery.
+
+The market also has a system seller, switched off by default. Staff may enable
+`RP_ECONOMY_SYSTEM_SELLER` through `+runtime`, then use `+browse/system` and
+`+buy/system timber=2`. Base prices are in `RP_ECONOMY_BASIC_PRICES`.
+The host registers `CmdShop` and calls the resource award login helper. No additional MRO,
+URL or API mounting is needed. Building's rendered transfer form includes an
+explicit return-or-transfer choice for shop merchandise.
+
 ### Workshops and crafting
 
 `evennia-rp-crafting` 0.2.0 seeds Weaver, Jeweller, Smith, Scribe, Cook and
@@ -181,21 +195,6 @@ its user's room. CI tests actual physically absent partners
 through `scripts/ci_run_crafting_tests.py`.
 
 ### The map, and the web surface
-
-The **Supply Court** off the market holds **Sample Supply Shop**, with a timber
-lot available through `+browse` and `+buy`. `The Supply Expedition` demonstrates
-a staff-approved rare-crystal payout budget. Eligible active participants
-receive rewards when the Plot concludes. Owners propose with
-`+resources/payout #<plot>=key,quantity`; staff use `/payoutapprove` and
-`/payoutretry` for authorization and recovery.
-
-The market also has a system seller, switched off by default. Staff may enable
-`RP_ECONOMY_SYSTEM_SELLER` through `+runtime`, then use `+browse/system` and
-`+buy/system timber=2`. Base prices are in `RP_ECONOMY_BASIC_PRICES`.
-The host registers `CmdShop` and calls the resource award login helper. No additional MRO,
-URL or API mounting is needed. Building's rendered transfer form includes an
-explicit return-or-transfer choice for shop merchandise.
-
 
 **Every contrib web surface is mounted.** `web/website/urls.py` mounts all
 nine; `web/urls.py` mounts the two DRF routers:
