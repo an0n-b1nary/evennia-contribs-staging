@@ -455,6 +455,7 @@ jobs:
       - name: Party/combat without optional packages
         run: >-
           python scripts/ci_run_party_tests.py ci_game
+          --absent evennia_rp_contest
           --absent evennia_rp_chargen --absent evennia_npcs
           --absent evennia_scenes --absent evennia_posing
           --absent evennia_social --absent evennia_accessibility
@@ -468,3 +469,17 @@ jobs:
         run: |
           pip install wheels/evennia_rp_party-*.whl
           python scripts/ci_run_party_tests.py ci_game --phase restored
+      - name: Add packaged Contest and verify bound response integration
+        run: |
+          pip wheel --no-deps -w wheels contribs/rpg/evennia_rp_contest
+          pip install wheels/evennia_rp_contest-*.whl
+          printf "\nINSTALLED_APPS += ['evennia_rp_contest']\n" >> ci_game/server/conf/settings.py
+          python scripts/ci_run_party_tests.py ci_game --phase migrate
+          python scripts/ci_run_party_tests.py ci_game
+      - name: Retain a bound Contest across physical provider removal
+        run: |
+          python scripts/ci_run_party_tests.py ci_game --phase contest-create
+          pip uninstall -y evennia-rp-contest
+          python scripts/ci_run_party_tests.py ci_game --phase contest-absent --absent evennia_rp_contest
+          pip install wheels/evennia_rp_contest-*.whl
+          python scripts/ci_run_party_tests.py ci_game --phase contest-restored

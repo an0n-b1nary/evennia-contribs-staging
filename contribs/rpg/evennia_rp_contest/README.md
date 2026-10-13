@@ -1,6 +1,15 @@
 # evennia-rp-contest
 
-> **Preview (0.1.0, Pre-Alpha).** Authored directly as a contrib-native pilot.
+Hosts may bind one-off attempts to another system through `bound.snapshot`,
+`bound.approaches`, `bound.perform` and `bound.validate`. Snapshots fold ratings
+and modifiers at the host's build lock; later attempts use that frozen source
+and the authored difficulty. `perform` requires the host's atomic transaction;
+the host enforces authorization, uniqueness and journaling. These attempts
+create normal private audit records with a binding, without room-challenge
+matching or award signals. Public history renders them without ratings even
+when ordinary room tests reveal ratings. Staff review retains the breakdown.
+
+> **Preview (0.1.4, Pre-Alpha).** Authored directly as a contrib-native pilot.
 > APIs and migrations may change; pin an exact commit.
 
 Non-combat stat checks and room challenges, with no game-specific stat names,

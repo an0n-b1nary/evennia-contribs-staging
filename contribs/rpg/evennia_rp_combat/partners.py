@@ -2,8 +2,9 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Pure partner contracts, called inside the coordinator's transaction.
 
-Providers are trusted host code, not player policies. Inputs are detached
-JSON state; providers must not query models, random generators or presence.
+Providers are trusted host code, not player policies. Engine callbacks receive
+detached JSON state and must not query models, randomness or presence. The
+coordinator-only subject_snapshot hook may read the authorized subject's sheet.
 Only validated numeric outputs reach reaction policies. A provider owns
 only its versioned section under ``state['partners']``.
 """
@@ -181,6 +182,7 @@ class Provider:
     help: Callable | None = None
     support: Callable | None = None
     reserve: Callable | None = None
+    subject_snapshot: Callable | None = None
 
     def __post_init__(self):
         if (
@@ -194,6 +196,7 @@ class Provider:
                     self.help,
                     self.support,
                     self.reserve,
+                    self.subject_snapshot,
                 )
             )
         ):
@@ -224,6 +227,22 @@ def registered():
         if not isinstance(provider, Provider):
             raise CombatError(f"Combat partner {key} must export a Provider.")
         result[key] = provider
+    return result
+
+
+def subject_snapshots(subject, *, stats=None):
+    """Coordinator-only enrollment/relock seam, allowed to read stat sources.
+
+    Unlike pure resolution callbacks this receives the authorized subject.
+    Detached JSON snapshots are retained with that subject's locked build.
+    """
+    result = {}
+    for key, provider in registered().items():
+        if provider.subject_snapshot is not None:
+            value = provider.subject_snapshot(subject, stats=stats)
+            if value is not None:
+                json.dumps(value, allow_nan=False)
+                result[key] = deepcopy(value)
     return result
 
 

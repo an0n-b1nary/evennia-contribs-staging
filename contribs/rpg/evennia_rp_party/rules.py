@@ -17,7 +17,7 @@ POSITIONS = ("front", "back", "flex")
 def upgrade(section):
     if section is None:
         return {
-            "schema": 2,
+            "schema": 3,
             "data": {
                 "next_party": 1,
                 "parties": {},
@@ -28,9 +28,12 @@ def upgrade(section):
                 "proposals": {},
                 "surges": {},
                 "synergy_awards": {},
+                "next_check": 1,
+                "checks": {},
+                "check_issued": {},
             },
         }
-    if section.get("schema") not in (1, 2):
+    if section.get("schema") not in (1, 2, 3):
         raise CombatError("Unsupported Party state version; no progress was applied.")
     result = deepcopy(section)
     data = result["data"]
@@ -42,6 +45,9 @@ def upgrade(section):
         data["synergy_awards"] = {}
         for row in data.get("parties", {}).values():
             row["synergy"] = "0"
+    if result["schema"] == 2:
+        result["schema"] = 3
+        data.update(next_check=1, checks={}, check_issued={})
     if (
         type(data.get("next_party")) is not int
         or data["next_party"] < 1
@@ -56,10 +62,37 @@ def upgrade(section):
                 "proposals",
                 "surges",
                 "synergy_awards",
+                "checks",
+                "check_issued",
             )
         )
     ):
         raise CombatError("Invalid saved Party state.")
+    if type(data.get("next_check")) is not int or data["next_check"] < 1:
+        raise CombatError("Invalid saved Boss Check sequence.")
+    for ident, check in data["checks"].items():
+        if (
+            not isinstance(check, dict)
+            or check.get("id") != ident
+            or check.get("kind") not in ("tank", "dps", "support", "pressure", "special", "contest")
+            or check.get("status") not in ("pending", "resolved", "canceled")
+            or any(
+                not isinstance(check.get(key), list) for key in ("roster", "cohort", "withdrawn")
+            )
+            or any(
+                not isinstance(check.get(key), dict)
+                for key in (
+                    "profile",
+                    "options",
+                    "initial",
+                    "damage",
+                    "attempts",
+                    "allowed",
+                    "contest_sources",
+                )
+            )
+        ):
+            raise CombatError("Invalid saved Boss Check.")
     for row in data["parties"].values():
         if not isinstance(row, dict) or number(row.get("synergy")) < 0:
             raise CombatError("Invalid saved Party Synergy balance.")
@@ -224,6 +257,8 @@ def prepare(state, value, side):
 
 
 def join(state, ident, key):
+    from .boss import membership
+
     engine.progress(state)
     row = clear_queue(state, ident)
     selected = party(state, key)
@@ -232,6 +267,7 @@ def join(state, ident, key):
     previous = party_id(state, ident)
     if previous == str(key):
         raise CombatError("You already belong to that party.")
+    membership(state, ident, joining=str(key))
     for affected in (previous, str(key)):
         data(state)["proposals"].pop(affected, None)
     data(state)["members"][str(ident)] = {"party": str(key), "position": "flex", "cover": False}
@@ -239,11 +275,14 @@ def join(state, ident, key):
 
 
 def leave(state, ident):
+    from .boss import membership
+
     engine.progress(state)
     clear_queue(state, ident)
     key = party_id(state, ident)
     if not key:
         raise CombatError("You are already unpartied.")
+    membership(state, ident)
     data(state)["members"][str(ident)] = {
         "party": None,
         "last_party": key,
@@ -274,6 +313,8 @@ def rename(state, ident, value):
 
 
 def dissolve(state, ident, key, *, agree=False, decline=False):
+    from .boss import membership
+
     engine.participant(state, ident)
     party(state, key)
     ids = roster(state, key)
@@ -284,6 +325,7 @@ def dissolve(state, ident, key, *, agree=False, decline=False):
             raise CombatError("Only members may decline dissolution.")
         section["proposals"].pop(key, None)
         return "declined"
+    membership(state, ident, dissolving=key)
     if required:
         if str(ident) not in ids:
             raise CombatError("Only members may propose or agree to dissolution.")

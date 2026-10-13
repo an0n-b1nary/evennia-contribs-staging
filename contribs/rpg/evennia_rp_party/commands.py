@@ -41,7 +41,7 @@ class CmdParty(MuxCommand):
     Party never changes your side, personal turns or combat assessment.
     Team Surge spends 100 Synergy for +25% primary output, once per personal
     turn. A canceled packet refunds it; an executed miss spends it.
-    Boss Checks remain deferred. See the Party guide for details.
+    +bosscheck offers manual Party-level Boss challenges. See the Party guide.
     """
 
     key = "+party"
@@ -210,4 +210,7 @@ class PartyCmdSet(CmdSet):
     key = "RPParty"
 
     def at_cmdset_creation(self):
+        from .boss_commands import CmdBossCheck
+
         self.add(CmdParty)
+        self.add(CmdBossCheck)

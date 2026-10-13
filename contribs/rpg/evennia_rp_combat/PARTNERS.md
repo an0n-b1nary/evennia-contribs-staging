@@ -1,4 +1,4 @@
-# Combat partner contract (0.2.2)
+# Combat partner contract (0.2.3)
 
 Combat owns transactions, queues, costs, accepted inputs, personal clocks,
 draws and rollback. A partner owns its own rules and versioned state. No
@@ -29,7 +29,8 @@ Registration is host configuration, never executable player input.
 for its initial state and returning its current envelope. Upgrades must be
 deterministic and idempotent. Core `state.upgrade` detaches its input,
 advances the core schema step by step (1 to 2 added partner sections; 2 to 3
-added combat 0.2's participant fields), validates every envelope and calls
+added combat 0.2's participant fields; 3 to 4 adds encounter-effect identities,
+skipped turns, actual action counts and frozen partner subjects), validates every envelope and calls
 present owners.
 It is used on normal loads and old rollback snapshots. It never writes
 stored historical snapshots or changes frozen-build hashes.
@@ -110,7 +111,8 @@ Callbacks must use `event.kind` explicitly:
   once, including exactly once for a Burst.
 - `recovery`: the recovery action advanced its actor's allowance and clock;
   no attack or support executed and no action reward is implied.
-- `hostile_damage`: attributed Poison suffered on an ordinary own exchange,
+- `hostile_damage`: attributed Poison suffered on an ordinary own exchange
+  or real encounter-effect damage,
   with source actor, actual victim/loss and pre-damage participation. A
   recovery Poison tick emits no resource-reward event. Source-less or self
   Poison is not attributed hostile damage. The partner still checks sides.
@@ -208,6 +210,31 @@ handoff, even if the coverer changes Formation between hits.
 returns its public `ReactionView` without accepting or spending anything.
 `services.describe_odds(view, token)` formats exact neutral odds, including
 public Calling the Shot inputs, without revealing an ordinary hidden bet.
+
+## Enrollment snapshots and encounter effects
+
+The optional `subject_snapshot(subject, stats=None)` hook runs only in the
+authorized coordinator enrollment/relock transaction. It may read the subject's
+sheet and trusted modifier providers, but must return finite JSON or `None`.
+For NPCs, `stats` supplies the blueprint's stat block. The result is stored
+under the participant's private `partner_subjects[key]`, separately from the
+core build hash. Rejoining retains it; explicit relock refreshes it. Old
+participants receive no retrospective snapshot. Engine callbacks remain pure.
+
+`effects.damage(state, source, target, amount, identity)` applies actual
+opposing-side damage and ordinary damage-taken resources, then emits
+`hostile_damage`. `effects.resist` supplies a declared physical damage profile
+with zero Accuracy/Spirit, normal defender Resist mitigation and pressure,
+and a caller-supplied committed draw. Both retain idempotent effect results.
+They grant no exchange clock, allowance, completion or Empower rewards.
+The host owns authorization, consent, queue checks and the Fight transaction.
+
+`effects.stagger` adds a nonstacking next-full-personal-turn skip and reaction
+penalty. A partial current turn finishes; a fresh boundary consumes the skip
+without ticking exchange clocks or producing rewards. The penalty expires
+only on an executed initiating action after that boundary (including recovery),
+never a canceled declaration, and persists at the final cap. These are generic
+primitives; Party owns challenge types, thresholds, targeting and resolution.
 
 ## Plain-text display
 

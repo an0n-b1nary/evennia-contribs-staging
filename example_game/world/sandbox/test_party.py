@@ -13,7 +13,7 @@ from world.sandbox.test_rp_partners import RPSeedMixin
 
 @skipUnless(apps.is_installed("evennia_rp_party"), "Party partner absent")
 class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
-    def opponent(self, actor, side):
+    def opponent(self, actor, side, *, boss=1):
         if not apps.is_installed("evennia_npcs"):
             self.skipTest("optional NPC partner absent")
         from evennia_npcs import services as npcs
@@ -26,7 +26,7 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
             kind="template",
             stat_block={stat: "B" for stat in get("RP_COMBAT_ROLES").values()},
         )
-        return combat.template(actor, blueprint, side)
+        return combat.template(actor, blueprint, side, boss=boss)
 
     def test_seed_is_opt_in_and_commands_and_guide_are_registered(self):
         from commands.default_cmdsets import CharacterCmdSet
@@ -40,10 +40,12 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         )
         commands = CharacterCmdSet()
         self.assertIn("+party", {cmd.key for cmd in commands.commands})
+        self.assertIn("+bosscheck", {cmd.key for cmd in commands.commands})
         if apps.is_installed("evennia_guides"):
             response = Client().get("/guide/party/")
             self.assertEqual(response.status_code, 200)
             self.assertIn("Position and Cover", response.content.decode())
+            self.assertIn("Boss Checks", response.content.decode())
             with override_settings(RP_PARTY_REVEALED=False):
                 self.assertEqual(Client().get("/guide/party/").status_code, 404)
 
@@ -150,6 +152,63 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         fight.refresh_from_db()
         self.assertEqual(fight.state, before)
         self.assertEqual(fight.entries.count(), entries)
+
+    def test_manual_npc_boss_checks_ignore_consent_shelving_and_bound_contest(self):
+        from evennia_rp_combat import engine
+        from evennia_rp_combat import services as combat
+        from evennia_rp_party import boss, boss_services, services
+
+        from evennia_rp_rules.dice import ScriptedRoller
+
+        first, second = self.samples
+        first.account, second.account = self.account, self.account2
+        combat.join(first, "heroes")
+        combat.join(second, "heroes")
+        opponent = self.opponent(first, "boss", boss=3)
+        key = services.change(first, "create", "Check defenders")
+        services.change(second, "join", key)
+        services.change(first, "formation", "front")
+        services.change(second, "formation", "front")
+        if apps.is_installed("evennia_social"):
+            self.account2.db.ignore_list = [self.account.pk]
+            with self.assertRaisesRegex(ValueError, "confirmation"):
+                boss_services.issue(first, [key], "tank", subject=opponent)
+            self.account2.db.ignore_list = []
+        ident = boss_services.issue(first, [key], "tank", subject=opponent)[0]
+        fight = combat.open_fight(self.grounds)
+        before = deepcopy(combat.state_for(first)["participants"][str(opponent.pk)])
+        combat.shelve(first, "Manual Check intermission")
+        combat.unshelve(first, fight.pk)
+        for subject in (first, second, opponent):
+            combat.join(first if subject == opponent else subject, subject=subject)
+        combat.storyteller(first, "resume")
+        self.assertEqual(boss.get(combat.state_for(first), ident)["status"], "pending")
+        view = boss_services.preview(first, ident, subject=opponent)
+        outcome = boss_services.resolve(
+            first, ident, view["token"], subject=opponent, acknowledgment="Both defenders are ready"
+        )
+        self.assertTrue(outcome["passed"])
+        state = combat.state_for(first)
+        row = state["participants"][str(opponent.pk)]
+        self.assertEqual(row["actions_spent"], before["actions_spent"])
+        self.assertEqual(row["clock"], before["clock"])
+        self.assertEqual(engine.value(row, "staggered"), 30)
+        if not apps.is_installed("evennia_rp_contest"):
+            return
+        from evennia_rp_contest.models import CheckRecord
+        from evennia_rp_contest.narration import public_text
+
+        ident = boss_services.issue(
+            first, [key], "contest", subject=opponent, approaches=("intellect",)
+        )[0]
+        attempt = boss_services.roll(second, ident, "intellect", roller=ScriptedRoller([0]))
+        record = CheckRecord.objects.get(pk=attempt["record"])
+        self.assertIsNone(record.challenge)
+        self.assertEqual(record.detail["binding"]["check"], ident)
+        with override_settings(RP_CONTEST_SHOW_RATINGS_TO_ROOM=True):
+            self.assertNotIn(" vs ", public_text(record))
+        boss_services.cancel(first, ident)
+        self.assertEqual(boss.get(combat.state_for(first), ident)["status"], "canceled")
 
     def test_real_team_surge_snapshots_cover_and_restore_use_one_combat_journal(self):
         from evennia_rp_combat import services as combat

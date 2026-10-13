@@ -1605,7 +1605,17 @@ Synergy. `+party/surge enemy=balanced` spends 100 to boost one packet's
 primary output by 25%; `+party/surgepress` selects a later Burst hit. Support
 and multi-target options are documented in the Party guide. Reservations,
 refunds and once-per-personal-turn use share combat's transaction and journal.
-Auto-Act never spends. Boss Checks are reserved for Party 0.2.
+Auto-Act never spends. Party 0.2 adds manual `+bosscheck`: an authorized
+Boss Mode x2+ controller can issue Tank, DPS, Support, Pressure, Special or
+Contest challenges to one or several named opposing Parties. Preview then
+explicitly resolve, acknowledging pacing warnings with a public reason.
+Targets may withdraw individually or cancel their Party's instance before
+consequences commit. Formation stays flexible, but membership is locked;
+committed consequences require staff recovery. Checks are never automated.
+Contest freezes the host's stat vocabulary at enrollment/relock; it uses one
+free bound response rather than an ordinary room test. See the Party guide
+and `scripts/calibrate_boss_checks.py` for the authored practice workflow
+and reproducible provisional defaults.
 `world.sandbox.test_party` exercises real sheets, NPC control,
 Calling the Shot previews, ignores, guides and chat. The independent CI job
 also installs combat/Party wheels without optional packages, removes Party

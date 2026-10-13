@@ -18,7 +18,11 @@ def check_configuration(app_configs=None, **kwargs):
                 if name == "RP_PARTY_ENCORE_FACTOR"
                 else 100
             )
-            if not 0 <= value <= maximum or (name == "RP_PARTY_SURGE_COST" and value == 0):
+            if (
+                not 0 <= value <= maximum
+                or (name == "RP_PARTY_SURGE_COST" and value == 0)
+                or (name == "RP_PARTY_STAGGER_POINTS" and value.denominator != 1)
+            ):
                 raise ValueError
         except ValueError:
             errors.append(
@@ -27,4 +31,10 @@ def check_configuration(app_configs=None, **kwargs):
                     id="rp_party.E001",
                 )
             )
+    from .boss import presets
+
+    try:
+        presets()
+    except ValueError as exc:
+        errors.append(Error(str(exc), id="rp_party.E002"))
     return errors
