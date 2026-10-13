@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-13
+
+- Party OOC chat honors shared communication restrictions, including when
+  directing an NPC. A mute cannot be bypassed through private party chat.
+
 ## [0.2.1] - 2026-10-13
 
 ### Changed

@@ -35,6 +35,7 @@ from world.sandbox.test_economy import EconomySeams
 from world.sandbox.test_frontier import FrontierSeams
 from world.sandbox.test_interiors import BuildingInteriorSeams
 from world.sandbox.test_jobs import JobsSeams
+from world.sandbox.test_moderation import TestModerationSeams
 from world.sandbox.test_npcs import NPCCommandSeams, NPCSeams
 
 # Keep the resources seam in the standard sandbox gate as well as the

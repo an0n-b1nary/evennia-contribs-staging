@@ -2,6 +2,14 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.7.4 — 2026-10-13
+
+- Check shared communication restrictions before creating or delivering pages.
+- Hosts can disable the personal `+mute` alias with `SOCIAL_IGNORE_MUTE_ALIAS`
+  so it does not hide Moderation's staff command; `+ignore` remains available.
+- Opt-in public staff-run markers use current account roster membership, including
+  offline characters and quelled staff, with a reusable website helper.
+
 ## 0.7.3 — 2026-10-12
 
 - Guests may page staff only, return to their own lounge with +ooc/+home, appear marked in connected listings, and stay out of permanent public presence.

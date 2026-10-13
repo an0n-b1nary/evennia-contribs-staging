@@ -80,6 +80,14 @@ class CmdPage(MuxCommand):
         """Create the Msg and deliver to online targets."""
         from evennia.utils import create
 
+        from evennia_links.communication import denial
+
+        for target in targets:
+            blocked = denial(caller_char, "page", target)
+            if blocked:
+                self.caller.msg(blocked)
+                return
+
         caller_account = caller_char.account
 
         from evennia_links.guests import is_guest

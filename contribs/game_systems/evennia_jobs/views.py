@@ -154,6 +154,13 @@ class JobDetailView(LoginRequiredMixin, DetailView):
         context["is_submitter"] = character_id is not None and job.author_id == character_id
         context["submissions"] = job.submissions.select_related("decision")
         latest = job.submissions.last()
+        from evennia.objects.models import ObjectDB
+
+        from evennia_jobs.review import review_fields
+
+        context["review_fields"] = (
+            review_fields(latest, ObjectDB.objects.filter(pk=character_id).first()) if staff else {}
+        )
         context["can_revise"] = (
             context["is_submitter"]
             and job.status != JobStatus.CLOSED

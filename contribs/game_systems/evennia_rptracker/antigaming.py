@@ -182,4 +182,89 @@ def sweep_rp_sessions(window_end):
     logger.info("rptracker.antigaming: sweep starting for window_end=%s", window_end)
     _flag_pose_spam(window_end)
     _flag_manual_end_abuse(window_end)
+    review_alt_copresence(window_end)
     logger.info("rptracker.antigaming: sweep complete")
+
+
+def review_alt_copresence(window_end):
+    """Notify staff after repeated overlapping alt sessions, without flagging RP.
+
+    Room and channel sources are separate venues. Multiple alts sharing one
+    overlapping exchange count once. Stored account snapshots preserve the
+    meaning of a session even when the character's current roster changes.
+    """
+    import hashlib
+    from collections import defaultdict
+
+    from evennia_links.characters import account_ids
+    from evennia_rptracker.models import CoPresenceNotice, RPSession
+
+    threshold = getattr(settings, "RPTRACKER_ALT_COPRESENCE_COUNT", 3)
+    days = getattr(settings, "RPTRACKER_ALT_COPRESENCE_DAYS", 7)
+    if type(threshold) is not int or threshold < 1 or type(days) is not int or days < 1:
+        raise ValueError("Alt co-presence count and window must be positive integers")
+    start = window_end - timedelta(days=days)
+    venues = defaultdict(list)
+    sessions = RPSession.objects.filter(
+        activated_at__isnull=False,
+        ended_at__gt=start,
+        ended_at__lte=window_end,
+        status__in=[RPSession.Status.COMPLETED, RPSession.Status.FLAGGED],
+    ).select_related("character")
+    for session in sessions:
+        owners = (
+            [session.account_id_snapshot]
+            if session.account_id_snapshot
+            else account_ids(session.character)
+        )
+        venue = (
+            session.channel_id
+            if session.source_type == RPSession.Source.CHANNEL
+            else session.room_id
+        )
+        if venue is None:
+            continue
+        for account_id in owners:
+            venues[(account_id, session.source_type, venue)].append(session)
+    events = defaultdict(list)
+    for (account_id, source, venue), rows in venues.items():
+        overlaps = []
+        rows.sort(key=lambda row: row.activated_at)
+        for i, first in enumerate(rows):
+            for second in rows[i + 1 :]:
+                if second.activated_at >= first.ended_at:
+                    break
+                if first.character_id == second.character_id:
+                    continue
+                overlap_start = max(first.activated_at, second.activated_at)
+                overlap_end = min(first.ended_at, second.ended_at)
+                if overlap_start < overlap_end:
+                    overlaps.append((overlap_start, overlap_end, {first.pk, second.pk}))
+        overlaps.sort(key=lambda item: item[0])
+        merged = []
+        for begin, end, ids in overlaps:
+            if merged and begin < merged[-1][1]:
+                old_begin, old_end, old_ids = merged[-1]
+                merged[-1] = old_begin, max(old_end, end), old_ids | ids
+            else:
+                merged.append((begin, end, ids))
+        for begin, _end, ids in merged:
+            events[account_id].append((begin, source, venue, sorted(ids)))
+    for account_id, occurrences in events.items():
+        occurrences.sort(key=lambda event: event[0])
+        for i, occurrence in enumerate(occurrences):
+            if i + 1 < threshold:
+                continue
+            begin, source, venue, ids = occurrence
+            fingerprint = hashlib.sha256(
+                repr((account_id, source, venue, ids)).encode()
+            ).hexdigest()
+            _, created = CoPresenceNotice.objects.get_or_create(
+                fingerprint=fingerprint,
+                defaults={"account_id_snapshot": account_id, "session_ids": ids},
+            )
+            if created:
+                _notify_flag_review(
+                    title=f"Advisory: repeated alt co-presence — account #{account_id}",
+                    description=f"Account #{account_id} has {i + 1} shared alt sessions within {days} days. Latest session IDs: {ids}. Review only: no XP was withheld and no RP session was flagged.",
+                )

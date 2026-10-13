@@ -62,6 +62,9 @@ class BoardsAuthoringMixin(LoginRequiredMixin):
 
     def post(self, request, *args, **kwargs):
         character_id = self.get_character()
+        from evennia_links.communication import require_communication
+
+        require_communication(ObjectDB.objects.get(pk=character_id), "board")
         self.check_permission(character_id, self.get_permission_target())
         return super().post(request, *args, **kwargs)
 

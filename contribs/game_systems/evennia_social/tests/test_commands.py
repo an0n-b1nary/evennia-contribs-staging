@@ -8,6 +8,7 @@ introduced by this extraction (find_character, find_room — see
 MIGRATION_NOTES.md) and the severed evennia_scenes coupling in CmdOoc.
 """
 
+from django.test import override_settings
 from evennia.utils.create import create_object
 
 from evennia_posing.signals import pose_recorded
@@ -24,6 +25,15 @@ from evennia_social.tests.base import SocialCommandTestCase, SocialTestCase
 
 
 class TestCmdIgnore(SocialCommandTestCase):
+    @override_settings(SOCIAL_IGNORE_MUTE_ALIAS=False)
+    def test_host_can_reserve_mute_for_staff_without_removing_ignore(self):
+        command = CmdIgnore()
+        self.assertNotIn("+mute", command._keyaliases)
+        self.assertIn("+ignore", command._keyaliases)
+        self.call(command, "Char2", "Now ignoring")
+        with override_settings(SOCIAL_IGNORE_MUTE_ALIAS=True):
+            self.assertIn("+mute", CmdIgnore()._keyaliases)
+
     def setUp(self):
         super().setUp()
         self.account.db.ignore_list = []

@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.2.3 — 2026-10-13
+
+- Advisory-only repeated alt co-presence notices for room and channel sessions,
+  with durable deduplication and no change to sessions or XP eligibility.
+- IC channels participate in the shared communication restriction seam.
+
 ## 0.2.2 — 2026-10-12
 
 - Exclude guests from room and channel tracking, partner detection and activity reports, including in a misconfigured IC room.

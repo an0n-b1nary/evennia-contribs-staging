@@ -16,7 +16,7 @@ part of this repo).
 
 ## What's wired up
 
-All 22 current contribs, in dependency order — `evennia_links` first, then
+All current contribs, in dependency order — `evennia_links` first, then
 `evennia_economy` and `evennia_rp_resources`, followed by `evennia_rp_crafting`.
 Other apps that depend on links include `evennia_rptracker`, `evennia_scenes`,
 `evennia_boards`, `evennia_lore`, `evennia_plots`, `evennia_regions`,
@@ -669,6 +669,7 @@ for d in contribs/base_systems/evennia_links \
          contribs/game_systems/evennia_maps \
          contribs/game_systems/evennia_calendar \
          contribs/game_systems/evennia_jobs \
+         contribs/game_systems/evennia_moderation \
          contribs/game_systems/evennia_xp \
          contribs/utils/evennia_accessibility \
          contribs/utils/evennia_guides \
@@ -1674,3 +1675,38 @@ newly installed commands are unavailable until reviewed. This public demo keeps
 account registration open; invitation-only hosts disable it in their settings.
 The reference game uses multisession mode 3 and 1000 character slots; accounts
 create characters deliberately (`AUTO_CREATE_CHARACTER_WITH_ACCOUNT=False`).
+
+### Moderation and reviewed admissions
+
+Guests can use `+apply` in the guest wing. `seed_sandbox` creates a private
+`SampleApplicant` ticket with a disposable author so staff can inspect
+`+admissions`, `+jobs/form admission` and the rendered Jobs review page.
+Reseeding preserves the sample's existing review decision. The public sandbox
+also retains ordinary signup; hosts choosing reviewed intake disable direct
+telnet and website registration separately.
+
+`evennia_moderation` follows Jobs in install/app order. Its settings block
+configures optional referrals with a game-wide allowance, uncapped intake,
+the application questionnaire, the replacement authentication backend and
+the middleware that rechecks existing website/API sessions. Staff use
+`+softban`, `+mute`, `+notes`, `+admissions` and audited stock bans. Account
+commands include a guarded stock page route so unpuppeting cannot bypass mutes.
+
+`ModerationAccountMixin` precedes both account classes and `GuestAccountMixin`.
+`CommunicationCharacterMixin` precedes Social/Posing and DefaultCharacter;
+the existing Guest boundary remains first. The channel mixin precedes
+DefaultChannel; RPTracker's IC channel already includes it. The server-start
+hook ensures the daily retention sweep exists.
+
+The staff-run marker is enabled on terminal and website character displays.
+It uses current account roster status, including offline and quelled staff,
+and current NPC controllers. Repeated alt co-presence produces advisory Jobs
+notices after three overlapping room/channel sessions in seven days; it never
+flags sessions or changes XP eligibility.
+
+`world/sandbox/test_moderation.py` covers real communication and authentication
+routes, website board writes, private review context and the decline-reason
+choice. CI also starts Moderation with its optional communication packages
+physically absent, and runs file-backed admissions races. See the package
+[README](../contribs/game_systems/evennia_moderation/README.md) for the complete
+installation, runtime settings, retention policy and host integration signal.

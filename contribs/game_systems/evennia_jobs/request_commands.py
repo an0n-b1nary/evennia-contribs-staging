@@ -243,6 +243,7 @@ def handle_review(command):
             outcome=actions[action],
             reason=command.rhs,
             expected_revision=int(parts[1]),
+            review_options={"share_decline_reason": "share" in command.switches},
         )
         command.caller.msg(
             f"Ticket #{job.job_number}: {decision.get_outcome_display()} (revision {parts[1]})."

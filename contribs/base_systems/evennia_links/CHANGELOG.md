@@ -1,5 +1,10 @@
 # Changelog — evennia-links
 
+## 0.8.5 — 2026-10-13
+
+- Shared, optional communication restriction signal with fail-closed evaluation,
+  plus cooperative character speech and channel delivery mixins.
+
 ## 0.8.4 — 2026-10-12
 
 - Added disposable guest identification, movement and inventory boundaries, seeded arrival and restricted account lifecycle. Shared playable-character and web-character helpers exclude guests.

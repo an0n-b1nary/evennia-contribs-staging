@@ -415,6 +415,11 @@ def portray(actor, body, *, pose_type="pose"):
     npc, player = controlled(actor)
     if npc is None:
         raise NPCError("Choose an NPC with +npc/puppet first.")
+    from evennia_links.communication import denial
+
+    blocked = denial(player, "room", npc.location)
+    if blocked:
+        raise NPCError(blocked)
     body = text(body, maximum=10000)
     name = attribution(npc)
     rendered = (

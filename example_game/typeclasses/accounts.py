@@ -25,9 +25,10 @@ several more options for customizing the Guest account system.
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
 from evennia_links.guests import GuestAccountMixin
+from evennia_moderation.auth import ModerationAccountMixin
 
 
-class Account(DefaultAccount):
+class Account(ModerationAccountMixin, DefaultAccount):
     """
     An Account is the actual OOC player entity. It doesn't exist in the game,
     but puppets characters.
@@ -141,7 +142,7 @@ class Account(DefaultAccount):
     pass
 
 
-class Guest(GuestAccountMixin, DefaultGuest):
+class Guest(ModerationAccountMixin, GuestAccountMixin, DefaultGuest):
     """
     This class is used for guest logins. Unlike Accounts, Guests and their
     characters are deleted after disconnection.

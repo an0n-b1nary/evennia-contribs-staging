@@ -1,0 +1,5 @@
+{% extends "website/object_detail.html" %}
+{% block content %}
+{% if staff_run_marker %}<p class="badge badge-info">staff-run</p>{% endif %}
+{{ block.super }}
+{% endblock %}

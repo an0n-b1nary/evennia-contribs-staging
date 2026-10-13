@@ -28,6 +28,17 @@ from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
 from commands.sandbox import CmdSandbox
 from evennia_links.commands import CmdRuntime
 from evennia_maps.commands import CmdMap
+from evennia_moderation.commands import (
+    CmdAccountPage,
+    CmdAdmissions,
+    CmdApply,
+    CmdBan,
+    CmdMute,
+    CmdNotes,
+    CmdReferral,
+    CmdSoftban,
+    CmdUnban,
+)
 from evennia_posing.commands import (
     CmdEmit,
     CmdHighlight,
@@ -81,6 +92,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         """
         super().at_cmdset_creation()
         self.add(CmdBuild())
+        for command in (CmdApply, CmdAdmissions, CmdSoftban, CmdMute, CmdNotes, CmdBan, CmdUnban):
+            self.add(command)
 
         # Pose pipeline (evennia_posing) — CmdPose replaces Evennia's stock
         # pose/emote command, the same way the old hand-rolled stopgap did.
@@ -238,6 +251,9 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         Populates the cmdset
         """
         super().at_cmdset_creation()
+
+        self.add(CmdReferral)
+        self.add(CmdAccountPage)
 
         # Boards support account-level (pre-puppet) reading and subscription,
         # per evennia_boards' README — expose +bb without a puppet too.

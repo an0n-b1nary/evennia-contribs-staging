@@ -97,6 +97,7 @@ class GuestCharacterCmdSet(GuestAccountCmdSet):
             "+test",
             "+request",
             "+bug",
+            "+apply",
         }
         for command in class_from_module(settings.CMDSET_CHARACTER)().commands:
             if command.key in allowed:

@@ -108,7 +108,7 @@ jobs:
             excludes: "--exclude evennia-regions"
           - profile: building-no-jobs
             args: "--building --absent evennia_jobs"
-            excludes: "--exclude evennia-jobs"
+            excludes: "--exclude evennia-jobs --exclude evennia-moderation"
           - profile: building-no-economy
             args: "--building --absent evennia_economy"
             excludes: "--exclude evennia-economy"
@@ -117,7 +117,7 @@ jobs:
             excludes: "--exclude evennia-social"
           - profile: building-core
             args: "--building --absent evennia_maps --absent evennia_regions --absent evennia_jobs --absent evennia_economy --absent evennia_social"
-            excludes: "--exclude evennia-maps --exclude evennia-regions --exclude evennia-jobs --exclude evennia-economy --exclude evennia-social"
+            excludes: "--exclude evennia-maps --exclude evennia-regions --exclude evennia-jobs --exclude evennia-moderation --exclude evennia-economy --exclude evennia-social"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -191,7 +191,7 @@ jobs:
             excludes: "--exclude evennia-rp-resources --exclude evennia-rp-crafting"
             absent: "--absent evennia_rp_resources"
           - profile: no-jobs
-            excludes: "--exclude evennia-jobs"
+            excludes: "--exclude evennia-jobs --exclude evennia-moderation"
             absent: "--absent evennia_jobs"
           - profile: no-building
             excludes: "--exclude evennia-building"
@@ -406,6 +406,37 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+
+  moderation-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: core
+            packages: ""
+            absent: "--absent evennia_posing --absent evennia_social --absent evennia_boards --absent evennia_rptracker --absent evennia_npcs --absent evennia_rp_party"
+          - profile: social
+            packages: "contribs/game_systems/evennia_posing contribs/game_systems/evennia_social"
+            absent: "--absent evennia_boards --absent evennia_rptracker --absent evennia_npcs --absent evennia_rp_party"
+          - profile: communications
+            packages: "contribs/game_systems/evennia_posing contribs/game_systems/evennia_social contribs/game_systems/evennia_boards contribs/game_systems/evennia_rptracker"
+            absent: "--absent evennia_npcs --absent evennia_rp_party"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install only hard dependencies and selected communication partners
+        run: |
+          pip install evennia==6.0.0
+          for package in contribs/base_systems/evennia_links contribs/game_systems/evennia_jobs contribs/game_systems/evennia_moderation ${{ matrix.packages }}; do
+            pip install -e "$package"
+          done
+          evennia --init ci_game < /dev/null
+      - name: Verified partner absence and file-backed admissions races
+        run: python scripts/ci_run_moderation_tests.py ci_game ${{ matrix.absent }} < /dev/null
 
   combat-independent:
     runs-on: ubuntu-latest

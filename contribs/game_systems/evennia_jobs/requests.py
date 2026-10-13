@@ -27,8 +27,19 @@ def request_forms(*, include_owned=False):
             raise ImproperlyConfigured("Request form keys must be stable lowercase identifiers.")
         if not isinstance(definition, dict):
             raise ImproperlyConfigured(f"Request form {key} must be a dictionary.")
-        if set(definition) - {"label", "description", "enabled", "questions", "owner"}:
+        if set(definition) - {"label", "description", "enabled", "questions", "owner", "outcomes"}:
             raise ImproperlyConfigured(f"Unknown option in request form {key}.")
+        if "outcomes" in definition:
+            from evennia_jobs.models import RequestOutcome
+
+            outcomes = definition["outcomes"]
+            if (
+                not isinstance(outcomes, (list, tuple))
+                or not outcomes
+                or any(outcome not in RequestOutcome.values for outcome in outcomes)
+                or len(set(outcomes)) != len(outcomes)
+            ):
+                raise ImproperlyConfigured(f"Invalid review outcomes in request form {key}.")
         owner = definition.get("owner")
         if owner is not None and (not isinstance(owner, str) or not _KEY.fullmatch(owner)):
             raise ImproperlyConfigured(f"Invalid domain owner in request form {key}.")
@@ -37,6 +48,8 @@ def request_forms(*, include_owned=False):
         if definition.get("enabled", True) is False:
             continue
         form = deepcopy(definition)
+        if "outcomes" in form:
+            form["outcomes"] = list(form["outcomes"])
         form.setdefault("label", key.replace("_", " ").title())
         form.setdefault("description", "")
         if not isinstance(form["label"], str) or not isinstance(form["description"], str):

@@ -342,3 +342,25 @@ Guests retain plain private requests and bug reports; player questionnaires rema
 Guest identity comes from `evennia_links.guests.is_guest`, using the actual
 account typeclass and playable ownership rather than a hierarchical Guest
 permission check. See the reference game for restricted command composition.
+
+
+## Domain-owned review extensions
+
+A request form may set `outcomes` to a nonempty subset of `approved`,
+`declined`, and `changes_requested`. The saved submission schema governs
+review, so later configuration changes do not change an existing decision
+contract. Both the service and website form enforce the subset.
+`+jobs/form <key>` filters the queue by each ticket's latest form key.
+
+`request_review_context` sends `submission` and `viewer` only through the
+staff-gated `review_fields` helper. Receivers return a namespaced dictionary
+of label/value dictionaries, as with other Links collectors. Values appear
+in staff terminal details and rendered detail/review pages, never API answers
+or applicant text. Providers must apply any stricter domain staff policy.
+
+`request_review_form` sends `form`, `schema`, and `viewer`, allowing a domain
+to add optional review fields without making Jobs depend on that domain.
+`review_request(..., review_options={...})` attaches those options to the
+in-transaction decision sent to receivers. Domain receivers validate and
+persist their own options; Jobs does not add them to the applicant's immutable
+answers. Repeated decisions do not emit again. Ordinary forms are unchanged.

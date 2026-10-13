@@ -33,6 +33,17 @@ from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_posing.highlighting import format_pose_time
 
+
+def _room_allowed(caller):
+    from evennia_links.communication import denial
+
+    blocked = denial(caller, "room")
+    if blocked:
+        caller.msg(blocked)
+        return False
+    return True
+
+
 # Screenreader support is optional; falls back to always-False when
 # evennia-accessibility is not installed. Mirrors the pattern used by
 # evennia_boards and other contribs in this repo.
@@ -70,6 +81,8 @@ class CmdPose(DefaultCmdPose):
 
     def func(self):
         """Execute the pose and record it for +pot tracking."""
+        if not _room_allowed(self.caller):
+            return
         # Note: DefaultCmdPose.parse() overrides MuxCommand.parse() with
         # custom emote-space handling and never sets self.rhs, so only
         # self.args is meaningful here.
@@ -105,6 +118,8 @@ class CmdEmit(MuxCommand):
 
     def func(self):
         """Execute the emit."""
+        if not _room_allowed(self.caller):
+            return
         if not self.args:
             self.caller.msg("What do you want to emit?")
             return
@@ -141,6 +156,8 @@ class CmdSemipose(MuxCommand):
 
     def func(self):
         """Execute the semipose."""
+        if not _room_allowed(self.caller):
+            return
         if not self.args:
             self.caller.msg("What do you want to pose?")
             return

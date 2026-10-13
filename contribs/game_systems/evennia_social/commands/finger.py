@@ -156,7 +156,9 @@ class CmdFinger(MuxCommand):
         lines.append(f"|w+{'=' * left}{header}{'=' * right}+|n")
 
         # Name (with short_desc via get_display_name)
-        display_name = target.get_display_name(looker=viewer)
+        from evennia_social.identity import staff_run_marker
+
+        display_name = target.get_display_name(looker=viewer) + staff_run_marker(target)
         lines.append(f" |wName:|n        {display_name}")
 
         # Quote (only if set)

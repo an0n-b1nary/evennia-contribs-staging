@@ -1,0 +1,6 @@
+{% if review_fields %}
+<section aria-label="Staff review context">
+  <h2>Staff review context</h2>
+  <dl>{% for label, value in review_fields.items %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% empty %}<dt>Review</dt><dd>No additional context.</dd>{% endfor %}</dl>
+</section>
+{% endif %}

@@ -23,6 +23,7 @@ from evennia.objects.models import ObjectDB
 
 from evennia_posing.highlighting import format_pose_time
 from evennia_social import presence
+from evennia_social.identity import staff_run_marker
 from evennia_social.social import get_connected_characters, is_staff
 from evennia_social.typeclasses import HANGOUT_TYPES
 
@@ -121,7 +122,7 @@ class CmdWhere(MuxCommand):
                 room_type = getattr(room, "room_type", "ic") or "ic"
                 char_descs = []
                 for char in sorted(chars, key=lambda c: c.last_pose_time or 0):
-                    name = char.get_display_name(looker=viewer)
+                    name = char.get_display_name(looker=viewer) + staff_run_marker(char)
                     from evennia_links.guests import is_guest
 
                     if is_guest(char):
@@ -162,7 +163,7 @@ class CmdWhere(MuxCommand):
                 # Sort by pose time ascending (longest wait first).
                 chars.sort(key=lambda c: c.last_pose_time or 0)
                 for char in chars:
-                    name = char.get_display_name(looker=viewer)
+                    name = char.get_display_name(looker=viewer) + staff_run_marker(char)
                     from evennia_links.guests import is_guest
 
                     if is_guest(char):

@@ -14,6 +14,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils import utils
 
 from evennia_social import presence
+from evennia_social.identity import staff_run_marker
 from evennia_social.social import is_staff
 
 _EXPLAIN = {
@@ -110,7 +111,8 @@ class CmdWho(DefaultCmdWho):
         table = self.styled_table("|wAccount name", "|wOn for", "|wIdle")
         for session in sessions:
             table.add_row(
-                utils.crop(session.get_account().get_display_name(account), width=25),
+                utils.crop(session.get_account().get_display_name(account), width=25)
+                + staff_run_marker(session.get_account()),
                 utils.time_format(time.time() - session.conn_time, 0),
                 utils.time_format(time.time() - session.cmd_last_visible, 1),
             )

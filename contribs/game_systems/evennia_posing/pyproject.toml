@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-posing"
-version = "0.1.1"
+version = "0.1.2"
 description = "The pose pipeline for Evennia games: pose/emit/say/semipose capture, pose order tracking, pose headers, and name highlighting."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -21,7 +21,7 @@ classifiers = [
 ]
 # No models, so no dependency on evennia-links. This contrib is a peer of
 # evennia-links at the foundational layer, not a consumer of it.
-dependencies = ["evennia>=6.0"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.5"]
 
 [project.optional-dependencies]
 # +pot renders a screen-reader-friendly plain list when this is installed

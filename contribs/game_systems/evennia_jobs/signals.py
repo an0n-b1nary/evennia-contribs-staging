@@ -14,3 +14,5 @@ from django.dispatch import Signal
 request_approved = Signal()
 request_reviewed = Signal()  # submission, decision; all outcomes, inside transaction
 request_withdrawn = Signal()  # submission, withdrawal; author action, inside transaction
+request_review_context = Signal()  # submission, viewer; staff-only field dictionaries
+request_review_form = Signal()  # form, schema, viewer; optional domain-owned fields

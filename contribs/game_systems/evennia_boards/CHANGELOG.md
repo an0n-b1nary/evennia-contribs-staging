@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.5.3 — 2026-10-13
+
+- Apply shared communication restrictions before posts, replies and edits,
+  including an editor opened before a mute and website form submissions.
+
 ## 0.5.2 — 2026-10-12
 
 - Refuse guest posts and replies before creating shared board content.

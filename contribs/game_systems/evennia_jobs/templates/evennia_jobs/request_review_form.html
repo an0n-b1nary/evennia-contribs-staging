@@ -3,6 +3,7 @@
 {% block titleblock %}{{ page_title }}{% endblock %}
 {% block content %}
 <h1>{{ page_title }}</h1>
+{% include "evennia_jobs/_review_fields.html" %}
 <p>{{ submission.schema.label }} — revision {{ submission.revision }}</p>
 <dl>
 {% for row in submission.answer_rows %}
@@ -16,8 +17,7 @@
   {{ form.revision }}
   <fieldset>
     <legend>Staff decision</legend>
-    {% include "evennia_accessibility/_form_field.html" with field=form.outcome %}
-    {% include "evennia_accessibility/_form_field.html" with field=form.reason %}
+    {% for field in form.visible_fields %}{% include "evennia_accessibility/_form_field.html" with field=field %}{% empty %}<p>Nothing to review.</p>{% endfor %}
   </fieldset>
   {% url 'job-detail' job.pk as cancel_url %}
   {% include "evennia_accessibility/_form_actions.html" with cancel_url=cancel_url submit_label="Record decision" %}

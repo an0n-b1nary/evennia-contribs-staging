@@ -21,6 +21,21 @@ from evennia_jobs.signals import request_approved, request_reviewed, request_wit
 from evennia_links.transactions import atomic_objects
 
 
+def review_fields(submission, viewer):
+    """Partner context is never requested for nonstaff viewers."""
+    from evennia_jobs.signals import request_review_context
+    from evennia_links.collect import collect_dicts
+
+    if submission is None or not is_staff_character(viewer):
+        return {}
+    fields = {}
+    for provider in collect_dicts(
+        request_review_context, sender=review_fields, submission=submission, viewer=viewer
+    ).values():
+        fields.update(provider)
+    return fields
+
+
 def is_staff_character(character):
     """Check the configured Jobs command lock, failing closed."""
     lock = getattr(settings, "JOBS_STAFF_LOCK", "cmd:perm(Builder)")
@@ -78,7 +93,7 @@ def submit_request(
 
 
 @atomic_objects
-def review_request(*, job, reviewer, outcome, reason, expected_revision):
+def review_request(*, job, reviewer, outcome, reason, expected_revision, review_options=None):
     """Review exactly the latest revision and emit approval once, atomically.
 
     Repeating the same decision returns its original record without emitting
@@ -90,12 +105,16 @@ def review_request(*, job, reviewer, outcome, reason, expected_revision):
         raise PermissionDenied("Only Jobs staff may review requests.")
     if outcome not in RequestOutcome.values:
         raise ValidationError("Choose a valid review outcome.")
+    if review_options is not None and not isinstance(review_options, dict):
+        raise ValidationError("Review options must be a dictionary.")
     if not isinstance(reason, str) or not reason.strip() or len(reason) > 10000:
         raise ValidationError("Give a review explanation of 1 to 10,000 characters.")
     job = Job.objects.select_for_update().get(pk=job.pk)
     latest = job.submissions.select_for_update().order_by("-revision").first()
     if latest is None or latest.revision != expected_revision:
         raise ValidationError("This request has changed. Reload it before reviewing.")
+    if outcome not in latest.schema.get("outcomes", RequestOutcome.values):
+        raise ValidationError("That review outcome is unavailable for this form.")
     if RequestWithdrawal.objects.filter(submission=latest).exists():
         raise ValidationError("This revision was withdrawn and cannot be reviewed.")
     previous = RequestDecision.objects.filter(submission=latest).first()
@@ -112,6 +131,9 @@ def review_request(*, job, reviewer, outcome, reason, expected_revision):
         outcome=outcome,
         reason=reason.strip(),
     )
+    # Domain receivers validate and persist their own options transactionally.
+    # These values are never put in the applicant's saved answers.
+    decision.review_options = dict(review_options or {})
     job.mark_answered()
     if outcome == RequestOutcome.APPROVED:
         request_approved.send(sender=RequestSubmission, submission=latest, decision=decision)

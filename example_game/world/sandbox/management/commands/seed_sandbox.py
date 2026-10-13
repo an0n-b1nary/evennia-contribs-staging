@@ -281,6 +281,7 @@ class Command(BaseCommand):
     def _rebuild(self):
         counts = {}
         self._create_guest_wing()
+        self._create_moderation_demo()
         from django.apps import apps
 
         if apps.is_installed("evennia_rptracker"):
@@ -1385,6 +1386,52 @@ class Command(BaseCommand):
                 )
             )
         return len(rooms)
+
+    def _create_moderation_demo(self):
+        """A private sample application; preserve staff decisions on reseeding."""
+        import secrets
+
+        from evennia.accounts.accounts import DefaultGuest
+        from evennia.accounts.models import AccountDB
+        from evennia.utils.create import create_account, create_object
+
+        from evennia_moderation.admissions import submit_application
+        from evennia_moderation.models import Application, Referral
+
+        name = "SampleApplicant"
+        if (
+            Application.objects.filter(account_name=name).exists()
+            or Referral.objects.filter(account_name=name).exists()
+            or AccountDB.objects.filter(username__iexact=name).exists()
+        ):
+            return
+        guest = create_account(
+            "AdmissionDemoGuest",
+            "",
+            secrets.token_urlsafe(32),
+            typeclass=DefaultGuest,
+            permissions=["Guests"],
+        )
+        character = create_object(
+            "evennia.objects.objects.DefaultCharacter", key="Sample guest applicant"
+        )
+        character.account = guest
+        guest.characters.add(character)
+        character.tags.add("character", category="guest")
+        try:
+            submit_application(
+                guest=character,
+                username=name,
+                password=secrets.token_urlsafe(32),
+                answers={
+                    "introduction": "A demonstration application for staff to review.",
+                    "conduct": True,
+                },
+                address="192.0.2.10",
+            )
+        finally:
+            character.delete()
+            guest.delete()
 
     def _create_guest_wing(self):
         from evennia.utils.create import create_channel, create_object

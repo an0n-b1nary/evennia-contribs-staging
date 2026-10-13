@@ -7,6 +7,7 @@ Account-level ignore list management. Filtering enforcement happens in
 ``SocialCharacterMixin.msg()`` (typeclasses.py), not here.
 """
 
+from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
 
@@ -33,6 +34,11 @@ class CmdIgnore(MuxCommand):
     aliases = ["+mute"]  # noqa: RUF012
     help_category = "Social"
     locks = "cmd:all()"
+
+    def __init__(self, **kwargs):
+        if not getattr(settings, "SOCIAL_IGNORE_MUTE_ALIAS", True):
+            kwargs.setdefault("aliases", [])
+        super().__init__(**kwargs)
 
     def func(self):
         """Execute command."""

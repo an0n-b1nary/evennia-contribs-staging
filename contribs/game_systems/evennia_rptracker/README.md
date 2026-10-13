@@ -317,3 +317,19 @@ Exclude guests from room and channel tracking, partner detection and activity re
 Guest identity comes from `evennia_links.guests.is_guest`, using the actual
 account typeclass and playable ownership rather than a hierarchical Guest
 permission check. See the reference game for restricted command composition.
+
+
+## Advisory alt co-presence
+
+The anti-gaming sweep also calls `review_alt_copresence(window_end)`. After
+`RPTRACKER_ALT_COPRESENCE_COUNT` overlapping exchanges within
+`RPTRACKER_ALT_COPRESENCE_DAYS` (defaults 3 and 7), it sends an advisory through
+the existing `RPTRACKER_FLAG_REVIEW_HOOK`. Activated, completed sessions in
+the same room or channel are compared using recorded account snapshots.
+Overlapping multi-alt exchanges count once per venue. Durable fingerprints
+deduplicate notices on rerun.
+
+This rule never calls `session.flag()`, changes a session or withholds XP.
+Staff decide whether a conversation is needed. The existing pose-spam and
+manual-end-abuse rules retain their existing behavior. IC channels also
+consult Links' optional communication restrictions before delivery/logging.

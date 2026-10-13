@@ -2,6 +2,11 @@
 
 All notable changes to `evennia_posing` are documented here.
 
+## 0.1.2 — 2026-10-13
+
+- Check the Links communication seam before delivering poses, emits and
+  semiposes. Links is now a declared hard dependency.
+
 ## 0.1.1 — 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `posing` (pose, emit,
