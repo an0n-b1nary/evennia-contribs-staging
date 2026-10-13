@@ -22,6 +22,9 @@ from pathlib import Path
 from playtesting.host import HIDDEN, Host
 from playtesting.session import Session
 
+# The sandbox suite took 22 minutes in CI on 2026-10-13; keep generous headroom.
+INTEGRATION_TIMEOUT = 45 * 60
+
 
 def write(path, value):
     path.write_text(json.dumps(value, indent=2, default=str) + "\n", encoding="utf-8")
@@ -307,7 +310,7 @@ def integration(source, directory, artifacts):
             stdin=subprocess.DEVNULL,
             stdout=stream,
             stderr=subprocess.STDOUT,
-            timeout=1200,
+            timeout=INTEGRATION_TIMEOUT,
             **HIDDEN,
         )
     text = log.read_text(encoding="utf-8", errors="replace")

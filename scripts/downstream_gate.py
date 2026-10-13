@@ -31,6 +31,8 @@ OLD_REVISION = "1939b8aa80d8e90c408715d68ca18a379d1699b4"
 # Public fixtures with the older reference vocabulary, for pre-driver snapshots.
 LEGACY_FIXTURE_REVISION = "0d5beef3fcf7ebdcb34eb57f07a4056de1d9a34f"
 ROOT = Path(__file__).resolve().parents[1]
+# A phase includes the integration suite plus its playtest and evidence work.
+PHASE_TIMEOUT = 60 * 60
 HIDDEN = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 
 
@@ -302,7 +304,7 @@ def main(argv=None):
                     [interpreters[name], worker, mode, directory, revision],
                     cwd=directory,
                     log=directory / (mode + ".log"),
-                    timeout=1800,
+                    timeout=PHASE_TIMEOUT,
                 )
             phase_result = json.loads((directory / (mode + ".json")).read_text(encoding="utf-8"))
             if not phase_result.get("passed"):

@@ -3,6 +3,7 @@
 """Fault checks for data preservation and isolated package requirements."""
 
 import json
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -264,6 +265,17 @@ class RequirementsTests(unittest.TestCase):
             self.assertRaisesRegex(ValueError, "no contribs"),
         ):
             requirements(Path(temporary), "a" * 40)
+
+
+class BudgetTests(unittest.TestCase):
+    def test_budgets_cover_the_sandbox_suite_and_nest(self):
+        # CI's rp-sandbox job ran the same suite in 22 minutes on 2026-10-13;
+        # the old 20-minute integration limit cut every fresh phase off.
+        self.assertGreaterEqual(runtime.INTEGRATION_TIMEOUT, 40 * 60)
+        self.assertGreater(gate.PHASE_TIMEOUT, runtime.INTEGRATION_TIMEOUT)
+        workflow = (gate.ROOT / ".github/workflows/downstream.yml").read_text(encoding="utf-8")
+        minutes = int(re.search(r"timeout-minutes: (\d+)", workflow).group(1))
+        self.assertGreater(minutes * 60, gate.PHASE_TIMEOUT)
 
 
 if __name__ == "__main__":
