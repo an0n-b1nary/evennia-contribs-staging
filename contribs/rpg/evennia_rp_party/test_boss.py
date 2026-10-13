@@ -123,6 +123,33 @@ class TestBossRules(SimpleTestCase):
         self.assertEqual(boss.get(self.state, ident)["status"], "canceled")
         self.assertEqual(self.state["participants"], before)
 
+    def test_withdrawn_member_cannot_cancel_party_instance_or_relabel_it(self):
+        ident = check(self.state, self.party)
+        boss.cancel(self.state, ident, 4, individual=True, reason="Sitting this out")
+        row = boss.get(self.state, ident)
+        self.assertEqual((row["status"], row["canceled_by"], row["reason"]), ("pending", "", ""))
+        rules.leave(self.state, 4)
+        for individual in (False, True):
+            with self.assertRaises(CombatError):
+                boss.cancel(self.state, ident, 4, individual=individual)
+        with self.assertRaisesRegex(CombatError, "no pending participation"):
+            boss.cancel(self.state, ident, 1, individual=True)
+        self.assertEqual(boss.get(self.state, ident)["status"], "pending")
+        boss.cancel(self.state, ident, 5, reason="Regrouping")
+        row = boss.get(self.state, ident)
+        self.assertEqual((row["status"], row["canceled_by"]), ("canceled", "5"))
+
+    def test_raid_contest_approvals_belong_to_each_party_instance(self):
+        rules.leave(self.state, 6)
+        third = rules.create(self.state, 6, "Third")
+        approvals = {member: {"brains": "Mid"} for member in ("4", "5", "6")}
+        first, second = boss.issue(self.state, 1, [self.party, third], "contest", contest=approvals)
+        first, second = boss.get(self.state, first), boss.get(self.state, second)
+        self.assertEqual(set(first["allowed"]), {"4", "5"})
+        self.assertEqual(set(second["allowed"]), {"6"})
+        first["allowed"]["4"]["brawn"] = "Mid"
+        self.assertEqual(approvals["4"], {"brains": "Mid"})
+
     def test_incapacitation_recovery_scales_only_original_cohort(self):
         self.state["participants"]["6"]["hp"] = 0
         ident = check(self.state, self.party)

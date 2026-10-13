@@ -210,7 +210,10 @@ def issue(
             },
             "damage": {},
             "attempts": {},
-            "allowed": (contest or {}),
+            # Each raid instance owns its cohort's approvals; /allow mutates them.
+            "allowed": {member: deepcopy(contest[member]) for member in cohort}
+            if kind == "contest"
+            else {},
             "contest_difficulty": contest_difficulty,
             "contest_sources": {
                 member: deepcopy(
@@ -235,16 +238,18 @@ def cancel(state, ident, actor, *, individual=False, reason=""):
     actor = str(actor)
     if check["status"] != "pending":
         raise CombatError("That Check has ended; committed consequences require staff recovery.")
-    if actor not in check["roster"] and (individual or actor != check["boss"]):
+    # A withdrawn member has opted out, and may since have left the Party, so
+    # only the boss or a still-participating member cancels the instance.
+    member = actor in check["roster"] and actor not in check["withdrawn"]
+    if individual and not member:
+        raise CombatError("You have no pending participation in that Check.")
+    if not member and actor != check["boss"]:
         raise CombatError("Only a challenged member or the boss can cancel this Check.")
     if individual:
-        if actor not in check["roster"] or actor in check["withdrawn"]:
-            raise CombatError("You have no pending participation in that Check.")
         check["withdrawn"].append(actor)
-        if set(check["cohort"]) <= set(check["withdrawn"]):
-            check["status"] = "canceled"
-    else:
-        check["status"] = "canceled"
+        if not set(check["cohort"]) <= set(check["withdrawn"]):
+            return
+    check["status"] = "canceled"
     check["canceled_by"], check["reason"] = actor, reason
 
 
