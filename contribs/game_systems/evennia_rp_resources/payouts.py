@@ -9,10 +9,10 @@ from django.db import transaction
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
 
+from evennia_links.characters import playable_characters
 from evennia_links.guests import is_guest
 
 from . import conf
-from .batch import eligible_characters
 from .models import PlotPayoutReceipt, PlotPayoutRun, PlotThreadResourcePayout
 from .services import ResourceError, _quantity, definition, grant
 
@@ -80,14 +80,25 @@ def on_concluded(sender, thread, **kwargs):
     rows = list(
         PlotThreadResourcePayout.objects.filter(thread_id=thread.pk).select_related("resource")
     )
+    if not rows:
+        return
     if any(not row.approved_by_id or row.resource.archived for row in rows):
         raise ResourceError("Approve all payout resources before concluding this plot.")
-    eligible = {character.pk for character in eligible_characters()}
-    recipients = list(
-        thread.participants.filter(is_active=True, character_id__in=eligible)
+    active = list(
+        thread.participants.filter(is_active=True)
         .order_by("character_id")
         .values("character_id", "character_name")
     )
+    # One roster sweep; the host eligibility hook only sees this plot's participants.
+    ids = {row["character_id"] for row in active}
+    predicate = conf.hook("RP_ECONOMY_ELIGIBLE")
+    eligible = {
+        character.pk
+        for character in playable_characters(
+            lambda character: character.pk in ids and (predicate is None or predicate(character))
+        )
+    }
+    recipients = [row for row in active if row["character_id"] in eligible]
     run = PlotPayoutRun.objects.create(
         thread_id=thread.pk,
         plot_name=thread.name,
@@ -152,5 +163,7 @@ def retry(actor, plot_id):
         plot_for(actor, plot_id, staff=True)
         run = PlotPayoutRun.objects.filter(thread_id=plot_id).first()
         if run is None:
-            raise ResourceError("No frozen award exists; historical plots are not backfilled.")
+            raise ResourceError(
+                "No frozen award exists; unbudgeted and historical plots are not backfilled."
+            )
     return deliver(run.pk)

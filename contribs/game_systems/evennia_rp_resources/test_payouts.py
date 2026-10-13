@@ -106,6 +106,34 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(grant_row.thread_id, self.plot.pk)
         self.assertEqual(grant_row.by_id, self.char1.pk)
 
+    def test_unbudgeted_conclusion_records_no_award_or_eligibility_sweep(self):
+        checked = []
+
+        def record(character):
+            checked.append(character.pk)
+            return True
+
+        with (
+            override_settings(RP_ECONOMY_ELIGIBLE=record),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.plot.conclude(concluded_by=self.char2)
+        self.assertFalse(PlotPayoutRun.objects.exists())
+        self.assertFalse(PlotPayoutReceipt.objects.exists())
+        self.assertEqual(checked, [])
+
+    def test_eligibility_hook_sees_only_this_plots_participants(self):
+        checked = []
+
+        def record(character):
+            checked.append(character.pk)
+            return True
+
+        self.budget()
+        with override_settings(RP_ECONOMY_ELIGIBLE=record):
+            self.conclude()
+        self.assertEqual(checked, [self.char2.pk])
+
     def test_inactive_and_ineligible_participants_are_excluded(self):
         self.budget()
         self.participant.is_active = False
@@ -197,7 +225,7 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self.call(
             CmdResources(),
-            f"/payout {self.plot.pk}=rare,4",
+            f"/payout #{self.plot.plot_number}=rare,4",
             "Payout proposed; staff approval is required.",
             caller=self.char2,
         )
@@ -209,7 +237,7 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.call(
             CmdResources(),
-            f"/payoutapprove {self.plot.pk}",
+            f"/payoutapprove #{self.plot.plot_number}",
             "Approved 1 payout resources.",
             caller=self.char1,
         )
