@@ -146,7 +146,9 @@ There is no waitlist.
 +admissions/restore <account>
 ```
 
-Apply a restriction with a reason before changing its duration. A mute with
+The staff commands (`+softban`, `+mute`, `+notes`, `+admissions`) match and
+appear in `help` only for callers passing `MODERATION_STAFF_LOCK`, read at
+each use. Apply a restriction with a reason before changing its duration. A mute with
 no duration remains until lifted. Timed IP bans support IPv4, IPv6 and CIDR.
 Stock `ban`/`unban` keep their existing permissions, confirmation prompts and
 wildcard matching. The wrappers record actual changes, reasons and lifts.

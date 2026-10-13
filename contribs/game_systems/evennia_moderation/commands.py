@@ -140,6 +140,14 @@ class StaffCommand(MuxCommand):
     locks = "cmd:all()"  # Dynamic runtime lock is enforced on every invocation.
     help_category = "Staff"
 
+    def access(self, srcobj, access_type="cmd", default=False):
+        """Apply the runtime staff lock to matching and help listing, not only to func()."""
+        try:
+            require_staff(srcobj)
+        except PermissionDenied:
+            return False
+        return super().access(srcobj, access_type=access_type, default=default)
+
     def at_pre_cmd(self):
         try:
             require_staff(self.caller)

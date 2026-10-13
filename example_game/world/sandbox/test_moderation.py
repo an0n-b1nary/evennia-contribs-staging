@@ -75,6 +75,21 @@ class TestModerationSeams(EvenniaCommandTest):
         self.assertIsInstance(CharacterCmdSet().get("+mute"), CmdMute)
         self.assertEqual(CharacterCmdSet().get("+ignore").key, "+ignore")
 
+    def test_staff_commands_are_listed_in_help_only_for_moderation_staff(self):
+        from commands.default_cmdsets import CharacterCmdSet
+        from evennia.commands.default.help import CmdHelp
+
+        class PlainHelp(CmdHelp):
+            help_more = False  # the pager would swallow the index in call()
+
+        # The help index lists keys without their "+" prefix.
+        staff_keys = {"softban", "mute", "notes", "admissions"}
+        player = self.call(PlainHelp(), "", cmdset=CharacterCmdSet(), caller=self.char2).split()
+        self.assertFalse(staff_keys & set(player))
+        self.assertIn("apply", player)
+        staff = self.call(PlainHelp(), "", cmdset=CharacterCmdSet(), caller=self.char1).split()
+        self.assertTrue(staff_keys <= set(staff))
+
     def test_normal_and_ic_channels_block_mutes_without_recording_activity(self):
         self.mute()
         for typeclass in (

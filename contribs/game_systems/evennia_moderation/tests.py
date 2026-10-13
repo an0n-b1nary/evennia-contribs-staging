@@ -526,6 +526,16 @@ class TestCommands(AdmissionFixture, EvenniaCommandTest):
             self.call(command, args, "Only moderation staff", caller=self.char2)
         self.assertFalse(ModerationAction.objects.exists())
 
+    def test_staff_commands_are_unavailable_and_unlisted_for_players(self):
+        for command in (CmdNotes(), CmdAdmissions(), CmdSoftban(), CmdMute()):
+            with self.subTest(command=command.key):
+                self.assertFalse(command.access(self.char2, "cmd"))
+                self.assertTrue(command.access(self.char1, "cmd"))
+        self.account.is_superuser = False  # superusers bypass every lock
+        self.account.save()
+        with override_settings(MODERATION_STAFF_LOCK="cmd:false()"):
+            self.assertFalse(CmdSoftban().access(self.char1, "cmd"))
+
     def test_staff_softban_and_lift(self):
         self.call(CmdSoftban(), f"{self.account2.key}=Reason", "Recorded softban")
         self.call(CmdSoftban(), f"/lift {self.account2.key}", "Lifted 1")
