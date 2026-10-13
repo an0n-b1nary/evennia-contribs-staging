@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-13
+
+### Changed
+
+- Boss Check status details only the viewer's own pending Checks (or every
+  Check the viewing boss issued), lists other Parties' pending Checks in one
+  line each and collapses finished Checks into one summary line plus the
+  viewer's latest result. Full history stays in `+combat/journal`.
+- Issue journal entries name each raid instance once and print the shared
+  Special requirement/hint, Contest approaches and setup warnings once.
+  Special Checks no longer show "requirement None"; response-pacing warnings
+  wait for preview and status.
+- Resolve journal entries list damage in one bounded line by character name
+  and cause instead of one line per raw participant identity.
+- Automatic cancellation names its cause: fight ended, boss incapacitated,
+  boss withdrew or boss left the fight.
+
+### Fixed
+
+- Issuing a Check prunes that boss's issuance markers from earlier personal
+  turns, so saved state and journal snapshots no longer grow with every
+  Check. The once-per-personal-turn rule is unchanged.
+
 ## [0.2.0] - 2026-10-12
 
 ### Added

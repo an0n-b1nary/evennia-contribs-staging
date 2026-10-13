@@ -193,6 +193,11 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         self.assertEqual(row["actions_spent"], before["actions_spent"])
         self.assertEqual(row["clock"], before["clock"])
         self.assertEqual(engine.value(row, "staggered"), 30)
+        # Finished Checks collapse to a summary; the journal keeps names.
+        status = services.render(second).splitlines()
+        self.assertIn("Earlier Boss Checks: 1 passed; details in +combat/journal.", status)
+        self.assertFalse(any(line.startswith(f"Boss Check {ident}:") for line in status))
+        self.assertIn(f"Check {ident} damage: {first.key} ", combat.journal(first))
         if not apps.is_installed("evennia_rp_contest"):
             return
         from evennia_rp_contest.models import CheckRecord

@@ -150,6 +150,74 @@ class TestBossRules(SimpleTestCase):
         first["allowed"]["4"]["brawn"] = "Mid"
         self.assertEqual(approvals["4"], {"brains": "Mid"})
 
+    def test_status_details_viewers_pending_checks_and_summarizes_ended_ones(self):
+        rules.leave(self.state, 6)
+        third = rules.create(self.state, 6, "Third")
+        self.state["participants"]["1"]["turn_limit"] = 10
+        for turn, kind, value in (
+            (0, "support", "0"),
+            (1, "support", "0"),
+            (2, "tank", None),
+            (3, "dps", "1"),
+        ):
+            self.state["participants"]["1"]["turns"] = turn
+            ident = check(self.state, self.party, kind, options={"value": value} if value else {})
+            if kind == "tank":
+                boss.cancel(self.state, ident, 4, reason="Regrouping")
+            else:
+                resolve(self.state, ident)
+        self.state["participants"]["1"]["turns"] = 4
+        options = {"requirement": "Break the seal", "hint": "The three stones"}
+        boss.issue(self.state, 1, [self.party, third], "special", options=options)
+        status = {viewer: boss.lines(self.state, viewer) for viewer in (1, 2, 4)}
+        summary = "Earlier Boss Checks: 2 passed, 1 failed, 1 canceled; details in +combat/journal."
+        # A bystander sees one line per pending instance and one for history.
+        self.assertEqual(len(status[2]), 3)
+        self.assertEqual(status[2][-1], summary)
+        self.assertFalse(any("Requirement" in line or "withdraw" in line for line in status[2]))
+        # Members see their own instance in full, the other Party's briefly.
+        own = status[4]
+        self.assertEqual(sum("Requirement: Break the seal" in line for line in own), 1)
+        self.assertEqual(sum("+bosscheck/withdraw" in line for line in own), 1)
+        self.assertIn(summary, own)
+        self.assertEqual(own[-1], "  Your latest: 1.c4 dps -> Second; failed.")
+        # The boss controller sees every instance it issued in full.
+        self.assertEqual(sum("Requirement: Break the seal" in line for line in status[1]), 2)
+        self.assertEqual(sum("+bosscheck/withdraw" in line for line in status[1]), 1)
+
+    def test_issue_prunes_only_that_bosss_earlier_turn_markers(self):
+        self.state["participants"]["2"].update(allowance=2, actions_left=2)
+        for actor in (1, 2):
+            ident = boss.issue(self.state, actor, [self.party], "tank")[0]
+            boss.cancel(self.state, ident, 4)
+        self.state["participants"]["1"]["turns"] = 1
+        ident = check(self.state, self.party)
+        self.assertEqual(
+            set(rules.data(self.state)["check_issued"]),
+            {
+                f"{actor}/{turn}/{member}"
+                for actor, turn in ((1, 1), (2, 0))
+                for member in (4, 5, 6)
+            },
+        )
+        boss.cancel(self.state, ident, 4)
+        with self.assertRaisesRegex(CombatError, "already challenged"):
+            check(self.state, self.party)
+
+    def test_reconcile_names_why_pending_checks_were_canceled(self):
+        for change, reason in (
+            (lambda row: self.state.update(ended=True), "Fight ended"),
+            (lambda row: row.update(hp=0), "Boss incapacitated"),
+            (lambda row: row.update(status="withdrawn"), "Boss withdrew"),
+        ):
+            self.state, _, self.party = teams(boss=3)
+            ident = check(self.state, self.party)
+            change(self.state["participants"]["1"])
+            self.assertEqual(
+                boss.reconcile(self.state),
+                [f"Boss Check {ident} canceled without consequences: {reason}."],
+            )
+
     def test_incapacitation_recovery_scales_only_original_cohort(self):
         self.state["participants"]["6"]["hp"] = 0
         ident = check(self.state, self.party)
@@ -403,6 +471,74 @@ class TestBossCoordinator(EvenniaCommandTest):
             combat.control(self.char2, "relock")
             ident = boss_services.issue(self.char1, [self.party], "tank")[0]
             boss_services.cancel(self.char2, ident)
+
+    def latest(self):
+        return combat.current_fight(self.char1.location).entries.order_by("-sequence")[0].summary
+
+    def test_journal_names_damaged_participants_and_omits_absent_requirements(self):
+        ident = boss_services.issue(
+            self.char1,
+            [self.party],
+            "special",
+            options={"requirement": "Break the seal", "hint": "The three stones"},
+        )[0]
+        issued = self.latest()
+        self.assertNotIn("None", issued)
+        self.assertNotIn("Explain the controller", issued)
+        self.assertEqual(issued.count("Break the seal"), 1)
+        view = boss_services.preview(self.char1, ident, verdict=False)
+        boss_services.resolve(
+            self.char1, ident, view["token"], verdict=False, acknowledgment="The seal held"
+        )
+        resolved = self.latest()
+        self.assertIn(f"Check {ident} damage: {self.char2.key} 12 (failure wave).", resolved)
+        self.assertNotIn(f"failure/{self.char2.pk}", resolved)
+        self.assertNotIn("None", resolved)
+
+    def test_raid_issue_journals_shared_text_once(self):
+        from evennia.utils.create import create_object
+
+        third = create_object(
+            "evennia.objects.objects.DefaultCharacter", key="Char3", location=self.char1.location
+        )
+        combat.join(third, "heroes")
+        other = services.change(third, "create", "Scouts")
+        boss_services.issue(
+            self.char1,
+            [self.party, other],
+            "special",
+            options={"requirement": "Break the seal", "hint": "The three stones"},
+        )
+        issued = self.latest()
+        self.assertEqual(issued.count("issued to"), 2)
+        for shared in ("Requirement: Break the seal", "Hint:", "+bosscheck/withdraw"):
+            self.assertEqual(issued.count(shared), 1)
+
+    def test_ending_the_fight_cancels_pending_checks_in_that_journal_entry(self):
+        def exhaust(state):
+            for row in state["participants"].values():
+                row["turns"] = row["turn_limit"]
+
+        for finish in (
+            lambda: combat.execute(self.char1, "Exhaust turns", exhaust),
+            lambda: (
+                combat.storyteller(self.char1, "end", reason="Truce"),
+                combat.control(self.char2, "accept"),
+            ),
+        ):
+            ident = boss_services.issue(self.char1, [self.party], "tank")[0]
+            fight = combat.current_fight(self.char1.location)
+            finish()
+            fight.refresh_from_db()
+            self.assertEqual(fight.status, fight.ENDED)
+            self.assertEqual(boss.get(fight.state, ident)["status"], "canceled")
+            self.assertIn(
+                f"Boss Check {ident} canceled without consequences: Fight ended.", self.latest()
+            )
+            combat.setup(self.char1)
+            combat.join(self.char1, "boss", boss=3)
+            combat.join(self.char2, "heroes")
+            self.party = services.change(self.char2, "create", "Heroes")
 
     def test_commands_register_and_no_dice_in_status_or_preview(self):
         self.call(CmdBossCheck(), "Heroes=tank", "Boss Checks issued: 1.c1.")

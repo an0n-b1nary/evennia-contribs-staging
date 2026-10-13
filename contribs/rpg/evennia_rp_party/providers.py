@@ -142,7 +142,7 @@ def status(state, subject_id):
         lines.append(
             f"Your Team Surge this personal turn: {used[0] if used else 'available (requires Synergy and a legal action)'}."
         )
-    lines.extend(boss.lines(state))
+    lines.extend(boss.lines(state, subject_id))
     return tuple(lines) or ("No tactical parties. Unpartied combat remains available.",)
 
 

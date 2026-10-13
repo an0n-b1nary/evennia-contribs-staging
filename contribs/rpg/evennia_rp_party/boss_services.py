@@ -110,22 +110,30 @@ def issue(
             contest=allowed,
             contest_difficulty=roll_difficulty,
         )
+        # One line per Party instance; text shared by a raid batch appears once.
+        hazards = {}
         for ident in ids:
             check = boss.get(state, ident)
+            requirement = (
+                ""
+                if kind == "special"
+                else f"; requirement {boss.required(check, len(check['cohort']))}"
+            )
             combat.notice(
                 state,
-                f"{check['kind']} Check {ident} issued to {rules.party(state, check['party'])['name']} ({difficulty}); {len(check['cohort'])} targets; requirement {boss.required(check, len(check['cohort']))}; failure {check['profile']['failure']} per target.",
+                f"{kind} Check {ident} issued to {rules.party(state, check['party'])['name']} ({difficulty}); {len(check['cohort'])} targets{requirement}; failure {check['profile']['failure']} per target.",
             )
-            if kind == "special":
-                combat.notice(state, f"Requirement: {options['requirement']}")
-                combat.notice(state, f"Hint: {options['hint']}; interpret responses generously.")
-            if kind == "contest":
-                combat.notice(
-                    state,
-                    f"Contest approaches: {', '.join(approaches)}; roll difficulty {roll_difficulty or 'middle'}; one free bound response each.",
-                )
-            for warning in boss.warnings(state, check):
-                combat.notice(state, warning)
+            hazards.update(dict.fromkeys(boss.hazards(state, check)))
+        if kind == "special":
+            combat.notice(state, f"Requirement: {options['requirement']}")
+            combat.notice(state, f"Hint: {options['hint']}; interpret responses generously.")
+        if kind == "contest":
+            combat.notice(
+                state,
+                f"Contest approaches: {', '.join(approaches)}; roll difficulty {roll_difficulty or 'middle'}; one free bound response each.",
+            )
+        for warning in hazards:
+            combat.notice(state, warning)
         combat.notice(
             state,
             "Targets may +bosscheck/withdraw their own participation or /cancel their Party's Check before commitment. No automatic deadline.",
@@ -180,6 +188,30 @@ def preview(actor, ident, *, subject=None, verdict=None):
     return boss.preview(state, ident, verdict=verdict)
 
 
+def damage_line(state, ident, kind, losses, limit=360):
+    """Name each loss by character and cause, clipped to one notice."""
+    parts = []
+    for key, value in losses.items():
+        cause, _, member = key.rpartition("/")
+        label = (
+            "failure wave"
+            if cause == "failure"
+            else "Resist"
+            if kind == "tank"
+            else "failed response"
+        )
+        amount = value["damage"] if isinstance(value, dict) else value
+        parts.append(f"{state['participants'][member]['name']} {amount} ({label})")
+    shown = []
+    for part in parts:
+        # Leave room for ", +N more." after the names that fit.
+        if len(", ".join([*shown, part])) > limit - len(ident) - 32:
+            break
+        shown.append(part)
+    hidden = len(parts) - len(shown)
+    return f"Check {ident} damage: {', '.join([*shown, *([f'+{hidden} more'] if hidden else [])])}."
+
+
 def resolve(
     actor,
     ident,
@@ -217,15 +249,19 @@ def resolve(
         result = boss.resolve(
             state, ident, token, verdict=verdict, acknowledgment=acknowledgment, draws=draws
         )
+        facts = [f"eligible {len(result['eligible'])}"]
+        if check["kind"] != "special":
+            facts.append(f"requirement {result['threshold']}")
+        if result["backlash"]:
+            facts.append(f"Backlash {result['backlash']}")
+        if result["collapse"]:
+            facts.append("Front collapsed")
         combat.notice(
             state,
-            f"Check {ident}: {'passed' if result['passed'] else 'failed'}; eligible {len(result['eligible'])}, requirement {result['threshold']}, Backlash {result['backlash']}, Front collapse {result['collapse']}. Acknowledgment: {acknowledgment or 'none needed'}.",
+            f"Check {ident}: {'passed' if result['passed'] else 'failed'}; {', '.join(facts)}. Acknowledgment: {acknowledgment or 'none needed'}.",
         )
-        for member, value in result["damage"].items():
-            combat.notice(
-                state,
-                f"Check {ident} damage {member}: {value['damage'] if isinstance(value, dict) else value}.",
-            )
+        if result["damage"]:
+            combat.notice(state, damage_line(state, ident, check["kind"], result["damage"]))
         return result
 
     return _execute(
