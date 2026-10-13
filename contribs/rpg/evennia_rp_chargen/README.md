@@ -391,3 +391,18 @@ library authoring does not change a combat snapshot. Keys are never reused.
 Set `RP_CHARGEN_MOVE_VALIDATOR` to a dotted validator for host content;
 combat provides `evennia_rp_combat.integrations.validate_move`. Without it,
 structural validation still applies. No XP cost or staff approval is added.
+
+## Disposable guests
+
+Optional disposable guest trials support finalized checks without approval inside tagged trial rooms, and +stats/reset for repeated builds. Ordinary approval policy is unchanged.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.
+
+`RP_CHARGEN_GUEST_TRIALS` defaults to `False`. Enable it only with a confined
+guest wing. Guests must still finish normal allocation and finalize the sheet;
+the check adapter accepts that finalized trial only while in the wing. A draft
+never rolls, and `CharacterBuild.is_playable` never receives a guest exception.
+`+stats/reset` deletes only the caller's guest build and starts a fresh draft.
+Trial builds and their abilities cascade away when the character is deleted.

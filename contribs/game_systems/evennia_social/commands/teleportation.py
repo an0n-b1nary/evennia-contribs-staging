@@ -176,7 +176,8 @@ class CmdSummon(MuxCommand):
             caller.msg("You do not have permission to enter that room.")
             return
         # Execute the move.
-        caller.move_to(destination, quiet=False)
+        if not caller.move_to(destination, quiet=False):
+            return
         caller.msg(f"You were summoned to |w{target.key}|n's location.")
         target.msg(f"|w{caller.key}|n accepted your summon request.")
 
@@ -332,7 +333,9 @@ class CmdJoin(MuxCommand):
             caller.msg("That character does not have permission to enter this room.")
             return
         # Execute the move.
-        target.move_to(destination, quiet=False)
+        if not target.move_to(destination, quiet=False):
+            caller.msg("The move was refused.")
+            return
         target.msg(f"|w{caller.key}|n accepted your join request. You have been moved.")
         caller.msg(f"You accepted |w{target.key}|n's join request.")
 

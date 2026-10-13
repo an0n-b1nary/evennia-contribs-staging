@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.2.2 — 2026-10-12
+
+- Exclude guests from room and channel tracking, partner detection and activity reports, including in a misconfigured IC room.
+
 ## [0.2.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `rp-sessions` (how RP

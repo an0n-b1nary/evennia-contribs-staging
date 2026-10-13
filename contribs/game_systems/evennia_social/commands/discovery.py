@@ -122,6 +122,10 @@ class CmdWhere(MuxCommand):
                 char_descs = []
                 for char in sorted(chars, key=lambda c: c.last_pose_time or 0):
                     name = char.get_display_name(looker=viewer)
+                    from evennia_links.guests import is_guest
+
+                    if is_guest(char):
+                        name += " (guest)"
                     if is_viewer_staff:
                         name += presence.staff_marker(char)
                     idle = format_pose_time(char.last_pose_time)
@@ -159,6 +163,10 @@ class CmdWhere(MuxCommand):
                 chars.sort(key=lambda c: c.last_pose_time or 0)
                 for char in chars:
                     name = char.get_display_name(looker=viewer)
+                    from evennia_links.guests import is_guest
+
+                    if is_guest(char):
+                        name += " (guest)"
                     if is_viewer_staff:
                         name += presence.staff_marker(char)
                     if len(name) > 34:

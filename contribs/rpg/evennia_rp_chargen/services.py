@@ -208,6 +208,53 @@ def clear_edge(character, stat_text: str | None = None) -> list[Rating]:
 # ---------------------------------------------------------------------------
 
 
+def guest_trial(character):
+    """A host-enabled disposable trial, never ordinary approval eligibility."""
+    from django.conf import settings
+
+    from evennia_links.guests import in_guest_wing, is_guest
+
+    return (
+        getattr(settings, "RP_CHARGEN_GUEST_TRIALS", False)
+        and is_guest(character)
+        and in_guest_wing(character.location)
+    )
+
+
+def reset_trial(character):
+    """Discard only the caller's disposable build and start from its defaults."""
+    from django.db import transaction
+
+    if not guest_trial(character):
+        raise ChargenError("Only guests in the guest wing may reset a trial sheet.")
+    from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, SignatureMove
+
+    with transaction.atomic():
+        CharacterAbility.objects.filter(character_id=character.pk).delete()
+        SignatureMove.objects.filter(character_id=character.pk).delete()
+        AbilityTransaction.objects.filter(character_id=character.pk).delete()
+        CharacterBuild.objects.filter(character_id=character.pk).delete()
+        StatHandler(character).wipe()
+        locks.release(character, "your trial sheet was reset")
+        return ensure_build(character)
+
+
+def discard_guest_audit(sender, instance, **kwargs):
+    """Guest purchase history is disposable; ordinary audits still survive deletion."""
+    from evennia.objects.models import ObjectDB
+
+    from evennia_links.guests import is_guest
+    from evennia_rp_chargen.models import AbilityTransaction
+
+    if not isinstance(instance, ObjectDB):
+        return
+    history = AbilityTransaction.objects.filter(character_id=instance.pk)
+    # Most deleted objects have no sheet purchases. Avoid resolving their
+    # playable-account rosters on every inventory/world-content deletion.
+    if history.exists() and is_guest(instance):
+        history.delete()
+
+
 def finalize(character) -> CharacterBuild:
     """Finish a draft. Refuses, listing everything left to do, if it isn't ready."""
     build = ensure_build(character)

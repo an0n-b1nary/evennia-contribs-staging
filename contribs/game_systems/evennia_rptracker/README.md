@@ -309,3 +309,11 @@ with the same key to `GUIDES_DIRS`.
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+## Disposable guests
+
+Exclude guests from room and channel tracking, partner detection and activity reports, including in a misconfigured IC room.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

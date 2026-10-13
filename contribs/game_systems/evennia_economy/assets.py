@@ -151,6 +151,10 @@ def describe(spec):
 
 
 def check(giver, recipient, spec, *, item_giver=None):
+    from evennia_links.guests import is_guest
+
+    if is_guest(giver) or is_guest(recipient):
+        raise EconomyError("Guests cannot exchange assets.")
     available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]
@@ -216,6 +220,10 @@ def _finish_item(item, giver, recipient, *, item_giver=None):
 
 
 def move(giver, recipient, spec, exchange_id, *, item_giver=None):
+    from evennia_links.guests import is_guest
+
+    if is_guest(giver) or is_guest(recipient):
+        raise EconomyError("Guests cannot exchange assets.")
     available = providers(giver, recipient)
     for asset in spec:
         kind, key, count = asset["kind"], asset["key"], asset["quantity"]

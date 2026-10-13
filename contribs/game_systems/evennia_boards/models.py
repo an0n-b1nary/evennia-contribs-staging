@@ -165,6 +165,13 @@ class Post(AbstractArchived):
         Returns:
             The newly created Post instance.
         """
+        from django.core.exceptions import PermissionDenied
+
+        from evennia_links.guests import is_guest
+
+        if is_guest(author):
+            raise PermissionDenied("Guests cannot post or reply on boards.")
+
         from evennia_boards.signals import post_created
 
         current_max = (

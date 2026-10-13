@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.5.2 — 2026-10-12
+
+- Refuse guest posts and replies before creating shared board content.
+
 ## [0.5.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `boards` (reading, posting,

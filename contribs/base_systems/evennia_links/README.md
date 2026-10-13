@@ -474,3 +474,33 @@ object fields, Attributes, tags, aliases, locks and contents, including existing
 references to deleted objects. Required database listeners must run within the
 decorated service; schedule cache notifications after commit. It does not undo
 external effects or mutations made after the decorated service returns.
+
+## Disposable guests
+
+Added disposable guest identification, movement and inventory boundaries, seeded arrival and restricted account lifecycle. Shared playable-character and web-character helpers exclude guests.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.
+
+The host mixes `GuestCharacterMixin` **before** its other character mixins and
+`GuestAccountMixin` before `DefaultGuest`. Tag every allowed room `wing` in
+category `guest`, and exactly one room `start` in that category. Tag the one
+welcoming channel `chat` in category `guest`. No room IDs are hardcoded.
+Set `GUEST_CHARACTER_CMDSET` and `GUEST_ACCOUNT_CMDSET` to restricted host
+cmdsets. The reference sets use Replace with priorities 100/90, disable object
+and channel cmdsets, and explicitly select commands. New commands are denied
+until deliberately added. Keep guest channels out of XP collection.
+
+Movement is checked even with `move_hooks=False`. Creation fails closed when
+the guest wing is absent or ambiguous. No new migrations are needed. Never use
+these guards as a substitute for restricting guest commands: mutation services
+and other players' transfers need their own policy too.
+
+Because Evennia's `no_objs` also hides exits, the character mixin explicitly
+supplies local stock exit traversal commands when the guest's merged cmdset sets
+`no_objs` (and not `no_exits`). Other object commands remain unavailable.
+Custom exit command classes require an explicit host policy.
+
+Override `GuestAccountMixin.guest_welcome` to name the host's guest commands;
+the default mentions none.

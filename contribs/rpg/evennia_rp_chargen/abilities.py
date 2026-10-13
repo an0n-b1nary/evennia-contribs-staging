@@ -214,6 +214,12 @@ def _pay(character, build: CharacterBuild, amount: Decimal, tx: AbilityTransacti
     from_allowance = min(left, amount)
     from_xp = amount - from_allowance
     if from_xp > 0:
+        from evennia_links.guests import is_guest
+
+        if is_guest(character):
+            raise ChargenError(
+                "Guest trials use only their starting allowance; reset the trial to build again."
+            )
         ref = f"rp_chargen.tx.{tx.pk}"
         try:
             get_ledger().spend(character, from_xp, ref_key=ref, reason=tx.ability_name)

@@ -51,7 +51,11 @@ def activity_report(days=7, *, now=None):
     )
     room_groups = {}
     live = {s["session_id"]: s for s in _active_channel_sessions.values() if s["session_id"]}
+    from evennia_links.guests import is_guest
+
     for session in sessions:
+        if is_guest(session.character):
+            continue
         if session.source_type == RPSession.Source.CHANNEL:
             key = (
                 "channel",

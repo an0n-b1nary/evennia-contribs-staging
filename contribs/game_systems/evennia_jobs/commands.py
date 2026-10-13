@@ -330,6 +330,13 @@ class CmdRequest(MuxCommand):
         caller = self.caller
         switches = [s.lower() for s in self.switches]
 
+        from evennia_links.guests import is_guest
+
+        if is_guest(caller) and set(switches) - {"comment"}:
+            caller.msg(
+                "Guests may send plain private requests to staff; questionnaires are unavailable."
+            )
+            return
         if handle_request(self):
             return
 

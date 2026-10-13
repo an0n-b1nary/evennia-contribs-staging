@@ -1033,3 +1033,19 @@ REQUEST_DEMO_ANSWERS = {
 PRIVATE_PREVIEW_PLANES = ("Private Draft Preview", "Private Draft Preview - Upper")
 PRIVATE_PREVIEW_ROOMS = ("Draft Entry", "Draft Upper Room")
 PRIVATE_PREVIEW_DESC = "[Placeholder] A private workbench for a two-floor map preview."
+
+
+# Disposable guest trial area; off the IC map and outside reward eligibility.
+GUEST_ROOMS = (
+    (
+        "lounge",
+        "Guest Lounge",
+        "Welcome. Chat with guest <message>, page staff, or visit practice. Players are welcome here too.",
+    ),
+    (
+        "practice",
+        "Guest Practice Room",
+        "Try +stats, +stats/finalize and +test. Use +stats/reset to rebuild. Nothing here earns rewards.",
+    ),
+)
+GUEST_CHANNEL_DESC = "Guests and welcoming players; join Guest to say hello."

@@ -23,14 +23,16 @@ PLAYABLE_ATTRIBUTE = "_playable_characters"  # Evennia's CharactersHandler stora
 _web_choice = ContextVar("evennia_links_web_choice", default=None)
 
 
-def playable_accounts():
-    """Yield `(account_id, [character, ...])`, oldest account first."""
+def playable_accounts(accounts=None):
+    """Yield `(account_id, [character, ...])`, oldest account first.
+
+    `accounts`, an optional AccountDB queryset, narrows the sweep.
+    """
     from evennia.utils.dbserialize import from_pickle
 
     rows = (
-        AccountDB.objects.filter(
-            db_attributes__db_key=PLAYABLE_ATTRIBUTE, db_attributes__db_category__isnull=True
-        )
+        (AccountDB.objects if accounts is None else accounts)
+        .filter(db_attributes__db_key=PLAYABLE_ATTRIBUTE, db_attributes__db_category__isnull=True)
         .order_by("pk")
         .values_list("pk", "db_attributes__db_value")
     )
@@ -56,10 +58,12 @@ def same_account(first, second):
 
 def playable_characters(predicate=None):
     """Yield each playable character once, filtered by an optional `(character) -> bool`."""
+    from .guests import is_guest
+
     seen = set()
     for _, characters in playable_accounts():
         for character in characters:
-            if character.pk not in seen:
+            if character.pk not in seen and not is_guest(character):
                 seen.add(character.pk)
                 if predicate is None or predicate(character):
                     yield character
@@ -67,13 +71,22 @@ def playable_characters(predicate=None):
 
 def is_playable(character, predicate=None):
     """One character's membership and predicate, without sweeping the others."""
-    return bool(account_ids(character)) and (predicate is None or bool(predicate(character)))
+    from .guests import is_guest
+
+    return (
+        not is_guest(character)
+        and bool(account_ids(character))
+        and (predicate is None or bool(predicate(character)))
+    )
 
 
 def _web_account(user):
     if user is None or not getattr(user, "is_authenticated", False):
         return None
-    return getattr(user, "account", None) or user
+    from .guests import is_guest
+
+    account = getattr(user, "account", None) or user
+    return None if is_guest(account) else account
 
 
 def web_roster(user):

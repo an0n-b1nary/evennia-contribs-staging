@@ -48,14 +48,21 @@ class CmdOocTeleport(MuxCommand):
 
     def func(self):
         """Teleport to the OOC room."""
-        destination = _resolve_ooc_room()
+        from evennia_links.guests import guest_start, is_guest
+
+        try:
+            destination = guest_start() if is_guest(self.caller) else _resolve_ooc_room()
+        except ValueError as exc:
+            self.caller.msg(str(exc))
+            return
         if not destination:
             self.caller.msg("The OOC room is not configured. Contact staff.")
             return
         if self.caller.location == destination:
             self.caller.msg("You are already in the OOC room.")
             return
-        self.caller.move_to(destination, quiet=False)
+        if not self.caller.move_to(destination, quiet=False):
+            return
         self.caller.msg("You teleport to the OOC Nexus.")
 
 
@@ -93,6 +100,17 @@ class CmdHome(MuxCommand):
     def _do_home(self):
         """Teleport to home room or OOC fallback."""
         caller = self.caller
+        from evennia_links.guests import guest_start, is_guest
+
+        if is_guest(caller):
+            try:
+                destination = guest_start()
+            except ValueError as exc:
+                caller.msg(str(exc))
+                return
+            if caller.move_to(destination, quiet=True):
+                caller.msg("You return to the guest lounge.")
+            return
         destination = None
         label = "home"
 
@@ -129,7 +147,8 @@ class CmdHome(MuxCommand):
         if not is_staff(caller) and travel_permission(caller, destination) is False:
             caller.msg("You no longer have permission to enter your home.")
             return
-        caller.move_to(destination, quiet=False)
+        if not caller.move_to(destination, quiet=False):
+            return
         caller.msg(f"You teleport to {label}.")
 
     def _do_set(self):

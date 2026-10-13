@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.1 — 2026-10-12
+
+- Guests retain plain private requests and bug reports; player questionnaires remain unavailable until a dedicated admissions flow is installed.
+
 ## 0.7.0 ? 2026-10-11
 
 - Add attributed author withdrawal, domain-owned forms and transactional review/withdrawal signals.

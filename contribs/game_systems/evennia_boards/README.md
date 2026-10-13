@@ -231,3 +231,11 @@ highest displayed post number in the account Attribute `boards_web_read`, keyed
 by board ID. Reading with replies hidden does not mark unseen replies read.
 Anonymous browsing creates no read state. These markers are separate from
 subscription `last_notified_at`, so web reading never consumes login notifications.
+
+## Disposable guests
+
+Refuse guest posts and replies before creating shared board content.
+
+Guest identity comes from `evennia_links.guests.is_guest`, using the actual
+account typeclass and playable ownership rather than a hierarchical Guest
+permission check. See the reference game for restricted command composition.

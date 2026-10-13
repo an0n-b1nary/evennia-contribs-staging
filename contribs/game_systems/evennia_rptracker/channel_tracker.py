@@ -18,7 +18,9 @@ _recent_speakers = {}  # channel id -> {character id: (timestamp, account ids)}
 
 def eligible(character):
     """Common validation for the typeclass and direct collection entry point."""
-    if character is None or not getattr(character, "account", None):
+    from evennia_links.guests import is_guest
+
+    if character is None or is_guest(character) or not getattr(character, "account", None):
         return False
     if character.tags.get("npc", category="npc_system"):
         return False
