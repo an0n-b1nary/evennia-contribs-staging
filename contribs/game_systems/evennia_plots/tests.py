@@ -418,6 +418,24 @@ class TestPlotThreadLifecycle(EvenniaTest):
             self.thread.conclude(concluded_by=self.char1)
         self.assertEqual(received[0]["concluded_by"], self.char1)
 
+    def test_required_conclusion_listener_failure_rolls_back_plot(self):
+        from evennia_plots.signals import plot_thread_concluded
+
+        def refuse(sender, **kwargs):
+            raise ValueError("Partner rejected conclusion")
+
+        self.thread.activate()
+        plot_thread_concluded.connect(refuse, weak=False)
+        try:
+            with self.assertRaisesRegex(ValueError, "Partner rejected"):
+                self.thread.conclude(concluded_by=self.char1)
+        finally:
+            plot_thread_concluded.disconnect(refuse)
+        self.assertEqual(self.thread.status, PlotThread.Status.ACTIVE)
+        self.thread.refresh_from_db()
+        self.assertEqual(self.thread.status, PlotThread.Status.ACTIVE)
+        self.assertIsNone(self.thread.concluded_at)
+
     def test_archive_transitions_to_archived(self):
         self.thread.archive()
         self.thread.refresh_from_db()

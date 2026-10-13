@@ -45,7 +45,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
@@ -531,6 +531,15 @@ class PlotThread(models.Model):
         Returns:
             int: The computed bonus XP (0–5).
         """  # noqa: RUF002
+        try:
+            with transaction.atomic():
+                type(self).objects.select_for_update().get(pk=self.pk)
+                return self._conclude_locked(concluded_by)
+        except Exception:
+            self.refresh_from_db()
+            raise
+
+    def _conclude_locked(self, concluded_by):
         bonus = self._compute_bonus_xp()
         self.bonus_xp_computed = bonus
         self.status = self.Status.CONCLUDED
