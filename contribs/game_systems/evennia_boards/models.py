@@ -172,6 +172,10 @@ class Post(AbstractArchived):
         if is_guest(author):
             raise PermissionDenied("Guests cannot post or reply on boards.")
 
+        from evennia_links.communication import require_communication
+
+        require_communication(author, "board", board)
+
         from evennia_boards.signals import post_created
 
         current_max = (

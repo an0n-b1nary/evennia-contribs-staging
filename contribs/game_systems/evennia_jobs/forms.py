@@ -140,3 +140,16 @@ class RequestReviewForm(AccessibleForm):
     revision = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
     outcome = forms.ChoiceField(choices=RequestOutcome.choices)
     reason = forms.CharField(label="Explanation", max_length=10000, widget=forms.Textarea)
+
+    def __init__(self, *args, schema=None, viewer=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        outcomes = (schema or {}).get("outcomes", RequestOutcome.values)
+        self.fields["outcome"].choices = [
+            (value, label) for value, label in RequestOutcome.choices if value in outcomes
+        ]
+        from evennia_jobs.signals import request_review_form
+
+        request_review_form.send(
+            sender=RequestReviewForm, form=self, schema=schema or {}, viewer=viewer
+        )
+        self._add_widget_attrs()

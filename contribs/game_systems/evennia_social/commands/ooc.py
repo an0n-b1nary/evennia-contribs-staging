@@ -36,6 +36,12 @@ class CmdOoc(MuxCommand):
 
     def func(self):
         """Broadcast an OOC message to the room."""
+        from evennia_links.communication import denial
+
+        blocked = denial(self.caller, "ooc")
+        if blocked:
+            self.caller.msg(blocked)
+            return
         if not self.args:
             self.caller.msg("What do you want to say OOC?")
             return

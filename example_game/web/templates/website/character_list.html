@@ -11,7 +11,7 @@
   <ul class="list-group">
     {% for object in object_list %}
     <li class="list-group-item">
-      <a href="{{ object.web_get_detail_url }}">{{ object }}</a>
+        <a href="{{ object.web_get_detail_url }}">{{ object }}</a>{{ object.sandbox_staff_marker }}
       {% if object.sandbox_online %}<span class="badge badge-success">Online</span>{% else %}<span class="badge badge-secondary">Offline</span>{% endif %}
       <p class="mb-1">{{ object.sandbox_concept }}</p>
       <small class="text-muted">Last seen: {% if object.sandbox_online %}now{% elif object.sandbox_last_seen %}{{ object.sandbox_last_seen|timesince }} ago{% else %}Not recorded{% endif %}</small>

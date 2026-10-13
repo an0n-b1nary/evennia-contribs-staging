@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.2 — 2026-10-13
+
+- Configure allowed review outcomes per form, enforced against the saved schema.
+- Filter the command queue by latest form key and collect private partner review
+  context for staff on terminal and rendered web review pages.
+
 ## 0.7.1 — 2026-10-12
 
 - Guests retain plain private requests and bug reports; player questionnaires remain unavailable until a dedicated admissions flow is installed.

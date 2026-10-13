@@ -128,6 +128,12 @@ def _bb_load(caller):
 
 def _bb_save(caller, buffer):
     """Save the EvEditor buffer according to the current context mode."""
+    from evennia_links.communication import denial
+
+    blocked = denial(caller, "board")
+    if blocked:
+        caller.msg(blocked)
+        return False
     ctx = getattr(caller.ndb, "_bb_context", None)
     if not ctx:
         caller.msg("|rError: no board editing context found.|n")
@@ -258,6 +264,13 @@ class CmdBoard(MuxCommand):
             return
 
         switch = switches[0]
+        if switch in {"post", "reply", "edit"}:
+            from evennia_links.communication import denial
+
+            blocked = denial(caller, "board")
+            if blocked:
+                caller.msg(blocked)
+                return
         dispatch = {
             "post": self._post,
             "reply": self._reply,

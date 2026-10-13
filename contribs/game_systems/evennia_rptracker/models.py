@@ -25,6 +25,15 @@ from django.utils import timezone
 from evennia_links import AbstractLink
 
 
+class CoPresenceNotice(models.Model):
+    """Advisory-only deduplication; never changes RPSession or XP eligibility."""
+
+    fingerprint = models.CharField(max_length=64, unique=True)
+    account_id_snapshot = models.PositiveBigIntegerField()
+    session_ids = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class RPSession(models.Model):
     """
     A detected stretch of RP activity by a single character.

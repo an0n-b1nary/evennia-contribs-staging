@@ -42,6 +42,7 @@ processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
 
 from evennia.objects.objects import DefaultCharacter
 
+from evennia_links.communication import CommunicationCharacterMixin
 from evennia_links.guests import GuestCharacterMixin
 from evennia_posing import PosingCharacterMixin
 from evennia_social import SocialCharacterMixin
@@ -50,7 +51,12 @@ from .objects import ObjectParent
 
 
 class Character(
-    GuestCharacterMixin, SocialCharacterMixin, PosingCharacterMixin, ObjectParent, DefaultCharacter
+    GuestCharacterMixin,
+    CommunicationCharacterMixin,
+    SocialCharacterMixin,
+    PosingCharacterMixin,
+    ObjectParent,
+    DefaultCharacter,
 ):
     """
     The Character just re-implements some of the Object's methods and hooks

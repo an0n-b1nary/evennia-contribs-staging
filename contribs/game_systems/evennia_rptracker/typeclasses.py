@@ -8,6 +8,7 @@ from evennia.accounts.models import AccountDB
 from evennia.comms.comms import DefaultChannel
 from evennia.utils.utils import make_iter
 
+from evennia_links.communication import CommunicationChannelMixin
 from evennia_rptracker.channel_tracker import eligible, end_subscriber_sessions
 
 logger = logging.getLogger("evennia")
@@ -26,7 +27,7 @@ def sending_character(sender, session=None):
     return sender if getattr(sender, "account", None) else None
 
 
-class ICChannel(DefaultChannel):
+class ICChannel(CommunicationChannelMixin, DefaultChannel):
     """Character-attributed channel with passive session collection and normal history.
 
     Configure RPTRACKER_CHANNEL_ELIGIBLE(character) for host policy. Unattributed

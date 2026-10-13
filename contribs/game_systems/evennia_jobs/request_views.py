@@ -123,6 +123,12 @@ class RequestReviewView(AuthoringMixin, FormView):
     def get_initial(self):
         return {"revision": self.latest.revision}
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["schema"] = self.latest.schema
+        kwargs["viewer"] = get_object_or_404(ObjectDB, pk=self.get_character())
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -130,6 +136,11 @@ class RequestReviewView(AuthoringMixin, FormView):
             job=self.job,
             submission=self.latest,
             form_action=self.request.path,
+        )
+        from evennia_jobs.review import review_fields
+
+        context["review_fields"] = review_fields(
+            self.latest, get_object_or_404(ObjectDB, pk=self.get_character())
         )
         return context
 
@@ -141,6 +152,11 @@ class RequestReviewView(AuthoringMixin, FormView):
                 outcome=form.cleaned_data["outcome"],
                 reason=form.cleaned_data["reason"],
                 expected_revision=form.cleaned_data["revision"],
+                review_options={
+                    key: value
+                    for key, value in form.cleaned_data.items()
+                    if key not in {"revision", "outcome", "reason"}
+                },
             )
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))

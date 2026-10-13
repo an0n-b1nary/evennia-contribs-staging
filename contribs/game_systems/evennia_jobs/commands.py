@@ -20,6 +20,7 @@ Settings:
 """
 
 from django.conf import settings
+from django.db import models
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
@@ -127,7 +128,7 @@ def _format_job_row(job, viewer_is_staff):
     )
 
 
-def _format_job_detail(job, viewer_is_staff, sr_mode=False):
+def _format_job_detail(job, viewer_is_staff, sr_mode=False, viewer=None):
     """Full job detail view including visible comments."""
 
     if job.job_type == JobType.ISSUE and not viewer_is_staff:
@@ -136,6 +137,9 @@ def _format_job_detail(job, viewer_is_staff, sr_mode=False):
         reporter = job.author_name or "(unknown)"
 
     comments = job.comments.all()
+    from evennia_jobs.review import review_fields
+
+    extra = review_fields(job.submissions.last(), viewer) if viewer_is_staff else {}
     if not viewer_is_staff:
         comments = comments.filter(is_staff_only=False)
 
@@ -155,6 +159,7 @@ def _format_job_detail(job, viewer_is_staff, sr_mode=False):
             lines.append(f"  Closed: {job.closed_at.strftime('%Y-%m-%d %H:%M')} UTC")
         lines.append(f"Description: {job.description}")
         lines.append(format_submissions(job))
+        lines.extend(f"{key}: {value}" for key, value in extra.items())
         if comments.exists():
             lines.append("Comments:")
             for c in comments:
@@ -190,6 +195,7 @@ def _format_job_detail(job, viewer_is_staff, sr_mode=False):
     lines.append("|b" + "-" * 70 + "|n")
     lines.append(job.description)
     lines.append(format_submissions(job))
+    lines.extend(f"{key}: {value}" for key, value in extra.items())
     lines.append("|b" + "-" * 70 + "|n")
 
     if comments.exists():
@@ -643,7 +649,7 @@ class CmdDiscuss(MuxCommand):
         if job.job_type != JobType.DISCUSS:
             self.caller.msg("Use |w+request <id>|n to view player tickets.")
             return
-        self.caller.msg(_format_job_detail(job, True))
+        self.caller.msg(_format_job_detail(job, True, viewer=self.caller))
 
     def _add_comment(self):
         from evennia_jobs.models import JobComment
@@ -688,6 +694,7 @@ class CmdJobs(MuxCommand):
         +jobs                           - List all non-closed tickets
         +jobs <id>                      - View a ticket with all comments
         +jobs/list <type>               - Filter by type (request/bug/issue/discuss)
+        +jobs/form <key>                - Filter structured requests by form key
         +jobs/assign <id>=<character>   - Assign ticket to a staff member
         +jobs/status <id>=<status>      - Set status (open/in_review/answered/closed)
         +jobs/priority <id>=<priority>  - Set priority (normal/high/urgent)
@@ -726,7 +733,26 @@ class CmdJobs(MuxCommand):
                 caller.msg("Usage: |w+jobs [<id>]|n or use a switch.")
             return
 
-        if "list" in switches:
+        if "form" in switches:
+            from evennia_jobs.models import Job, RequestSubmission
+
+            latest = RequestSubmission.objects.filter(job_id=models.OuterRef("pk")).order_by(
+                "-revision"
+            )
+            jobs = (
+                Job.objects.annotate(latest_form=models.Subquery(latest.values("form_key")[:1]))
+                .filter(latest_form=self.args.strip())
+                .exclude(status=JobStatus.CLOSED)
+            )
+            self.caller.msg(
+                "\n".join(
+                    [
+                        f"Requests: {self.args.strip()}",
+                        *[_format_job_row(job, True) for job in jobs],
+                    ]
+                )
+            )
+        elif "list" in switches:
             self._filter_list(self.args.strip().lower() if self.args else "")
         elif "assign" in switches:
             self._assign()
@@ -782,7 +808,7 @@ class CmdJobs(MuxCommand):
         if err:
             self.caller.msg(err)
             return
-        self.caller.msg(_format_job_detail(job, True))
+        self.caller.msg(_format_job_detail(job, True, viewer=self.caller))
 
     def _assign(self):
         from evennia.objects.models import ObjectDB

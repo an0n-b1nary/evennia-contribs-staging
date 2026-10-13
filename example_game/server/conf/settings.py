@@ -68,6 +68,7 @@ INSTALLED_APPS += [
     "evennia_regions",
     "evennia_maps",
     "evennia_jobs",
+    "evennia_moderation",
     "evennia_xp",
     "evennia_accessibility",
     # Guides: Markdown pages from every app's guides/ and GUIDES_DIRS below.
@@ -829,6 +830,42 @@ RP_CHARGEN_GUEST_TRIALS = True
 MULTISESSION_MODE = 3
 MAX_NR_CHARACTERS = 1000
 AUTO_CREATE_CHARACTER_WITH_ACCOUNT = False
+
+######################################################################
+# Moderation and reviewed admissions (evennia-moderation)
+######################################################################
+# Replace the stock backend; retaining it alongside this one permits bypasses.
+AUTHENTICATION_BACKENDS = ["evennia_moderation.auth.ModerationBackend"]
+MIDDLEWARE += ["evennia_moderation.auth.ModerationMiddleware"]
+MODERATION_PLAYER_CAP = None
+MODERATION_REFERRAL_MODE = "optional"
+MODERATION_REFERRAL_ALLOWANCE = 3
+MODERATION_INTAKE_CLOSED = False
+MODERATION_STAFF_LOCK = "cmd:perm(Builder)"
+# Reserve +mute for staff moderation; personal filtering remains +ignore.
+SOCIAL_IGNORE_MUTE_ALIAS = False
+MODERATION_APPLICATION_FORM = "admission"
+JOBS_REQUEST_FORMS["admission"] = {
+    "label": "Player application",
+    "description": "A private application reviewed by staff.",
+    "owner": "moderation",
+    "outcomes": ["approved", "declined"],
+    "questions": [
+        {
+            "key": "introduction",
+            "label": "Tell staff what brings you to the game.",
+            "type": "longtext",
+        },
+        {
+            "key": "conduct",
+            "label": "Do you agree to respect other players and staff?",
+            "type": "boolean",
+        },
+    ],
+}
+SOCIAL_STAFF_RUN_MARKER = True
+RPTRACKER_ALT_COPRESENCE_COUNT = 3
+RPTRACKER_ALT_COPRESENCE_DAYS = 7
 
 ######################################################################
 # Settings given in secret_settings.py override those in this file.

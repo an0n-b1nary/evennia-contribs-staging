@@ -61,6 +61,10 @@ def at_server_start():
 
     ensure_calendar_script_running()
 
+    from evennia_moderation.scripts import ensure_retention_sweep
+
+    ensure_retention_sweep()
+
     if apps.is_installed("evennia_rp_resources"):
         from evennia_rp_resources.scripts import ensure_resource_script_running
 

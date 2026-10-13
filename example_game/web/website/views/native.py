@@ -198,6 +198,9 @@ class SandboxCharacterListView(CharacterListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         for character in context["object_list"]:
+            from evennia_social.identity import staff_run_marker
+
+            character.sandbox_staff_marker = staff_run_marker(character)
             character.sandbox_online = bool(character.sessions.count())
             character.sandbox_last_seen = character.attributes.get("sandbox_last_seen")
             concept = getattr(character, "profile_role", "")
@@ -216,6 +219,15 @@ class SandboxCharacterManageView(CharacterManageView):
 
 
 class SandboxCharacterDetailView(CharacterDetailView):
+    template_name = "website/sandbox_character_detail.html"
+
+    def get_context_data(self, **kwargs):
+        from evennia_social.identity import staff_run_marker
+
+        context = super().get_context_data(**kwargs)
+        context["staff_run_marker"] = staff_run_marker(self.object)
+        return context
+
     def get_queryset(self):
         from evennia_links.guests import is_guest
 

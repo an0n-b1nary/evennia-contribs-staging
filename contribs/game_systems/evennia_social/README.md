@@ -1,5 +1,9 @@
 # evennia-social
 
+`SOCIAL_IGNORE_MUTE_ALIAS` defaults to `True`, retaining `+mute` as an alias
+for personal `+ignore`. Set it to `False` when installing Moderation's staff
+`+mute` command, then reload the command sets. `+ignore` remains available.
+
 Managed property integration uses Links' optional `LINKS_ROOM_TRAVEL` and
 `LINKS_ROOM_VISIBILITY` providers. A three-way travel answer can explicitly
 admit a character to a private, unvisited home or deny entry; `None` preserves
@@ -337,3 +341,20 @@ Guests may page staff only, return to their own lounge with +ooc/+home, appear m
 Guest identity comes from `evennia_links.guests.is_guest`, using the actual
 account typeclass and playable ownership rather than a hierarchical Guest
 permission check. See the reference game for restricted command composition.
+
+
+## Staff-run character identity and communication policy
+
+`SOCIAL_STAFF_RUN_MARKER = True` adds a public `(staff-run)` marker to
+`+finger`, player-facing `who`, and `+where`. The default is off.
+`evennia_social.identity.staff_run_marker(character)` supplies the same
+display-only suffix for host website lists/profiles. It checks current
+account roster permissions, including offline characters and quelling;
+`SOCIAL_STAFF_PERMISSION` defaults to Builder. When NPCs is installed,
+currently controlled NPCs also reflect their controller's account status.
+It never identifies the account or links other alts.
+
+Page delivery and explicit OOC chat consult Links' optional communication
+restriction seam before persistence, room delivery or pose-recorded signals.
+Existing guest pages remain staff-only. Moderation uses this seam to preserve
+staff contact while stopping communication with other players.

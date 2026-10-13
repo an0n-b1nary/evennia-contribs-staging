@@ -209,6 +209,11 @@ def surge_press(actor, *, subject=None, empower=False, rng=None, operation_id=No
 
 def chat(actor, message, *, subject=None):
     """Transient OOC routing only: never execute/journal or call a posing hook."""
+    from evennia_links.communication import denial
+
+    blocked = denial(actor, "ooc")
+    if blocked:
+        raise CombatError(blocked)
     subject = subject or actor
     require(actor)
     combat.authorize(actor, subject, cleanup=True)

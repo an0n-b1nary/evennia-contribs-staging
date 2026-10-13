@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 — 2026-10-13
+
+- Apply shared communication restrictions to NPC portrayal and fallback room
+  commands, keeping IC portrayal open while stopping OOC-room mute bypasses.
+
 ## 0.1.1 — 2026-10-11
 
 - Say "plot" where messages and the guide said "plot thread" (`+npc/plot Name=#plot`), following evennia-plots 0.7, where a thread is now a question inside a plot.

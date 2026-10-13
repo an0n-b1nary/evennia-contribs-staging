@@ -181,6 +181,11 @@ class PortrayalMixin:
         try:
             npc, _ = svc.controlled(self.caller)
             if npc is None:
+                from evennia_links.communication import denial
+
+                blocked = denial(self.caller, "room")
+                if blocked:
+                    raise svc.NPCError(blocked)
                 if not callable(getattr(self.caller, "record_pose", None)):
                     if self.npc_pose_type == "pose":
                         return DefaultPose.func(self)

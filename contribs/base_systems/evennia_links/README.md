@@ -504,3 +504,23 @@ Custom exit command classes require an explicit host policy.
 
 Override `GuestAccountMixin.guest_welcome` to name the host's guest commands;
 the default mentions none.
+
+
+## Optional communication restrictions
+
+`evennia_links.communication` provides `denial(actor, kind, target=None)`
+and `require_communication(...)` (raises Django `PermissionDenied`). Its
+`communication_requested` signal sends `actor`, `kind` and `target`; receivers
+return a denial string or `None`. Any denial wins, and receiver errors fail
+closed. Without a provider the seam leaves existing behavior unchanged.
+
+`CommunicationCharacterMixin` guards stock say/whisper and direct `at_say`;
+put it before DefaultCharacter and before any mixin that records speech.
+`CommunicationChannelMixin` checks every sender before delivery or logging;
+put it before DefaultChannel. Unattributed system messages remain available.
+RPTracker's updated ICChannel already includes the channel mixin.
+
+Moderation supplies account policy through this seam without introducing a
+hard dependency from communication contribs to Moderation. New delivery routes
+should check the seam before storing or sending content. Kinds currently used
+are `page`, `channel`, `board`, `room`, and explicit `ooc`.
