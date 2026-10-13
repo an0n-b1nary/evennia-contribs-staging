@@ -405,8 +405,11 @@ class CmdBuy(EconomyCommand):
         if self.switches == ["system"]:
             from .seller import buy as buy_system
 
-            total = buy_system(self.caller, self.lhs.strip(), int((self.rhs or "").strip()))
-            self.msg(f"Bought {self.rhs.strip()} {self.lhs.strip()} for {conf.currency(total)}.")
+            amount = (self.rhs or "").strip()
+            if not amount.isdigit():
+                raise EconomyError("Usage: +buy/system resource=quantity")
+            total = buy_system(self.caller, self.lhs.strip(), int(amount))
+            self.msg(f"Bought {amount} {self.lhs.strip()} for {conf.currency(total)}.")
             return
         if self.switches:
             raise EconomyError("Usage: +buy listing number")
