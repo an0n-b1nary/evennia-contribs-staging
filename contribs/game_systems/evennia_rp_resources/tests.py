@@ -56,6 +56,14 @@ class ResourceTests(EvenniaTest):
         super().setUp()
         seed_catalog(update=True)
 
+    def test_resource_overflow_is_refused_without_changing_holdings_or_ledger(self):
+        grant(self.char2, "wood", 2**63 - 1)
+        count = ResourceGrant.objects.count()
+        with self.assertRaises(ResourceError):
+            grant(self.char2, "wood", 1)
+        self.assertEqual(total_held(self.char2), 2**63 - 1)
+        self.assertEqual(ResourceGrant.objects.count(), count)
+
     def run_batch(self, week="2026-W40", **kwargs):
         result = batch.run_weekly_batch(week, characters=[self.char2], **kwargs)
         self.assertEqual(result["errors"], [])

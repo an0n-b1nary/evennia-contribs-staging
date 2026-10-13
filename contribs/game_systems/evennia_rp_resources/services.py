@@ -14,7 +14,7 @@ class ResourceError(ValueError):
 
 
 def _quantity(qty):
-    if type(qty) is not int or qty <= 0:
+    if type(qty) is not int or not 0 < qty <= 2**63 - 1:
         raise ResourceError("Quantity must be a positive whole number.")
 
 
@@ -51,8 +51,12 @@ def _change(character, key, qty, source, *, allow_archived=False, **metadata):
         query = ResourceHolding.objects.filter(pk=holding.pk)
         if qty < 0:
             query = query.filter(quantity__gte=-qty)
+        else:
+            query = query.filter(quantity__lte=2**63 - 1 - qty)
         if not query.update(quantity=F("quantity") + qty):
-            raise ResourceError(f"Not enough {resource.name}.")
+            if qty < 0:
+                raise ResourceError(f"Not enough {resource.name}.")
+            raise ResourceError("Resource holdings exceed the supported range.")
         return ResourceGrant.objects.create(
             character=character, resource=resource, quantity=qty, source=source, **metadata
         )
