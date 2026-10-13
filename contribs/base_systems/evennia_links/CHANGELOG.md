@@ -3,6 +3,7 @@
 ## 0.8.4 — 2026-10-12
 
 - Added disposable guest identification, movement and inventory boundaries, seeded arrival and restricted account lifecycle. Shared playable-character and web-character helpers exclude guests.
+- Supply stock exit traversal to restricted guests without enabling other local object commands.
 
 ## 0.8.3 ? 2026-10-11
 

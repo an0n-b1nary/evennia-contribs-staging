@@ -61,6 +61,29 @@ def guest_start():
 class GuestCharacterMixin:
     """Enforce the guest boundary on exits and direct command-driven moves."""
 
+    def get_cmdsets(self, caller, current, **kwargs):
+        current, cmdsets = super().get_cmdsets(caller, current, **kwargs)
+        if not is_guest(self) or not self.location:
+            return current, cmdsets
+        from evennia.objects.objects import DefaultExit, ExitCommand
+
+        # Evennia's no_objs also suppresses automatic exit discovery. Supply
+        # only stock traversal commands, retaining the host's object allowlist.
+        cmdsets = list(cmdsets)
+        for exit_obj in self.location.exits:
+            if not isinstance(exit_obj, DefaultExit) or not exit_obj.access(
+                caller, "call", no_superuser_bypass=True
+            ):
+                continue
+            DefaultExit.at_cmdset_get(exit_obj, caller=caller)
+            for candidate in exit_obj.cmdset.cmdset_stack:
+                if candidate.key == "ExitCmdSet" and all(
+                    type(command) is ExitCommand and command.obj == exit_obj
+                    for command in candidate.commands
+                ):
+                    cmdsets.append(candidate)
+        return current, cmdsets
+
     def move_to(self, destination, *args, **kwargs):
         # Even privileged commands may request move_hooks=False. The boundary
         # remains a rule of this character, rather than an optional move hook.

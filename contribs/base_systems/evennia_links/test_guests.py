@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from evennia import CmdSet, Command
 from evennia.accounts.accounts import DefaultGuest
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_account
@@ -35,3 +36,35 @@ class TestGuestIdentity(EvenniaTest):
         self.assertFalse(self.char1.move_to(self.room2, move_hooks=False))
         self.room2.tags.add("wing", category="guest")
         self.assertTrue(self.char1.move_to(self.room2, quiet=True))
+
+    def test_guest_exits_are_available_without_other_local_object_commands(self):
+        from evennia.commands.cmdhandler import get_and_merge_cmdsets
+
+        class RestrictedCmdSet(CmdSet):
+            priority = 100
+            mergetype = "Replace"
+            no_objs = True
+
+            def at_cmdset_creation(self):
+                self.add(Command(key="look"))
+
+        class UnsafeCommand(Command):
+            key = "unsafe"
+
+        class UnsafeCmdSet(CmdSet):
+            priority = 200
+
+            def at_cmdset_creation(self):
+                self.add(UnsafeCommand())
+
+        self.room1.cmdset.add(UnsafeCmdSet, persistent=False)
+        self.char1.cmdset.add(RestrictedCmdSet, persistent=False)
+        self.char1.tags.add("character", category="guest")
+        current, sets = self.char1.get_cmdsets(self.char1, self.char1.cmdset.current)
+        self.assertTrue(current.no_objs)
+        commands = [command for cmdset in sets for command in cmdset.commands]
+        self.assertIn(self.exit.key.lower(), [command.key for command in commands])
+        self.assertNotIn("unsafe", [command.key for command in commands])
+        merged = get_and_merge_cmdsets(self.char1, [self.char1], "object", "out").result
+        keys = {command.key for command in merged.commands}
+        self.assertEqual(keys, {"look", "out"})

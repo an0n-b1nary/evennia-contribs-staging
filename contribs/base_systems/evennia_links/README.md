@@ -496,3 +496,7 @@ Movement is checked even with `move_hooks=False`. Creation fails closed when
 the guest wing is absent or ambiguous. No new migrations are needed. Never use
 these guards as a substitute for restricting guest commands: mutation services
 and other players' transfers need their own policy too.
+
+Because Evennia's `no_objs` also hides exits, the character mixin explicitly
+supplies local stock exit traversal commands. Other object commands remain
+unavailable. Custom exit command classes require an explicit host policy.
