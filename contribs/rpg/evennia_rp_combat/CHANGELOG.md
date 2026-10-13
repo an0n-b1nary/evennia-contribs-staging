@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-12
+
+- Add reusable idempotent encounter damage and mandatory Resist operations,
+  plus nonstacking next-full-turn skips with execution-expiring reaction penalties.
+- Freeze optional partner subject snapshots at enrollment/relock; resolution
+  providers remain pure. Read-upgrade schema 3 fights to schema 4 without
+  changing shipped migrations or replaying resources/history.
+
 ## [0.2.2] - 2026-10-11
 
 ### Added

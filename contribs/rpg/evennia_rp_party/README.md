@@ -1,7 +1,7 @@
 # evennia-rp-party
 
-Optional tactical parties within a combat side. Preview release **0.1.1**;
-Python 3.12+ and Evennia 6.0+. Combat 0.2.2+ is required for atomic resource
+Optional tactical parties within a combat side. Preview release **0.2.0**;
+Python 3.12+ and Evennia 6.0+. Combat 0.2.3+ is required for atomic resource
 reservations and public transition notices. No new models, migrations or typeclass mixins.
 
 ## Install
@@ -130,8 +130,84 @@ it and releases the marker; canceling another target does not. An executed
 miss spends it. A declined revival Heal refunds it. Refunds obey the live
 cap; pending reservations cannot make the available balance negative.
 Reservations, outcomes and awards share combat's journal/rollback boundary.
-Boss Checks remain Party 0.2 work; automatic Cover and ally Burst handoffs
+Manual Boss Checks ship in 0.2; automatic Cover and ally Burst handoffs
 remain future work.
+
+## Manual Boss Checks
+
+`+bosscheck Parties=type;difficulty=balanced` offers a narrative challenge
+to named opposing Parties (IDs or exact names separated by commas). Types
+are Tank, DPS, Support, Pressure, Special and optionally Contest. A Boss
+Mode x2+ character issues between its exchanges without spending an action
+or resource. One boss may simultaneously challenge multiple Parties; each
+has an independent instance, cancellation and result. Each Party has at
+most one pending Check across all bosses, and each boss may issue against
+that cohort once per personal turn, even after cancellation/party recreation.
+Whole sides and unpartied characters are not Check targets. Nothing
+automatically issues or resolves a Check, including NPC Auto-Act/schedules.
+
+Membership is locked while a Check is pending; Formation remains flexible.
+`+bosscheck/withdraw id` cancels only your participation and permits departure
+once ordinary queues are clear. `+bosscheck/cancel id` cancels your Party's
+instance; the boss may also cancel. Neither needs a vote or applies failure
+damage. Withdrawals cannot re-enter or be replaced during that Check. The
+initial eligible cohort supplies the size; incapacitation/withdrawal reduces
+it and recovery may restore an original member. Initially unavailable
+members do not acquire obligations by recovering. No eligible targets means
+suspend/cancel, never an automatic success. Committed consequences require
+staff recovery; cancellation cannot refund an executed ordinary Surge or attack.
+
+Use `/preview id` to inspect the current requirement, roster/progress,
+potential damage and resolution token, then `/resolve id=token` to commit.
+Changes invalidate the preview. Uneven/incomplete progress, missing Contest
+responses and unreachable/already-met requirements warn; `;ack=public reason`
+acknowledges warnings. Accepted unresolved exchanges cannot be bypassed.
+Tank draws occur only on commitment. Special needs `;requirement=...;hint=...`
+when issued and explicit `;pass` or `;fail` on preview and resolve. The
+controller interprets roleplay generously; nobody's prose is machine-scored.
+Special resolution requires `;ack=public explanation` for that judgment.
+
+Tank distributes declared damage across the current Front, with automatic
+ordinary Resist (physical, Accuracy/Spirit zero, no domain/element/RPS).
+Every Front defender must survive for Backlash/Stagger. A partial casualty
+fails without extra party damage; no Front or complete collapse adds the
+failure wave to still-eligible targets. DPS counts actual direct damage
+from cohort Attack/Spell/Burst hits and Overpower, excluding Poison,
+outsiders, edits and Check Backlash. Support tests final Party boost including
+Rally/Rattle; Pressure tests actual boss Spirit at resolution. Ordinary outside
+support/debuffs can help those state-based tests. Other failed non-Contest
+Checks inflict an unavoidable per-eligible-member failure wave.
+
+Success Staggers the boss: a nonstacking reaction penalty and loss of the
+next **whole personal turn**. Its current partial turn may finish. The
+penalty remains until its first executed initiating action after the skipped
+turn; a canceled action does not clear it. A final-cap boss retains the
+opening until fight end. Skips grant no actions/resources/repeat resets.
+Tank/Contest successes additionally inflict proportional Backlash. Real
+damage feeds normal assessment, Transcendence and hostile-damage Synergy,
+but Check Backlash never satisfies another DPS Check.
+
+Install `evennia-rp-party[contest]` and add `evennia_rp_contest` to the host's
+apps for Contest Checks. Declare `;approaches=stat,stat[/tag][;roll=rating]`.
+`/roll id=stat[/tag]` is one free, bound response; `/allow id=member;stat[/tag]`
+allows the boss to approve an alternative **before** rolling. Individual
+failures take damage even if the quota is met; meeting it grants group
+Backlash/Stagger, with no second party-wide failure wave. Missing responses
+count as failures only after explicit warning acknowledgment. Ratings,
+modifiers and ruleset identity freeze at enrollment/relock, and rolls remain
+private audit records. Each issued Check retains that source even if a later
+build correction relocks the participant. An upgraded pre-0.2 participant must explicitly
+relock to acquire its Contest source. Contest absence disables only that
+type; pending data remains available for resume/cancellation.
+An older installed Contest package without the bound API also leaves the other
+Check types and ordinary combat available; upgrade it before using Contest Checks.
+
+Pause/shelving preserves pending Checks; a Faded boss suspends them, while
+defeat/permanent withdrawal cancels them without consequences. Saved Check
+state upgrades without history replay. Provider removal preserves data;
+generic combat Fade/pause and staff recovery remain available. Reinstalling
+does not backfill missed progress or replay damage. See the player guide and
+[Check calibration](BOSS_CHECK_CALIBRATION.md) for defaults and limits.
 
 ## Configuration and lifecycle
 
@@ -151,13 +227,20 @@ The point release adds [Synergy calibration](SYNERGY_CALIBRATION.md).
 | `RP_PARTY_EXCHANGE_SYNERGY` | `"10"` | points per completed exchange, 0..100 |
 | `RP_PARTY_DAMAGE_SYNERGY` | `"1/4"` | points per actual hostile Vitality lost, 0..100 |
 | `RP_PARTY_EMPOWER_SYNERGY` | `"40"` | extra points once per executed outgoing Empower exchange, 0..100 |
+| `RP_PARTY_STAGGER_POINTS` | `"30"` | integer reaction percentage points, 0..100 |
+
+`RP_PARTY_CHECK_PRESETS` may replace the complete easy/balanced/hard mapping
+shown in [Check calibration](BOSS_CHECK_CALIBRATION.md). Each preset needs
+`tank`, `dps`, `support`, `pressure`, `failure`, `backlash` and `fraction`.
+Damage/boost fields are >0..1000, Pressure is -10..20 displayed Spirit,
+and Backlash/Contest fractions are >0..1. Issued Checks retain their preset.
 
 Use exact integer/rational strings; floats, booleans and nonfinite numbers
 are rejected. `RP_PARTY_FROZEN` blocks new coordination; saved combat rules
 continue. `RP_PARTY_REVEALED` hides commands; remove the provider registration
 to disable its mechanical rules. Runtime settings follow evennia-links.
 
-State is `fight.state["partners"]["party"]`, schema 2. Mechanical changes use
+State is `fight.state["partners"]["party"]`, schema 3. Mechanical changes use
 combat's Fight lock and append-only journal. Reload, shelving and rollback
 keep party identities, positions, permissions and support. Ending archives
 the data. No membership/resources cross fights. Removing the package while

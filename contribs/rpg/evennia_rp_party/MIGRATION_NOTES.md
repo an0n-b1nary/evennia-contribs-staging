@@ -1,5 +1,25 @@
 # Migration notes
 
+## 0.1.1 to 0.2.0
+
+Install links 0.8.4+ and combat 0.2.3+ before Party 0.2.0. Contest Checks additionally need
+contest 0.1.4+ installed and registered as a Django app; the other five Check
+types have no Contest dependency. Add `CmdBossCheck` if your host registers
+commands individually; `PartyCmdSet` already includes it. No model migrations
+are added. Party schema 2 upgrades to 3 with empty Check/issuance ledgers,
+preserving existing Synergy and history without retroactive awards.
+
+New combat enrollments/relocks capture a frozen optional Contest source.
+Existing participants must explicitly relock before receiving a Contest
+Check; rejoin alone preserves their original lock. Each Check retains the
+issuance-time source across later corrections. Check attempts use the existing
+Contest audit table and combat transaction; no ordinary room test counts.
+
+Checks are manual storytelling beats. Stored NPC schedules remain unsupported.
+Review the provisional presets and reference-game practice before adopting
+the mechanics in authored encounters. Provider absence preserves saved data
+and does not replay progress, consequences or awards on restoration.
+
 ## 0.1.0 to 0.1.1
 
 Install combat 0.2.2+ before Party 0.1.1. No model migration, core combat

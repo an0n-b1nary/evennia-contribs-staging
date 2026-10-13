@@ -1,5 +1,16 @@
 # Changelog — evennia-rp-contest
 
+## [0.1.4] - 2026-10-12
+
+- Add a host-bound API to freeze rating/modifier sources, validate allowed
+  approaches, resolve attempts inside the host transaction and validate
+  binding/void status. Private audit records use existing migration history;
+  the bridge has no combat dependency or post-commit mechanical signals.
+- Bound attempts remain compatible with room history and never reveal ratings
+  through the ordinary public-rating setting; staff review keeps the audit.
+- Bound snapshots and durable attempts refuse guests, preserving disposable
+  trial checks without shared participation or persistent audit writes.
+
 ## 0.1.3 — 2026-10-12
 
 - Guest practice checks have no persistent audit record, challenge attempt or result signals. Guests cannot create or manage shared challenges.

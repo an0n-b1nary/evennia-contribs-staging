@@ -592,7 +592,8 @@ def npc_build(subject, record):
 def npc_policy(profile):
     if profile.boss_check_schedule:
         raise CombatError(
-            "Boss Check schedules are not supported in combat 0.1; clear the schedule first."
+            "Automatic Boss Check schedules are not supported; checks are manual "
+            "narrative beats. Clear the schedule first."
         )
     policy = {
         **profile.reaction_policy,
@@ -647,6 +648,9 @@ def join(actor, side="", *, subject=None, boss=1, turn_limit=None, batch=False, 
         row["last_activity"] = time.time()
         state["invitations"].pop(str(subject.pk), None)
         if existing is None:
+            row["partner_subjects"] = partners.subject_snapshots(
+                subject, stats=record.blueprint.stat_block if record else None
+            )
             if record:
                 if batch:
                     row["batch_controller"] = actor.pk
@@ -1227,6 +1231,9 @@ def control(
             engine.correction(
                 state, subject.pk, build=npc_build(subject, record) if record else snapshot(subject)
             )
+            row["partner_subjects"] = partners.subject_snapshots(
+                subject, stats=record.blueprint.stat_block if record else None
+            )
         elif operation in ("press", "stop"):
             if operation == "press":
                 exchange = state["exchanges"].get(row["outgoing"])
@@ -1355,7 +1362,8 @@ def storyteller(actor, operation, *, target=None, value=None, reason="", operati
     immediately; ending needs the present players' agreement."""
     if operation == "boss":
         raise CombatError(
-            "Set Boss Mode when joining; live reconfiguration and Boss Checks are not in 0.1."
+            "Set Boss Mode when joining; live reconfiguration is unavailable. "
+            "The optional Party package supplies manual Boss Checks."
         )
     if operation == "shelve":
         return shelve(actor, reason, operation_id=operation_id)
