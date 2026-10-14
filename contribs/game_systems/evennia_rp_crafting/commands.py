@@ -8,6 +8,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from . import conf, services
 from .behaviours import registry
 from .catalog import seed_catalog
+from .composition import invoke, specifications
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, Workshop
 
@@ -141,6 +142,8 @@ class CmdCraft(_CraftCommand):
       +craft/require = <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
       +craft/text = <readable text>
+      +craft/verb <niche key>/<verb key>  (only an allowed combination)
+      +craft/unverb <verb key>
       +craft/beat = <EVENT prose>  (repeat for up to three beats)
       +craft/unbeat <number>
       +craft/reach = adjacent  (Broadcast; the default)
@@ -195,11 +198,33 @@ class CmdCraft(_CraftCommand):
                     draft["description"],
                     draft["configuration"],
                     draft["selected"],
+                    verbs=draft.get("verbs"),
                 )
                 self.caller.attributes.remove(DRAFT_KEY)
                 self.msg(f"You craft {item.key}. {item.get_display_provenance(self.caller)}.")
                 return
-            if switch in (
+            if switch == "verb":
+                if "/" not in self.args:
+                    raise CraftingError("Usage: +craft/verb niche/verb")
+                key, kind = (value.strip() for value in self.args.split("/", 1))
+                definition = services.niche(key)
+                implementation = registry().get(kind)
+                if implementation is None or not implementation.available():
+                    raise CraftingError("That crafting behaviour is unavailable.")
+                if kind not in definition.behaviours:
+                    raise CraftingError("That niche doesn't grant this behaviour.")
+                verbs = [*draft.get("verbs", []), {"key": kind, "niche": key, "configuration": {}}]
+                specifications(
+                    draft["niche"], draft["behaviour"], draft["configuration"], verbs, partial=True
+                )
+                draft["verbs"] = verbs
+            elif switch == "unverb":
+                kind = self.args.strip()
+                entries = draft.get("verbs", [])
+                if not any(entry["key"] == kind for entry in entries):
+                    raise CraftingError("No such draft verb.")
+                draft["verbs"] = [entry for entry in entries if entry["key"] != kind]
+            elif switch in (
                 "desc",
                 "line",
                 "aura",
@@ -225,7 +250,17 @@ class CmdCraft(_CraftCommand):
                         "require": "requirements",
                         "beat": "beats",
                     }.get(switch, switch)
-                    implementation = registry().get(draft["behaviour"])
+                    verb_entry = next(
+                        (
+                            entry
+                            for entry in draft.get("verbs", [])
+                            if entry["key"] == "readable" and field == "text"
+                        ),
+                        None,
+                    )
+                    implementation = registry().get(
+                        verb_entry["key"] if verb_entry else draft["behaviour"]
+                    )
                     if implementation is None:
                         raise CraftingError("That crafting behaviour is unavailable.")
                     if field not in implementation.fields:
@@ -243,7 +278,10 @@ class CmdCraft(_CraftCommand):
                         limit = (
                             12000 if field == "text" else 30 if field in ("slot", "reach") else 200
                         )
-                        draft["configuration"][field] = text(value, field, limit)
+                        target = (
+                            verb_entry["configuration"] if verb_entry else draft["configuration"]
+                        )
+                        target[field] = text(value, field, limit)
             elif switch in ("unrequire", "unbeat"):
                 field = "beats" if switch == "unbeat" else "requirements"
                 values = list(draft["configuration"].get(field, []))
@@ -255,12 +293,18 @@ class CmdCraft(_CraftCommand):
             elif switch:
                 raise CraftingError("Unknown craft switch. See help +craft.")
             else:
-                _, _, _, cost = services.craft_cost(
-                    self.caller, draft["niche"], draft["behaviour"], draft["configuration"]
+                _, composition, _, cost = services.craft_cost(
+                    self.caller,
+                    draft["niche"],
+                    draft["behaviour"],
+                    draft["configuration"],
+                    verbs=draft.get("verbs"),
                 )
                 rows = [
                     f"Draft: {draft['name']} ({draft['niche']}/{draft['behaviour']})",
                     draft["description"],
+                    f"Lifecycle: {composition.lifecycle_key}; verbs: {', '.join(entry['key'] for entry in composition.verbs) or 'none'}.",
+                    f"Contributing niches: {', '.join(row['name'] for row in composition.contributors)}.",
                 ]
                 labels = {
                     "worn_line": "Worn line",
@@ -272,6 +316,11 @@ class CmdCraft(_CraftCommand):
                 for field, label in labels.items():
                     if draft["configuration"].get(field):
                         rows.append(f"{label}: {draft['configuration'][field]}")
+                for entry in draft.get("verbs", []):
+                    rows.append(f"{entry['key']} ({entry['niche']})")
+                    for field, label in labels.items():
+                        if entry["configuration"].get(field):
+                            rows.append(f"{label}: {entry['configuration'][field]}")
                 for number, rule in enumerate(draft["configuration"].get("requirements", []), 1):
                     rows.append(f"Requirement {number}: {rule}")
                 for number, beat in enumerate(draft["configuration"].get("beats", []), 1):
@@ -310,11 +359,7 @@ class CmdRead(_CraftCommand):
         item = self.caller.search(self.args.strip(), candidates=candidates)
         if item is None:
             return
-        from .typeclasses import Readable
-
-        if not isinstance(item, Readable):
-            raise CraftingError("There is nothing written here.")
-        self.msg(f"{item.key}\n{item.read(self.caller)}")
+        self.msg(f"{item.key}\n{invoke(self.caller, item, 'readable')}")
 
 
 class CmdUse(_CraftCommand):
@@ -374,7 +419,7 @@ class CmdCrafting(_CraftCommand):
                 if row is None:
                     raise CraftingError("Unknown craft record.")
                 self.msg(
-                    f"Craft #{row.pk}: {row.hallmark}, item #{row.item_id}, {row.created.isoformat()}\nMaker: {row.crafter_name} (#{row.crafter_id}), accounts {row.crafter_accounts}\nNiche: {row.niche_name} ({row.niche.key}), behaviour {row.behaviour}\nSpent: {dict(row.resources_spent)}, money {row.money_spent}\n{dict(row.prose)}"
+                    f"Craft #{row.pk}: {row.hallmark}, item #{row.item_id}, {row.created.isoformat()}\nMaker: {row.crafter_name} (#{row.crafter_id}), accounts {row.crafter_accounts}\nContributors: {row.contributor_data}\nLifecycle: {row.lifecycle}; verbs: {row.verb_data}\nSpent: {dict(row.resources_spent)}, money {row.money_spent}\n{dict(row.prose)}"
                 )
                 from .models import EventUse
 
@@ -388,7 +433,7 @@ class CmdCrafting(_CraftCommand):
                 self.msg(
                     "Recent crafts:\n"
                     + "\n".join(
-                        f"#{row.pk} {row.prose['name']} — {row.hallmark}, {row.behaviour}, item #{row.item_id}"
+                        f"#{row.pk} {row.prose['name']} — {row.hallmark}, {', '.join(row.behaviour_keys)}, item #{row.item_id}"
                         for row in rows
                     )
                 )

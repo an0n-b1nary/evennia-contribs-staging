@@ -15,8 +15,9 @@ from evennia_links.characters import account_ids
 from evennia_links.runtime import get
 
 from . import conf
-from .behaviours import behaviour, registry, text
+from .behaviours import registry, text
 from .catalog import validate_niche
+from .composition import prepare
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, NicheUnlock, Workshop, WorkshopInvestment
 
@@ -155,39 +156,46 @@ def abandon(actor, key):
     return held
 
 
-def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True):
-    definition = niche(key)
-    validate_niche(definition)
-    if behaviour_key not in definition.behaviours:
-        raise CraftingError("That niche doesn't grant this behaviour.")
-    implementation = behaviour(behaviour_key)
-    config = implementation.validate(configuration)
-    costs = implementation.cost(behaviour_key, config)
-    if set(costs) - set(definition.input_categories):
-        raise CraftingError("This feature needs an input category the niche doesn't allow.")
+def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True, verbs=None):
+    definition, composition = prepare(key, behaviour_key, configuration, verbs)
     money = 0
     if include_fee and apps.is_installed("evennia_economy"):
         from evennia_economy.services import fee
 
-        money = fee(
-            "craft", actor, {"niche": key, "behaviour": behaviour_key, "configuration": config}
-        )
-    return definition, implementation, config, {"resources": costs, "money": money}
+        money = fee("craft", actor, composition.context(key))
+    return (
+        definition,
+        composition,
+        composition.configuration,
+        {
+            "resources": composition.resources,
+            "money": money,
+        },
+    )
 
 
 @transaction.atomic
-def craft(actor, key, behaviour_key, name, description, configuration, selected):
+def craft(actor, key, behaviour_key, name, description, configuration, selected, *, verbs=None):
     _require(actor)
     workshop = _workshop(actor)
-    NicheDefinition.objects.select_for_update().get(pk=niche(key).pk)
-    definition, implementation, config, cost = craft_cost(
-        actor, key, behaviour_key, configuration, include_fee=False
+    # Catalogue locks are ordered independently of a draft's component order.
+    # The actor lock above serializes concurrent unlock/abandon/craft calls.
+    _, initial = prepare(key, behaviour_key, configuration, verbs)
+    list(
+        NicheDefinition.objects.select_for_update()
+        .filter(pk__in=[definition.pk for definition in initial.definitions])
+        .order_by("pk")
     )
-    if not active_unlocks(workshop).filter(niche=definition).exists():
+    definition, implementation, config, cost = craft_cost(
+        actor, key, behaviour_key, configuration, include_fee=False, verbs=verbs
+    )
+    if active_unlocks(workshop).filter(niche__in=implementation.definitions).count() != len(
+        implementation.definitions
+    ):
         raise CraftingError("Unlock that niche in your Workshop first.")
     name = text(name, "Item name", 80, required=True)
     description = text(description, "Description", 4000, required=True)
-    selected = payment(selected, cost["resources"], definition.input_categories)
+    selected = payment(selected, cost["resources"], implementation.input_categories)
     _spend(actor, selected, f"Craft: {definition.key}/{behaviour_key}")
     if apps.is_installed("evennia_economy"):
         from evennia_economy.services import EconomyError, charge_fee
@@ -196,11 +204,7 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected)
             cost["money"] = charge_fee(
                 "craft",
                 actor,
-                {
-                    "niche": key,
-                    "behaviour": behaviour_key,
-                    "configuration": config,
-                },
+                implementation.context(key),
             )
         except EconomyError as exc:
             raise CraftingError(str(exc)) from None
@@ -214,12 +218,14 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected)
         crafter_accounts=account_ids(actor),
         niche=definition,
         niche_name=definition.name,
-        behaviour=behaviour_key,
+        behaviour=implementation.lifecycle_key,
+        verbs=implementation.verbs,
+        contributors=implementation.contributors,
         item_id=item.pk,
         resources_spent=selected,
         money_spent=cost["money"],
         prose={"name": name, "description": description, "configuration": config},
-        hallmark=f"Made by {actor.key} ({definition.name})",
+        hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
     )
     Workshop.objects.filter(pk=workshop.pk).update(last_craft=record.created)
     return item

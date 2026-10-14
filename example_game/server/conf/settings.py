@@ -143,6 +143,13 @@ RP_CRAFTING_REVEALED = True
 RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
+# Complete verb sets: only the original products are open in this host.
+RP_CRAFTING_COMBINATIONS = {
+    "carried": [["readable"]],
+    "wearable": [[]],
+    "consumable": [[]],
+    "broadcast": [[]],
+}
 RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
 RP_CRAFTING_CONSUMABLE_TYPECLASS = "typeclasses.craft_items.CraftedConsumable"
 RP_CRAFTING_BROADCAST_TYPECLASS = "typeclasses.craft_items.CraftedBroadcast"

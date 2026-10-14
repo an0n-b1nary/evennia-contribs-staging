@@ -4,6 +4,7 @@
 
 from django.apps import apps
 from django.core.management import call_command
+from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTest
 from evennia_rp_crafting import services
 from evennia_rp_crafting.models import CraftRecord, NicheDefinition, Workshop
@@ -24,7 +25,7 @@ class CraftingSeams(EvenniaTest):
     def test_seed_reseed_preserves_player_workshop_and_restores_demonstration_items(self):
         call_command("seed_sandbox", verbosity=0)
         self.assertTrue(Workshop.objects.exists())
-        self.assertTrue(CraftRecord.objects.filter(behaviour="readable").exists())
+        self.assertTrue(CraftRecord.objects.filter(behaviour="carried").exists())
         from evennia_rp_resources.services import grant
 
         grant(self.char1, "timber", 3, "staff")
@@ -36,7 +37,21 @@ class CraftingSeams(EvenniaTest):
         call_command("seed_sandbox", verbosity=0)
         self.assertTrue(Workshop.objects.filter(character=self.char1).exists())
         self.assertEqual(NicheDefinition.objects.count(), 6)
-        self.assertTrue(CraftRecord.objects.filter(behaviour="readable").exists())
+        self.assertTrue(CraftRecord.objects.filter(behaviour="carried").exists())
+
+    def test_host_book_uses_carried_lifecycle_and_record_based_read_dispatch(self):
+        from evennia.objects.models import ObjectDB
+        from evennia_rp_crafting.composition import invoke
+        from typeclasses.craft_items import CraftedBook
+
+        from world.sandbox.crafting import BOOK_NAME, BOOK_TEXT
+
+        call_command("seed_sandbox", verbosity=0)
+        book = ObjectDB.objects.get(db_key=BOOK_NAME)
+        self.assertIsInstance(book, CraftedBook)
+        self.assertEqual(book.craft_record.behaviour_keys, ["carried", "readable"])
+        with override_settings(RP_CRAFTING_COMBINATIONS={}):
+            self.assertEqual(invoke(self.char1, book, "readable"), BOOK_TEXT)
 
     def test_real_collectors_raise_caps_and_lower_them_on_abandonment(self):
         from evennia_rp_resources.batch import holdings_cap
