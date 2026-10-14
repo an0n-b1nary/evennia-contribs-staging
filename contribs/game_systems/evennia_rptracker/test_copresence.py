@@ -48,6 +48,61 @@ class TestAltCoPresence(EvenniaTest):
         self.assertEqual(list(RPSession.objects.order_by("pk").values()), before)
         self.assertEqual(CoPresenceNotice.objects.count(), 1)
 
+    def test_many_exchanges_in_one_sweep_send_one_advisory(self):
+        for hours in (10, 8, 6, 4, 2):
+            self.exchange(hours)
+        with patch("evennia_rptracker.antigaming._notify_flag_review") as notify:
+            review_alt_copresence(self.now)
+        notify.assert_called_once()
+        self.assertIn("5 overlapping", notify.call_args.kwargs["description"])
+        self.assertEqual(CoPresenceNotice.objects.count(), 1)
+
+    def test_later_exchanges_within_window_do_not_renotify(self):
+        for hours in (10, 8, 6):
+            self.exchange(hours)
+        with patch("evennia_rptracker.antigaming._notify_flag_review") as notify:
+            review_alt_copresence(self.now)
+            self.exchange(4)
+            self.exchange(2)
+            review_alt_copresence(self.now)
+        notify.assert_called_once()
+        self.assertEqual(CoPresenceNotice.objects.count(), 1)
+
+    def test_session_joining_a_noticed_exchange_does_not_renotify(self):
+        for hours in (6, 4, 2):
+            self.exchange(hours)
+        review_alt_copresence(self.now)
+        start = self.now - timedelta(hours=2)
+        RPSession.objects.create(
+            character=self.char1,
+            character_name=self.char1.key,
+            account_id_snapshot=self.account2.pk,
+            room=self.room1,
+            room_name=self.room1.key,
+            source_type="rp_session",
+            status="completed",
+            pose_count=10,
+            activated_at=start + timedelta(minutes=5),
+            ended_at=start + timedelta(minutes=40),
+        )
+        with patch("evennia_rptracker.antigaming._notify_flag_review") as notify:
+            review_alt_copresence(self.now)
+        notify.assert_not_called()
+        self.assertEqual(CoPresenceNotice.objects.count(), 1)
+
+    def test_new_window_after_cooldown_can_notify_again(self):
+        earlier = self.now - timedelta(days=8)
+        for hours in (6, 4, 2):
+            self.exchange(24 * 8 + hours)
+        review_alt_copresence(earlier)
+        CoPresenceNotice.objects.update(created_at=earlier)
+        for hours in (6, 4, 2):
+            self.exchange(hours)
+        with patch("evennia_rptracker.antigaming._notify_flag_review") as notify:
+            review_alt_copresence(self.now)
+        notify.assert_called_once()
+        self.assertEqual(CoPresenceNotice.objects.count(), 2)
+
     def test_sequential_sessions_and_different_accounts_do_not_count(self):
         for hours in (6, 4, 2):
             self.exchange(hours, overlap=False)

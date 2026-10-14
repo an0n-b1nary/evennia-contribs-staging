@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.2.4 — 2026-10-13
+
+- Alt co-presence advisories are limited to one per account per window.
+  Later exchanges, and sessions joining an exchange already reported, no
+  longer open another staff notice. No schema change.
+
 ## 0.2.3 — 2026-10-13
 
 - Advisory-only repeated alt co-presence notices for room and channel sessions,

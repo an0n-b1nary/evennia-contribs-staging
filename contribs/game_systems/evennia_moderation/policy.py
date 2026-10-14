@@ -36,12 +36,49 @@ def acting_account(actor):
     raise PermissionDenied("An unambiguous account is required.")
 
 
-def staff_account(account):
-    """Current account status; never the puppet's permissions or quelled lock."""
+def _staff_permission():
     from django.conf import settings
 
-    permission = getattr(settings, "MODERATION_STAFF_PERMISSION", "Builder")
-    return bool(account and (account.is_superuser or account.permissions.check(permission)))
+    return getattr(settings, "MODERATION_STAFF_PERMISSION", "Builder")
+
+
+def staff_account(account):
+    """Current account status; never the puppet's permissions or quelled lock."""
+    return bool(
+        account and (account.is_superuser or account.permissions.check(_staff_permission()))
+    )
+
+
+def staff_accounts():
+    """Queryset form of staff_account() that never loads every account.
+
+    An account passes Evennia's perm() check when one of its permission keys
+    passes on its own, so each distinct key in use is tested with perm()
+    itself. That keeps hierarchy and plural handling identical to Evennia's.
+    """
+    from types import SimpleNamespace
+
+    from evennia.locks.lockfuncs import perm
+
+    permission = _staff_permission()
+    held = (
+        AccountDB.objects.filter(db_tags__db_tagtype="permission")
+        .order_by()
+        .values_list("db_tags__db_key", flat=True)
+        .distinct()
+    )
+    keys = [
+        key
+        for key in held
+        if perm(
+            SimpleNamespace(permissions=SimpleNamespace(all=lambda key=key: [key])),
+            None,
+            permission,
+        )
+    ]
+    return AccountDB.objects.filter(
+        Q(is_superuser=True) | Q(db_tags__db_tagtype="permission", db_tags__db_key__in=keys)
+    )
 
 
 def require_staff(actor):

@@ -192,6 +192,7 @@ def review_alt_copresence(window_end):
     Room and channel sources are separate venues. Multiple alts sharing one
     overlapping exchange count once. Stored account snapshots preserve the
     meaning of a session even when the character's current roster changes.
+    Each account gets at most one advisory per window.
     """
     import hashlib
     from collections import defaultdict
@@ -251,20 +252,31 @@ def review_alt_copresence(window_end):
         for begin, _end, ids in merged:
             events[account_id].append((begin, source, venue, sorted(ids)))
     for account_id, occurrences in events.items():
+        if len(occurrences) < threshold:
+            continue
+        # One advisory per account per window. A notice inside the window
+        # covers later exchanges, including sessions that join a noticed one.
+        if CoPresenceNotice.objects.filter(
+            account_id_snapshot=account_id, created_at__gt=start
+        ).exists():
+            continue
         occurrences.sort(key=lambda event: event[0])
-        for i, occurrence in enumerate(occurrences):
-            if i + 1 < threshold:
-                continue
-            begin, source, venue, ids = occurrence
-            fingerprint = hashlib.sha256(
-                repr((account_id, source, venue, ids)).encode()
-            ).hexdigest()
-            _, created = CoPresenceNotice.objects.get_or_create(
-                fingerprint=fingerprint,
-                defaults={"account_id_snapshot": account_id, "session_ids": ids},
+        ids = sorted({pk for *_, event_ids in occurrences for pk in event_ids})
+        latest = occurrences[-1][3]
+        venue_count = len({(source, venue) for _, source, venue, _ in occurrences})
+        fingerprint = hashlib.sha256(repr((account_id, ids)).encode()).hexdigest()
+        _, created = CoPresenceNotice.objects.get_or_create(
+            fingerprint=fingerprint,
+            defaults={"account_id_snapshot": account_id, "session_ids": ids},
+        )
+        if created:
+            _notify_flag_review(
+                title=f"Advisory: repeated alt co-presence — account #{account_id}",
+                description=(
+                    f"Account #{account_id} had {len(occurrences)} overlapping alt exchanges "
+                    f"across {venue_count} venue(s) within {days} days. Latest session IDs: "
+                    f"{latest}. Further exchanges are not reported until {days} days pass "
+                    "without a notice. Review only: no XP was withheld and no RP session "
+                    "was flagged."
+                ),
             )
-            if created:
-                _notify_flag_review(
-                    title=f"Advisory: repeated alt co-presence — account #{account_id}",
-                    description=f"Account #{account_id} has {i + 1} shared alt sessions within {days} days. Latest session IDs: {ids}. Review only: no XP was withheld and no RP session was flagged.",
-                )

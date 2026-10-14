@@ -326,8 +326,11 @@ The anti-gaming sweep also calls `review_alt_copresence(window_end)`. After
 `RPTRACKER_ALT_COPRESENCE_DAYS` (defaults 3 and 7), it sends an advisory through
 the existing `RPTRACKER_FLAG_REVIEW_HOOK`. Activated, completed sessions in
 the same room or channel are compared using recorded account snapshots.
-Overlapping multi-alt exchanges count once per venue. Durable fingerprints
-deduplicate notices on rerun.
+Overlapping multi-alt exchanges count once per venue. Each account gets at
+most one advisory per window: while a notice from the last
+`RPTRACKER_ALT_COPRESENCE_DAYS` exists, further exchanges (including a session
+that joins an exchange already reported) are not reported again. Durable
+notice records make reruns idempotent.
 
 This rule never calls `session.flag()`, changes a session or withholds XP.
 Staff decide whether a conversation is needed. The existing pose-spam and

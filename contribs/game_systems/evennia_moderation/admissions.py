@@ -35,7 +35,7 @@ from evennia_moderation.policy import (
     acting_account,
     connection_restriction,
     require_staff,
-    staff_account,
+    staff_accounts,
 )
 from evennia_moderation.signals import account_admitted
 
@@ -63,12 +63,28 @@ def normalize_address(address):
         raise ValidationError("A valid connection address is required.") from exc
 
 
+def guest_typeclass_paths():
+    """Account typeclass paths in use that resolve to guest classes, as is_guest() does."""
+    from evennia.accounts.accounts import DefaultGuest
+
+    paths = []
+    for path in AccountDB.objects.order_by().values_list("db_typeclass_path", flat=True).distinct():
+        try:
+            typeclass = class_from_module(path)
+        except Exception:
+            continue  # Evennia falls back to the default, non-guest account typeclass.
+        if isinstance(typeclass, type) and issubclass(typeclass, DefaultGuest):
+            paths.append(path)
+    return paths
+
+
 def seat_count():
-    retired = set(RetiredSeat.objects.values_list("account_id", flat=True))
-    approved = sum(
-        1
-        for account in AccountDB.objects.all()
-        if account.pk not in retired and not is_guest(account) and not staff_account(account)
+    """Approved seats plus live reservations, in a fixed number of queries."""
+    approved = (
+        AccountDB.objects.exclude(db_typeclass_path__in=guest_typeclass_paths())
+        .exclude(pk__in=RetiredSeat.objects.values("account_id"))
+        .exclude(pk__in=staff_accounts().values("pk"))
+        .count()
     )
     return (
         approved
