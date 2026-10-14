@@ -8,6 +8,11 @@
   contributor snapshots in hallmarks, staff review, market keywords and fee context.
 - Changed: new craft records distinguish lifecycles and verbs. An additive
   migration preserves earlier snapshots, item paths, consumption records and drafts.
+- Upgrade: hosts that register their own behaviours in `RP_CRAFTING_BEHAVIOURS`
+  must also list them in `RP_CRAFTING_COMBINATIONS` (for example
+  `"engraved": [[]]`); unlisted lifecycles are refused. Craft fee policies now
+  receive `"carried"` rather than `"readable"` in `context["behaviour"]` for
+  books; the Readable text is in `context["verbs"]`.
 - Verified: reference-game books and optional equipment, economy and accessibility
   profiles; combinations remain closed to the original products by default.
 

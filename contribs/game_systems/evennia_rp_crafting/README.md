@@ -166,7 +166,8 @@ RP_CRAFTING_COMBINATIONS = {
 ```
 
 An empty outer list permits no products for that lifecycle; `[[]]` permits a
-lifecycle without verbs. Listing `[["readable"], ["another_verb"]]` permits
+lifecycle without verbs. A lifecycle missing from the mapping, including a
+custom one registered in `RP_CRAFTING_BEHAVIOURS`, cannot be crafted. Listing `[["readable"], ["another_verb"]]` permits
 each separately, never their union. Open each complete combination deliberately
 with its own tests. The reference host leaves the default combinations closed.
 

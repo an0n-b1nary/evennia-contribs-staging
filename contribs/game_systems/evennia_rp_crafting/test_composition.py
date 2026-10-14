@@ -226,10 +226,9 @@ class CompositionTests(CraftingFixture, EvenniaCommandTest):
             self.assertIn("Scribe 0", output)
             self.assertIn("2 materials", output)
             before = self.held()
-            with patch(
-                "evennia_rp_crafting.models.CraftRecord.objects.create",
-                side_effect=ValueError("record failed"),
-            ):
+            # Patch the class, not the manager: importing an item typeclass
+            # registers a model, which rebuilds every model's cached managers.
+            with patch.object(CraftRecord, "save", side_effect=ValueError("record failed")):
                 self.call(CmdCraft(), "/finish", "record failed")
             self.assertEqual(self.held(), before)
             self.assertTrue(self.char1.attributes.has(DRAFT_KEY))
