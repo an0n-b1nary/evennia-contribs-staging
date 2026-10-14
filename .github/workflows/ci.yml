@@ -290,7 +290,9 @@ jobs:
 
   rp-sandbox:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The all-present profile runs the full reference game, not just RP seams.
+    # Match the full contrib budget; absent-partner profiles keep a short limit.
+    timeout-minutes: ${{ matrix.profile == 'all-present' && 120 || 30 }}
     strategy:
       fail-fast: false
       matrix:
