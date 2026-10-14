@@ -76,6 +76,8 @@ class Activatable(Behaviour):
         rules = getattr(settings, "RP_CRAFTING_COSTS", conf.DEFAULT_COSTS).get(key, {})
         from .catalog import category_cost
 
+        if "extra_mode" not in rules or "extra_reading" not in rules:
+            raise CraftingError("This behaviour has no extra-mode or extra-reading cost rule.")
         total = Counter(super().cost(key, config))
         for _ in range(len(config["modes"]) - 1):
             total.update(category_cost(rules["extra_mode"]))

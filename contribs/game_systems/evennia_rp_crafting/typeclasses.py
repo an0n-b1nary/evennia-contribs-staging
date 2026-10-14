@@ -86,10 +86,18 @@ class Installable(CraftedItemMixin, DefaultObject):
 
 
 class CraftingRoomMixin:
-    """Place before the host room; preserve its description and sensory prose."""
+    """Place before the host room; preserve its prose and release fixtures on delete."""
 
     def get_display_desc(self, looker, **kwargs):
         from .fixtures import layers
 
         base = super().get_display_desc(looker, **kwargs)
         return "\n".join([base, *layers(self)])
+
+    def at_object_delete(self):
+        allowed = super().at_object_delete()
+        if allowed:
+            from .fixtures import release_room
+
+            release_room(self)
+        return allowed

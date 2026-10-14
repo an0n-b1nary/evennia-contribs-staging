@@ -310,6 +310,9 @@ owner, including when staff removes them. Public fixtures go to the removing
 staff member. Property transfer retains fixtures; original craft provenance
 never changes. Archive suspends layers, ambients and credit while preserving
 objects. Restore resumes them. Visit the room to install, clear or uninstall.
+Deleting a room with `CraftingRoomMixin` ends its temporary layers and returns
+its fixtures to the property owner, or to the default home when there is none.
+Without the mixin, a deleted room leaves its installed fixtures with no location.
 
 ### Temporary atmosphere
 
@@ -322,6 +325,8 @@ scene's close or their bounded timer, whichever occurs first. Without Scenes,
 the timer is sufficient. `+fixture` lists layer numbers;
 `+fixture/clear <number>` permits its creator, property owner or staff.
 Temporary layers earn no cap credit and do not occupy permanent fixture slots.
+A fixture supplies one temporary layer at a time and cannot be installed while
+that layer is showing; clear it first.
 Broadcast/Consumable lingering-illusion workflows remain a separate follow-up.
 
 ### Limits and output

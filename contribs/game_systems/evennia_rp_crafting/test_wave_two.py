@@ -12,6 +12,7 @@ from django.db import transaction
 from django.test import override_settings
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
+from evennia.objects.objects import DefaultRoom
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_links.rooms import can
@@ -30,7 +31,12 @@ from .models import (
 )
 from .room_commands import CmdFixture, CmdListen, CmdSense
 from .tests import CraftingFixture
+from .typeclasses import CraftingRoomMixin
 from .wave_two import activate
+
+
+class FixtureRoom(CraftingRoomMixin, DefaultRoom):
+    pass
 
 
 class WaveTwoFixture(CraftingFixture):
@@ -117,6 +123,39 @@ class FixtureTests(WaveTwoFixture, EvenniaTest):
         self.assertFalse(item.at_pre_get(self.char2))
         self.assertFalse(item.delete())
         self.assertTrue(FixtureInstallation.objects.get(pk=row.pk).active)
+
+    def test_deleting_a_room_returns_its_fixtures_and_ends_its_layers(self):
+        from evennia.utils.create import create_object
+
+        room = create_object(FixtureRoom, key="a workshop loft")
+        self.char1.move_to(room, quiet=True)
+        item = self.fixture()
+        placement = fixtures.install(self.char1, item, room)
+        layer = fixtures.decorate(self.char1, self.fixture(room_line="Paper lanterns."), room)
+        self.char1.move_to(self.room1, quiet=True)
+        self.assertTrue(room.delete())
+        placement.refresh_from_db()
+        layer.refresh_from_db()
+        self.assertFalse(placement.active)
+        self.assertIsNotNone(placement.removed_at)
+        self.assertIsNotNone(layer.cleared_at)
+        self.assertEqual(ObjectDB.objects.get(pk=item.pk).location, self.char1)
+
+    def test_one_fixture_supplies_one_layer_at_a_time(self):
+        item = self.fixture()
+        row = fixtures.decorate(self.char1, item, self.room1)
+        with self.assertRaisesMessage(CraftingError, "already on display"):
+            fixtures.decorate(self.char1, item, self.room1)
+        self.char1.move_to(self.room2, quiet=True)
+        with self.assertRaisesMessage(CraftingError, "already on display"):
+            fixtures.decorate(self.char1, item, self.room2)
+        with self.assertRaisesMessage(CraftingError, "already on display"):
+            fixtures.install(self.char1, item, self.room2)
+        self.char1.move_to(self.room1, quiet=True)
+        fixtures.clear_layer(self.char1, row.pk)
+        self.char1.move_to(self.room2, quiet=True)
+        fixtures.install(self.char1, item, self.room2)
+        self.assertEqual(fixtures.layers(self.room1), [])
 
     def test_resident_install_permission_never_grants_removal(self):
         item = self.fixture()
@@ -212,11 +251,10 @@ class FixtureTests(WaveTwoFixture, EvenniaTest):
         self.assertEqual(fixtures.layers(self.room1), [])
 
     def test_temporary_expiry_separate_capacity_and_owner_cleanup(self):
-        item = self.fixture()
         for _ in range(3):
-            fixtures.decorate(self.char1, item, self.room1)
+            fixtures.decorate(self.char1, self.fixture(), self.room1)
         with self.assertRaisesMessage(CraftingError, "temporary layer limit"):
-            fixtures.decorate(self.char1, item, self.room1)
+            fixtures.decorate(self.char1, self.fixture(), self.room1)
         fixtures.install(self.char1, self.fixture(), self.room1)
         row = RoomLayer.objects.first()
         with self.assertRaises(CraftingError):
@@ -465,6 +503,25 @@ class ActivationTests(WaveTwoFixture, EvenniaCommandTest):
         self.room1.attributes.add("room_sound", "A breeze.")
         self.call(CmdSense(), "", "Cool stone.\na brass lantern: Beeswax.")
         self.call(CmdListen(), "", "A breeze.\na brass lantern: A hum.")
+
+    def test_fixture_numbers_report_usage_instead_of_parser_errors(self):
+        self.fixture()
+        self.call(CmdFixture(), "/clear first", "Usage: +fixture/clear <layer number>")
+        self.call(
+            CmdFixture(),
+            "/decorate a brass lantern = soon",
+            "Usage: +fixture/decorate <carried item> [= seconds]",
+        )
+
+    def test_missing_activation_cost_rules_report_a_crafting_error(self):
+        costs = {**conf.DEFAULT_COSTS, "activatable": {"base": {"materials": 1}}}
+        with (
+            override_settings(RP_CRAFTING_COSTS=costs),
+            self.assertRaisesMessage(CraftingError, "extra-mode"),
+        ):
+            services.craft_cost(
+                self.char1, "music", "activatable", {"modes": {"play": ["One.", "Two."]}}
+            )
 
     def test_freeze_hide_and_closed_production_do_not_rewrite_item_history(self):
         item = self.instrument()

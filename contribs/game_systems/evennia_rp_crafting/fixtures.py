@@ -3,6 +3,7 @@
 """Transactional placements, bounded temporary layers and current-owner credit."""
 
 import math
+from contextlib import suppress
 from datetime import timedelta
 
 from django.apps import apps
@@ -47,20 +48,27 @@ def _lock(actor, room, item=None):
     return actor, room, locked.get(getattr(item, "pk", None))
 
 
-def active_layers(room, now=None):
-    rows = RoomLayer.objects.filter(
-        room_id=room.pk, cleared_at__isnull=True, expires_at__gt=now or timezone.now()
-    ).select_related("craft")
-    if apps.is_installed("evennia_scenes"):
+def _current_layers(now=None, **filters):
+    rows = list(
+        RoomLayer.objects.filter(
+            cleared_at__isnull=True, expires_at__gt=now or timezone.now(), **filters
+        ).select_related("craft")
+    )
+    scene_ids = {row.scene_id for row in rows} - {None}
+    if scene_ids and apps.is_installed("evennia_scenes"):
         from evennia_scenes.models import Scene
 
         running = set(
-            Scene.objects.filter(status__in=(Scene.Status.OPEN, Scene.Status.ACTIVE)).values_list(
-                "pk", flat=True
-            )
+            Scene.objects.filter(
+                pk__in=scene_ids, status__in=(Scene.Status.OPEN, Scene.Status.ACTIVE)
+            ).values_list("pk", flat=True)
         )
         return [row for row in rows if row.scene_id is None or row.scene_id in running]
-    return list(rows)
+    return rows
+
+
+def active_layers(room, now=None):
+    return _current_layers(now, room_id=room.pk)
 
 
 def installations(room):
@@ -81,6 +89,9 @@ def _record(item, actor):
     record = CraftRecord.objects.filter(item_id=item.pk, behaviour="installable").first()
     if record is None or item.location != actor:
         raise CraftingError("Carry a crafted Installable fixture first.")
+    # One object, one display: a carried fixture cannot fill several layer slots.
+    if _current_layers(craft=record):
+        raise CraftingError("That fixture is already on display; clear its temporary layer first.")
     return record
 
 
@@ -200,6 +211,27 @@ def _clear_layer(actor, layer_id, room):
         raise CraftingError("Only its creator, the property owner or staff may clear this layer.")
     RoomLayer.objects.filter(pk=row.pk, cleared_at__isnull=True).update(cleared_at=timezone.now())
     return row
+
+
+@transaction.atomic
+def release_room(room):
+    """Before a room is deleted, end its layers and return installed fixtures.
+
+    Fixtures with no owner to receive them are left for Evennia's content
+    clearing, which sends them to the default home.
+    """
+    now = timezone.now()
+    RoomLayer.objects.filter(room_id=room.pk, cleared_at__isnull=True).update(cleared_at=now)
+    owner = owner_of(room) or owner_of(room, include_inactive=True)
+    rows = FixtureInstallation.objects.select_for_update().filter(room_id=room.pk, active=True)
+    for row in rows.select_related("craft"):
+        row.active = False
+        row.removed_at = now
+        row.save(update_fields=["active", "removed_at"])
+        item = ObjectDB.objects.filter(pk=row.craft.item_id, db_location_id=room.pk).first()
+        if item is not None and owner is not None:
+            with suppress(CraftingError):
+                _move(item, owner)
 
 
 def scene_closed(sender, scene, **kwargs):

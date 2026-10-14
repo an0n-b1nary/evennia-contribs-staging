@@ -25,7 +25,10 @@ class CmdFixture(_CraftCommand):
         if room is None:
             raise CraftingError("Visit a room first.")
         if switch == "clear":
-            fixtures.clear_layer(self.caller, int(self.args.strip()))
+            number = self.args.strip()
+            if not number.isdecimal():
+                raise CraftingError("Usage: +fixture/clear <layer number>")
+            fixtures.clear_layer(self.caller, int(number))
             self.msg("Temporary atmosphere cleared.")
         elif switch in ("install", "uninstall", "decorate"):
             candidates = list(room.contents if switch == "uninstall" else self.caller.contents)
@@ -39,8 +42,11 @@ class CmdFixture(_CraftCommand):
                 fixtures.uninstall(self.caller, item)
                 self.msg(f"Uninstalled {item.key}; it belongs to the property owner.")
             else:
+                seconds = self.rhs.strip() if self.rhs else ""
+                if seconds and not seconds.isdecimal():
+                    raise CraftingError("Usage: +fixture/decorate <carried item> [= seconds]")
                 row = fixtures.decorate(
-                    self.caller, item, room, seconds=int(self.rhs) if self.rhs else None
+                    self.caller, item, room, seconds=int(seconds) if seconds else None
                 )
                 self.msg(
                     f"Temporary layer #{row.pk}: {item.key}, expires {row.expires_at:%Y-%m-%d %H:%M UTC} or at scene close."
