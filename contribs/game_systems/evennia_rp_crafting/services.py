@@ -13,6 +13,7 @@ from evennia_rp_resources import services as resources
 
 from evennia_links.characters import account_ids
 from evennia_links.runtime import get
+from evennia_links.transactions import atomic_objects
 
 from . import conf
 from .behaviours import registry, text
@@ -22,9 +23,11 @@ from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, NicheUnlock, Workshop, WorkshopInvestment
 
 
-def _require(actor, *, spending=True):
+def _require(actor, *, spending=True, wave_two=False):
     if not conf.visible(actor):
         raise CraftingError("Crafting is unavailable.")
+    if wave_two and not conf.wave_two_visible(actor):
+        raise CraftingError("Crafting wave two is unavailable.")
     if get("RP_CRAFTING_FROZEN"):
         raise CraftingError("Crafting is paused for the moment.")
     if spending and apps.is_installed("evennia_economy"):
@@ -103,6 +106,8 @@ def unlock(actor, key, selected):
     _require(actor)
     workshop = _workshop(actor)
     definition = NicheDefinition.objects.select_for_update().get(pk=niche(key).pk)
+    if not any(conf.component_visible(actor, key) for key in definition.behaviours):
+        raise CraftingError("This niche is unavailable.")
     if definition.archived:
         raise CraftingError("Unknown or archived niche.")
     count = active_unlocks(workshop).count()
@@ -158,6 +163,10 @@ def abandon(actor, key):
 
 def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True, verbs=None):
     definition, composition = prepare(key, behaviour_key, configuration, verbs)
+    if not conf.component_visible(actor, composition.lifecycle_key) or any(
+        not conf.component_visible(actor, entry["key"]) for entry in composition.verbs
+    ):
+        raise CraftingError("Crafting wave two is unavailable.")
     money = 0
     if include_fee and apps.is_installed("evennia_economy"):
         from evennia_economy.services import fee
@@ -174,7 +183,7 @@ def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True, ve
     )
 
 
-@transaction.atomic
+@atomic_objects
 def craft(actor, key, behaviour_key, name, description, configuration, selected, *, verbs=None):
     _require(actor)
     workshop = _workshop(actor)
@@ -208,6 +217,13 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected,
             )
         except EconomyError as exc:
             raise CraftingError(str(exc)) from None
+    from .valuation import furnishing_value
+
+    weeks = (
+        furnishing_value(selected, cost["money"])
+        if implementation.lifecycle_key == "installable"
+        else 0
+    )
     item = implementation.create(actor, name, description, config)
     if item is None or not item.pk or item.location != actor:
         raise CraftingError("The behaviour did not produce an item in your hands.")
@@ -224,6 +240,7 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected,
         item_id=item.pk,
         resources_spent=selected,
         money_spent=cost["money"],
+        furnishing_weeks=weeks,
         prose={"name": name, "description": description, "configuration": config},
         hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
     )

@@ -16,6 +16,13 @@ class CraftingConfig(AppConfig):
 
         register_controls()
         cap_contributions.connect(caps, dispatch_uid="crafting_workshop_caps")
+        from .fixtures import furnishing_caps, scene_closed
+
+        cap_contributions.connect(furnishing_caps, dispatch_uid="crafting_furnishing_caps")
+        if self.apps.is_installed("evennia_scenes"):
+            from evennia_scenes.signals import scene_closed as closed
+
+            closed.connect(scene_closed, dispatch_uid="crafting_temporary_scene_close")
         if self.apps.is_installed("evennia_economy"):
             from evennia_economy.signals import economy_figures
 

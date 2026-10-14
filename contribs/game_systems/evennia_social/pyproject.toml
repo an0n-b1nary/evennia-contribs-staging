@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-social"
-version = "0.7.4"
+version = "0.7.5"
 description = "The social quality-of-life command layer for Evennia games: profiles, discovery, messaging, ignore/mute, consensual teleportation, and OOC chat."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,7 +22,7 @@ classifiers = [
 # Hard dependency on evennia-posing: reuses format_pose_time, reads
 # last_pose_time/pose_status for +where, and layers ignore-filtering onto
 # posing's header/highlight msg() via cooperative mixin inheritance.
-dependencies = ["evennia>=6.0", "evennia-posing>=0.1", "evennia-links>=0.8.5"]
+dependencies = ["evennia>=6.0", "evennia-posing>=0.1", "evennia-links>=0.8.6"]
 
 [project.optional-dependencies]
 # +where/+hangouts render a screen-reader-friendly plain list when this is

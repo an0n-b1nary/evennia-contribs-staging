@@ -2,7 +2,7 @@
 
 Workshops unlock breadth, never quality. Invest money and resources in niches,
 then compose new cosmetic items with one **lifecycle** and compatible **verbs**.
-The initial products are Wearables, Readables, Consumables and Broadcasts.
+Products include Wearables, Readables, Consumables, Broadcasts, reusable Activatables and Installable fixtures.
 Crafting has no XP, RP quota, quality tier or waiting period.
 
 ## Installation
@@ -10,7 +10,7 @@ Crafting has no XP, RP quota, quality tier or waiting period.
 Install `evennia-links` and `evennia-rp-resources` first, then `pip install -e .`.
 Add `evennia_rp_crafting` after resources in `INSTALLED_APPS`, run
 `evennia migrate --noinput`, and add `evennia_rp_crafting.commands.CraftingCmdSet`
-to the character cmdset. There is no web/API surface or scheduler.
+to the character cmdset. There is no web/API surface. A persistent room-ambient/expiry Script starts lazily on the first installation or temporary decoration.
 
 Configure `RP_CRAFTING_CATALOG` as a callable or dotted path returning niche
 dicts, then run `+crafting/seed` as staff. Keys are permanent: archive old niches,
@@ -146,7 +146,7 @@ honouring the caller's transaction. Verbs instead implement
 
 ## Composition
 
-Every item has one lifecycle: `carried`, `wearable`, `consumable` or `broadcast`.
+Every item has one lifecycle: `carried`, `wearable`, `consumable`, `broadcast` or `installable`.
 The lifecycle selects its typeclass and owns movement, equipment and destruction
 hooks. `readable` is a verb, dispatched from the verified CraftRecord rather than
 the item's typeclass. `+craft/new writing/readable` remains shorthand for a
@@ -154,12 +154,13 @@ Carried item with a Readable verb. Carried adds no cost or niche requirement;
 the Readable verb retains the original resource price.
 
 Only explicitly listed **complete verb sets** may be crafted. Defaults preserve
-the original products and do not offer standalone Carried objects:
+the original products and add the tested wave-two combinations. Standalone Carried objects remain closed:
 
 ```python
 RP_CRAFTING_COMBINATIONS = {
-    "carried": [["readable"]],
-    "wearable": [[]],
+    "carried": [["readable"], ["activatable"], ["readable", "activatable"]],
+    "wearable": [[], ["activatable"]],
+    "installable": [[], ["readable"], ["activatable"], ["readable", "activatable"]],
     "consumable": [[]],
     "broadcast": [[]],
 }
@@ -169,7 +170,7 @@ An empty outer list permits no products for that lifecycle; `[[]]` permits a
 lifecycle without verbs. A lifecycle missing from the mapping, including a
 custom one registered in `RP_CRAFTING_BEHAVIOURS`, cannot be crafted. Listing `[["readable"], ["another_verb"]]` permits
 each separately, never their union. Open each complete combination deliberately
-with its own tests. The reference host leaves the default combinations closed.
+with its own tests. The reference host opens exactly these tested combinations.
 
 For a host that has tested wearable lockets, add `["readable"]` to its Wearable
 sets. A crafter holding both contributing niches can then draft one with:
@@ -202,9 +203,7 @@ lifecycle in `context["behaviour"]`, plus `verbs` and contributing niche snapsho
 
 The allow-list controls new production. Removing a combination prevents new
 crafts without disabling existing items. Their actions still enforce runtime
-permissions and installed-partner availability. This release supplies Readable
-only; activation, installation, companions, facets and post-craft modification
-are separate work.
+permissions and installed-partner availability. Readable and Activatable are dispatched from verified record configuration. Companions, general facets and post-craft modification remain separate work.
 
 ## Provenance and review
 
@@ -251,3 +250,149 @@ Readable continues to work and existing wearables remain ordinary crafted object
 with their hallmark. Accessibility enables muted remote Broadcast delivery.
 Scenes and jobs are not used in this release. The reference game and
 CI exercise actual partners and fresh environments with them physically absent.
+
+## Activation and fixtures
+
+`RP_CRAFTING_WAVE_TWO_REVEALED` is a separate runtime reveal control (default
+True). Set it False to stage these features while keeping wave-one crafting
+available. Ordinary players cannot unlock the new niches, compose or activate
+wave-two features, or see fixture/sensory commands; room layers, new emissions
+and furnishing credit are suspended. Staff retain service/command access for
+testing. Existing wave-one items and reads continue unchanged. Global Crafting
+hide/freeze controls still apply to both waves.
+
+An Activatable is a reusable verb with 1-8 named modes. Each mode has 1-20
+plain-text readings; activation selects one uniformly. Every extra mode and
+reading has a configurable craft-input cost. These are cosmetic experiences:
+they never replace system dice, grant lore, change combat, or advance posing.
+Carried items require possession. Installed items allow visitors in the room,
+subject to the item's `use` lock; using never grants editing/removal rights.
+
+```text
++craft/new music/activatable = a carved flute
++craft/desc = A small carved flute.
++craft/mode play = A clear melody carries through the room.
++craft/resources = timber:1
++craft/finish
+use a carved flute = play
+
++craft/new decoration/installable = a lantern
++craft/desc = A brass lantern.
++craft/room_line = Warm lamplight falls across the wall.
++craft/smell = A trace of beeswax.
++craft/sound = A faint candlewick hiss.
++craft/resources = timber:1
++craft/finish
++fixture/install a lantern
++smell
++listen
++fixture/uninstall a lantern
+```
+
+An interactive fixture adds `+craft/verb music/activatable` before its modes.
+A playable wearable adds that verb to a Wearable draft; equipment's existing
+wear/transfer/build guards still apply. Readable + Activatable Carried objects
+and readable/interactive fixtures use the same record-based dispatch. The
+crafter needs all contributing niches and pays the combined craft costs once.
+Modes do not provide a game engine, verse sequencing or general state facets.
+
+Installable configuration has `room_line`, `smell`, `sound` and `ambient`.
+At least one line is required. Add `CraftingRoomMixin` before the host's Room
+class to append layers cooperatively without overwriting room descriptions.
+The reference host uses `+roomconfig/smell` and `/sound` for free owner-written
+room prose; sensory commands show that prose before the attributed item lines.
+
+Installation checks Links `install` permission, serializes the room, and moves
+the object into it. Ordinary get/give/delete cannot remove an installed fixture.
+Explicitly permitted residents may install, but only the current property owner
+or authorized staff may uninstall. Uninstalled fixtures go to the property
+owner, including when staff removes them. Public fixtures go to the removing
+staff member. Property transfer retains fixtures; original craft provenance
+never changes. Archive suspends layers, ambients and credit while preserving
+objects. Restore resumes them. Visit the room to install, clear or uninstall.
+
+### Temporary atmosphere
+
+`+fixture/decorate <carried fixture> [= seconds]` publishes a temporary room
+layer without permanently installing the object. It checks the same Links
+`decorate` policy as Social `+mood`: owner/staff, public-scene active
+participants, and private-scene hosts, including host mood-policy extensions.
+It grants no `install` or `configure` rights. Layers expire at their associated
+scene's close or their bounded timer, whichever occurs first. Without Scenes,
+the timer is sufficient. `+fixture` lists layer numbers;
+`+fixture/clear <number>` permits its creator, property owner or staff.
+Temporary layers earn no cap credit and do not occupy permanent fixture slots.
+Broadcast/Consumable lingering-illusion workflows remain a separate follow-up.
+
+### Limits and output
+
+Runtime controls, all prefixed `RP_CRAFTING_`:
+
+| Control | Default |
+|---|---:|
+| `WAVE_TWO_REVEALED` | True |
+| `FIXTURE_ROOM_LIMIT` | 5 |
+| `TEMPORARY_LAYER_LIMIT` | 3 |
+| `TEMPORARY_LAYER_SECONDS` | 3600 |
+| `AMBIENT_INTERVAL` | 300 seconds |
+| `ACTIVATION_ITEM_COOLDOWN` | 30 seconds |
+| `EVENT_ROOM_COOLDOWN` | 30 seconds |
+
+Permanent and temporary layers share one ambient emitter per room. Optional
+ambient prose costs an additional essence. Accessibility is required to create
+ambient fixtures; its physical absence silences existing emitters. Automatic
+ambients respect ambient mute, avoid empty rooms, pause in open room fights,
+and stop while Crafting is hidden/frozen or the room is archived. Item/room
+cooldowns and emitter timestamps survive reloads. Delivery occurs after commit.
+New activation/fixture emissions use the actor/current owner as `from_obj`,
+respect Social ignore, and are logged as scene emits without becoming poses or
+RP session activity. Broader legacy emission and reading-mode integration remain
+tracked follow-ups. Screen readers receive plain item labels and EVENT text.
+
+### Furnishing credit and host ownership
+
+Only currently installed fixtures in live owned rooms raise the owner's money
+capacity, through Links' `cap_contributions`. There is no overall furnishing
+ceiling. Public rooms and temporary layers contribute nothing. Uninstalling
+removes credit; reinstalling restores it. Property transfer changes the recipient.
+
+Capture value once at craft time from the whole item's recorded inputs,
+including composed verbs and the craft fee. Defaults:
+
+```python
+RP_CRAFTING_BASIC_FIXTURE_WEEKS = "0.2"
+RP_CRAFTING_FURNISHING_REFERENCE = 1
+RP_CRAFTING_FURNISHING_CATEGORY_VALUES = {"materials": 1, "essences": 2, "provisions": 1}
+RP_CRAFTING_FURNISHING_COIN_VALUE = "0.01"
+```
+
+Value in UBI-weeks is basic weeks times weighted craft inputs divided by the
+reference cost. Add weights for every host resource category. Commission,
+purchase and resale prices never enter valuation; retuning input coefficients
+affects new crafts only. Current weekly UBI remains the runtime coin scale.
+Without Economy, crafting and fixtures continue; no money raise is supplied.
+Ordinary furnishings do not raise resource storage.
+
+Configure the shared room seams for Building hosts:
+
+```python
+LINKS_ROOM_PERMISSION = "evennia_building.access.room_permission"
+LINKS_ROOM_OWNER = "evennia_building.access.owner_of"
+LINKS_ROOM_LIVE = "evennia_building.access.room_is_live"
+LINKS_ROOM_LOCK = "evennia_building.access.lock_room_state"
+LINKS_OWNED_ROOMS = "evennia_building.access.owned_room_ids"
+```
+
+Custom lifecycle providers must return false for inactive rooms. The optional bulk-owned-room lookup
+limits cap queries to the character's rooms; current ownership is revalidated
+and item locations are fetched together rather than once per fixture. Without
+this optimization, custom hosts retain the ordinary per-room owner lookup.
+Lock providers must acquire the same transaction lock as ownership transfer, archive and access
+edits; failures abort changes. Owner providers may accept `include_inactive=True`
+for recovering archived fixtures; ordinary credit always uses the live lookup.
+Without an ownership provider, Evennia control governs installation and no
+furnishing credit is awarded. The additive migration preserves existing records,
+typeclass paths and use history, with zero furnishing value on earlier records.
+
+Wave-three Modifiers/Companions and the letterbox, library, places, map markers,
+radius/bearings and remaining facet integrations are separate milestones.

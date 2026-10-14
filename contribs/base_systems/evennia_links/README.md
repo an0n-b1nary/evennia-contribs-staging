@@ -524,3 +524,20 @@ Moderation supplies account policy through this seam without introducing a
 hard dependency from communication contribs to Moderation. New delivery routes
 should check the seam before storing or sending content. Kinds currently used
 are `page`, `channel`, `board`, `room`, and explicit `ooc`.
+
+## Temporary room atmosphere and lifecycle consumers
+
+`rooms.can(actor, room, "decorate")` is the shared temporary-atmosphere policy.
+It preserves Social's `SOCIAL_ROOM_MOOD_PERMISSION` extension, then permits
+owners/staff, public-scene active participants, or private-scene hosts. It
+grants no installation or lasting configuration rights. Scenes is optional.
+`rooms.is_live(room)` calls optional `LINKS_ROOM_LIVE(room)` and fails closed
+for broken providers; the default is true. `rooms.lock_state(room)` calls
+`LINKS_ROOM_LOCK(room)` inside a consumer's transaction before object locks.
+The host must lock the same rows as ownership/lifecycle mutations; exceptions
+abort the mutation. `owner_of(room, include_inactive=True)` is optional recovery
+lookup and requires a provider accepting that keyword. Ordinary owner lookup
+continues to call one positional argument. These seams have no Building import.
+`owned_room_ids(character)` optionally calls `LINKS_OWNED_ROOMS(character)` for
+bulk cap lookup. It returns None without a provider and an empty list on provider
+errors; returned values must be saved positive integer room ids.

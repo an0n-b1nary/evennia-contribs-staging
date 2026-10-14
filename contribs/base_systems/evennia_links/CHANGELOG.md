@@ -1,5 +1,9 @@
 # Changelog — evennia-links
 
+## 0.8.6 - 2026-10-14
+
+- Shared temporary decorate permission, optional room lifecycle/ownership locks, and inactive-owner lookup for fixture recovery.
+
 ## 0.8.5 — 2026-10-13
 
 - Shared, optional communication restriction signal with fail-closed evaluation,

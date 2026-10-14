@@ -39,13 +39,20 @@ mixin):
 from django.apps import apps
 from evennia.objects.objects import DefaultRoom
 from evennia.typeclasses.attributes import AttributeProperty
-from evennia_building.typeclasses import BuildingRoomMixin
 
 from evennia_maps.typeclasses import MapsRoomMixin
 from evennia_posing import PosingRoomMixin
 from evennia_social import SocialRoomMixin
 
 from .objects import ObjectParent
+
+if apps.is_installed("evennia_building"):
+    from evennia_building.typeclasses import BuildingRoomMixin
+else:
+
+    class BuildingRoomMixin:
+        pass
+
 
 if apps.is_installed("evennia_economy"):
     from evennia_economy.typeclasses import MarketRoomMixin
@@ -55,7 +62,16 @@ else:
         pass
 
 
+if apps.is_installed("evennia_rp_crafting"):
+    from evennia_rp_crafting.typeclasses import CraftingRoomMixin
+else:
+
+    class CraftingRoomMixin:
+        pass
+
+
 class Room(
+    CraftingRoomMixin,
     BuildingRoomMixin,
     MarketRoomMixin,
     MapsRoomMixin,

@@ -36,7 +36,7 @@ class CraftingSeams(EvenniaTest):
         services.unlock(self.char1, "writing", {"timber": 3})
         call_command("seed_sandbox", verbosity=0)
         self.assertTrue(Workshop.objects.filter(character=self.char1).exists())
-        self.assertEqual(NicheDefinition.objects.count(), 6)
+        self.assertEqual(NicheDefinition.objects.count(), 8)
         self.assertTrue(CraftRecord.objects.filter(behaviour="carried").exists())
 
     def test_host_book_uses_carried_lifecycle_and_record_based_read_dispatch(self):

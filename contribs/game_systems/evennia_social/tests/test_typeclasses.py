@@ -98,6 +98,30 @@ class TestCooperativeMsg(SocialTestCase):
 
         self.assertEqual(received, [])
 
+    def test_crafted_event_from_ignored_sender_is_suppressed_without_pose_placeholder(self):
+        self.account.db.ignore_list = [self.account2.id]
+        received, restore = self._capture_delivered()
+        try:
+            self.char1.msg(
+                ("<EVENT> A bright flare.", {"type": "crafting_event"}), from_obj=self.char2
+            )
+        finally:
+            restore()
+        self.assertEqual(received, [])
+
+    def test_offline_fixture_owner_still_respects_ignore(self):
+        self.account2.characters.add(self.char2)
+        self.char2.account = None
+        self.account.db.ignore_list = [self.account2.pk]
+        received, restore = self._capture_delivered()
+        try:
+            self.char1.msg(
+                ("<EVENT> An unattended chime.", {"type": "crafting_event"}), from_obj=self.char2
+            )
+        finally:
+            restore()
+        self.assertEqual(received, [])
+
     def test_staff_sender_bypasses_ignore(self):
         """Builder+ senders are never filtered, even if ignored."""
         self.account.db.ignore_list = [self.account2.id]

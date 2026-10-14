@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 - 2026-10-14
+
+- Add reusable activation modes, random flavour readings, Installable fixtures, bounded temporary room layers, sensory commands, ambient scheduling, and captured furnishing credit in UBI-weeks. Preserve existing craft/item paths with an additive migration. Wire actual ownership, economy, scenes, ignore and combat partners in the reference host and test physically absent partners.
+
 ## 0.3.0 — 2026-10-13
 
 - Added: one lifecycle plus explicit compatible verb sets, with Readable

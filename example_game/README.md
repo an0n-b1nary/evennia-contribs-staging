@@ -1718,3 +1718,29 @@ choice. CI also starts Moderation with its optional communication packages
 physically absent, and runs file-backed admissions races. See the package
 [README](../contribs/game_systems/evennia_moderation/README.md) for the complete
 installation, runtime settings, retention policy and host integration signal.
+
+
+### Crafting wave two
+
+The market contains a sample brass lantern with room/smell/sound layers and a
+sample carved lute. Pick up the lute and `use a sample carved lute = play`.
+The host reveals wave two by default; set `RP_CRAFTING_WAVE_TWO_REVEALED=False`
+for a separate staged rollout while leaving wave-one crafting on.
+Use `+fixture`, `+smell`, and `+listen` to inspect the room. The public lantern
+earns no furnishing credit. The catalogue adds Artisan and Decorator niches;
+all opened lifecycle/verb sets are listed explicitly in settings.py.
+
+`CraftingRoomMixin` precedes the host Room class to append description layers;
+`CraftedFixture` puts the host stock-deletion guard before the contrib typeclass.
+The same Links room providers support Social mood, permanent installation,
+temporary decoration, lifecycle suspension, and property transaction locking.
+Owners can write free sensory prose with `+roomconfig/smell` and `/sound`.
+Five permanent fixtures and three temporary layers share one ambient emitter.
+Fixture removal belongs to the property owner/staff, not permitted installers.
+Temporary layers expire with their scene or timer and supply no cap credit.
+
+Actual ownership-transfer/archive/restore, economy credit, ignore, scene logging
+and combat-pause seams run in `world.sandbox.test_wave_two`. Crafting partner CI
+also removes Building and Scenes physically, and the independent job tests only
+Links/Resources/Crafting. Golden reseeding retires only tagged demonstration
+placements; player fixtures and append-only craft history are preserved.

@@ -140,19 +140,30 @@ SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
 # RP crafting (evennia-rp-crafting) — invested niches and cosmetic items
 ######################################################################
 RP_CRAFTING_REVEALED = True
+RP_CRAFTING_WAVE_TWO_REVEALED = True
 RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
-# Complete verb sets: only the original products are open in this host.
+# Complete verb sets: original products and the tested wave-two combinations.
 RP_CRAFTING_COMBINATIONS = {
-    "carried": [["readable"]],
-    "wearable": [[]],
+    "carried": [["readable"], ["activatable"], ["readable", "activatable"]],
+    "wearable": [[], ["activatable"]],
+    "installable": [[], ["readable"], ["activatable"], ["readable", "activatable"]],
     "consumable": [[]],
     "broadcast": [[]],
 }
 RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
 RP_CRAFTING_CONSUMABLE_TYPECLASS = "typeclasses.craft_items.CraftedConsumable"
 RP_CRAFTING_BROADCAST_TYPECLASS = "typeclasses.craft_items.CraftedBroadcast"
+RP_CRAFTING_INSTALLABLE_TYPECLASS = "typeclasses.craft_items.CraftedFixture"
+RP_CRAFTING_FIXTURE_ROOM_LIMIT = 5
+RP_CRAFTING_TEMPORARY_LAYER_LIMIT = 3
+RP_CRAFTING_TEMPORARY_LAYER_SECONDS = 3600
+RP_CRAFTING_AMBIENT_INTERVAL = 300
+RP_CRAFTING_BASIC_FIXTURE_WEEKS = "0.2"
+RP_CRAFTING_FURNISHING_REFERENCE = 1
+RP_CRAFTING_FURNISHING_CATEGORY_VALUES = {"materials": 1, "essences": 2, "provisions": 1}
+RP_CRAFTING_FURNISHING_COIN_VALUE = "0.01"
 RP_CRAFTING_EVENT_ROOM_COOLDOWN = 30
 RP_CRAFTING_EVENT_FRAME = "<EVENT> {text}"
 RP_CRAFTING_NICHE_CAP = 5
@@ -710,6 +721,9 @@ MIDDLEWARE += ["evennia_links.web.WebCharacterMiddleware"]
 # Control access remains the default until an ownership provider is installed.
 LINKS_ROOM_PERMISSION = "evennia_building.access.room_permission"
 LINKS_ROOM_OWNER = "evennia_building.access.owner_of"
+LINKS_ROOM_LIVE = "evennia_building.access.room_is_live"
+LINKS_ROOM_LOCK = "evennia_building.access.lock_room_state"
+LINKS_OWNED_ROOMS = "evennia_building.access.owned_room_ids"
 # One viewer-aware policy on both surfaces, including disconnected web users.
 MAPS_ROOM_VISIBILITY = "world.sandbox.building.room_visible"
 REGIONS_ROOM_VISIBILITY = MAPS_ROOM_VISIBILITY
@@ -722,18 +736,19 @@ BUILDING_DEFAULT_POLICY = "open"
 BUILDING_SAFE_ROOM = "#2"
 BUILDING_ACTIVITY_PROVIDER = "world.sandbox.building.last_played"
 BUILDING_QUIET_DAYS = 35
-SOCIAL_ROOM_MOOD_PERMISSION = "evennia_building.access.steward_mood_permission"
-GLOBAL_SCRIPTS = {
-    **GLOBAL_SCRIPTS,
-    "building_quiet_review": {"typeclass": "evennia_building.scripts.QuietReview"},
-}
-LOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")
-LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
-LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"
-from evennia_building.request_form import FORM as BUILDING_REQUEST_FORM
-from evennia_building.request_form import FORM_KEY as BUILDING_REQUEST_FORM_KEY
+if "evennia_building" in INSTALLED_APPS:
+    SOCIAL_ROOM_MOOD_PERMISSION = "evennia_building.access.steward_mood_permission"
+    GLOBAL_SCRIPTS = {
+        **GLOBAL_SCRIPTS,
+        "building_quiet_review": {"typeclass": "evennia_building.scripts.QuietReview"},
+    }
+    LOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")
+    LINKS_ROOM_TRAVEL = "evennia_building.access.can_teleport"
+    LINKS_ROOM_VISIBILITY = "evennia_building.visibility.room_visibility"
+    from evennia_building.request_form import FORM as BUILDING_REQUEST_FORM
+    from evennia_building.request_form import FORM_KEY as BUILDING_REQUEST_FORM_KEY
 
-JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, BUILDING_REQUEST_FORM_KEY: BUILDING_REQUEST_FORM}
+    JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, BUILDING_REQUEST_FORM_KEY: BUILDING_REQUEST_FORM}
 
 ######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues

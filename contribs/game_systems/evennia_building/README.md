@@ -237,3 +237,16 @@ Maps' `frontier` overlay carries public provenance and approval metadata.
 Upgrade 0.2 with normal migrations. Historical migrations, ordinary interior
 snapshot shape and the stable `building_interior` request form identifier are
 preserved; existing pending interior/apartment candidates remain reviewable.
+
+## Fixture consumers
+
+For Crafting >=0.4, also set `LINKS_ROOM_LIVE` to
+`evennia_building.access.room_is_live` and `LINKS_ROOM_LOCK` to
+`evennia_building.access.lock_room_state`. Archived/draft rooms suspend room
+effects. The transaction provider locks the property/frontier state before
+consumer object locks, sharing transfer/archive/access-edit serialization.
+`access.owner_of(room, include_inactive=True)` identifies archived owners for
+fixture recovery; the default lookup still excludes archived rooms. Building
+awards no furnishing credit itself: Crafting owns that collector.
+`LINKS_OWNED_ROOMS = "evennia_building.access.owned_room_ids"` supplies live
+owned room ids in one query, so furnishing credit does not scan the whole grid.
