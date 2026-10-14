@@ -1700,9 +1700,9 @@ hook ensures the daily retention sweep exists.
 
 The staff-run marker is enabled on terminal and website character displays.
 It uses current account roster status, including offline and quelled staff,
-and current NPC controllers. Repeated alt co-presence produces advisory Jobs
-notices after three overlapping room/channel sessions in seven days; it never
-flags sessions or changes XP eligibility.
+and current NPC controllers. Repeated alt co-presence produces one advisory
+Jobs notice per account per seven days, once three overlapping room/channel
+sessions occur in that window; it never flags sessions or changes XP eligibility.
 
 `world/sandbox/test_moderation.py` covers real communication and authentication
 routes, website board writes, private review context and the decline-reason
