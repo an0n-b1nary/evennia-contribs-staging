@@ -19,7 +19,17 @@ class CraftedItemMixin:
 
     def get_market_keywords(self, looker=None):
         record = self.craft_record
-        return [record.niche.key, record.niche_name, record.behaviour] if record else []
+        if record is None:
+            return []
+        return [
+            *(value for row in record.contributor_data for value in (row["key"], row["name"])),
+            *record.behaviour_keys,
+        ]
+
+    def read(self, reader):
+        from .composition import invoke
+
+        return invoke(reader, self, "readable")
 
     def get_display_desc(self, looker, **kwargs):
         desc = super().get_display_desc(looker, **kwargs)
@@ -28,17 +38,7 @@ class CraftedItemMixin:
 
 
 class Readable(CraftedItemMixin, DefaultObject):
-    """A crafted container of text; its contents are read from the craft record."""
-
-    def read(self, reader):
-        from .errors import CraftingError
-
-        record = self.craft_record
-        if record is None or record.behaviour != "readable":
-            raise CraftingError("There is nothing written here.")
-        if not self.access(reader, "read", default=True):
-            raise CraftingError("You cannot read that.")
-        return record.prose["configuration"]["text"]
+    """Carried lifecycle, retaining the original public typeclass path."""
 
 
 class Consumable(CraftedItemMixin, DefaultObject):

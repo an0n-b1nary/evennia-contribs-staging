@@ -1,8 +1,8 @@
 # evennia-rp-crafting
 
 Workshops unlock breadth, never quality. Invest money and resources in niches,
-then compose new cosmetic items with **Wearable**, **Readable**, **Consumable**
-or **Broadcast** behaviours.
+then compose new cosmetic items with one **lifecycle** and compatible **verbs**.
+The initial products are Wearables, Readables, Consumables and Broadcasts.
 Crafting has no XP, RP quota, quality tier or waiting period.
 
 ## Installation
@@ -139,8 +139,71 @@ RP_CRAFTING_COSTS = {
 
 Staff own the code registry `RP_CRAFTING_BEHAVIOURS` (stable key → dotted class).
 Each implementation provides `available`, `validate`, `cost` and `create`;
-see `behaviours.py`. Niches list registered keys and allowed categories. Custom
-implementations must return a new carried item and honour the caller's transaction.
+see `behaviours.py`. Niches list registered keys and allowed categories.
+Lifecycles implement `create`, returning a new item in the crafter's hands and
+honouring the caller's transaction. Verbs instead implement
+`invoke(actor, item, configuration)` and declare `role = "verb"`.
+
+## Composition
+
+Every item has one lifecycle: `carried`, `wearable`, `consumable` or `broadcast`.
+The lifecycle selects its typeclass and owns movement, equipment and destruction
+hooks. `readable` is a verb, dispatched from the verified CraftRecord rather than
+the item's typeclass. `+craft/new writing/readable` remains shorthand for a
+Carried item with a Readable verb. Carried adds no cost or niche requirement;
+the Readable verb retains the original resource price.
+
+Only explicitly listed **complete verb sets** may be crafted. Defaults preserve
+the original products and do not offer standalone Carried objects:
+
+```python
+RP_CRAFTING_COMBINATIONS = {
+    "carried": [["readable"]],
+    "wearable": [[]],
+    "consumable": [[]],
+    "broadcast": [[]],
+}
+```
+
+An empty outer list permits no products for that lifecycle; `[[]]` permits a
+lifecycle without verbs. Listing `[["readable"], ["another_verb"]]` permits
+each separately, never their union. Open each complete combination deliberately
+with its own tests. The reference host leaves the default combinations closed.
+
+For a host that has tested wearable lockets, add `["readable"]` to its Wearable
+sets. A crafter holding both contributing niches can then draft one with:
+
+```text
++craft/new weaving/wearable = a locket
++craft/verb writing/readable
++craft/desc = A small locket with a note inside.
++craft/text = Meet me at the market.
++craft/slot = neck
++craft/resources = timber:2
++craft
++craft/finish
+```
+
+`/unverb <key>` removes an added draft verb. Preview and finish validate the
+whole combination. Every contributing niche must grant its selected component;
+finish requires all of them to be actively unlocked. Each component's resources
+must fit its own niche's allowed input categories. Costs add once per component,
+and the economy craft fee is charged once for the whole item. Holding another
+niche that grants the same verb does not add a charge. Duplicate verbs and a
+second lifecycle are refused. Existing equipment guards apply to composed gear.
+
+The service entry points `craft` and `craft_cost` accept an optional `verbs`
+list, with entries shaped as
+`{"key": "readable", "niche": "writing", "configuration": {"text": "..."}}`.
+They also accept `carried` with empty lifecycle configuration and explicit verbs.
+The primary niche must contribute to the item. Fee policies receive the
+lifecycle in `context["behaviour"]`, plus `verbs` and contributing niche snapshots.
+
+The allow-list controls new production. Removing a combination prevents new
+crafts without disabling existing items. Their actions still enforce runtime
+permissions and installed-partner availability. This release supplies Readable
+only; activation, installation, companions, facets and post-craft modification
+are separate work.
 
 ## Provenance and review
 
@@ -151,6 +214,8 @@ through equipment's `get_display_provenance` hook. Item typeclasses put
 `CraftedItemMixin` before the host object/equipment class in their MRO.
 Hosts can set `RP_CRAFTING_READABLE_TYPECLASS` and
 `RP_CRAFTING_WEARABLE_TYPECLASS` to subclasses of the shipped item classes.
+`RP_CRAFTING_CARRIED_TYPECLASS` takes precedence over the Readable override;
+the original `typeclasses.Readable` path remains a Carried lifecycle class.
 Consumable and Broadcast also support `RP_CRAFTING_CONSUMABLE_TYPECLASS` and
 `RP_CRAFTING_BROADCAST_TYPECLASS` with the same host guard ordering.
 Put any early stock-deletion guard before those bases, as `example_game` does.
@@ -160,6 +225,13 @@ configuration, inputs, maker/account snapshots and the timestamp. No approval is
 required. Records retain their original hallmark after a maker or niche is renamed
 and survive deletion of the maker/item through integer soft references. Staff
 administrative SQL is outside the player-service protection boundary.
+
+New records store the lifecycle in `behaviour`, the verb configurations in
+`verbs`, and all contributing niche keys/names/component grants in `contributors`.
+Hallmarks, staff review and market keywords include every contributor and
+component. The additive migration leaves earlier records intact; their Readable
+configuration is interpreted as Carried + Readable without rewriting history.
+Earlier saved drafts continue through the same single-behaviour shorthand.
 
 ## Runtime controls and partners
 

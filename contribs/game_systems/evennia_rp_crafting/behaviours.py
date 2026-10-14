@@ -42,6 +42,7 @@ def behaviour(key):
 
 
 class Behaviour:
+    role = "lifecycle"
     fields = ()
     typeclass = ""
     typeclass_setting = ""
@@ -77,14 +78,34 @@ class Behaviour:
         return item
 
 
-class Readable(Behaviour):
-    fields = ("text",)
+class Carried(Behaviour):
+    """Neutral lifecycle; its verbs supply access requirements and costs."""
+
     typeclass = "evennia_rp_crafting.typeclasses.Readable"
-    typeclass_setting = "RP_CRAFTING_READABLE_TYPECLASS"
+    typeclass_setting = "RP_CRAFTING_CARRIED_TYPECLASS"
+
+    def cost(self, key, config):
+        return {}
+
+    def create(self, actor, name, description, config):
+        # Keep the existing host override and stored typeclass paths usable.
+        if not hasattr(settings, self.typeclass_setting):
+            self.typeclass_setting = "RP_CRAFTING_READABLE_TYPECLASS"
+        return super().create(actor, name, description, config)
+
+
+class Readable(Behaviour):
+    role = "verb"
+    fields = ("text",)
 
     def validate(self, config):
         config = super().validate(config)
         return {"text": text(config.get("text", ""), "Readable text", 12000, required=True)}
+
+    def invoke(self, actor, item, config):
+        if not item.access(actor, "read", default=True):
+            raise CraftingError("You cannot read that.")
+        return config["text"]
 
 
 class Wearable(Behaviour):
