@@ -159,7 +159,7 @@ explicit return-or-transfer choice for shop merchandise.
 
 ### Workshops and crafting
 
-`evennia-rp-crafting` 0.2.0 seeds Weaver, Jeweller, Smith, Scribe, Cook and
+`evennia-rp-crafting` 0.3.0 seeds Weaver, Jeweller, Smith, Scribe, Cook and
 Illusionist niches.
 At Market Row, a sample field book can be read and a woven cloak shows a
 verified maker hallmark. The demonstration crafter owns a Workshop; resetting
@@ -183,6 +183,14 @@ Compose with `+craft/new writing/readable = a field book`, `/desc`,
 Wearable drafts use `/line`, optional `/aura`, `/slot` and `/require`.
 Crafted wearables reuse equipment's requirements and sealing and do not use
 the plain-gear cap. Staff `+crafting/review` sees the original prose and costs.
+
+Books now have the Carried lifecycle and a Readable verb; the commands and price
+stay the same. `RP_CRAFTING_COMBINATIONS` explicitly lists complete verb sets
+and leaves only the original products open. The foundation supports composed
+items when a host deliberately enables and tests a combination, with every
+contributing niche required and each component paid once. Staff review and
+market keywords include all contributors. Activation, installation and the
+remaining item facets are separate follow-ups.
 
 The host's crafted item typeclasses put `ObjectParent`
 first, so economy's early stock-deletion guard runs before item cleanup.

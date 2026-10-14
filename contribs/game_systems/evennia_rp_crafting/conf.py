@@ -7,10 +7,18 @@ from evennia_links.runtime import get, register
 
 MAX_AMOUNT = 2**63 - 1
 DEFAULT_BEHAVIOURS = {
+    "carried": "evennia_rp_crafting.behaviours.Carried",
     "wearable": "evennia_rp_crafting.behaviours.Wearable",
     "readable": "evennia_rp_crafting.behaviours.Readable",
     "consumable": "evennia_rp_crafting.behaviours.Consumable",
     "broadcast": "evennia_rp_crafting.behaviours.Broadcast",
+}
+# Each entry is a complete verb set, not independently composable permissions.
+DEFAULT_COMBINATIONS = {
+    "carried": [["readable"]],
+    "wearable": [[]],
+    "consumable": [[]],
+    "broadcast": [[]],
 }
 DEFAULT_COSTS = {
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},

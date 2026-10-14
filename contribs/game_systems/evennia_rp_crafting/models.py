@@ -73,15 +73,48 @@ class CraftRecord(models.Model):
     niche = models.ForeignKey(NicheDefinition, on_delete=models.PROTECT)
     niche_name = models.CharField(max_length=120)
     behaviour = models.SlugField(max_length=80)
+    # Behaviour is the lifecycle on new records; verbs carry their own prose.
+    verbs = models.JSONField(default=list)
+    contributors = models.JSONField(default=list)
     item_id = models.PositiveBigIntegerField(unique=True)
     resources_spent = models.JSONField(default=dict)
     money_spent = models.PositiveBigIntegerField(default=0)
     prose = models.JSONField(default=dict)
-    hallmark = models.CharField(max_length=500)
+    hallmark = models.TextField()
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering: ClassVar = ["pk"]
+
+    @property
+    def lifecycle(self):
+        return "carried" if self.behaviour == "readable" else self.behaviour
+
+    @property
+    def verb_data(self):
+        if self.behaviour == "readable":
+            return [
+                {
+                    "key": "readable",
+                    "niche": self.niche.key,
+                    "configuration": self.prose["configuration"],
+                }
+            ]
+        return self.verbs
+
+    @property
+    def contributor_data(self):
+        return self.contributors or [
+            {
+                "key": self.niche.key,
+                "name": self.niche_name,
+                "behaviours": [self.behaviour],
+            }
+        ]
+
+    @property
+    def behaviour_keys(self):
+        return [self.lifecycle, *(entry["key"] for entry in self.verb_data)]
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

@@ -333,6 +333,11 @@ class Suite:
         self.command("alice", "+workshop/catalog", "Weaver.*Scribe|Scribe.*Weaver")
         self.command("alice", "+workshop/unlock weaving=timber:3", "Unlocked Weaver")
         self.command("alice", "+craft/new weaving/wearable = live crafted cloak", "draft saved")
+        self.command(
+            "alice",
+            "+craft/verb writing/readable",
+            "That lifecycle and verb combination is unavailable",
+        )
         self.command("alice", "+craft/desc = A cloak made for the live market.", "draft saved")
         self.command("alice", "+craft/line = a bright woven cloak", "draft saved")
         self.command("alice", "+craft/aura = soft ember sparks", "draft saved")
@@ -370,6 +375,15 @@ class Suite:
         self.command("alice", "+craft/text = A record of the market road.", "draft saved")
         self.command("alice", "+craft/resources = timber:1", "draft saved")
         self.command("alice", "+craft/finish", "You craft live field notes")
+        self.command("alice", "read live field notes", "record of the market road")
+        book = next(
+            row for row in self.state()["crafts"] if row["prose"]["name"] == "live field notes"
+        )
+        assert book["behaviour"] == "carried"
+        self.command(
+            "staff", f"+crafting/review {book['id']}", "Lifecycle: carried; verbs:.*readable"
+        )
+        self.session.host.reload()
         self.command("alice", "read live field notes", "record of the market road")
         self.command("staff", "+crafting/review", "live field notes")
         self.command("alice", "+workshop/abandon weaving", "not refunded")
