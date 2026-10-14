@@ -239,6 +239,76 @@ class TestAdmissions(AdmissionFixture, EvenniaTest):
         self.assertEqual(application.status, "pending")
 
 
+@override_settings(JOBS_REQUEST_FORMS=FORMS)
+class TestSeatCount(AdmissionFixture, EvenniaTest):
+    """Seat counting queries the database instead of loading every account."""
+
+    @staticmethod
+    def reference_count():
+        from evennia_links.guests import is_guest
+        from evennia_moderation.models import RetiredSeat
+        from evennia_moderation.policy import staff_account
+
+        retired = set(RetiredSeat.objects.values_list("account_id", flat=True))
+        approved = sum(
+            1
+            for account in AccountDB.objects.all()
+            if account.pk not in retired and not is_guest(account) and not staff_account(account)
+        )
+        pending = Application.objects.filter(status="pending", expires_at__gt=timezone.now())
+        return approved + pending.count()
+
+    def add_accounts(self, prefix, count, permissions=("Player",)):
+        for i in range(count):
+            create_account(f"{prefix}{i}", "", PASSWORD, permissions=list(permissions))
+
+    def test_count_matches_account_and_permission_semantics(self):
+        for name, permissions in [
+            ("PlainPlayer", ["Player"]),
+            ("HelperPlayer", ["Helper"]),
+            ("BuilderStaff", ["Builder"]),
+            ("PluralStaff", ["Builders"]),
+            ("AdminStaff", ["Admin"]),
+            ("DeveloperStaff", ["Developer"]),
+            ("CustomModerator", ["Moderator"]),
+            ("GuestPermission", ["Guests"]),
+            ("NoPermission", []),
+        ]:
+            create_account(name, "", PASSWORD, permissions=permissions)
+        quelled = create_account("QuelledStaff", "", PASSWORD, permissions=["Builder"])
+        quelled.db._quell = True
+        superuser = create_account("OtherSuperuser", "", PASSWORD, permissions=["Player"])
+        superuser.is_superuser = True
+        superuser.save()
+        create_account("SecondGuest", "", PASSWORD, typeclass=DefaultGuest, permissions=["Guests"])
+        retired = create_account("RetiredPlayer", "", PASSWORD, permissions=["Player"])
+        admissions.retire_seat(self.char1, retired)
+        AccountDB.objects.filter(username="PlainPlayer").update(is_active=False)
+        self.apply()
+        for permission in ("Builder", "Builders", "Admin", "Helper", "Player", "Moderator"):
+            with (
+                self.subTest(permission=permission),
+                override_settings(MODERATION_STAFF_PERMISSION=permission),
+            ):
+                self.assertEqual(admissions.seat_count(), self.reference_count())
+
+    def test_query_count_does_not_grow_with_accounts(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self.add_accounts("Player", 3)
+        self.add_accounts("Staff", 2, permissions=("Builder",))
+        with CaptureQueriesContext(connection) as small:
+            admissions.seat_count()
+        self.add_accounts("MorePlayer", 25)
+        self.add_accounts("MoreStaff", 5, permissions=("Admin",))
+        with CaptureQueriesContext(connection) as large:
+            admissions.seat_count()
+        self.assertEqual(len(large), len(small))
+        self.assertLessEqual(len(large), 5)
+        self.assertEqual(admissions.seat_count(), self.reference_count())
+
+
 @override_settings(
     JOBS_REQUEST_FORMS=FORMS, MODERATION_REFERRAL_ALLOWANCE=1, MODERATION_REFERRAL_MODE="required"
 )

@@ -75,6 +75,38 @@ class TestModerationSeams(EvenniaCommandTest):
         self.assertIsInstance(CharacterCmdSet().get("+mute"), CmdMute)
         self.assertEqual(CharacterCmdSet().get("+ignore").key, "+ignore")
 
+    def test_capped_apply_counts_seats_with_host_guest_and_plural_staff(self):
+        from commands.guests import GuestCharacterCmdSet
+        from evennia.accounts.models import AccountDB
+        from evennia.utils.create import create_account, create_object
+        from typeclasses.accounts import Guest
+
+        from evennia_links.guests import is_guest
+        from evennia_moderation import admissions
+        from evennia_moderation.policy import staff_account
+
+        guest_account = create_account(
+            "CapGuest", "", "temporary-passphrase-528", typeclass=Guest, permissions=["Guests"]
+        )
+        create_account("CapStaff", "", "temporary-passphrase-528", permissions=["Builders"])
+        create_account("CapPlayer", "", "temporary-passphrase-528", permissions=["Player"])
+        expected = sum(
+            1
+            for account in AccountDB.objects.all()
+            if not is_guest(account) and not staff_account(account)
+        )
+        self.assertEqual(admissions.seat_count(), expected)
+        guest = create_object(Character, key="Cap guest")
+        guest.account = guest_account
+        guest_account.characters.add(guest)
+        guest.tags.add("character", category="guest")
+        with override_settings(MODERATION_PLAYER_CAP=expected):
+            self.call(
+                GuestCharacterCmdSet().get("+apply"), "", "The game is at capacity", caller=guest
+            )
+        guest.delete()
+        guest_account.delete()
+
     def test_staff_commands_are_listed_in_help_only_for_moderation_staff(self):
         from commands.default_cmdsets import CharacterCmdSet
         from evennia.commands.default.help import CmdHelp

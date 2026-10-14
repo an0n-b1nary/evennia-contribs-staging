@@ -52,7 +52,7 @@ The repo is being populated incrementally. The full anticipated slate, grouped b
 - `evennia-maps` (game_systems) — a 2D coordinate map of your rooms, auto-grown from canonical exits, with a BFS reflow engine, an SVG + Leaflet web map, and a signal seam other contribs light overlays through
 - `evennia-rptracker` (game_systems) — pose tracking and RP session recording
 - `evennia-jobs` (game_systems) — staff job-request workflow with anti-favoritism patterns
-- [`evennia-moderation`](contribs/game_systems/evennia_moderation/README.md) (game_systems) — preview 0.1.0; account-wide timed bans and mutes, private staff notes, audited bans, and reviewed guest admissions with seat reservations and referral codes
+- [`evennia-moderation`](contribs/game_systems/evennia_moderation/README.md) (game_systems) — preview 0.1.1; account-wide timed bans and mutes, private staff notes, audited bans, and reviewed guest admissions with seat reservations and referral codes
 - [`evennia-building`](contribs/game_systems/evennia_building/README.md) (game_systems) — preview 0.3.0; reviewed public frontier and mixed settlements, exact contributor and recipient agreements, individual home ownership, apartment passage, stewardship and safe retirement; depends only on links, with optional maps, regions, jobs, economy and social
 - `evennia-lore` (game_systems) — wiki-style knowledge entries with approval queue, version history, region-weighted passive discovery
 - `evennia-xp` (game_systems) — pluggable XP collection, login summaries, projected earnings and atomic spending/refunds (preview 0.4.0)
