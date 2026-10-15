@@ -1,0 +1,184 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+"""Wave-three services and Companions under real reference-game partners."""
+
+from unittest import skipUnless
+from unittest.mock import patch
+
+from django.apps import apps
+from django.core.management import call_command
+from evennia.objects.models import ObjectDB
+from evennia.objects.objects import DefaultCharacter
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+from evennia_rp_crafting import companions, modifiers, services
+from evennia_rp_crafting.models import ActivationUse, CompanionState, ModificationLayer
+from evennia_rp_crafting.test_wave_three import WaveThreeFixture
+from evennia_rp_crafting.wave_two import activate
+from typeclasses.characters import Character
+from typeclasses.objects import Object
+from typeclasses.rooms import Room
+
+
+class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
+    character_typeclass = Character
+    room_typeclass = Room
+
+    @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+    def test_ordinary_and_market_handoffs_update_companion_owner(self):
+        from evennia_economy.exchange import accept_offer, create_offer, give
+
+        pet = self.pet()
+        with self.captureOnCommitCallbacks(execute=True):
+            give(self.char1, self.char2, [{"kind": "item", "key": str(pet.pk), "quantity": 1}])
+        self.assertEqual(CompanionState.objects.get(item=pet).owner_id, self.char2.pk)
+        with self.captureOnCommitCallbacks(execute=True):
+            offer = create_offer(
+                self.char2,
+                self.char1,
+                [{"kind": "item", "key": str(pet.pk), "quantity": 1}],
+                [{"kind": "money", "key": "", "quantity": 10}],
+            )
+            accept_offer(self.char1, offer.pk)
+        self.assertEqual(CompanionState.objects.get(item=pet).owner_id, self.char1.pk)
+        self.assertEqual(CompanionState.objects.get(item=pet).mode, "stay")
+        from evennia_economy.stalls import buy, claim, list_stock
+
+        self.room1.tags.add("market", category="rp_economy")
+        store = claim(self.char1)
+        with self.captureOnCommitCallbacks(execute=True):
+            listing = list_stock(
+                self.char1, store.pk, [{"kind": "item", "key": str(pet.pk), "quantity": 1}], 10
+            )
+        with self.captureOnCommitCallbacks(execute=True):
+            buy(self.char2, listing.pk)
+        self.assertEqual(CompanionState.objects.get(item=pet).owner_id, self.char2.pk)
+        self.assertEqual(pet.home, self.char2)
+
+    @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+    def test_plain_objects_and_character_marks_render_without_base_edits(self):
+        item = create_object(Object, key="a plain heirloom", location=self.char2)
+        item.db.desc = "An old heirloom."
+        offer = self.offer(target=item)
+        modifiers.accept(self.char2, offer.pk)
+        self.assertEqual(item.db.desc, "An old heirloom.")
+        self.assertIn("A silver shimmer.", item.return_appearance(self.char1))
+        mark = self.offer(target=self.char2, modifier_key="modifier_mark")
+        modifiers.accept(self.char2, mark.pk)
+        self.char2.db.desc = "A newly written description."
+        self.assertIn("A silver shimmer.", self.char2.get_display_desc(self.char1))
+
+    @skipUnless(
+        apps.is_installed("evennia_economy") and apps.is_installed("evennia_rp_equipment"),
+        "Equipment/Economy absent",
+    )
+    def test_worn_plain_gear_keeps_requirements_and_sealed_prose(self):
+        from evennia_rp_equipment.typeclasses import Equipment
+
+        item = create_object(Equipment, key="an heirloom cloak", location=self.char2)
+        item.db.desc = "Original cloak prose."
+        item.worn_line = "a blue cloak"
+        item.requirement_data = []
+        item.sealed = True
+        item.tags.add("worn", category="rp_equipment")
+        offer = self.offer(target=item)
+        modifiers.accept(self.char2, offer.pk)
+        self.assertTrue(item.sealed)
+        self.assertEqual(item.requirement_data, [])
+        self.assertEqual(item.db.desc, "Original cloak prose.")
+        self.assertIn("A silver shimmer", self.char2.get_display_desc(self.char1))
+
+    @skipUnless(apps.is_installed("evennia_scenes"), "Scenes absent")
+    def test_owner_pose_is_logged_and_updates_owner_pose_state(self):
+        from evennia_scenes.models import LogEntry, Scene
+
+        scene = Scene.objects.create(title="A bird's greeting", room=self.room1, creator=self.char1)
+        self.room1.active_scene_id = scene.pk
+        pet = self.pet()
+        companions.pose(self.char1, pet, "bows politely.")
+        self.assertEqual(self.char1.last_pose_text, "a brass bird bows politely.")
+        log = LogEntry.objects.get(scene=scene)
+        self.assertEqual(log.author_id, self.char1.pk)
+        self.assertEqual(log.log_type, "emit")
+
+    @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility absent")
+    def test_trick_output_is_muted_ignored_and_never_owner_activity(self):
+        from evennia_rp_crafting.models import NicheDefinition
+
+        NicheDefinition.objects.create(
+            key="music",
+            name="Artisan",
+            behaviours=["activatable"],
+            input_categories=["materials"],
+            unlock_resources={"materials": 3},
+            unlock_money=0,
+        )
+        self.unlock("music")
+        pet = services.craft(
+            self.char1,
+            "pets",
+            "companion",
+            "a trick bird",
+            "A brass bird.",
+            {},
+            {"wood": 2},
+            verbs=[
+                {
+                    "key": "activatable",
+                    "niche": "music",
+                    "configuration": {"modes": {"bow": ["The bird bows."]}},
+                }
+            ],
+        )
+        companions.set_mode(self.char1, pet, "stay")
+        self.account2.db.ignore_list = [self.account.pk]
+        before = self.char1.last_pose_time
+        received = []
+        with (
+            patch.object(
+                DefaultCharacter,
+                "msg",
+                lambda target, text=None, **kwargs: received.append((target.pk, text)),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            activate(self.char1, pet, "bow")
+        self.assertFalse(any(target == self.char2.pk for target, _ in received))
+        self.assertFalse(pet.access(self.char2, "view"))
+        self.assertEqual(self.char1.last_pose_time, before)
+        self.assertEqual(ActivationUse.objects.count(), 1)
+
+    @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility absent")
+    def test_ambients_pause_offline_and_during_real_fights(self):
+        pet = self.pet(ambient="A brass feather clicks.")
+        companions.set_mode(self.char1, pet, "stay")
+        with patch.object(
+            DefaultCharacter, "has_account", new_callable=lambda: property(lambda obj: False)
+        ):
+            self.assertEqual(companions.ambient_tick(), 0)
+        if apps.is_installed("evennia_rp_combat"):
+            from evennia_rp_combat.models import Fight
+
+            fight = Fight.objects.create(room=self.room1, status=Fight.OPEN, state={})
+            self.assertEqual(companions.ambient_tick(), 0)
+            fight.status = Fight.ENDED
+            fight.save(update_fields=["status"])
+        self.assertEqual(companions.ambient_tick(), 1)
+        self.assertEqual(companions.ambient_tick(), 0)
+
+
+class WaveThreeSeedSeams(EvenniaTest):
+    def test_seed_exposes_companion_and_modifier_and_reseed_keeps_history(self):
+        from world.sandbox import crafting
+
+        call_command("seed_sandbox", verbosity=0)
+        pet = ObjectDB.objects.get(db_key=crafting.COMPANION_NAME)
+        record = pet.craft_record
+        self.assertEqual(CompanionState.objects.get(item=pet).mode, "stay")
+        if apps.is_installed("evennia_economy"):
+            self.assertTrue(ModificationLayer.objects.exists())
+        call_command("seed_sandbox", verbosity=0)
+        self.assertEqual(ObjectDB.objects.filter(db_key=crafting.COMPANION_NAME).count(), 1)
+        from evennia_rp_crafting.models import CraftRecord
+
+        self.assertTrue(CraftRecord.objects.filter(pk=record.pk).exists())

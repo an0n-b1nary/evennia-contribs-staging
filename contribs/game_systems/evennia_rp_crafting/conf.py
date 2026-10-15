@@ -14,6 +14,12 @@ DEFAULT_BEHAVIOURS = {
     "broadcast": "evennia_rp_crafting.behaviours.Broadcast",
     "installable": "evennia_rp_crafting.wave_two.Installable",
     "activatable": "evennia_rp_crafting.wave_two.Activatable",
+    "companion": "evennia_rp_crafting.companions.Companion",
+    "modifier_aura": "evennia_rp_crafting.modifiers.Modifier",
+    "modifier_mark": "evennia_rp_crafting.modifiers.Mark",
+    "modifier_dye": "evennia_rp_crafting.modifiers.Dye",
+    "modifier_engrave": "evennia_rp_crafting.modifiers.Engrave",
+    "modifier_undo": "evennia_rp_crafting.modifiers.Undo",
 }
 # Each entry is a complete verb set, not independently composable permissions.
 DEFAULT_COMBINATIONS = {
@@ -22,8 +28,15 @@ DEFAULT_COMBINATIONS = {
     "installable": [[], ["activatable"], ["readable"], ["readable", "activatable"]],
     "consumable": [[]],
     "broadcast": [[]],
+    "companion": [[], ["activatable"]],
 }
 DEFAULT_COSTS = {
+    "companion": {"base": {"materials": 1}, "ambient": {"essences": 1}},
+    "modifier_aura": {"base": {"essences": 1}},
+    "modifier_mark": {"base": {"essences": 1}},
+    "modifier_dye": {"base": {"materials": 1}},
+    "modifier_engrave": {"base": {"materials": 1}},
+    "modifier_undo": {"base": {"essences": 1}},
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},
     "readable": {"base": {"materials": 1}},
     "consumable": {"base": {"provisions": 1}, "extra_beat": {"provisions": 1}},
@@ -57,6 +70,7 @@ def register_controls():
     for name, default, validator in (
         ("REVEALED", True, boolean),
         ("WAVE_TWO_REVEALED", True, boolean),
+        ("WAVE_THREE_REVEALED", True, boolean),
         ("FROZEN", False, boolean),
         ("NICHE_CAP", 5, positive),
         ("UNLOCK_STEP", 1, nonnegative),
@@ -94,7 +108,13 @@ def wave_two_visible(character):
 
 
 def component_visible(character, key):
+    if key == "companion" or key.startswith("modifier_"):
+        return wave_three_visible(character)
     return key not in ("installable", "activatable") or wave_two_visible(character)
+
+
+def wave_three_visible(character):
+    return visible(character) and (get("RP_CRAFTING_WAVE_THREE_REVEALED") or is_staff(character))
 
 
 def multiplier(position):

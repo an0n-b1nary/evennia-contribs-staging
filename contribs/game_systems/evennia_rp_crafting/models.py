@@ -179,3 +179,48 @@ class ActivationUse(models.Model):
     mode = models.SlugField(max_length=40)
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ModificationOffer(models.Model):
+    """An exact, unreserved service proposal; Economy owns external acceptance."""
+
+    maker_id = models.PositiveBigIntegerField()
+    customer_id = models.PositiveBigIntegerField()
+    target_id = models.PositiveBigIntegerField()
+    room_id = models.PositiveBigIntegerField()
+    niche = models.ForeignKey(NicheDefinition, on_delete=models.PROTECT)
+    modifier = models.SlugField(max_length=80)
+    configuration = models.JSONField(default=dict)
+    snapshot = models.JSONField(default=dict)
+    resources = models.JSONField(default=dict)
+    category_cost = models.JSONField(default=dict)
+    commission = models.PositiveBigIntegerField(default=0)
+    craft_fee = models.PositiveBigIntegerField(default=0)
+    economy_offer_id = models.PositiveBigIntegerField(null=True, unique=True)
+    expires_at = models.DateTimeField()
+    applied_at = models.DateTimeField(null=True)
+    cancelled_at = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ModificationLayer(models.Model):
+    """Authored layers survive edits to the base and keep their own provenance."""
+
+    target_id = models.PositiveBigIntegerField(db_index=True)
+    service = models.OneToOneField(ModificationOffer, on_delete=models.PROTECT)
+    kind = models.SlugField(max_length=80)
+    text = models.TextField()
+    maker_id = models.PositiveBigIntegerField()
+    hallmark = models.TextField()
+    hidden = models.BooleanField(default=False)
+    removed_by = models.OneToOneField(
+        ModificationOffer, null=True, on_delete=models.PROTECT, related_name="removed_layer"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class CompanionState(models.Model):
+    item = models.OneToOneField("objects.ObjectDB", on_delete=models.CASCADE)
+    owner_id = models.PositiveBigIntegerField(db_index=True)
+    mode = models.CharField(max_length=10, default="stay")
+    last_emitted = models.DateTimeField(null=True)

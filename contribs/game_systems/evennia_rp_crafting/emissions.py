@@ -15,10 +15,12 @@ def frame(text):
     return getattr(settings, "RP_CRAFTING_EVENT_FRAME", "<EVENT> {text}").format(text=text)
 
 
-def emit(room_id, actor_id, message, *, ambient=False):
+def emit(room_id, actor_id, message, *, ambient=False, wave_three=False):
     if (
         not get("RP_CRAFTING_REVEALED")
-        or not get("RP_CRAFTING_WAVE_TWO_REVEALED")
+        or not get(
+            "RP_CRAFTING_WAVE_THREE_REVEALED" if wave_three else "RP_CRAFTING_WAVE_TWO_REVEALED"
+        )
         or get("RP_CRAFTING_FROZEN")
     ):
         return

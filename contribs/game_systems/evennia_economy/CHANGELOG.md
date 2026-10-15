@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 - 2026-10-14
+
+- Let optional asset providers acquire host ownership locks before exchange character locks, so atomic crafting services follow the same lock order as property transfer. Existing providers remain unchanged.
+
 ## 0.3.0 — 2026-10-13
 
 - Add property-bound shops, explicit stock disposition on transfer, archive suspension and reconciliation.

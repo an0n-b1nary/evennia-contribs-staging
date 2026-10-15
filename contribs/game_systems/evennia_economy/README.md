@@ -330,3 +330,8 @@ Refuse asset exchanges involving guests; reward eligibility follows the guest-sa
 Guest identity comes from `evennia_links.guests.is_guest`, using the actual
 account typeclass and playable ownership rather than a hierarchical Guest
 permission check. See the reference game for restricted command composition.
+
+Asset providers may implement `lock_context(giver, recipient, key, quantity)`
+to acquire host ownership locks before exchange character/item locks. This hook
+only acquires locks; provider checks must still revalidate authority and terms
+inside acceptance. Crafting uses it for services on installed property fixtures.

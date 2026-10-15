@@ -45,6 +45,20 @@ class OfferAssets:
     """Collector sender, with no import dependency on optional asset packages."""
 
 
+def lock_provider_context(giver, recipient, spec):
+    """Optional host/property locks precede Economy's character and asset locks.
+
+    Providers must acquire locks only: acceptance still rechecks all authority
+    and terms after locking the offer and characters. Providers sharing a host
+    lock domain must use the same order as that host's transfer services.
+    """
+    available = providers(giver, recipient)
+    for asset in spec:
+        provider = available.get(asset["kind"])
+        if provider is not None and hasattr(provider, "lock_context"):
+            provider.lock_context(giver, recipient, asset["key"], asset["quantity"])
+
+
 def normalize(spec):
     if not isinstance(spec, list) or len(spec) > 100:
         raise EconomyError("Supply a list of at most 100 assets.")
