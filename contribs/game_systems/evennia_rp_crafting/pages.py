@@ -91,11 +91,16 @@ def read(actor, item, number=None, *, table=False):
     bookmark_key = f"craft_{record.pk}"
     if number is None:
         number = actor.attributes.get(bookmark_key, category=BOOKMARK_CATEGORY, default=1)
+        # A custom provider may now return fewer pages; restart, don't strand.
+        if type(number) is not int or not 1 <= number <= len(pages):
+            number = 1
     try:
         page = page_at(pages, number)
     except ValueError as exc:
         raise CraftingError(str(exc)) from None
-    actor.attributes.add(bookmark_key, number, category=BOOKMARK_CATEGORY)
+    # Single-page books have nothing to resume, so they never store progress.
+    if len(pages) > 1:
+        actor.attributes.add(bookmark_key, number, category=BOOKMARK_CATEGORY)
     # Retain the original single-text read output exactly.
     if len(pages) == 1 and not page.title:
         return page.text

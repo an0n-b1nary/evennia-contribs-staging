@@ -66,6 +66,20 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
         key = f"craft_{book.craft_record.pk}"
         self.assertEqual(self.char1.attributes.get(key, category=BOOKMARK_CATEGORY), 2)
 
+    def test_single_page_reads_store_nothing_and_stale_bookmarks_restart(self):
+        single = self.book()
+        self.assertEqual(single.read(self.char1), "A record of the road.")
+        self.assertFalse(
+            self.char1.attributes.has(f"craft_{single.craft_record.pk}", category=BOOKMARK_CATEGORY)
+        )
+        book = self.paged_book()
+        read(self.char1, book, 2)
+        with override_settings(
+            RP_CRAFTING_BEHAVIOURS=conf.DEFAULT_BEHAVIOURS | {"readable": RedactedReadable}
+        ):
+            self.assertEqual(book.read(self.char1), "Only this text is public.")
+        self.assertIn("Page 2 of 2", book.read(self.char1))
+
     def test_contents_and_invalid_or_denied_reads_do_not_advance_bookmark(self):
         book = self.paged_book()
         self.assertEqual(
@@ -190,6 +204,7 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdRead(), "chapter 2", "chapter 2\nPage 1 of 2: Departure")
         self.call(CmdRead(), "chapter 2 = 2", "chapter 2\nPage 2 of 2: Arrival")
         self.call(CmdRead(), "chapter 2 = 0", "Choose a page from 1 to 2.")
+        self.call(CmdRead(), "chapter ²", "Could not find")
         book.move_to(self.room2, quiet=True)
         self.call(CmdRead(), "chapter 2", "Could not find")
         self.obj1.db.pages = PAGES

@@ -465,7 +465,7 @@ class CmdRead(_CraftCommand):
             # Try the whole name first so names ending in numbers still work.
             matches = self.caller.search(name, candidates=candidates, quiet=True)
             tail = name.rsplit(" ", 1)
-            if not matches and not switch and len(tail) == 2 and tail[1].lstrip("-").isdigit():
+            if not matches and not switch and len(tail) == 2 and tail[1].lstrip("-").isdecimal():
                 name, number = tail[0], int(tail[1])
         item = self.caller.search(name, candidates=candidates)
         if item is None:

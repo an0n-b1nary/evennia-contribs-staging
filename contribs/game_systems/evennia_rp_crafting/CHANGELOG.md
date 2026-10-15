@@ -4,6 +4,7 @@
 
 - Readables support immutable authored pages, optional titles, contents and
   persistent personal bookmarks through the shared Links pagination helpers.
+  Only multi-page books store bookmarks; a stale bookmark restarts at page 1.
 - Add draft `/page` and `/unpage`, explicit page breaks in `/text`, and numbered
   reads. Each additional page has a configurable material cost; total readable
   text remains bounded. Original single-text books retain their output and cost.

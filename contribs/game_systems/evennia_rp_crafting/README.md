@@ -68,7 +68,9 @@ for item names ending in numbers: exact whole-name matches take precedence.
 `read <item>` resumes the last page read by that character, initially page 1.
 Progress is stored in character Attributes under category
 `rp_crafting_reading`, keyed by immutable craft ID, so renames and transfers do
-not mix different books or readers. View and read locks apply to contents too;
+not mix different books or readers. Only books with more than one page store
+progress, and a bookmark past a custom provider's current last page restarts at
+page 1. View and read locks apply to contents too;
 commands search only carried items and the current room. Contents reads and
 failed reads do not change progress. Single-page untitled books preserve their
 original read output, and pre-existing text is never reinterpreted as pages.
