@@ -12,7 +12,7 @@ from django.test import override_settings
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
 
-from .commands import CmdForget
+from .commands import CmdForget, CmdLore
 from .item_commands import CmdLoreCraft, CmdReadTome, CmdTome
 from .items import LoreItemError, create_tome
 from .models import LoreAcquisition, LoreEntry, LoreTomeRecord
@@ -107,6 +107,29 @@ class TomeTests(EvenniaCommandTest):
         self.call(CmdReadTome(), "Chronicle 2", "Chronicle 2\nPage 1 of 2: One")
         self.call(CmdReadTome(), "Chronicle 2 = 2", "Chronicle 2\nPage 2 of 2: Two")
         self.call(CmdReadTome(), "/contents Chronicle 2", "Chronicle 2\nContents (2 pages)")
+
+    def test_object_tag_authority_requires_control_of_target(self):
+        lore = entry(self.char2, "A personal account")
+        self.obj1.locks.add("control:false()")
+        self.call(
+            CmdLore(),
+            f"/object #{lore.entry_number}={self.obj1.key}",
+            "Only staff or an object controller",
+            caller=self.char2,
+        )
+        self.assertFalse(lore.objects_tagged.exists())
+        self.obj1.locks.add(f"control:id({self.char2.pk})")
+        self.call(
+            CmdLore(), f"/object #{lore.entry_number}={self.obj1.key}", "Tagged", caller=self.char2
+        )
+        self.obj1.locks.add("control:false()")
+        self.call(
+            CmdLore(),
+            f"/unobject #{lore.entry_number}={self.obj1.key}",
+            "Only staff or an object controller",
+            caller=self.char2,
+        )
+        self.assertTrue(lore.objects_tagged.exists())
 
     def test_failed_bookmark_write_rolls_back_tome_acquisition(self):
         book = self.tome()

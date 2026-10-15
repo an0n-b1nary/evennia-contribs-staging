@@ -15,8 +15,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add fixed staff LoreTomes and persistent authoring drafts without requiring
   crafting. Successful reads grant knowledge; previews, contents, custom
   redaction, failed reads and inspection never grant knowledge or XP.
-- Preserve shipped history with an additive migration, and exercise real host
-  and absent-partner seams.
+- Limit object lore tagging to staff or controllers, preserve shipped history
+  with an additive migration, and exercise real host and absent-partner seams.
 - Journal revision citations and citation-preserving editions remain a separate
   bridge; these features do not yet extend to owner-written journals or copies.
 

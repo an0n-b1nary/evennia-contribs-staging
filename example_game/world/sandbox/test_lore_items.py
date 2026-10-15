@@ -7,7 +7,7 @@ from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
 from evennia_lore.item_commands import CmdTome
-from evennia_lore.models import LoreAcquisition, LoreTomeRecord
+from evennia_lore.models import LoreAcquisition, LoreEntry, LoreTomeRecord
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
@@ -42,6 +42,18 @@ class LoreItemSeams(EvenniaCommandTest):
             self.assertIn("familiar sign", book.get_display_desc(self.char2))
         self.assertIn("+tome", {row.key for row in CharacterCmdSet().commands})
         self.assertFalse(CmdTome().access(self.char2))
+        own_entry = LoreEntry.create_entry(
+            "A visitor's account", self.char2, body="A visit to the market."
+        )
+        tome.locks.add("control:false()")
+        lore_command = type(next(row for row in CharacterCmdSet().commands if row.key == "+lore"))
+        self.call(
+            lore_command(),
+            f"/object #{own_entry.entry_number}={tome.key}",
+            "Only staff or an object controller",
+            caller=self.char2,
+        )
+        self.assertFalse(own_entry.objects_tagged.exists())
 
     def test_reseed_keeps_published_tome_history_and_replaces_the_visible_book(self):
         call_command("seed_sandbox", verbosity=0)
