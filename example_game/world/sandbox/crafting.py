@@ -8,6 +8,14 @@ BOOK_TEXT = "Field notes: the market opens onto the common road."
 CLOAK_NAME = "a sample woven cloak"
 CLOAK_DESC = "A grey cloak with a simple woven border."
 CLOAK_LINE = "a grey cloak with a woven border"
+LUTE_NAME = "a sample carved lute"
+LUTE_DESC = "A small lute carved from pale wood."
+LUTE_MODE = "A bright melody rings from the little lute."
+FIXTURE_NAME = "a sample brass lantern"
+FIXTURE_DESC = "A brass lantern with a beeswax candle."
+FIXTURE_LINE = "Warm lamplight falls across the market stalls."
+FIXTURE_SMELL = "A faint scent of beeswax."
+FIXTURE_SOUND = "The soft hiss of a candlewick."
 
 
 def catalog():
@@ -34,11 +42,27 @@ def catalog():
             "name": name,
             "description": description,
             "behaviours": [behaviour],
-            "input_categories": [category],
+            "input_categories": [category, "essences"]
+            if key in ("music", "decoration")
+            else [category],
             "unlock_money": 100,
             "unlock_resources": {category: 3},
         }
         for key, name, description, behaviour, category in (
+            (
+                "music",
+                "Artisan",
+                "Instruments, games and flavour readings.",
+                "activatable",
+                "materials",
+            ),
+            (
+                "decoration",
+                "Decorator",
+                "Fixtures and sensory room layers.",
+                "installable",
+                "materials",
+            ),
             ("cooking", "Cook", "Food, drinks and cosmetic tonics.", "consumable", "provisions"),
             (
                 "illusions",

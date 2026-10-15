@@ -453,6 +453,80 @@ class Suite:
         self.command("bob", "laboratory", "laboratory")
         self.command("staff", "+runtime/reset RP_CRAFTING_EVENT_ROOM_COOLDOWN", "30")
 
+    def wave_two(self):
+        import time
+
+        self.command("staff", "+runtime RP_CRAFTING_EVENT_ROOM_COOLDOWN=1", "1")
+        self.command("staff", "+runtime RP_CRAFTING_ACTIVATION_ITEM_COOLDOWN=86400", "86400")
+        alice_id = self.state()["actors"]["alice"]["id"]
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=timber,50,Wave two", "Resources updated"
+        )
+        self.command("staff", f"+economy/credit #{alice_id}=1000,Wave two", "Purse updated")
+        active = sum(
+            row["workshop__character_id"] == alice_id and row["abandoned_at"] is None
+            for row in self.state()["crafting_niches"]
+        )
+        self.command(
+            "alice", f"+workshop/unlock music=timber:{3 * (active + 1)}", "Unlocked Artisan"
+        )
+        self.command(
+            "alice", f"+workshop/unlock decoration=timber:{3 * (active + 2)}", "Unlocked Decorator"
+        )
+        for command in (
+            "+craft/new music/activatable = live carved lute",
+            "+craft/desc = A small carved lute.",
+            "+craft/mode play = A bright wave-two melody rings out.",
+            "+craft/resources = timber:1",
+        ):
+            self.command("alice", command, "draft saved")
+        self.command("alice", "+craft/finish", "You craft live carved lute")
+        time.sleep(1.1)
+        result = self.command("alice", "use live carved lute=play", "You use")
+        assert "wave-two melody" in self.observer(result)
+        self.command("alice", "use live carved lute=play", "Wait a moment")
+        self.session.host.reload()
+        self.command("alice", "use live carved lute=play", "Wait a moment")
+        self.command("alice", "live supply shop")
+        self.command("bob", "live supply shop")
+        self.command("alice", "+roomconfig/smell Cool stone.", "Room smell set")
+        for command in (
+            "+craft/new decoration/installable = live music lantern",
+            "+craft/desc = A lantern with a musical crank.",
+            "+craft/room_line = Warm amber lamplight fills the shop.",
+            "+craft/smell = A faint beeswax scent.",
+            "+craft/sound = A candlewick hisses.",
+            "+craft/verb music/activatable",
+            "+craft/mode turn = The lantern plays a gentle tune.",
+            "+craft/resources = timber:2",
+        ):
+            self.command("alice", command, "draft saved")
+        self.command("alice", "+craft/finish", "You craft live music lantern")
+        self.command("alice", "+fixture/decorate live music lantern=120", "Temporary layer")
+        layer = self.state()["temporary_layers"][-1]
+        self.command("alice", f"+fixture/clear {layer['id']}", "cleared")
+        self.command("alice", "+fixture/install live music lantern", "Installed")
+        self.command("alice", "look", "Warm amber lamplight")
+        self.command("bob", "+smell", "Cool stone.*beeswax")
+        self.command("bob", "+listen", "candlewick")
+        result = self.command("bob", "use live music lantern=turn", "You use")
+        assert "gentle tune" in self.observer(result)
+        self.command("bob", "+fixture/uninstall live music lantern", "Only the property owner")
+        self.command(
+            "bob",
+            "get live music lantern",
+            "fixture is installed|cannot|can't|could not|Unable|You can't",
+        )
+        self.session.host.reload()
+        self.command("alice", "+fixture", "live music lantern.*installed")
+        self.command("alice", "+fixture/uninstall live music lantern", "Uninstalled")
+        assert not self.state()["fixture_installations"][-1]["active"]
+        assert any(row["mode"] == "turn" for row in self.state()["activation_uses"])
+        self.command("alice", "outside")
+        self.command("bob", "outside")
+        self.command("staff", "+runtime/reset RP_CRAFTING_ACTIVATION_ITEM_COOLDOWN", "30")
+        self.command("staff", "+runtime/reset RP_CRAFTING_EVENT_ROOM_COOLDOWN", "30")
+
     def sheets(self):
         self.command("alice", "+stats presence=potato", "unknown|invalid|expected|grade")
         self.command("alice", "+stats/finalize", "Not yet")
@@ -681,6 +755,10 @@ def run_rp(session, smoke=False):
         ),
         ("invested niches, persistent crafts, hallmarks and offline crafted sale", suite.crafting),
         ("consumed EVENTs, adjacent Broadcast mute and durable audience limits", suite.events),
+        (
+            "reusable activations, installed/timed layers, visitor use and owner removal",
+            suite.wave_two,
+        ),
         ("draft validation, allocation and finalization", suite.sheets),
     ]
     if smoke:

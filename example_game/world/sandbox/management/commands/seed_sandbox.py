@@ -169,6 +169,17 @@ class Command(BaseCommand):
                     channel.delete()
 
         objs = search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
+        if apps.is_installed("evennia_rp_crafting") and not dry_run:
+            from django.utils import timezone
+            from evennia_rp_crafting.models import FixtureInstallation, RoomLayer
+
+            demo_ids = [obj.pk for obj in objs]
+            FixtureInstallation.objects.filter(craft__item_id__in=demo_ids, active=True).update(
+                active=False, removed_at=timezone.now()
+            )
+            RoomLayer.objects.filter(craft__item_id__in=demo_ids, cleared_at__isnull=True).update(
+                cleared_at=timezone.now()
+            )
         if apps.is_installed("evennia_economy"):
             # Close demo-owned stalls before rebuilding their owners or market.
             # Player-owned stalls in rooms being rebuilt need explicit staff recovery.
@@ -338,9 +349,12 @@ class Command(BaseCommand):
         counts["map_tiles"] = self._create_map(rooms)
         counts["scratch_tiles"] = self._create_scratch_plane(rooms)
         counts["private_preview_tiles"] = self._create_private_preview(authors)
-        from world.sandbox.building_seed import seed as seed_building
+        from django.apps import apps
 
-        counts.update(seed_building(rooms[content.IC_ENTRY_SLUG]))
+        if apps.is_installed("evennia_building"):
+            from world.sandbox.building_seed import seed as seed_building
+
+            counts.update(seed_building(rooms[content.IC_ENTRY_SLUG]))
         scenes = self._create_scenes(rooms, authors)
         counts["scenes"] = len(scenes)
         counts["overlay_links"] = self._link_overlays(regions, entries, events, scenes)
@@ -385,9 +399,10 @@ class Command(BaseCommand):
                 )
             owner.location = original_room
             counts["stalls"] = 1
-            from world.sandbox.m6 import seed as seed_m6
+            if apps.is_installed("evennia_building") and apps.is_installed("evennia_rp_resources"):
+                from world.sandbox.m6 import seed as seed_m6
 
-            counts.update(seed_m6(market))
+                counts.update(seed_m6(market))
         if apps.is_installed("evennia_rp_crafting"):
             counts.update(self._create_crafting(authors, rooms))
         if apps.is_installed("evennia_npcs"):
@@ -518,9 +533,51 @@ class Command(BaseCommand):
                     {resource: 1},
                 )
             )
+        demo = authors[0]
+        grant(demo, "timber", 20, "staff", note="Sandbox wave-two inputs")
+        if apps.is_installed("evennia_economy"):
+            credit(demo, 500, note="Sandbox wave-two Workshop")
+        unlock(demo, "music", {"timber": 3})
+        unlock(demo, "decoration", {"timber": 6})
+        lute = craft(
+            demo,
+            "music",
+            "activatable",
+            crafting.LUTE_NAME,
+            crafting.LUTE_DESC,
+            {"modes": {"play": [crafting.LUTE_MODE]}},
+            {"timber": 1},
+        )
+        lantern = craft(
+            demo,
+            "decoration",
+            "installable",
+            crafting.FIXTURE_NAME,
+            crafting.FIXTURE_DESC,
+            {
+                "room_line": crafting.FIXTURE_LINE,
+                "smell": crafting.FIXTURE_SMELL,
+                "sound": crafting.FIXTURE_SOUND,
+            },
+            {"timber": 1},
+        )
+        items += [lute, lantern]
         for item in items:
             item.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
-            item.move_to(rooms["market"], quiet=True)
+            if item != lantern:
+                item.move_to(rooms["market"], quiet=True)
+        from evennia_rp_crafting.fixtures import install
+
+        original = demo.location
+        had_builder = demo.permissions.check("Builder")
+        demo.location = rooms["market"]
+        demo.permissions.add("Builder")
+        try:
+            install(demo, lantern, rooms["market"])
+        finally:
+            demo.location = original
+            if not had_builder:
+                demo.permissions.remove("Builder")
         counts["crafted_items"] = len(items)
         return counts
 

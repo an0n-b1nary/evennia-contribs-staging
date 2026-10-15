@@ -36,6 +36,9 @@ class CmdRoomConfig(MuxCommand):
         +roomconfig                         - Show current room settings
         +roomconfig/hangout <type>          - Designate as a hangout
         +roomconfig/hangout/clear           - Remove hangout designation
+        +roomconfig/smell <text>            - Free room sensory prose
+        +roomconfig/sound <text>            - Free room sensory prose
+        An empty smell or sound clears that sensory line.
 
     Valid hangout types: bar, eatery, arena, market, park, temple,
     library, plaza, theater, docks.
@@ -72,6 +75,13 @@ class CmdRoomConfig(MuxCommand):
             self._set_hangout(room)
         elif switches == ["hangout", "clear"] or switches == ["clear", "hangout"]:
             self._clear_hangout(room)
+        elif switches in (["smell"], ["sound"]):
+            text = self.args.strip()
+            if len(text) > 400:
+                caller.msg("Keep room sensory prose to 400 characters.")
+                return
+            room.attributes.add(f"room_{switches[0]}", text)
+            caller.msg(f"Room {switches[0]} {'set' if text else 'cleared'}.")
         else:
             caller.msg(
                 f"|rUnknown switch:|n /{'/'.join(self.switches)}. "
@@ -104,6 +114,10 @@ class CmdRoomConfig(MuxCommand):
             lines.append(" |wHangout:|n None")
 
         mood = getattr(room, "room_mood", "") or ""
+        for sense in ("smell", "sound"):
+            value = room.attributes.get(f"room_{sense}", default="")
+            if value:
+                lines.append(f" |w{sense.capitalize()}:|n {value}")
         if mood:
             setter = getattr(room, "room_mood_setter", None)
             byline = f" |x(set by {setter})|n" if setter else ""

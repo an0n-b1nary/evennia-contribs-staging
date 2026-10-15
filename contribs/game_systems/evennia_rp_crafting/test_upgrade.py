@@ -10,7 +10,7 @@ from django.test import TransactionTestCase
 class CompositionUpgradeTests(TransactionTestCase):
     def test_populated_upgrade_keeps_original_snapshots_and_consumption(self):
         old_target = [("evennia_rp_crafting", "0002_eventroomlimit_eventuse")]
-        new_target = [("evennia_rp_crafting", "0003_composition")]
+        new_target = [("evennia_rp_crafting", "0004_wave_two")]
         executor = MigrationExecutor(connection)
         executor.migrate(old_target)
         try:
@@ -53,6 +53,7 @@ class CompositionUpgradeTests(TransactionTestCase):
             current = CraftRecord.objects.filter(pk=snapshot["id"]).values().get()
             self.assertEqual(current.pop("verbs"), [])
             self.assertEqual(current.pop("contributors"), [])
+            self.assertEqual(current.pop("furnishing_weeks"), 0)
             self.assertEqual(current, snapshot)
         self.assertTrue(EventUse.objects.filter(craft_id=ids[-1]).exists())
         readable = CraftRecord.objects.get(pk=ids[0])

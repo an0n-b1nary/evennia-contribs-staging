@@ -7,10 +7,17 @@ for allowing Characters to traverse the exit to its destination.
 
 """
 
+from django.apps import apps
 from evennia.objects.objects import DefaultExit
-from evennia_building.typeclasses import BuildingExitMixin
 
 from .objects import ObjectParent
+
+if apps.is_installed("evennia_building"):
+    from evennia_building.typeclasses import BuildingExitMixin
+else:
+
+    class BuildingExitMixin:
+        pass
 
 
 class Exit(BuildingExitMixin, ObjectParent, DefaultExit):

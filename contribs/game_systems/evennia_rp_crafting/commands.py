@@ -3,14 +3,17 @@
 """Persistent, editable drafts keep composition separate from the final spend."""
 
 from evennia import CmdSet
-from evennia.commands.default.muxcommand import MuxCommand
 
 from . import conf, services
 from .behaviours import registry
 from .catalog import seed_catalog
+from .command_base import CraftCommand as _CraftCommand
 from .composition import invoke, specifications
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, Workshop
+from .room_commands import CmdFixture as CmdFixture
+from .room_commands import CmdListen as CmdListen
+from .room_commands import CmdSense as CmdSense
 
 DRAFT_KEY = "rp_crafting_draft"
 
@@ -40,24 +43,6 @@ def costs_text(cost):
     return ", ".join(parts)
 
 
-class _CraftCommand(MuxCommand):
-    locks = "cmd:all()"
-    help_category = "Crafting"
-
-    def access(self, srcobj, access_type="cmd", default=False, **kwargs):
-        return super().access(srcobj, access_type, default, **kwargs) and conf.visible(srcobj)
-
-    def func(self):
-        if not conf.visible(self.caller):
-            return
-        try:
-            if len(self.switches) > 1:
-                raise CraftingError("Use one switch at a time.")
-            self.run(self.switches[0] if self.switches else "")
-        except (CraftingError, ValueError) as exc:
-            self.msg(str(exc))
-
-
 class CmdWorkshop(_CraftCommand):
     """Your invested niches and the next unlock's cost.
 
@@ -80,12 +65,18 @@ class CmdWorkshop(_CraftCommand):
             rows = [f"Niches — next unlock position {len(held) + 1}:"]
             implementations = registry()
             for definition in NicheDefinition.objects.filter(archived=False):
+                if not any(
+                    conf.component_visible(self.caller, key) for key in definition.behaviours
+                ):
+                    continue
                 # A stored niche may name a behaviour the host has since
                 # unregistered; list it as unavailable rather than failing.
                 available = [
                     key
                     for key in definition.behaviours
-                    if key in implementations and implementations[key].available()
+                    if key in implementations
+                    and implementations[key].available()
+                    and conf.component_visible(self.caller, key)
                 ]
                 try:
                     cost = costs_text(services.unlock_cost(definition, len(held)))
@@ -147,6 +138,12 @@ class CmdCraft(_CraftCommand):
       +craft/beat = <EVENT prose>  (repeat for up to three beats)
       +craft/unbeat <number>
       +craft/reach = adjacent  (Broadcast; the default)
+      +craft/mode <mode key> = <reading>  (repeat for random readings)
+      +craft/unmode <mode key>
+      +craft/room_line = <room description layer>
+      +craft/smell = <sensory line>
+      +craft/sound = <sensory line>
+      +craft/ambient = <periodic EVENT prose>
       +craft/resources = <resource key>:<quantity>[,...]
       +craft                   preview; consumes nothing
       +craft/finish            pay and create once; clears the draft on success
@@ -167,6 +164,8 @@ class CmdCraft(_CraftCommand):
             from .behaviours import behaviour, text
 
             behaviour(kind)
+            if not conf.component_visible(self.caller, kind):
+                raise CraftingError("That crafting behaviour is unavailable.")
             if kind not in definition.behaviours:
                 raise CraftingError("That niche doesn't grant this behaviour.")
             name = text(self.rhs, "Item name", 80, required=True)
@@ -209,6 +208,8 @@ class CmdCraft(_CraftCommand):
                 key, kind = (value.strip() for value in self.args.split("/", 1))
                 definition = services.niche(key)
                 implementation = registry().get(kind)
+                if not conf.component_visible(self.caller, kind):
+                    raise CraftingError("That crafting behaviour is unavailable.")
                 if implementation is None or not implementation.available():
                     raise CraftingError("That crafting behaviour is unavailable.")
                 if kind not in definition.behaviours:
@@ -224,6 +225,29 @@ class CmdCraft(_CraftCommand):
                 if not any(entry["key"] == kind for entry in entries):
                     raise CraftingError("No such draft verb.")
                 draft["verbs"] = [entry for entry in entries if entry["key"] != kind]
+            elif switch in ("mode", "unmode"):
+                entry = next(
+                    (entry for entry in draft.get("verbs", []) if entry["key"] == "activatable"),
+                    None,
+                )
+                target = entry["configuration"] if entry else draft["configuration"]
+                implementation = registry().get(entry["key"] if entry else draft["behaviour"])
+                if implementation is None or "modes" not in implementation.fields:
+                    raise CraftingError("Add an Activatable verb first.")
+                modes = dict(target.get("modes", {}))
+                key = self.lhs.strip()
+                if switch == "unmode":
+                    if key not in modes:
+                        raise CraftingError("No such draft mode.")
+                    del modes[key]
+                else:
+                    from .wave_two import line
+
+                    if self.rhs is None:
+                        raise CraftingError("Usage: +craft/mode mode = reading")
+                    modes[key] = [*modes.get(key, []), line(self.rhs)]
+                    implementation.validate({"modes": modes})
+                target["modes"] = modes
             elif switch in (
                 "desc",
                 "line",
@@ -234,6 +258,10 @@ class CmdCraft(_CraftCommand):
                 "resources",
                 "beat",
                 "reach",
+                "room_line",
+                "smell",
+                "sound",
+                "ambient",
             ):
                 value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
                 from .behaviours import text
@@ -276,7 +304,13 @@ class CmdCraft(_CraftCommand):
                         ]
                     else:
                         limit = (
-                            12000 if field == "text" else 30 if field in ("slot", "reach") else 200
+                            12000
+                            if field == "text"
+                            else 30
+                            if field in ("slot", "reach")
+                            else 400
+                            if field in ("room_line", "smell", "sound", "ambient")
+                            else 200
                         )
                         target = (
                             verb_entry["configuration"] if verb_entry else draft["configuration"]
@@ -312,6 +346,11 @@ class CmdCraft(_CraftCommand):
                     "slot": "Slot",
                     "text": "Text",
                     "reach": "Reach",
+                    "room_line": "Room layer",
+                    "smell": "Smell",
+                    "sound": "Sound",
+                    "ambient": "Ambient",
+                    "modes": "Modes",
                 }
                 for field, label in labels.items():
                     if draft["configuration"].get(field):
@@ -363,12 +402,13 @@ class CmdRead(_CraftCommand):
 
 
 class CmdUse(_CraftCommand):
-    """Use a carried crafted Consumable or Broadcast once.
+    """Use a crafted Consumable/Broadcast, or play a reusable activation mode.
 
-    Usage: use <item>
+    Usage: use <item> [= mode]
 
-    Emits its authored EVENT beats together, then consumes the item. Room
-    rate limits survive reloads. Remote Broadcast effects respect +ambient.
+    Consumables/Broadcasts emit their beats then disappear. Activatables keep
+    the item and allow a named mode. Item/room limits survive reloads; ambient
+    effects respect +ambient.
     """
 
     key = "use"
@@ -377,12 +417,23 @@ class CmdUse(_CraftCommand):
     def run(self, switch):
         if switch or not self.args.strip():
             raise CraftingError("Usage: use <item>")
-        item = self.caller.search(self.args.strip(), candidates=list(self.caller.contents))
+        candidates = list(self.caller.contents) + list(
+            self.caller.location.contents if self.caller.location else []
+        )
+        item = self.caller.search(self.lhs.strip(), candidates=candidates)
         if item is None:
             return
         from .events import use
 
-        result = use(self.caller, item)
+        record = item.craft_record if hasattr(item, "craft_record") else None
+        if record and "activatable" in record.behaviour_keys:
+            from .wave_two import activate
+
+            result = activate(self.caller, item, self.rhs.strip() if self.rhs else None)
+        else:
+            if self.rhs:
+                raise CraftingError("This item has no activation modes.")
+            result = use(self.caller, item)
         self.msg(f"You use {result.craft.prose['name']}.")
 
 
@@ -446,4 +497,6 @@ class CraftingCmdSet(CmdSet):
 
     def at_cmdset_creation(self):
         for command in (CmdWorkshop, CmdCraft, CmdRead, CmdUse, CmdCrafting):
+            self.add(command())
+        for command in (CmdFixture, CmdListen, CmdSense):
             self.add(command())

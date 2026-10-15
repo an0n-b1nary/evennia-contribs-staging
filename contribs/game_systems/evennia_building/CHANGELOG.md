@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 - 2026-10-14
+
+- Expose room lifecycle and transaction locks for fixture consumers; allow explicitly requested inactive-owner lookup without awarding archived furnishing credit.
+
 ## 0.3.1 — 2026-10-13
 
 - Expose an atomic property-transfer partner signal and explicit shop stock choice in commands and web forms.

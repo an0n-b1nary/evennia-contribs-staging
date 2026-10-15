@@ -52,3 +52,52 @@ class Consumable(CraftedItemMixin, DefaultObject):
 
 class Broadcast(Consumable):
     """Consumable whose EVENT also reaches adjacent rooms."""
+
+
+class Installable(CraftedItemMixin, DefaultObject):
+    """Installed fixtures move only through the owner-authorized service."""
+
+    def at_pre_get(self, getter, **kwargs):
+        from .models import FixtureInstallation
+
+        if FixtureInstallation.objects.filter(craft__item_id=self.pk, active=True).exists():
+            getter.msg(
+                "That fixture is installed. Ask the property owner or staff to uninstall it."
+            )
+            return False
+        return super().at_pre_get(getter, **kwargs)
+
+    def at_pre_move(self, destination, **kwargs):
+        from .models import FixtureInstallation
+
+        if (
+            not self.ndb.crafting_placement
+            and FixtureInstallation.objects.filter(craft__item_id=self.pk, active=True).exists()
+        ):
+            return False
+        return super().at_pre_move(destination, **kwargs)
+
+    def at_object_delete(self):
+        from .models import FixtureInstallation
+
+        if FixtureInstallation.objects.filter(craft__item_id=self.pk, active=True).exists():
+            return False
+        return super().at_object_delete()
+
+
+class CraftingRoomMixin:
+    """Place before the host room; preserve its prose and release fixtures on delete."""
+
+    def get_display_desc(self, looker, **kwargs):
+        from .fixtures import layers
+
+        base = super().get_display_desc(looker, **kwargs)
+        return "\n".join([base, *layers(self)])
+
+    def at_object_delete(self):
+        allowed = super().at_object_delete()
+        if allowed:
+            from .fixtures import release_room
+
+            release_room(self)
+        return allowed

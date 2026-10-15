@@ -171,13 +171,24 @@ class SocialCharacterMixin:
 
             msg_type = msg_opts.get("type", "")
 
-            if msg_text and msg_type in ("pose", "say", "whisper", "page", "ooc"):
+            if msg_text and msg_type in ("pose", "say", "whisper", "page", "ooc", "crafting_event"):
                 from_acct = getattr(from_obj, "account", None)
+                if msg_type == "crafting_event" and from_acct is None:
+                    from evennia.accounts.models import AccountDB
+
+                    from evennia_links.characters import account_ids
+
+                    accounts = list(AccountDB.objects.filter(pk__in=account_ids(from_obj)))
+                    ignored = set(self.account.db.ignore_list or [])
+                    if any(account.pk in ignored for account in accounts) and not any(
+                        account.check_permstring("Builder") for account in accounts
+                    ):
+                        return
                 if from_acct:
                     ignore_list = self.account.db.ignore_list or []
                     is_staff_sender = from_acct.check_permstring("Builder")
                     if from_acct.id in ignore_list and not is_staff_sender:
-                        if msg_type in ("whisper", "page"):
+                        if msg_type in ("whisper", "page", "crafting_event"):
                             return  # full suppression
                         placeholder = _ignore_placeholder(msg_type)
                         # Retag as "system": the placeholder is no longer

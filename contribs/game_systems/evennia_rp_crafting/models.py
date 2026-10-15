@@ -79,6 +79,7 @@ class CraftRecord(models.Model):
     item_id = models.PositiveBigIntegerField(unique=True)
     resources_spent = models.JSONField(default=dict)
     money_spent = models.PositiveBigIntegerField(default=0)
+    furnishing_weeks = models.DecimalField(max_digits=20, decimal_places=6, default=0)
     prose = models.JSONField(default=dict)
     hallmark = models.TextField()
     created = models.DateTimeField(auto_now_add=True)
@@ -139,3 +140,42 @@ class EventUse(models.Model):
 class EventRoomLimit(models.Model):
     room_id = models.PositiveBigIntegerField(unique=True)
     last_used = models.DateTimeField(null=True)
+
+
+class FixtureInstallation(models.Model):
+    """Placement history; host ownership is always resolved through Links."""
+
+    craft = models.ForeignKey(CraftRecord, on_delete=models.PROTECT)
+    room_id = models.PositiveBigIntegerField(db_index=True)
+    installer_id = models.PositiveBigIntegerField()
+    active = models.BooleanField(default=True)
+    installed_at = models.DateTimeField(auto_now_add=True)
+    removed_at = models.DateTimeField(null=True)
+    last_emitted = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.UniqueConstraint(
+                fields=["craft"], condition=Q(active=True), name="crafting_one_active_install"
+            )
+        ]
+
+
+class RoomLayer(models.Model):
+    craft = models.ForeignKey(CraftRecord, on_delete=models.PROTECT)
+    room_id = models.PositiveBigIntegerField(db_index=True)
+    actor_id = models.PositiveBigIntegerField()
+    scene_id = models.PositiveBigIntegerField(null=True)
+    expires_at = models.DateTimeField()
+    cleared_at = models.DateTimeField(null=True)
+    last_emitted = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ActivationUse(models.Model):
+    craft = models.ForeignKey(CraftRecord, on_delete=models.PROTECT)
+    actor_id = models.PositiveBigIntegerField()
+    room_id = models.PositiveBigIntegerField()
+    mode = models.SlugField(max_length=40)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)

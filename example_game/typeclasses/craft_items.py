@@ -1,6 +1,6 @@
 """Host deletion guards run before crafting/equipment/DefaultObject hooks."""
 
-from evennia_rp_crafting.typeclasses import Broadcast, Consumable, Readable
+from evennia_rp_crafting.typeclasses import Broadcast, Consumable, Installable, Readable
 from evennia_rp_crafting.wearables import Wearable
 
 from .objects import ObjectParent
@@ -19,4 +19,8 @@ class CraftedConsumable(ObjectParent, Consumable):
 
 
 class CraftedBroadcast(ObjectParent, Broadcast):
+    pass
+
+
+class CraftedFixture(ObjectParent, Installable):
     pass

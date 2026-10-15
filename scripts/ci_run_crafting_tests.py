@@ -12,7 +12,13 @@ from pathlib import Path
 from ci_run_partner_tests import test_exit_code
 
 ROOT = Path(__file__).resolve().parents[1]
-PARTNERS = ("evennia_economy", "evennia_rp_equipment", "evennia_accessibility")
+PARTNERS = (
+    "evennia_economy",
+    "evennia_rp_equipment",
+    "evennia_accessibility",
+    "evennia_building",
+    "evennia_scenes",
+)
 
 
 def main(argv=None):
@@ -54,6 +60,8 @@ def main(argv=None):
     # No crafting web surface: avoid importing other packages' optional web
     # extras (which require accessibility) in its physically absent profile.
     source += '\nROOT_URLCONF = "crafting_test_urls"\n'
+    if "evennia_building" in args.absent:
+        source += "\nLINKS_ROOM_PERMISSION = None\nLINKS_ROOM_OWNER = None\nLINKS_ROOM_LIVE = None\nLINKS_ROOM_LOCK = None\nLINKS_OWNED_ROOMS = None\nSOCIAL_ROOM_MOOD_PERMISSION = None\n"
     settings.write_text(source, encoding="utf-8")
     (game / "crafting_test_urls.py").write_text("urlpatterns = []\n", encoding="utf-8")
     result = subprocess.run(
@@ -63,6 +71,33 @@ def main(argv=None):
             "--settings=test_settings.py",
             "evennia_rp_crafting",
             "world.sandbox.test_crafting",
+            "world.sandbox.test_wave_two",
+        ],
+        cwd=game,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    code = test_exit_code(result)
+    if code or "evennia_building" in args.absent:
+        return code
+    (game / "server/conf/crafting_race_settings.py").write_text(
+        "from server.conf.test_settings import *\n"
+        "from copy import deepcopy\n"
+        "DATABASES = deepcopy(DATABASES)\n"
+        f"DATABASES['default']['TEST'] = {{'NAME': {str(game / 'crafting-races.sqlite3')!r}}}\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            launcher,
+            "test",
+            "--noinput",
+            "--settings=crafting_race_settings.py",
+            "evennia_rp_crafting.test_concurrency",
         ],
         cwd=game,
         stdin=subprocess.DEVNULL,

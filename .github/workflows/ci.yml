@@ -235,6 +235,12 @@ jobs:
           - profile: no-accessibility
             excludes: "--exclude evennia-accessibility"
             absent: "--absent evennia_accessibility"
+          - profile: no-building
+            excludes: "--exclude evennia-building"
+            absent: "--absent evennia_building"
+          - profile: no-scenes
+            excludes: "--exclude evennia-scenes"
+            absent: "--absent evennia_scenes"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -331,6 +337,24 @@ jobs:
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
       - name: Sandbox gate with verified partner absence
         run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}
+
+  crafting-independent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install only hard partners
+        run: |
+          pip install evennia==6.0.0
+          pip install -e contribs/base_systems/evennia_links
+          pip install -e contribs/game_systems/evennia_rp_resources
+          pip install -e contribs/game_systems/evennia_rp_crafting
+          evennia --init ci_game < /dev/null
+      - name: Crafting with verified absence of every optional partner
+        run: python scripts/ci_run_crafting_core_tests.py ci_game
 
   npc-partners:
     runs-on: ubuntu-latest

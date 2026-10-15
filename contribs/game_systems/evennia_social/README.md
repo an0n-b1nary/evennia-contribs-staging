@@ -358,3 +358,15 @@ Page delivery and explicit OOC chat consult Links' optional communication
 restriction seam before persistence, room delivery or pose-recorded signals.
 Existing guest pages remain staff-only. Moderation uses this seam to preserve
 staff contact while stopping communication with other players.
+
+## Shared temporary atmosphere and sensory prose
+
+Mood uses Links' `decorate` policy, shared with temporary crafted room layers.
+The existing `SOCIAL_ROOM_MOOD_PERMISSION` extension retains its grant/defer/deny
+semantics; a temporary grant never permits installation or lasting configuration.
+`+roomconfig/smell <text>` and `/sound <text>` set free owner-written sensory
+prose (400 characters; empty clears), using `configure` permission. These work
+without Crafting; its room sensory commands append fixture lines when installed.
+Tuple-tagged `crafting_event` messages from ignored ordinary players are fully
+suppressed, without a pose placeholder or header. Staff keep existing bypass
+semantics. Item events never enter Social/Posing's ordinary pose processing.

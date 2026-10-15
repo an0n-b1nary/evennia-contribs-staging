@@ -19,7 +19,6 @@ from importlib import import_module
 from django.apps import apps
 from evennia import default_cmds
 from evennia_boards.commands import CmdBoard
-from evennia_building.commands import CmdBuild
 from evennia_calendar.commands import CmdCalendar, CmdRsvp
 from evennia_jobs.commands import CmdBug, CmdDiscuss, CmdIssue, CmdJobs, CmdRequest
 from evennia_lore.commands import CmdForget, CmdHint, CmdInvestigate, CmdLore, CmdShare
@@ -91,7 +90,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         Populates the cmdset
         """
         super().at_cmdset_creation()
-        self.add(CmdBuild())
+        for command in _optional_commands("evennia_building", "CmdBuild"):
+            self.add(command())
         for command in (CmdApply, CmdAdmissions, CmdSoftban, CmdMute, CmdNotes, CmdBan, CmdUnban):
             self.add(command)
 
@@ -116,7 +116,15 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         for command in _optional_commands("evennia_rp_resources", "CmdGather", "CmdResources"):
             self.add(command)
         for command in _optional_commands(
-            "evennia_rp_crafting", "CmdWorkshop", "CmdCraft", "CmdRead", "CmdUse", "CmdCrafting"
+            "evennia_rp_crafting",
+            "CmdWorkshop",
+            "CmdCraft",
+            "CmdRead",
+            "CmdUse",
+            "CmdCrafting",
+            "CmdFixture",
+            "CmdSense",
+            "CmdListen",
         ):
             self.add(command)
         self.add(CmdEmit)

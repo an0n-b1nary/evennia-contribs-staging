@@ -30,9 +30,53 @@ def ownership(room):
     )
 
 
-def owner_of(room):
+def owner_of(room, *, include_inactive=False):
     record = ownership(room)
-    return record.owner if record and record.room_id and record.property.state == "live" else None
+    return (
+        record.owner
+        if record and record.room_id and (include_inactive or record.property.state == "live")
+        else None
+    )
+
+
+def room_is_live(room):
+    record = ownership(room)
+    if record:
+        return bool(record.room_id and record.property.state == "live")
+    frontier = FrontierRoom.objects.filter(object_id=room.pk).first()
+    if frontier:
+        return bool(frontier.room_id and frontier.frontier.state == "live")
+    return not DraftRoom.objects.filter(object_id=room.pk).exists()
+
+
+def owned_room_ids(character):
+    return RoomOwnership.objects.filter(
+        owner=character,
+        property__owner=character,
+        property__state="live",
+        room__isnull=False,
+        property__anchor__isnull=False,
+    ).values_list("room_id", flat=True)
+
+
+def lock_room_state(room):
+    """Match the property-first write lock used by transfer/archive/residents."""
+    from django.db.models import F
+
+    from .models import Frontier, Property
+
+    # Write before reading: SQLite must not retain a stale read snapshot while
+    # waiting for a competing transfer transaction to commit.
+    properties = Property.objects.filter(
+        pk__in=RoomOwnership.objects.filter(object_id=room.pk).values("property_id")
+    )
+    properties.update(locked=F("locked"))
+    list(properties.select_for_update())
+    frontiers = Frontier.objects.filter(
+        pk__in=FrontierRoom.objects.filter(object_id=room.pk).values("frontier_id")
+    )
+    frontiers.update(state=F("state"))
+    list(frontiers.select_for_update())
 
 
 def room_permission(actor, room, action):

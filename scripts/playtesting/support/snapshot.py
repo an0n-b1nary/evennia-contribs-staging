@@ -18,7 +18,15 @@ from evennia_rp_chargen.locks import _load
 from evennia_rp_chargen.models import AbilityTransaction, CharacterAbility, CharacterBuild
 from evennia_rp_chargen.stats import StatHandler
 from evennia_rp_contest.models import Challenge, CheckRecord
-from evennia_rp_crafting.models import CraftRecord, EventUse, NicheUnlock, Workshop
+from evennia_rp_crafting.models import (
+    ActivationUse,
+    CraftRecord,
+    EventUse,
+    FixtureInstallation,
+    NicheUnlock,
+    RoomLayer,
+    Workshop,
+)
 from evennia_rp_resources.models import PlotPayoutRun, ResourceGrant, ResourceHolding
 from evennia_rptracker.models import RPSession
 from evennia_scenes.models import LogEntry, Scene
@@ -145,6 +153,25 @@ def snapshot():
             "money_spent",
             "hallmark",
             "prose",
+            "furnishing_weeks",
+        ),
+        "fixture_installations": rows(
+            FixtureInstallation.objects.filter(craft__crafter_id__in=ids),
+            "id",
+            "craft_id",
+            "room_id",
+            "active",
+        ),
+        "temporary_layers": rows(
+            RoomLayer.objects.filter(actor_id__in=ids),
+            "id",
+            "room_id",
+            "craft_id",
+            "cleared_at",
+            "expires_at",
+        ),
+        "activation_uses": rows(
+            ActivationUse.objects.filter(actor_id__in=ids), "id", "craft_id", "mode", "message"
         ),
         "economy_offers": rows(
             Offer.objects.filter(giver_id__in=ids),

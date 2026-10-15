@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
-from evennia_social.commands.roomconfig import _can_configure_room
+from evennia_social.commands.roomconfig import CmdRoomConfig, _can_configure_room
 from evennia_social.mood import can_set_mood
-from evennia_social.tests.base import SocialTestCase
+from evennia_social.tests.base import SocialCommandTestCase, SocialTestCase
 
 
 @override_settings(LINKS_ROOM_PERMISSION="game.room_rights")
@@ -29,3 +29,24 @@ class TestRoomPermissionSeam(SocialTestCase):
             self.assertFalse(can_set_mood(self.char2, self.room1))
             self.assertTrue(_can_configure_room(self.char1, self.room1))
             self.assertTrue(can_set_mood(self.char1, self.room1))
+
+
+class TestFreeRoomSenses(SocialCommandTestCase):
+    def test_owner_sets_and_clears_sensory_text_without_a_craft(self):
+        self.call(CmdRoomConfig(), "/smell Cool stone.", "Room smell set.")
+        self.call(CmdRoomConfig(), "/sound A breeze.", "Room sound set.")
+        self.assertEqual(self.room1.db.room_smell, "Cool stone.")
+        self.assertEqual(self.room1.db.room_sound, "A breeze.")
+        self.call(CmdRoomConfig(), "/smell", "Room smell cleared.")
+        self.assertEqual(self.room1.db.room_smell, "")
+
+    @override_settings(SOCIAL_ROOM_MOOD_PERMISSION=lambda actor, room: True)
+    def test_temporary_atmosphere_permission_cannot_edit_lasting_senses(self):
+        self.assertTrue(can_set_mood(self.char2, self.room1))
+        self.call(
+            CmdRoomConfig(),
+            "/smell Intrusive prose.",
+            "You don't have permission",
+            caller=self.char2,
+        )
+        self.assertIsNone(self.room1.db.room_smell)
