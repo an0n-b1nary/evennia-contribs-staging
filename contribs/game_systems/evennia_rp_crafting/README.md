@@ -57,9 +57,10 @@ Authored pages use `+craft/page [title] = page text` repeatedly, then
 pages; a standalone `---PAGE---` line in new text creates an explicit page
 break. Page numbers do not depend on terminal width. Up to 100 pages fit within
 the existing 12,000-character total, including titles (80 characters each).
-Published pages stay in the immutable CraftRecord. Each additional page costs `readable.extra_page`, defaulting to one
-material input. Hosts with a custom cost map must configure that rule before
-crafting multiple pages; old single-text books retain their original price.
+Published pages stay in the immutable CraftRecord. Each additional page costs
+`readable.extra_page`, defaulting to one material input. Hosts with a custom
+cost map must configure that rule before crafting multiple pages; old
+single-text books retain their original price.
 
 `read <item> 3` or `read <item> = 3` selects a page. The equals form also works
 for item names ending in numbers: exact whole-name matches take precedence.
@@ -134,8 +135,10 @@ freeze the current text, titles and page authors. They remain unchanged after
 source revisions, transfers or deletion. Copying an edition retains its writers
 and records the intermediate source, rather than making its copier the author.
 Only text is copied: other verbs, equipment rules, journal capacity, modifiers
-and fixture properties are excluded. Copy drafts accept resource selection,
-completion or cancellation; rewritten prose starts a new authored craft.
+and fixture properties are excluded. Copy drafts start with the source's
+description; `+craft/desc` replaces it, since the binding is the copier's own
+work. They otherwise accept resource selection, completion or cancellation;
+rewritten pages start a new authored craft.
 
 Custom reader denials and redaction remain authoritative. A provider's changed
 text is copied exactly as exposed, with unknown authorship explicitly credited

@@ -38,16 +38,28 @@ def copy_draft(command):
         "selected": {},
     }
     command.caller.attributes.add(DRAFT_KEY, draft)
-    command.msg(f"Copy draft saved: {draft['name']}. Use +craft to review its pages and cost.")
+    command.msg(
+        f"Copy draft saved: {draft['name']}. It starts with the source's description; "
+        "set your own with +craft/desc. Use +craft to review its pages and cost."
+    )
 
 
 def continue_copy(command, switch, draft):
     from .commands import DRAFT_KEY, costs_text, resource_spec
 
-    if switch not in ("", "resources", "finish"):
+    if switch not in ("", "desc", "resources", "finish"):
         raise CraftingError(
-            "Copy drafts allow /resources, /finish or /cancel. Start a new craft for rewritten text."
+            "Copy drafts allow /desc, /resources, /finish or /cancel. Start a new craft for rewritten text."
         )
+    if switch == "desc":
+        from .behaviours import text
+
+        # The binding is the copier's own work; only the pages are copied.
+        value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
+        draft["description"] = text(value, "Description", 4000, required=True)
+        command.caller.attributes.add(DRAFT_KEY, draft)
+        command.msg(f"Copy draft saved: {draft['name']}.")
+        return
     source = ObjectDB.objects.filter(pk=draft["copy_source"]).first()
     if source is None:
         raise CraftingError("The source no longer exists. Start a new copy draft.")

@@ -7,6 +7,7 @@
 - Add reviewable copy drafts at normal crafting cost, freezing accessible text
   and its authorship with source lineage. Revalidate source access and content
   before spending; copy failures roll back payment, items and history together.
+  A copy's binding takes the copier's own `/desc`, defaulting to the source's.
 - Label hallmarks and text authorship as OOC. Keep binding makers separate from
   journal writers and copiers, and respect custom reader denial/redaction.
 - Preserve shipped records with an additive migration; exercise journal gifts,

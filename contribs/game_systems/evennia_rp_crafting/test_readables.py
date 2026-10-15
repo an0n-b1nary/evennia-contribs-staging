@@ -292,3 +292,17 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
         self.assertIn("Hallmark (OOC):", output)
         self.assertFalse(self.char1.attributes.has(DRAFT_KEY))
         self.call(CmdCraft(), "/finish", "Start a draft")
+
+    def test_copy_draft_desc_replaces_the_sources_binding_description(self):
+        journal = self.journal()
+        write(self.char1, journal, "One", "First text.")
+        self.call(CmdCraft(), f"/copy {journal.key} = writing-0/Fair copy", "Copy draft saved")
+        self.assertIn("A bound notebook.", self.call(CmdCraft(), "", "Copy draft: Fair copy"))
+        self.call(CmdCraft(), "/desc = A slim printed copy.", "Copy draft saved")
+        self.assertIn("A slim printed copy.", self.call(CmdCraft(), "", "Copy draft: Fair copy"))
+        self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
+        self.call(CmdCraft(), "/finish", "You copy Fair copy")
+        copy = ObjectDB.objects.get(db_key="Fair copy")
+        self.assertEqual(copy.craft_record.prose["description"], "A slim printed copy.")
+        self.assertEqual(copy.db.desc, "A slim printed copy.")
+        self.assertIn("First text.", copy.read(self.char1))
