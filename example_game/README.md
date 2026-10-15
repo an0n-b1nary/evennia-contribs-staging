@@ -178,6 +178,15 @@ attribution. Create your own with `+craft/journal = 3` in a Readable draft.
 `+craft/copy a sample field journal = writing/a journal edition` starts a
 copy draft: preview it with `+craft`, select resources and `/finish` at normal
 crafting cost. Source revisions never change completed editions.
+The old market chronicle is a staff tome, readable without crafting. Its second
+page cites lore: `read an old market chronicle 2` acquires that entry; contents
+and the first page do not. The sample annotated guide carries the same citation
+and a recognition feature that appears after learning it. Crafters can attach
+references with `+lorecraft/cite [page] = #entry` and
+`+lorecraft/recognise = #entry | feature text` before previewing and finishing
+their draft. Staff can publish independent tomes through `+tome`; the host's
+`StaffTome` keeps the stock-deletion guard before the reusable `LoreTome` in
+its MRO. Journals and citation-preserving editions need their separate bridge.
 The market also holds a sample spice cake and spark globe. Pick one up and
 `use <item>` emits its EVENT and consumes it. Compose your own through
 `+craft/new cooking/consumable`, `/desc`, repeated `/beat`, `/resources`, preview

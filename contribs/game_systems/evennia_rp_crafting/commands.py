@@ -216,6 +216,7 @@ class CmdCraft(_CraftCommand):
                     draft["configuration"],
                     draft["selected"],
                     verbs=draft.get("verbs"),
+                    facets=draft.get("facets"),
                 )
                 self.caller.attributes.remove(DRAFT_KEY)
                 self.msg(
@@ -402,6 +403,7 @@ class CmdCraft(_CraftCommand):
                     draft["behaviour"],
                     draft["configuration"],
                     verbs=draft.get("verbs"),
+                    facets=draft.get("facets"),
                 )
                 rows = [
                     f"Draft: {draft['name']} ({draft['niche']}/{draft['behaviour']})",
@@ -448,6 +450,8 @@ class CmdCraft(_CraftCommand):
                     rows.append(f"Requirement {number}: {rule}")
                 for number, beat in enumerate(draft["configuration"].get("beats", []), 1):
                     rows.append(f"EVENT beat {number}: {beat}")
+                if composition.facets:
+                    rows.append(f"Facets: {composition.facets}")
                 selected = (
                     ", ".join(f"{amount} {key}" for key, amount in draft["selected"].items())
                     or "none"
@@ -482,30 +486,20 @@ class CmdRead(_CraftCommand):
     def run(self, switch):
         if switch not in ("", "contents") or not self.args.strip():
             raise CraftingError("Usage: read <item> [= page number], or read/contents <item>")
-        candidates = list(self.caller.contents)
-        if self.caller.location:
-            candidates += list(self.caller.location.contents)
-        name = self.lhs.strip()
-        number = None
-        if self.rhs is not None:
-            if switch:
-                raise CraftingError("Usage: read/contents <item>")
-            try:
-                number = int(self.rhs.strip())
-            except ValueError:
-                raise CraftingError("Choose a page number.") from None
-        else:
-            # Try the whole name first so names ending in numbers still work.
-            matches = self.caller.search(name, candidates=candidates, quiet=True)
-            tail = name.rsplit(" ", 1)
-            if not matches and not switch and len(tail) == 2 and tail[1].lstrip("-").isdecimal():
-                name, number = tail[0], int(tail[1])
-        item = self.caller.search(name, candidates=candidates)
+        from evennia_links.pagination import reading_target
+
+        item, number = reading_target(self.caller, self.lhs, self.rhs, table=switch == "contents")
         if item is None:
             return
         from .pages import read
 
-        self.msg(f"{item.key}\n{read(self.caller, item, number, table=switch == 'contents')}")
+        reader = getattr(item, "read", None)
+        result = (
+            reader(self.caller, number, contents=switch == "contents")
+            if callable(reader)
+            else read(self.caller, item, number, table=switch == "contents")
+        )
+        self.msg(f"{item.key}\n{result}")
 
 
 class CmdUse(_CraftCommand):

@@ -3,7 +3,7 @@
 """One lifecycle, explicit complete verb sets, and separately paid components."""
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.conf import settings
 
@@ -69,6 +69,7 @@ class Composition:
     definitions: list
     resources: dict
     input_categories: set
+    facets: dict = field(default_factory=dict)
 
     def create(self, actor, name, description, config):
         return self.implementation.create(actor, name, description, config)
@@ -80,7 +81,7 @@ class Composition:
             "configuration": self.configuration,
             "verbs": self.verbs,
             "contributors": self.contributors,
-        }
+        } | ({"facets": self.facets} if self.facets else {})
 
 
 def prepare(key, behaviour_key, configuration, verbs=None):

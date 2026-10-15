@@ -45,3 +45,28 @@ def contents(pages):
     return "\n".join(
         f"{number}. {page.title or f'Page {number}'}" for number, page in enumerate(pages, 1)
     )
+
+
+def reading_target(actor, name, value=None, *, table=False):
+    """Resolve a local book and optional page, preserving numeric item names.
+
+    Search/identity belong to the host actor; this helper imports no engine.
+    Access and the actual read belong to the resolved object's read service.
+    """
+    candidates = list(actor.contents)
+    if actor.location:
+        candidates += list(actor.location.contents)
+    name, number = name.strip(), None
+    if value is not None:
+        if table:
+            raise ValueError("Usage: read/contents <item>")
+        try:
+            number = int(value.strip())
+        except ValueError:
+            raise ValueError("Choose a page number.") from None
+    else:
+        matches = actor.search(name, candidates=candidates, quiet=True)
+        tail = name.rsplit(" ", 1)
+        if not matches and not table and len(tail) == 2 and tail[1].lstrip("-").isdecimal():
+            name, number = tail[0], int(tail[1])
+    return actor.search(name, candidates=candidates), number

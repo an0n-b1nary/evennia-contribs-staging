@@ -755,6 +755,7 @@ class LoreAcquisition(models.Model):
         SHARED = "shared", "Shared"
         STORYTELLER = "storyteller", "Storyteller"
         SEED = "seed", "Seed"
+        READ = "read", "Read"
 
     entry = models.ForeignKey(
         LoreEntry,
@@ -808,6 +809,29 @@ class LoreAcquisition(models.Model):
 
     def __str__(self):
         return f"{self.character_name} acquired LoreEntry #{self.entry_id} [{self.source}]"
+
+
+class LoreTomeRecord(models.Model):
+    """Fixed staff book; soft identity preserves its content after item deletion."""
+
+    item_id = models.PositiveBigIntegerField(unique=True)
+    author_id = models.PositiveBigIntegerField()
+    author_name = models.CharField(max_length=255)
+    pages = models.JSONField(default=list)
+    citations = models.JSONField(default=list)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError("Tome records are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        raise ValidationError("Tome records are append-only.")
 
 
 class PlotLoreLink(AbstractAuthoredLink):

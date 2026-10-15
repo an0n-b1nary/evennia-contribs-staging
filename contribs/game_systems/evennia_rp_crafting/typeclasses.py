@@ -46,8 +46,16 @@ class CraftedItemMixin(ModificationDisplayMixin):
 
         return read(reader, self, page, table=contents)
 
+    def get_display_recognition(self, looker):
+        from .facets import display
+
+        return display(self, looker)
+
     def get_display_desc(self, looker, **kwargs):
         desc = super().get_display_desc(looker, **kwargs)
+        recognition = self.get_display_recognition(looker)
+        if recognition:
+            desc = f"{desc}\n{recognition}"
         hallmark = self.get_display_provenance(looker)
         return f"{desc}\n\n|wCraft hallmark (OOC):|n {hallmark}" if hallmark else desc
 

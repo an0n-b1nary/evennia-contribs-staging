@@ -163,8 +163,13 @@ def abandon(actor, key):
     return held
 
 
-def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True, verbs=None):
+def craft_cost(
+    actor, key, behaviour_key, configuration, *, include_fee=True, verbs=None, facets=None
+):
     definition, composition = prepare(key, behaviour_key, configuration, verbs)
+    from .facets import prepare as prepare_facets
+
+    composition.facets, composition.resources = prepare_facets(actor, facets, composition)
     if not conf.component_visible(actor, composition.lifecycle_key) or any(
         not conf.component_visible(actor, entry["key"]) for entry in composition.verbs
     ):
@@ -186,7 +191,18 @@ def craft_cost(actor, key, behaviour_key, configuration, *, include_fee=True, ve
 
 
 @atomic_objects
-def craft(actor, key, behaviour_key, name, description, configuration, selected, *, verbs=None):
+def craft(
+    actor,
+    key,
+    behaviour_key,
+    name,
+    description,
+    configuration,
+    selected,
+    *,
+    verbs=None,
+    facets=None,
+):
     _require(actor)
     workshop = _workshop(actor)
     # Catalogue locks are ordered independently of a draft's component order.
@@ -198,7 +214,7 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected,
         .order_by("pk")
     )
     definition, implementation, config, cost = craft_cost(
-        actor, key, behaviour_key, configuration, include_fee=False, verbs=verbs
+        actor, key, behaviour_key, configuration, include_fee=False, verbs=verbs, facets=facets
     )
     if active_unlocks(workshop).filter(niche__in=implementation.definitions).count() != len(
         implementation.definitions
@@ -243,7 +259,8 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected,
         resources_spent=selected,
         money_spent=cost["money"],
         furnishing_weeks=weeks,
-        prose={"name": name, "description": description, "configuration": config},
+        prose={"name": name, "description": description, "configuration": config}
+        | ({"facets": implementation.facets} if implementation.facets else {}),
         hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
     )
     Workshop.objects.filter(pk=workshop.pk).update(last_craft=record.created)

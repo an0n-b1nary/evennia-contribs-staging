@@ -4,9 +4,11 @@
 
 Read from the verified verb configuration, never mutable item attributes.
 Journal text and edition attribution are resolved from verified history.
+Successful page reads notify optional partners; providers own any lore grants.
 """
 
 from evennia_links.pagination import Page, contents, page_at, split_pages
+from evennia_links.transactions import atomic_objects
 
 from .behaviours import text
 from .errors import CraftingError
@@ -96,6 +98,7 @@ def configuration(actor, item):
     return record, pages
 
 
+@atomic_objects
 def read(actor, item, number=None, *, table=False):
     record, pages = configuration(actor, item)
     if not pages:
@@ -115,6 +118,12 @@ def read(actor, item, number=None, *, table=False):
         page = page_at(pages, number)
     except ValueError as exc:
         raise CraftingError(str(exc)) from None
+    from .facets import read_lines
+
+    config = next(
+        entry["configuration"] for entry in record.verb_data if entry["key"] == "readable"
+    )
+    extra = read_lines(actor, item, record, number, tuple(pages) == authored_pages(config))
     # Single-page books have nothing to resume, so they never store progress.
     if len(pages) > 1:
         actor.attributes.add(bookmark_key, number, category=BOOKMARK_CATEGORY)
@@ -127,4 +136,4 @@ def read(actor, item, number=None, *, table=False):
     from .readables import page_credit
 
     credit = page_credit(record, pages, number)
-    return f"{result}\n{credit}" if credit else result
+    return "\n".join(part for part in (result, credit, extra) if part)

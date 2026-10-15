@@ -8,6 +8,11 @@ lines display its attributed cosmetic layers. These never rewrite sealed
 prose, change requirements or supply mechanics. Equipment works independently
 when that partner is absent.
 
+Detailed `+gear/info` inspection also calls an optional
+`get_display_recognition(looker)` hook. Crafted lore features therefore appear
+only for eligible viewers; ordinary names, worn rosters and requirements stay
+independent of lore. Removing the lore partner hides its recognition features.
+
 > **Preview (0.1.0, Pre-Alpha).** This package was written directly as a
 > contrib, and its API may move while the rest of the rp- cluster is built on
 > it. Pin an exact commit.

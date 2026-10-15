@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
+"""Actual host page commands, recognition inspection and persistent seed history."""
+
+from django.apps import apps
+from django.core.management import call_command
+from evennia.objects.models import ObjectDB
+from evennia.utils.test_resources import EvenniaCommandTest
+from evennia_lore.item_commands import CmdTome
+from evennia_lore.models import LoreAcquisition, LoreTomeRecord
+from typeclasses.characters import Character
+from typeclasses.rooms import Room
+
+from world.sandbox import crafting
+
+
+class LoreItemSeams(EvenniaCommandTest):
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_real_read_command_teaches_only_the_seeded_page_and_unlocks_recognition(self):
+        call_command("seed_sandbox", verbosity=0)
+        tome = ObjectDB.objects.get(db_key=crafting.TOME_NAME)
+        self.char2.move_to(tome.location, quiet=True)
+        from commands.default_cmdsets import CharacterCmdSet
+
+        command = type(next(row for row in CharacterCmdSet().commands if row.key == "read"))
+        if apps.is_installed("evennia_rp_crafting"):
+            book = ObjectDB.objects.get(db_key=crafting.LORE_BOOK_NAME)
+            self.assertNotIn("familiar sign", book.get_display_desc(self.char2))
+        self.call(
+            command(), f"/contents {tome.key}", f"{tome.key}\nContents (2 pages)", caller=self.char2
+        )
+        self.call(command(), f"{tome.key} 1", f"{tome.key}\nPage 1 of 2", caller=self.char2)
+        self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
+        output = self.call(
+            command(), f"{tome.key} 2", f"{tome.key}\nPage 2 of 2", caller=self.char2
+        )
+        self.assertIn("[Lore] You recognise", output)
+        self.assertEqual(LoreAcquisition.objects.get(character=self.char2).source, "read")
+        if apps.is_installed("evennia_rp_crafting"):
+            self.assertIn("familiar sign", book.get_display_desc(self.char2))
+        self.assertIn("+tome", {row.key for row in CharacterCmdSet().commands})
+        self.assertFalse(CmdTome().access(self.char2))
+
+    def test_reseed_keeps_published_tome_history_and_replaces_the_visible_book(self):
+        call_command("seed_sandbox", verbosity=0)
+        tome = ObjectDB.objects.get(db_key=crafting.TOME_NAME)
+        record = LoreTomeRecord.objects.get(item_id=tome.pk)
+        call_command("seed_sandbox", verbosity=0)
+        self.assertTrue(LoreTomeRecord.objects.filter(pk=record.pk).exists())
+        new = ObjectDB.objects.get(db_key=crafting.TOME_NAME)
+        self.assertNotEqual(LoreTomeRecord.objects.get(item_id=new.pk).pk, record.pk)

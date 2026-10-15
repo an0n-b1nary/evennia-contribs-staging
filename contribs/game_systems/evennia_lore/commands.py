@@ -22,6 +22,9 @@ from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
 from evennia_lore import layers
+from evennia_lore.item_commands import CmdLoreCraft as CmdLoreCraft
+from evennia_lore.item_commands import CmdReadTome as CmdReadTome
+from evennia_lore.item_commands import CmdTome as CmdTome
 from evennia_lore.layers import LoreLayerError
 from evennia_lore.models import (
     LoreAcquisition,

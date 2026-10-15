@@ -1,5 +1,10 @@
 # Changelog — evennia-links
 
+## 0.8.8 - 2026-10-15
+
+- Share local book/page target resolution between independent readable providers,
+  preserving exact numeric names and rejecting malformed page selections.
+
 ## 0.8.7 - 2026-10-15
 
 - Add dependency-free authored-page helpers: immutable `Page`, explicit page

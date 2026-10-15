@@ -16,6 +16,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Label verified craft hallmarks as OOC in equipment inspection, matching the
   crafted item's appearance and keeping them distinct from IC maker's marks.
 
+## [0.1.5] - 2026-10-15
+
+### Added
+
+- Render optional lore recognition through the item's viewer-sensitive hook in
+  detailed inspection, without exposing gated text in names or worn rosters.
+
 ## [0.1.3] - 2026-10-14
 
 ### Added

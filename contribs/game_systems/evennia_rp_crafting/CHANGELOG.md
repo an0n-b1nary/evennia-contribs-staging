@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0 - 2026-10-15
+
+- Add optional facet validation, costs, immutable snapshot metadata and explicit
+  successful-page-read hooks. Lore registers citations and recognition only when
+  compatible partners are installed; missing providers hide their gated output.
+- Share local reading target resolution with staff tomes. Keep contents and
+  provider enumeration free of acquisition side effects and roll back failed
+  reads together with their reading progress and lore acquisition.
+
 ## 0.7.0 - 2026-10-15
 
 - Add blank journals with prepaid capacity, free owner writing, retained revision
