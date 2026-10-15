@@ -141,9 +141,10 @@ def activate(actor, item, mode=None):
     use = ActivationUse.objects.create(
         craft=record, actor_id=actor.pk, room_id=room.pk, mode=mode, message=message
     )
+    # Tricks honour ambient mute when Accessibility can supply it; without that
+    # partner they are ordinary owner-triggered events rather than dropped.
+    mutable = record_is_companion and apps.is_installed("evennia_accessibility")
     transaction.on_commit(
-        lambda: emit(
-            room.pk, actor.pk, message, ambient=record_is_companion, wave_three=record_is_companion
-        )
+        lambda: emit(room.pk, actor.pk, message, ambient=mutable, wave_three=record_is_companion)
     )
     return use

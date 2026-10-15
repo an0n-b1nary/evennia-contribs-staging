@@ -2,7 +2,7 @@
 
 ## 0.5.0 - 2026-10-14
 
-- Add niche-owned cosmetic Modifier services with exact, atomic consent/payment, selected-layer undoing, free OOC visibility and persistent provenance. Add transferable cosmetic Companions, follow/stay, owner poses, tricks and bounded automatic output. Preserve existing data with an additive migration; wire the reference host and optional-partner gates.
+- Add niche-owned cosmetic Modifier services with exact, atomic consent/payment, selected-layer undoing, free OOC visibility and persistent provenance. Add transferable cosmetic Companions, follow/stay, owner poses, tricks and bounded automatic output; arrivals share the room EVENT limit, tricks still reach the room without Accessibility, and Companions refuse arriving objects before they move. Preserve existing data with an additive migration; wire the reference host and optional-partner gates.
 
 ## 0.4.0 - 2026-10-14
 

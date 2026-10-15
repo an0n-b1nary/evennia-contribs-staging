@@ -290,7 +290,8 @@ class CompanionTests(WaveThreeFixture, EvenniaTest):
     def test_companion_cannot_hold_items(self):
         pet = self.pet()
         before = self.item.location
-        self.item.move_to(pet, quiet=True)
+        # Refused before arrival, so give/put report failure instead of success.
+        self.assertFalse(self.item.move_to(pet, quiet=True))
         self.assertEqual(self.item.location, before)
 
     def test_only_owner_written_pose_enters_posing(self):
@@ -298,6 +299,75 @@ class CompanionTests(WaveThreeFixture, EvenniaTest):
         with patch.object(self.char1, "record_pose", create=True) as recorder:
             companions.pose(self.char1, pet, "bows politely.")
         recorder.assert_called_once_with("a brass bird bows politely.", pose_type="emit")
+
+    def test_tricks_reach_the_room_without_accessibility(self):
+        from .wave_two import activate
+
+        NicheDefinition.objects.create(
+            key="tricks",
+            name="Trick maker",
+            behaviours=["activatable"],
+            input_categories=["materials"],
+            unlock_resources={"materials": 3},
+            unlock_money=0,
+        )
+        self.unlock("tricks")
+        pet = services.craft(
+            self.char1,
+            "pets",
+            "companion",
+            "a quiet bird",
+            "A brass bird.",
+            {},
+            {"wood": 2},
+            verbs=[
+                {
+                    "key": "activatable",
+                    "niche": "tricks",
+                    "configuration": {"modes": {"bow": ["The bird bows."]}},
+                }
+            ],
+        )
+        installed = apps.is_installed
+        received = []
+        with (
+            patch.object(
+                apps,
+                "is_installed",
+                lambda name: name != "evennia_accessibility" and installed(name),
+            ),
+            patch.object(
+                DefaultCharacter,
+                "msg",
+                lambda target, text=None, **kwargs: received.append((target.pk, str(text))),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            activate(self.char1, pet, "bow")
+        self.assertIn(self.char2.pk, {pk for pk, text in received if "The bird bows." in text})
+
+    def test_arrivals_share_the_room_event_limit(self):
+        if not apps.is_installed("evennia_accessibility"):
+            self.skipTest("Accessibility absent: arrivals unavailable")
+        for source, destination in ((self.room1, self.room2), (self.room2, self.room1)):
+            create_object(DefaultExit, key="path", location=source, destination=destination)
+        pet = self.pet(arrival="A brass bird flutters in.")
+        companions.set_mode(self.char1, pet, "follow")
+        received = []
+        with (
+            patch("evennia_accessibility.mutes_ambient", return_value=False),
+            patch.object(
+                DefaultCharacter,
+                "msg",
+                lambda target, text=None, **kwargs: received.append((target.pk, str(text))),
+            ),
+        ):
+            for room in (self.room2, self.room1, self.room2):
+                self.char1.move_to(room, quiet=True)
+        self.assertEqual(pet.location, self.room2)
+        # The return within the room cooldown moves the bird without another EVENT.
+        arrivals = [pk for pk, text in received if "flutters in" in text]
+        self.assertEqual(arrivals.count(self.char1.pk), 2)
 
     def test_hidden_wave_blocks_actions_and_absent_economy_keeps_companions(self):
         pet = self.pet()

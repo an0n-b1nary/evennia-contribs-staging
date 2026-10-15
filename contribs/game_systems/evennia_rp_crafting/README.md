@@ -496,11 +496,14 @@ An independently acting animal belongs in NPCs.
 Persistent ambients pause while the owner is offline, its room or owner's
 room has an open fight, or Crafting is frozen/hidden. Arrivals, tricks and
 ambients use owner attribution, scene emit logs, ambient mute and Social
-ignore. They never record poses or RP activity. Owner-written `+pet/pose`
-calls the owner's `record_pose(..., pose_type="emit")`, using normal host
-tracking/capture once. Companion objects are hidden from viewers ignoring
-their owner. Automatic messages share persistent room limits; per-companion
-ambient timestamps survive reloads.
+ignore. They never record poses or RP activity. Without Accessibility,
+tricks still reach the room as ordinary owner-triggered events. Owner-written
+`+pet/pose` calls the owner's `record_pose(..., pose_type="emit")`, using
+normal host tracking/capture once. Companion objects are hidden from viewers
+ignoring their owner. Arrivals, tricks and ambients share persistent room
+EVENT limits (an arrival inside the cooldown moves quietly); per-companion
+ambient timestamps survive reloads. Companions refuse arriving objects, so
+`give`/`put` report failure.
 
 `RP_CRAFTING_WAVE_THREE_REVEALED` defaults True; use False for dark deployment.
 Additive migration 0005 preserves earlier craft, fixture and use history.

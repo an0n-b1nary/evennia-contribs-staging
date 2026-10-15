@@ -148,13 +148,9 @@ class CompanionObject(CraftedItemMixin, DefaultObject):
             return super().announce_move_to(source_location, **kwargs)
         return None
 
-    def at_object_receive(self, moved_obj, source_location, **kwargs):
-        # DefaultObject has no pre-receive hook. Refuse inventory immediately.
-        super().at_object_receive(moved_obj, source_location, **kwargs)
-        destination = source_location
-        if destination is None or isinstance(destination, CompanionObject):
-            destination = self.home
-        moved_obj.move_to(destination, quiet=True, to_none=True)
+    def at_pre_object_receive(self, arriving_object, source_location, **kwargs):
+        # No inventory: refuse before arrival so give/put report the failure.
+        return False
 
 
 def owner_moved(owner, source_location):
@@ -190,6 +186,15 @@ def owner_moved(owner, source_location):
         record = CraftRecord.objects.filter(item_id=item.pk, behaviour="companion").first()
         arrival = record.prose["configuration"].get("arrival") if record else ""
         if arrival:
+            from .fixtures import reserve_event
+
+            # Arrivals are automatic output: share the room's EVENT limit, so
+            # pacing between rooms arrives quietly instead of repeating prose.
+            try:
+                with transaction.atomic():
+                    reserve_event(destination, timezone.now())
+            except CraftingError:
+                continue
             emit(destination.pk, owner.pk, frame(arrival), ambient=True, wave_three=True)
 
 
