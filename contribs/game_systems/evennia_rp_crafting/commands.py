@@ -8,7 +8,7 @@ from . import conf, services
 from .behaviours import registry
 from .catalog import seed_catalog
 from .command_base import CraftCommand as _CraftCommand
-from .composition import invoke, specifications
+from .composition import specifications
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, Workshop
 from .room_commands import CmdFixture as CmdFixture
@@ -135,6 +135,8 @@ class CmdCraft(_CraftCommand):
       +craft/require = <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
       +craft/text = <readable text>
+      +craft/page [title] = <page text>  (repeat to append authored pages)
+      +craft/unpage <number>
       +craft/verb <niche key>/<verb key>  (only an allowed combination)
       +craft/unverb <verb key>
       +craft/beat = <EVENT prose>  (repeat for up to three beats)
@@ -205,7 +207,35 @@ class CmdCraft(_CraftCommand):
                 self.caller.attributes.remove(DRAFT_KEY)
                 self.msg(f"You craft {item.key}. {item.get_display_provenance(self.caller)}.")
                 return
-            if switch == "verb":
+            if switch in ("page", "unpage"):
+                from .pages import authored_pages, validate
+
+                entry = next(
+                    (entry for entry in draft.get("verbs", []) if entry["key"] == "readable"),
+                    None,
+                )
+                implementation = registry().get(entry["key"] if entry else draft["behaviour"])
+                if implementation is None or "pages" not in implementation.fields:
+                    raise CraftingError("Add a Readable verb first.")
+                target = entry["configuration"] if entry else draft["configuration"]
+                pages = (
+                    [{"title": page.title, "text": page.text} for page in authored_pages(target)]
+                    if target
+                    else []
+                )
+                if switch == "page":
+                    if self.rhs is None:
+                        raise CraftingError("Usage: +craft/page [title] = page text")
+                    pages.append({"title": self.lhs.strip(), "text": self.rhs})
+                else:
+                    number = int(self.args.strip())
+                    if not 1 <= number <= len(pages):
+                        raise CraftingError("No such draft page.")
+                    pages.pop(number - 1)
+                normalized = validate({"pages": pages}) if pages else {}
+                target.clear()
+                target.update(normalized)
+            elif switch == "verb":
                 if "/" not in self.args:
                     raise CraftingError("Usage: +craft/verb niche/verb")
                 key, kind = (value.strip() for value in self.args.split("/", 1))
@@ -319,7 +349,13 @@ class CmdCraft(_CraftCommand):
                         target = (
                             verb_entry["configuration"] if verb_entry else draft["configuration"]
                         )
-                        target[field] = text(value, field, limit)
+                        if field == "text":
+                            from .pages import validate
+
+                            target.clear()
+                            target.update(validate({"text": text(value, field, limit)}))
+                        else:
+                            target[field] = text(value, field, limit)
             elif switch in ("unrequire", "unbeat"):
                 field = "beats" if switch == "unbeat" else "requirements"
                 values = list(draft["configuration"].get(field, []))
@@ -360,6 +396,16 @@ class CmdCraft(_CraftCommand):
                 for field, label in labels.items():
                     if draft["configuration"].get(field):
                         rows.append(f"{label}: {draft['configuration'][field]}")
+                from .pages import authored_pages
+
+                for config in [
+                    draft["configuration"],
+                    *(entry["configuration"] for entry in draft.get("verbs", [])),
+                ]:
+                    if config.get("pages"):
+                        rows.append("Pages:")
+                        for number, page in enumerate(authored_pages(config), 1):
+                            rows.append(f"{number}. {page.title or f'Page {number}'}\n{page.text}")
                 for entry in draft.get("verbs", []):
                     rows.append(f"{entry['key']} ({entry['niche']})")
                     for field, label in labels.items():
@@ -388,22 +434,45 @@ class CmdCraft(_CraftCommand):
 class CmdRead(_CraftCommand):
     """Read the text held in a crafted item you carry or can see here.
 
-    Usage: read <item>
+    Usage:
+      read <item> [page number]
+      read <item> = <page number>
+      read/contents <item>
+
+    Without a page number, resume your last read page. Explicit page breaks
+    stay the same on every client. Contents does not move your bookmark.
     """
 
     key = "read"
     aliases = ["+read"]  # noqa: RUF012
 
     def run(self, switch):
-        if switch or not self.args.strip():
-            raise CraftingError("Usage: read <item>")
+        if switch not in ("", "contents") or not self.args.strip():
+            raise CraftingError("Usage: read <item> [= page number], or read/contents <item>")
         candidates = list(self.caller.contents)
         if self.caller.location:
             candidates += list(self.caller.location.contents)
-        item = self.caller.search(self.args.strip(), candidates=candidates)
+        name = self.lhs.strip()
+        number = None
+        if self.rhs is not None:
+            if switch:
+                raise CraftingError("Usage: read/contents <item>")
+            try:
+                number = int(self.rhs.strip())
+            except ValueError:
+                raise CraftingError("Choose a page number.") from None
+        else:
+            # Try the whole name first so names ending in numbers still work.
+            matches = self.caller.search(name, candidates=candidates, quiet=True)
+            tail = name.rsplit(" ", 1)
+            if not matches and not switch and len(tail) == 2 and tail[1].lstrip("-").isdecimal():
+                name, number = tail[0], int(tail[1])
+        item = self.caller.search(name, candidates=candidates)
         if item is None:
             return
-        self.msg(f"{item.key}\n{invoke(self.caller, item, 'readable')}")
+        from .pages import read
+
+        self.msg(f"{item.key}\n{read(self.caller, item, number, table=switch == 'contents')}")
 
 
 class CmdUse(_CraftCommand):

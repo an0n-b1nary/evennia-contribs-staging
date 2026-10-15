@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 - 2026-10-15
+
+- Readables support immutable authored pages, optional titles, contents and
+  persistent personal bookmarks through the shared Links pagination helpers.
+  Only multi-page books store bookmarks; a stale bookmark restarts at page 1.
+- Add draft `/page` and `/unpage`, explicit page breaks in `/text`, and numbered
+  reads. Each additional page has a configurable material cost; total readable
+  text remains bounded. Original single-text books retain their output and cost.
+- Exercise paged books through the reference game's actual commands and seed.
+  Journals, copies, mail, libraries and lore acquisition remain follow-ups.
+
 ## 0.5.0 - 2026-10-14
 
 - Add niche-owned cosmetic Modifier services with exact, atomic consent/payment, selected-layer undoing, free OOC visibility and persistent provenance. Add transferable cosmetic Companions, follow/stay, owner poses, tricks and bounded automatic output; arrivals share the room EVENT limit, tricks still reach the room without Accessibility, and Companions refuse arriving objects before they move. Preserve existing data with an additive migration; wire the reference host and optional-partner gates.

@@ -159,11 +159,16 @@ explicit return-or-transfer choice for shop merchandise.
 
 ### Workshops and crafting
 
-`evennia-rp-crafting` 0.3.0 seeds Weaver, Jeweller, Smith, Scribe, Cook and
+`evennia-rp-crafting` seeds Weaver, Jeweller, Smith, Scribe, Cook and
 Illusionist niches.
 At Market Row, a sample field book can be read and a woven cloak shows a
 verified maker hallmark. The demonstration crafter owns a Workshop; resetting
 rebuilds demo stock while preserving player Workshops and craft history.
+The sample travel book demonstrates two titled pages:
+`read/contents a sample travel book`, `read a sample travel book 2`, then
+`read a sample travel book` to resume that character's bookmark. Create pages
+with repeated `+craft/page title = text`; each extra page costs one additional
+material by default. The shared pagination helper comes from Links 0.8.7.
 The market also holds a sample spice cake and spark globe. Pick one up and
 `use <item>` emits its EVENT and consumes it. Compose your own through
 `+craft/new cooking/consumable`, `/desc`, repeated `/beat`, `/resources`, preview

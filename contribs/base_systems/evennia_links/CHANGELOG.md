@@ -1,5 +1,10 @@
 # Changelog — evennia-links
 
+## 0.8.7 - 2026-10-15
+
+- Add dependency-free authored-page helpers: immutable `Page`, explicit page
+  breaks, one-based selection and a plain-text table of contents.
+
 ## 0.8.6 - 2026-10-14
 
 - Shared temporary decorate permission, optional room lifecycle/ownership locks, and inactive-owner lookup for fixture recovery.

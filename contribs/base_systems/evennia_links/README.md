@@ -22,6 +22,7 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `AbstractVersion` | `versioning.py` | Append-only version history for any text field |
 | `AbstractArchived` + `ArchivedManager` | `archiving.py` | Soft-archive with default-manager filtering |
 | `EditingMixin` | `editing.py` | EvEditor + difflib mixin for version-tracked text editing; pairs with `AbstractVersion` |
+| `Page`, `split_pages`, `page_at`, `contents` | `pagination.py` | Authored IC pages with stable numbering and plain-text contents |
 | `connect_on_ready` | `listeners.py` | Import-order-safe signal-registration helper |
 | `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
 | `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
@@ -312,6 +313,19 @@ lock handler. A broken predicate or lock fails closed, and Django's
 games migrating HTTP staff checks should set the one web-wide setting instead.
 
 ---
+
+## Authored pages
+
+Helpers in `evennia_links.pagination` import without Django or Evennia
+initialization. `Page(text, title="")` is immutable; `split_pages(text)` splits
+only standalone `---PAGE---` lines, preserving paragraphs and retaining empty
+pages for the caller to validate. `page_at(pages, number)` selects a strictly
+one-based integer page and raises `ValueError` outside the range.
+`contents(pages)` renders numbered titles with plain `Page N` fallbacks.
+
+These helpers do not store progress, check access, apply content limits or wrap
+text to a client's terminal width. Consumers own those policies, so staff tomes
+and crafted books can share the same numbering.
 
 ## Bridge-ownership convention
 

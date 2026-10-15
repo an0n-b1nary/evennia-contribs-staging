@@ -471,7 +471,7 @@ class Command(BaseCommand):
 
         owner = authors[-1]
         counts = {"crafting_niches": len(seed_catalog(update=True))}
-        grant(owner, "timber", 12, "staff", note="Sandbox Workshop inputs")
+        grant(owner, "timber", 14, "staff", note="Sandbox Workshop inputs")
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
@@ -486,7 +486,16 @@ class Command(BaseCommand):
             {"text": crafting.BOOK_TEXT},
             {"timber": 1},
         )
-        items = [book]
+        paged_book = craft(
+            owner,
+            "writing",
+            "readable",
+            crafting.PAGED_BOOK_NAME,
+            "A bound travel book with two titled pages.",
+            {"pages": crafting.BOOK_PAGES},
+            {"timber": 2},
+        )
+        items = [book, paged_book]
         if apps.is_installed("evennia_rp_equipment"):
             unlock(owner, "weaving", {"timber": 6})
             cloak = craft(

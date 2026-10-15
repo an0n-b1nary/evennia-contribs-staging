@@ -51,6 +51,41 @@ def catalog():
 
 For Readable, use `+craft/new writing/readable = a field book`, `/desc`,
 `/text = ...`, `/resources`, then `/finish`. `read <item>` displays its text.
+
+Authored pages use `+craft/page [title] = page text` repeatedly, then
+`+craft/unpage <number>` to remove a draft page. `/text` replaces the draft's
+pages; a standalone `---PAGE---` line in new text creates an explicit page
+break. Page numbers do not depend on terminal width. Up to 100 pages fit within
+the existing 12,000-character total, including titles (80 characters each).
+Published pages stay in the immutable CraftRecord; these are not editable
+journals. Each additional page costs `readable.extra_page`, defaulting to one
+material input. Hosts with a custom cost map must configure that rule before
+crafting multiple pages; old single-text books retain their original price.
+
+`read <item> 3` or `read <item> = 3` selects a page. The equals form also works
+for item names ending in numbers: exact whole-name matches take precedence.
+`read/contents <item>` lists titles without moving the reader's bookmark.
+`read <item>` resumes the last page read by that character, initially page 1.
+Progress is stored in character Attributes under category
+`rp_crafting_reading`, keyed by immutable craft ID, so renames and transfers do
+not mix different books or readers. Only books with more than one page store
+progress, and a bookmark past a custom provider's current last page restarts at
+page 1. View and read locks apply to contents too;
+commands search only carried items and the current room. Contents reads and
+failed reads do not change progress. Single-page untitled books preserve their
+original read output, and pre-existing text is never reinterpreted as pages.
+
+Custom Readable implementations can supply `get_pages(actor, item, config)`
+and return shared `Page` objects after checking access. An existing custom
+`invoke` override remains authoritative: its returned text is one page until
+the provider explicitly supports pages. Contents and numbered reads never
+recover the raw text behind that provider's denial or redaction.
+
+`item.read(reader, page=None, contents=False)` uses these reading rules.
+`composition.invoke(reader, item, "readable")` retains the plain full-text
+dispatch API for existing integrations, with page bodies joined by blank
+lines. These operations do not grant lore or record poses. Journal authorship,
+copies, seals, mail and library access remain separate follow-ups.
 Drafts persist across logins and reloads. Preview consumes nothing; finish
 revalidates current costs, niche access, freeze settings, inputs and funds.
 Success clears the draft, so repeating finish cannot duplicate the craft.
@@ -133,7 +168,7 @@ to cover the first unlock. Existing balances and stock never decay.
 ```python
 RP_CRAFTING_COSTS = {
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},
-    "readable": {"base": {"materials": 1}},
+    "readable": {"base": {"materials": 1}, "extra_page": {"materials": 1}},
     "consumable": {"base": {"provisions": 1}, "extra_beat": {"provisions": 1}},
     "broadcast": {"base": {"essences": 1}, "extra_beat": {"essences": 1}},
 }
