@@ -1744,3 +1744,30 @@ and combat-pause seams run in `world.sandbox.test_wave_two`. Crafting partner CI
 also removes Building and Scenes physically, and the independent job tests only
 Links/Resources/Crafting. Golden reseeding retires only tagged demonstration
 placements; player fixtures and append-only craft history are preserved.
+
+### Crafting wave three
+
+The catalogue adds Enchanter and Companion Maker niches. Weavers can offer
+dye services and Smiths can engrave. The market's sample lute has an attributed
+aura; a sample clockwork bird stays in the market and has an Activatable bow.
+Its owner can use `+pet/follow`, `/stay`, `/trick` and `/pose`. Pick it up
+before gifting/selling it; ownership changes with ordinary handoffs and sales.
+
+`+modify/offer customer/target = niche/modifier ; prose ; resource:quantity ; commission`
+proposes a service; `+modify/accept number` consents and commits materials,
+payment and the layer change once. `/layers target` lists layer numbers;
+`/hide` and `/show` are free OOC toggles. `/undo customer/target = niche ; layer ; resources ; commission`
+offers selected-layer removal. Base prose, equipment requirements and maker
+history are preserved. Services require Economy; quiet Companions remain
+usable with optional partners absent.
+
+`ModificationDisplayMixin` precedes host objects/characters, and
+`CompanionCharacterMixin` precedes the host Character with cooperative movement
+hooks. Both imports are gated when Crafting is absent. The existing
+Crafting command registration supplies `+modify` and `+pet`; there is no new web/API surface.
+`RP_CRAFTING_WAVE_THREE_REVEALED=False` stages wave three independently.
+Owner-written pet poses enter the ordinary posing pipeline. Automatic output
+uses mute/ignore and scene emit logs without generating RP activity; ambients
+pause offline/in combat. Real partner seams live in `world.sandbox.test_wave_three`
+and run in the crafting partner matrix. The generated golden snapshot includes
+the additive migration and synthetic demonstrations.

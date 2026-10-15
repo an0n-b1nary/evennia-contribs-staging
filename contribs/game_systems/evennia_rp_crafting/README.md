@@ -2,7 +2,9 @@
 
 Workshops unlock breadth, never quality. Invest money and resources in niches,
 then compose new cosmetic items with one **lifecycle** and compatible **verbs**.
-Products include Wearables, Readables, Consumables, Broadcasts, reusable Activatables and Installable fixtures.
+Products include Wearables, Readables, Consumables, Broadcasts, reusable
+Activatables, Installable fixtures and cosmetic Companions. Niche-owned
+Modifier services add attributed layers to existing items or characters.
 Crafting has no XP, RP quota, quality tier or waiting period.
 
 ## Installation
@@ -146,7 +148,8 @@ honouring the caller's transaction. Verbs instead implement
 
 ## Composition
 
-Every item has one lifecycle: `carried`, `wearable`, `consumable`, `broadcast` or `installable`.
+Every item has one lifecycle: `carried`, `wearable`, `consumable`, `broadcast`,
+`installable` or `companion`.
 The lifecycle selects its typeclass and owns movement, equipment and destruction
 hooks. `readable` is a verb, dispatched from the verified CraftRecord rather than
 the item's typeclass. `+craft/new writing/readable` remains shorthand for a
@@ -163,6 +166,7 @@ RP_CRAFTING_COMBINATIONS = {
     "installable": [[], ["readable"], ["activatable"], ["readable", "activatable"]],
     "consumable": [[]],
     "broadcast": [[]],
+    "companion": [[], ["activatable"]],
 }
 ```
 
@@ -203,7 +207,9 @@ lifecycle in `context["behaviour"]`, plus `verbs` and contributing niche snapsho
 
 The allow-list controls new production. Removing a combination prevents new
 crafts without disabling existing items. Their actions still enforce runtime
-permissions and installed-partner availability. Readable and Activatable are dispatched from verified record configuration. Companions, general facets and post-craft modification remain separate work.
+permissions and installed-partner availability. Readable and Activatable are
+dispatched from verified record configuration. General facets remain separate
+work; wave-three services preserve those original records.
 
 ## Provenance and review
 
@@ -399,5 +405,104 @@ Without an ownership provider, Evennia control governs installation and no
 furnishing credit is awarded. The additive migration preserves existing records,
 typeclass paths and use history, with zero furnishing value on earlier records.
 
-Wave-three Modifiers/Companions and the letterbox, library, places, map markers,
-radius/bearings and remaining facet integrations are separate milestones.
+## Modifiers and consent services
+
+Wave three adds `modifier_aura`, `modifier_mark`, `modifier_dye`,
+`modifier_engrave` and `modifier_undo`. These are service behaviours granted
+by niches, rather than lifecycles or verbs. The host catalogue assigns them.
+Modifiers require Economy 0.3.1 or newer; service-only niches are unavailable without it,
+while existing layers still render.
+
+An offer identifies the exact target, added/replaced/removed layer,
+maker-supplied materials, maker craft fee and customer commission. Offers
+reserve nothing. Acceptance revalidates ownership, co-location, active niches,
+target snapshot and current costs. A changed target or terms requires a new
+offer. Materials, fees, payment, layer changes and acceptance commit together
+once; failure rolls everything back. Economy's guest, same-account, freeze,
+expiry, trade fees and ledger rules apply. Both parties' trade fees are shown
+in the quote and revalidated on acceptance. Self services require explicit
+acceptance and zero commission, but still consume materials and the craft fee.
+
+```text
++modify/offer Mira/a cloak = weaving/modifier_dye ; The fabric is a deep red. ; timber:1 ; 30
++modify/accept 1
++modify/layers a cloak
++modify/hide 1
++modify/show 1
++modify/undo Mira/a cloak = enchanting ; 1 ; ember:1 ; 20
+```
+
+Service numbers and layer numbers are separate. Accept/cancel the returned
+service number with `+modify/accept` or `/cancel`; its underlying Economy offer
+also supports Economy's acceptance/cancellation commands. Aura, dye and
+engraving have one active layer per kind; replacements explicitly name it as
+the fifth offer term. Marks can coexist. Undo targets one existing layer with
+the current owner's consent. Base prose, original aura lines, requirements
+and unrelated layers remain intact. Replacement/undo retain removed layers
+and their service/maker history. Hiding is a free OOC visibility toggle.
+
+`RP_CRAFTING_COSTS` supplies service category costs: by default one essence
+for aura, mark and undo; one material for dye and engraving. Hosts may subclass
+Modifier behaviours. Resource keys and the setting-specific meaning of undoing
+belong to the host. Services supply no stats or combat effects.
+
+To restrict a service to particular resource keys, configure, for example,
+`RP_CRAFTING_MODIFIER_RESOURCE_KEYS = {"modifier_undo": ["unmaking"]}`.
+The key must exist in the host's resource catalogue; category costs still
+come from `RP_CRAFTING_COSTS`. This permits a setting-specific undoing essence
+without hardcoding it into the public service.
+
+Put `ModificationDisplayMixin` before the host object/character in its MRO
+for ordinary heirlooms and character marks. Crafted items already include it.
+It appends visible attributed layers without altering base descriptions.
+Equipment 0.1.3 also displays layers on plain gear and worn lines when Crafting
+is installed. `+modify/layers` shows OOC history, including hidden/removed
+layers. Public services: `modifiers.propose`, `accept`, `cancel`, `set_hidden`.
+Economy's `service` asset cannot be gifted, listed or reoffered to bypass
+the original consent/payment offer.
+
+## Companions
+
+`companion` is a cosmetic lifecycle; its tested complete verb sets are
+`"companion": [[], ["activatable"]]`. Default cost: one material, plus one
+essence for optional ambience. Activatable tricks require both niches and
+their combined costs. `/arrival` and `/ambient` accept plain prose and require
+Accessibility. Quiet Companions work without that partner.
+
+```text
++craft/new companions/companion = a clockwork bird
++craft/desc = A little brass bird with decorative feathers.
++craft/verb music/activatable
++craft/mode bow = The little bird bows and spreads its wings.
++craft/resources = timber:2
++craft/finish
++pet/follow a clockwork bird
++pet/stay a clockwork bird
++pet/trick a clockwork bird = bow
++pet/pose a clockwork bird = tilts its head at the visitor.
+```
+
+Put `CompanionCharacterMixin` before the host Character, preserving cooperative
+`super()` movement hooks. Following uses a traversable exit to the owner's
+destination and respects entry/movement locks. Without a usable route it
+stays behind and notifies the owner. The host exit's actual traversal hook
+runs for the Companion; private routes may require explicit host permission.
+Stay leaves it here; visit or carry it
+to change modes. Pick it up before gifting/listing it. Ordinary handoffs and
+Economy sales change ownership and reset it to stay; former owners lose control.
+Companions have no inventory, puppeting, combat statistics or extra actions.
+An independently acting animal belongs in NPCs.
+
+Persistent ambients pause while the owner is offline, its room or owner's
+room has an open fight, or Crafting is frozen/hidden. Arrivals, tricks and
+ambients use owner attribution, scene emit logs, ambient mute and Social
+ignore. They never record poses or RP activity. Owner-written `+pet/pose`
+calls the owner's `record_pose(..., pose_type="emit")`, using normal host
+tracking/capture once. Companion objects are hidden from viewers ignoring
+their owner. Automatic messages share persistent room limits; per-companion
+ambient timestamps survive reloads.
+
+`RP_CRAFTING_WAVE_THREE_REVEALED` defaults True; use False for dark deployment.
+Additive migration 0005 preserves earlier craft, fixture and use history.
+Letterboxes, libraries, places, map markers, radius/bearings and remaining
+facets remain separate milestones.

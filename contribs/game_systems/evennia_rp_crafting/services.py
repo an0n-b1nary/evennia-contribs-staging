@@ -23,11 +23,13 @@ from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, NicheUnlock, Workshop, WorkshopInvestment
 
 
-def _require(actor, *, spending=True, wave_two=False):
+def _require(actor, *, spending=True, wave_two=False, wave_three=False):
     if not conf.visible(actor):
         raise CraftingError("Crafting is unavailable.")
     if wave_two and not conf.wave_two_visible(actor):
         raise CraftingError("Crafting wave two is unavailable.")
+    if wave_three and not conf.wave_three_visible(actor):
+        raise CraftingError("Crafting wave three is unavailable.")
     if get("RP_CRAFTING_FROZEN"):
         raise CraftingError("Crafting is paused for the moment.")
     if spending and apps.is_installed("evennia_economy"):
@@ -245,4 +247,8 @@ def craft(actor, key, behaviour_key, name, description, configuration, selected,
         hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
     )
     Workshop.objects.filter(pk=workshop.pk).update(last_craft=record.created)
+    if implementation.lifecycle_key == "companion":
+        from .fixtures import ensure_script
+
+        transaction.on_commit(ensure_script)
     return item

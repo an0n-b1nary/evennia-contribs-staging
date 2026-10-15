@@ -20,7 +20,9 @@ class CraftingSeams(EvenniaTest):
         from commands.default_cmdsets import CharacterCmdSet
 
         keys = {command.key for command in CharacterCmdSet().commands}
-        self.assertTrue({"+workshop", "+craft", "read", "use", "+crafting"} <= keys)
+        self.assertTrue(
+            {"+workshop", "+craft", "read", "use", "+crafting", "+modify", "+pet"} <= keys
+        )
 
     def test_seed_reseed_preserves_player_workshop_and_restores_demonstration_items(self):
         call_command("seed_sandbox", verbosity=0)
@@ -36,7 +38,7 @@ class CraftingSeams(EvenniaTest):
         services.unlock(self.char1, "writing", {"timber": 3})
         call_command("seed_sandbox", verbosity=0)
         self.assertTrue(Workshop.objects.filter(character=self.char1).exists())
-        self.assertEqual(NicheDefinition.objects.count(), 8)
+        self.assertEqual(NicheDefinition.objects.count(), 10)
         self.assertTrue(CraftRecord.objects.filter(behaviour="carried").exists())
 
     def test_host_book_uses_carried_lifecycle_and_record_based_read_dispatch(self):

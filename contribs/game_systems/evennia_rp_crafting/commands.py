@@ -14,6 +14,8 @@ from .models import CraftRecord, NicheDefinition, Workshop
 from .room_commands import CmdFixture as CmdFixture
 from .room_commands import CmdListen as CmdListen
 from .room_commands import CmdSense as CmdSense
+from .wave_three_commands import CmdModify as CmdModify
+from .wave_three_commands import CmdPet as CmdPet
 
 DRAFT_KEY = "rp_crafting_draft"
 
@@ -144,6 +146,7 @@ class CmdCraft(_CraftCommand):
       +craft/smell = <sensory line>
       +craft/sound = <sensory line>
       +craft/ambient = <periodic EVENT prose>
+      +craft/arrival = <Companion arrival prose>
       +craft/resources = <resource key>:<quantity>[,...]
       +craft                   preview; consumes nothing
       +craft/finish            pay and create once; clears the draft on success
@@ -262,6 +265,7 @@ class CmdCraft(_CraftCommand):
                 "smell",
                 "sound",
                 "ambient",
+                "arrival",
             ):
                 value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
                 from .behaviours import text
@@ -309,7 +313,7 @@ class CmdCraft(_CraftCommand):
                             else 30
                             if field in ("slot", "reach")
                             else 400
-                            if field in ("room_line", "smell", "sound", "ambient")
+                            if field in ("room_line", "smell", "sound", "ambient", "arrival")
                             else 200
                         )
                         target = (
@@ -350,6 +354,7 @@ class CmdCraft(_CraftCommand):
                     "smell": "Smell",
                     "sound": "Sound",
                     "ambient": "Ambient",
+                    "arrival": "Arrival",
                     "modes": "Modes",
                 }
                 for field, label in labels.items():
@@ -500,3 +505,5 @@ class CraftingCmdSet(CmdSet):
             self.add(command())
         for command in (CmdFixture, CmdListen, CmdSense):
             self.add(command())
+        self.add(CmdModify())
+        self.add(CmdPet())
