@@ -26,10 +26,10 @@ class CraftedItemMixin:
             *record.behaviour_keys,
         ]
 
-    def read(self, reader):
-        from .composition import invoke
+    def read(self, reader, page=None, *, contents=False):
+        from .pages import read
 
-        return invoke(reader, self, "readable")
+        return read(reader, self, page, table=contents)
 
     def get_display_desc(self, looker, **kwargs):
         desc = super().get_display_desc(looker, **kwargs)

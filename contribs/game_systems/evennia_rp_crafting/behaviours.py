@@ -96,16 +96,55 @@ class Carried(Behaviour):
 
 class Readable(Behaviour):
     role = "verb"
-    fields = ("text",)
+    fields = ("text", "pages")
 
     def validate(self, config):
         config = super().validate(config)
-        return {"text": text(config.get("text", ""), "Readable text", 12000, required=True)}
+        from .pages import validate
+
+        return validate(config)
+
+    def cost(self, key, config):
+        from .pages import authored_pages
+
+        total = Counter(super().cost(key, config))
+        extra = len(authored_pages(config)) - 1
+        if extra:
+            rules = getattr(settings, "RP_CRAFTING_COSTS", conf.DEFAULT_COSTS).get(key, {})
+            if "extra_page" not in rules:
+                raise CraftingError("This behaviour has no extra-page cost rule.")
+            for category, quantity in category_cost(rules["extra_page"]).items():
+                total[category] += quantity * extra
+        if sum(total.values()) > conf.MAX_AMOUNT:
+            raise CraftingError("Craft costs exceed the supported range.")
+        return dict(total)
+
+    def check_read(self, actor, item):
+        if not item.access(actor, "view", default=True) or not item.access(
+            actor, "read", default=True
+        ):
+            raise CraftingError("You cannot read that.")
 
     def invoke(self, actor, item, config):
-        if not item.access(actor, "read", default=True):
-            raise CraftingError("You cannot read that.")
-        return config["text"]
+        self.check_read(actor, item)
+        from .pages import authored_pages
+
+        return "\n\n".join(page.text for page in authored_pages(config))
+
+    def get_pages(self, actor, item, config):
+        """Page providers may override this; retain existing custom read guards.
+
+        A legacy invoke override may redact or deny text. Its output remains
+        one page until the provider explicitly supplies a page-aware method.
+        """
+        from evennia_links.pagination import Page
+
+        from .pages import authored_pages
+
+        if type(self).invoke is not Readable.invoke:
+            return (Page(self.invoke(actor, item, config)),)
+        self.check_read(actor, item)
+        return authored_pages(config)
 
 
 class Wearable(Behaviour):

@@ -25,7 +25,7 @@ DEFAULT_COMBINATIONS = {
 }
 DEFAULT_COSTS = {
     "wearable": {"base": {"materials": 1}, "aura_line": {"essences": 1}},
-    "readable": {"base": {"materials": 1}},
+    "readable": {"base": {"materials": 1}, "extra_page": {"materials": 1}},
     "consumable": {"base": {"provisions": 1}, "extra_beat": {"provisions": 1}},
     "broadcast": {"base": {"essences": 1}, "extra_beat": {"essences": 1}},
     "installable": {"base": {"materials": 1}, "ambient": {"essences": 1}},

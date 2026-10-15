@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 - 2026-10-15
+
+- Readables support immutable authored pages, optional titles, contents and
+  persistent personal bookmarks through the shared Links pagination helpers.
+- Add draft `/page` and `/unpage`, explicit page breaks in `/text`, and numbered
+  reads. Each additional page has a configurable material cost; total readable
+  text remains bounded. Original single-text books retain their output and cost.
+- Exercise paged books through the reference game's actual commands and seed.
+  Journals, copies, mail, libraries and lore acquisition remain follow-ups.
+
 ## 0.4.0 - 2026-10-14
 
 - Add reusable activation modes, random flavour readings, Installable fixtures, bounded temporary room layers, sensory commands, ambient scheduling, and captured furnishing credit in UBI-weeks. Preserve existing craft/item paths with an additive migration. Wire actual ownership, economy, scenes, ignore and combat partners in the reference host and test physically absent partners. A fixture supplies at most one temporary layer at a time, and deleting a room with `CraftingRoomMixin` returns its fixtures to the property owner.
