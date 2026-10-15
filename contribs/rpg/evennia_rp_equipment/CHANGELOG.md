@@ -13,6 +13,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Accept chargen 0.4 while retaining compatibility with chargen 0.3.
 
+## [0.1.4] - 2026-10-15
+
+### Fixed
+
+- Label verified craft hallmarks as OOC in equipment inspection, matching the
+  crafted item's appearance and keeping them distinct from IC maker's marks.
+
 ## [0.1.3] - 2026-10-14
 
 ### Added

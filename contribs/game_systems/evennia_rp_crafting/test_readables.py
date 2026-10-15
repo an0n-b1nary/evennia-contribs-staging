@@ -262,7 +262,8 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
         ):
             self.call(CmdCraft(), args, "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: Notebook")
-        self.call(CmdCraft(), "/finish", "You craft Notebook")
+        output = self.call(CmdCraft(), "/finish", "You craft Notebook")
+        self.assertIn("Hallmark (OOC):", output)
         self.call(CmdJournal(), "/write Notebook = Start | We arrived.", "Journal page 1 saved")
         self.call(
             CmdJournal(),
@@ -287,6 +288,7 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdCraft(), "/finish", "The source has changed")
         self.call(CmdCraft(), f"/copy {journal.key} = writing-0/First edition", "Copy draft saved")
         self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
-        self.call(CmdCraft(), "/finish", "You copy First edition")
+        output = self.call(CmdCraft(), "/finish", "You copy First edition")
+        self.assertIn("Hallmark (OOC):", output)
         self.assertFalse(self.char1.attributes.has(DRAFT_KEY))
         self.call(CmdCraft(), "/finish", "Start a draft")

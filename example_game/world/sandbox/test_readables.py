@@ -25,6 +25,11 @@ class ReadableSeams(EvenniaCommandTest):
         call_command("seed_sandbox", verbosity=0)
         journal = ObjectDB.objects.get(db_key=crafting.JOURNAL_NAME)
         edition = ObjectDB.objects.get(db_key=crafting.EDITION_NAME)
+        if apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_equipment.commands import render_info
+
+            cloak = ObjectDB.objects.get(db_key=crafting.CLOAK_NAME)
+            self.assertIn("Craft hallmark (OOC):", render_info(cloak, self.char1))
         self.assertIn("+journal", {command.key for command in CharacterCmdSet().commands})
         journal.move_to(self.char1, quiet=True)
         self.call(

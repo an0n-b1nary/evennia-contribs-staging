@@ -62,7 +62,9 @@ def continue_copy(command, switch, draft):
             expected=draft["copy_fingerprint"],
         )
         command.caller.attributes.remove(DRAFT_KEY)
-        command.msg(f"You copy {item.key}. {item.get_display_provenance(command.caller)}.")
+        command.msg(
+            f"You copy {item.key}. Hallmark (OOC): {item.get_display_provenance(command.caller)}."
+        )
         return
     record, config, authors, fingerprint = snapshot(command.caller, source)
     if fingerprint != draft["copy_fingerprint"]:

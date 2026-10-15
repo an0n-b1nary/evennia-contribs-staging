@@ -218,7 +218,9 @@ class CmdCraft(_CraftCommand):
                     verbs=draft.get("verbs"),
                 )
                 self.caller.attributes.remove(DRAFT_KEY)
-                self.msg(f"You craft {item.key}. {item.get_display_provenance(self.caller)}.")
+                self.msg(
+                    f"You craft {item.key}. Hallmark (OOC): {item.get_display_provenance(self.caller)}."
+                )
                 return
             if switch == "journal":
                 from .pages import validate
