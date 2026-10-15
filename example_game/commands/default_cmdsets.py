@@ -127,6 +127,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdListen",
             "CmdModify",
             "CmdPet",
+            "CmdJournal",
         ):
             self.add(command)
         self.add(CmdEmit)

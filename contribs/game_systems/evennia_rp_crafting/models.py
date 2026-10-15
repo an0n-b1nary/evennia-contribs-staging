@@ -126,6 +126,55 @@ class CraftRecord(models.Model):
         raise ValidationError("Craft records are append-only.")
 
 
+class JournalRevision(models.Model):
+    """Append-only text history; binding provenance never changes."""
+
+    craft = models.ForeignKey(
+        CraftRecord, on_delete=models.PROTECT, related_name="journal_revisions"
+    )
+    page = models.PositiveIntegerField()
+    revision = models.PositiveIntegerField()
+    author_id = models.PositiveBigIntegerField()
+    author_name = models.CharField(max_length=255)
+    title = models.CharField(max_length=80, blank=True)
+    text = models.TextField()
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering: ClassVar = ["page", "revision"]
+        constraints: ClassVar = [
+            models.UniqueConstraint(
+                fields=["craft", "page", "revision"], name="craft_journal_revision"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Journal revisions are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Journal revisions are append-only.")
+
+
+class ReadableEdition(models.Model):
+    """Verified copy lineage and the writers of its frozen page snapshot."""
+
+    craft = models.OneToOneField(CraftRecord, on_delete=models.PROTECT, related_name="edition")
+    source = models.ForeignKey(CraftRecord, on_delete=models.PROTECT, related_name="copies")
+    authors = models.JSONField(default=list)
+    source_fingerprint = models.CharField(max_length=64)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Readable editions are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Readable editions are append-only.")
+
+
 class EventUse(models.Model):
     """One lifetime use per item; soft identities survive consumption."""
 

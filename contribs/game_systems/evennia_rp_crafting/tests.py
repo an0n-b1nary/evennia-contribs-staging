@@ -278,7 +278,7 @@ class CraftTests(CraftingFixture, EvenniaTest):
         self.char1.key = "Renamed maker"
         NicheDefinition.objects.filter(key="writing-0").update(name="Renamed niche")
         self.assertEqual(item.get_display_provenance(), record.hallmark)
-        self.assertIn("Craft hallmark:", strip_ansi(item.return_appearance(self.char2)))
+        self.assertIn("Craft hallmark (OOC):", strip_ansi(item.return_appearance(self.char2)))
         self.assertEqual(record.prose["description"], "A bound notebook.")
         self.assertEqual(record.resources_spent, {"wood": 1})
         self.assertIsNotNone(Workshop.objects.get(character=self.char1).last_craft)

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 - 2026-10-15
+
+- Add blank journals with prepaid capacity, free owner writing, retained revision
+  history and immutable page-writer identities across gifts and sales.
+- Add reviewable copy drafts at normal crafting cost, freezing accessible text
+  and its authorship with source lineage. Revalidate source access and content
+  before spending; copy failures roll back payment, items and history together.
+- Label hallmarks and text authorship as OOC. Keep binding makers separate from
+  journal writers and copiers, and respect custom reader denial/redaction.
+- Preserve shipped records with an additive migration; exercise journal gifts,
+  sales, editions and reseeding in the reference host and partner-absence gates.
+
 ## 0.6.0 - 2026-10-15
 
 - Readables support immutable authored pages, optional titles, contents and

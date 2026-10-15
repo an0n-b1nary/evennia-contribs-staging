@@ -26,7 +26,11 @@ class CraftedItemMixin(ModificationDisplayMixin):
     def get_display_provenance(self, looker=None):
         """Verified provenance comes from the immutable record, never item prose."""
         record = self.craft_record
-        return record.hallmark if record else ""
+        if record is None:
+            return ""
+        from .readables import provenance
+
+        return provenance(record)
 
     def get_market_keywords(self, looker=None):
         record = self.craft_record
@@ -45,7 +49,7 @@ class CraftedItemMixin(ModificationDisplayMixin):
     def get_display_desc(self, looker, **kwargs):
         desc = super().get_display_desc(looker, **kwargs)
         hallmark = self.get_display_provenance(looker)
-        return f"{desc}\n\n|wCraft hallmark:|n {hallmark}" if hallmark else desc
+        return f"{desc}\n\n|wCraft hallmark (OOC):|n {hallmark}" if hallmark else desc
 
 
 class Readable(CraftedItemMixin, DefaultObject):

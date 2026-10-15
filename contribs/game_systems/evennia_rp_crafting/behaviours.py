@@ -96,7 +96,7 @@ class Carried(Behaviour):
 
 class Readable(Behaviour):
     role = "verb"
-    fields = ("text", "pages")
+    fields = ("text", "pages", "journal")
 
     def validate(self, config):
         config = super().validate(config)
@@ -108,7 +108,7 @@ class Readable(Behaviour):
         from .pages import authored_pages
 
         total = Counter(super().cost(key, config))
-        extra = len(authored_pages(config)) - 1
+        extra = config.get("journal", len(authored_pages(config))) - 1
         if extra:
             rules = getattr(settings, "RP_CRAFTING_COSTS", conf.DEFAULT_COSTS).get(key, {})
             if "extra_page" not in rules:
@@ -127,9 +127,9 @@ class Readable(Behaviour):
 
     def invoke(self, actor, item, config):
         self.check_read(actor, item)
-        from .pages import authored_pages
+        from .readables import current_pages
 
-        return "\n\n".join(page.text for page in authored_pages(config))
+        return "\n\n".join(page.text for page in current_pages(item, config))
 
     def get_pages(self, actor, item, config):
         """Page providers may override this; retain existing custom read guards.
@@ -139,12 +139,12 @@ class Readable(Behaviour):
         """
         from evennia_links.pagination import Page
 
-        from .pages import authored_pages
+        from .readables import current_pages
 
         if type(self).invoke is not Readable.invoke:
             return (Page(self.invoke(actor, item, config)),)
         self.check_read(actor, item)
-        return authored_pages(config)
+        return current_pages(item, config)
 
 
 class Wearable(Behaviour):
