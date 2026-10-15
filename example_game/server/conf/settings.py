@@ -141,6 +141,7 @@ SOCIAL_PROFILE_PROVIDERS = ["evennia_rp_resources.profile.gathering_field"]
 ######################################################################
 RP_CRAFTING_REVEALED = True
 RP_CRAFTING_WAVE_TWO_REVEALED = True
+RP_CRAFTING_WAVE_THREE_REVEALED = True
 RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
@@ -151,11 +152,13 @@ RP_CRAFTING_COMBINATIONS = {
     "installable": [[], ["readable"], ["activatable"], ["readable", "activatable"]],
     "consumable": [[]],
     "broadcast": [[]],
+    "companion": [[], ["activatable"]],
 }
 RP_CRAFTING_WEARABLE_TYPECLASS = "typeclasses.craft_items.CraftedWearable"
 RP_CRAFTING_CONSUMABLE_TYPECLASS = "typeclasses.craft_items.CraftedConsumable"
 RP_CRAFTING_BROADCAST_TYPECLASS = "typeclasses.craft_items.CraftedBroadcast"
 RP_CRAFTING_INSTALLABLE_TYPECLASS = "typeclasses.craft_items.CraftedFixture"
+RP_CRAFTING_COMPANION_TYPECLASS = "typeclasses.craft_items.CraftedCompanion"
 RP_CRAFTING_FIXTURE_ROOM_LIMIT = 5
 RP_CRAFTING_TEMPORARY_LAYER_LIMIT = 3
 RP_CRAFTING_TEMPORARY_LAYER_SECONDS = 3600

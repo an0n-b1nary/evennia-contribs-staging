@@ -107,6 +107,13 @@ def activate(actor, item, mode=None):
         allowed = placement.room_id == room.pk and item.location == room
     else:
         allowed = item.location == actor
+    if record_is_companion := CraftRecord.objects.filter(
+        item_id=item.pk, behaviour="companion"
+    ).exists():
+        from .companions import _require
+
+        _require(actor, item)
+        allowed = item.location in (actor, room)
     if not allowed or not item.access(actor, "use", default=True):
         raise CraftingError(
             "Carry the item or visit its installation, and have permission to use it."
@@ -134,5 +141,10 @@ def activate(actor, item, mode=None):
     use = ActivationUse.objects.create(
         craft=record, actor_id=actor.pk, room_id=room.pk, mode=mode, message=message
     )
-    transaction.on_commit(lambda: emit(room.pk, actor.pk, message))
+    # Tricks honour ambient mute when Accessibility can supply it; without that
+    # partner they are ordinary owner-triggered events rather than dropped.
+    mutable = record_is_companion and apps.is_installed("evennia_accessibility")
+    transaction.on_commit(
+        lambda: emit(room.pk, actor.pk, message, ambient=mutable, wave_three=record_is_companion)
+    )
     return use

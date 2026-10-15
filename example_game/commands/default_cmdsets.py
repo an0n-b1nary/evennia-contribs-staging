@@ -125,6 +125,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdFixture",
             "CmdSense",
             "CmdListen",
+            "CmdModify",
+            "CmdPet",
         ):
             self.add(command)
         self.add(CmdEmit)

@@ -51,6 +51,8 @@ def create_offer(giver, recipient, give, want=None, *, secret=False):
         raise EconomyError("An offer must give at least one asset.")
     with transaction.atomic():
         require_open()
+        assets.lock_provider_context(giver, recipient, give)
+        assets.lock_provider_context(recipient, giver, want)
         lock_characters(giver, recipient)
         room_id = _parties(giver, recipient)
         expire_offers()
@@ -131,6 +133,8 @@ def accept_offer(recipient, offer_id, *, secret=False):
     with transaction.atomic():
         require_open()
         # Same lock order as creation/currency/resources, then the offer row.
+        assets.lock_provider_context(initial.giver, recipient, initial.give)
+        assets.lock_provider_context(recipient, initial.giver, initial.want)
         lock_characters(initial.giver, recipient)
         offer = Offer.objects.select_for_update().get(pk=offer_id)
         if offer.status != "open" or offer.expires <= timezone.now():
@@ -160,6 +164,7 @@ def give(giver, recipient, spec):
     with transaction.atomic():
         if market:
             require_open()
+        assets.lock_provider_context(giver, recipient, spec)
         lock_characters(giver, recipient)
         room_id = _parties(giver, recipient)
         now = timezone.now()

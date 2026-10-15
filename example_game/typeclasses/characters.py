@@ -40,6 +40,7 @@ processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
   evennia_rptracker's README §"Wire the disconnect hook".
 """
 
+from django.apps import apps
 from evennia.objects.objects import DefaultCharacter
 
 from evennia_links.communication import CommunicationCharacterMixin
@@ -49,12 +50,20 @@ from evennia_social import SocialCharacterMixin
 
 from .objects import ObjectParent
 
+if apps.is_installed("evennia_rp_crafting"):
+    from evennia_rp_crafting.companions import CompanionCharacterMixin
+else:
+
+    class CompanionCharacterMixin:
+        pass
+
 
 class Character(
     GuestCharacterMixin,
     CommunicationCharacterMixin,
     SocialCharacterMixin,
     PosingCharacterMixin,
+    CompanionCharacterMixin,
     ObjectParent,
     DefaultCharacter,
 ):

@@ -10,13 +10,19 @@ class CraftCommand(MuxCommand):
     locks = "cmd:all()"
     help_category = "Crafting"
     wave_two = False
+    wave_three = False
+
+    def visible(self, actor):
+        if self.wave_three:
+            return conf.wave_three_visible(actor)
+        return conf.wave_two_visible(actor) if self.wave_two else conf.visible(actor)
 
     def access(self, srcobj, access_type="cmd", default=False, **kwargs):
-        visible = conf.wave_two_visible(srcobj) if self.wave_two else conf.visible(srcobj)
+        visible = self.visible(srcobj)
         return super().access(srcobj, access_type, default, **kwargs) and visible
 
     def func(self):
-        if not (conf.wave_two_visible(self.caller) if self.wave_two else conf.visible(self.caller)):
+        if not self.visible(self.caller):
             return
         try:
             if len(self.switches) > 1:

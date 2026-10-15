@@ -11,6 +11,14 @@ with a location in the game world (like Characters, Rooms, Exits).
 from django.apps import apps
 from evennia.objects.objects import DefaultObject
 
+if apps.is_installed("evennia_rp_crafting"):
+    from evennia_rp_crafting.typeclasses import ModificationDisplayMixin
+else:
+
+    class ModificationDisplayMixin:
+        pass
+
+
 if apps.is_installed("evennia_economy"):
     from evennia_economy.typeclasses import EconomyObjectMixin
 else:
@@ -19,7 +27,7 @@ else:
         pass
 
 
-class ObjectParent(EconomyObjectMixin):
+class ObjectParent(ModificationDisplayMixin, EconomyObjectMixin):
     """
     This is a mixin that can be used to override *all* entities inheriting at
     some distance from DefaultObject (Objects, Exits, Characters and Rooms).

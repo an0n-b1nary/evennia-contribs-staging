@@ -13,6 +13,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Accept chargen 0.4 while retaining compatibility with chargen 0.3.
 
+## [0.1.3] - 2026-10-14
+
+### Added
+
+- Display optional crafting layers on plain gear and worn lines without
+  changing sealed prose or requirements. Equipment remains independent
+  when Crafting is absent.
+
 ## [0.1.2] - 2026-10-09
 
 ### Added

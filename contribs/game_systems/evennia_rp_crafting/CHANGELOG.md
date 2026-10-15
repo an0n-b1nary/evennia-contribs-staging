@@ -10,6 +10,10 @@
 - Exercise paged books through the reference game's actual commands and seed.
   Journals, copies, mail, libraries and lore acquisition remain follow-ups.
 
+## 0.5.0 - 2026-10-14
+
+- Add niche-owned cosmetic Modifier services with exact, atomic consent/payment, selected-layer undoing, free OOC visibility and persistent provenance. Add transferable cosmetic Companions, follow/stay, owner poses, tricks and bounded automatic output; arrivals share the room EVENT limit, tricks still reach the room without Accessibility, and Companions refuse arriving objects before they move. Preserve existing data with an additive migration; wire the reference host and optional-partner gates.
+
 ## 0.4.0 - 2026-10-14
 
 - Add reusable activation modes, random flavour readings, Installable fixtures, bounded temporary room layers, sensory commands, ambient scheduling, and captured furnishing credit in UBI-weeks. Preserve existing craft/item paths with an additive migration. Wire actual ownership, economy, scenes, ignore and combat partners in the reference host and test physically absent partners. A fixture supplies at most one temporary layer at a time, and deleting a room with `CraftingRoomMixin` returns its fixtures to the property owner.

@@ -1,5 +1,10 @@
 # evennia-rp-equipment
 
+When optional `evennia-rp-crafting>=0.5` is installed, plain gear and worn
+lines display its attributed cosmetic layers. These never rewrite sealed
+prose, change requirements or supply mechanics. Equipment works independently
+when that partner is absent.
+
 > **Preview (0.1.0, Pre-Alpha).** This package was written directly as a
 > contrib, and its API may move while the rest of the rp- cluster is built on
 > it. Pin an exact commit.

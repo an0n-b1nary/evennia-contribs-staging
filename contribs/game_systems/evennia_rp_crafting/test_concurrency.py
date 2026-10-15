@@ -14,8 +14,59 @@ from evennia_links.test_transactions import committed_race
 from . import fixtures, services
 from .errors import CraftingError
 from .models import ActivationUse, FixtureInstallation
+from .test_wave_three import WaveThreeFixture
 from .test_wave_two import WaveTwoFixture
 from .wave_two import activate
+
+
+@skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+class ModifierAcceptanceRaces(WaveThreeFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+
+    def test_cancellation_waits_for_committed_acceptance(self):
+        from . import modifiers
+        from .models import ModificationLayer
+
+        offer = self.offer()
+        with self.assertRaises(ValueError):
+            committed_race(
+                lambda: modifiers.accept(self.char2, offer.pk),
+                lambda: modifiers.cancel(self.char2, offer.pk),
+            )
+        self.assertEqual(ModificationLayer.objects.filter(service=offer).count(), 1)
+
+    def test_acceptance_waits_for_committed_cancellation(self):
+        from . import modifiers
+        from .models import ModificationLayer
+
+        offer = self.offer()
+        with self.assertRaises(ValueError):
+            committed_race(
+                lambda: modifiers.cancel(self.char2, offer.pk),
+                lambda: modifiers.accept(self.char2, offer.pk),
+            )
+        self.assertFalse(ModificationLayer.objects.filter(service=offer).exists())
+
+    def test_duplicate_acceptance_commits_one_payment_and_layer(self):
+        from evennia_economy.services import balance
+
+        from . import modifiers
+        from .models import ModificationLayer
+
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        offer = self.offer()
+        before = balance(self.char1)
+        with self.assertRaises(ValueError):
+            committed_race(
+                lambda: modifiers.accept(self.char2, offer.pk),
+                lambda: modifiers.accept(self.char2, offer.pk),
+            )
+        self.assertEqual(ModificationLayer.objects.filter(service=offer).count(), 1)
+        self.assertEqual(balance(self.char1), before + 30)
 
 
 @skipUnless(apps.is_installed("evennia_building"), "building absent")

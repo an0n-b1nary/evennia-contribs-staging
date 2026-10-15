@@ -543,9 +543,9 @@ class Command(BaseCommand):
                 )
             )
         demo = authors[0]
-        grant(demo, "timber", 20, "staff", note="Sandbox wave-two inputs")
+        grant(demo, "timber", 100, "staff", note="Sandbox crafting inputs")
         if apps.is_installed("evennia_economy"):
-            credit(demo, 500, note="Sandbox wave-two Workshop")
+            credit(demo, 1500, note="Sandbox crafting Workshop")
         unlock(demo, "music", {"timber": 3})
         unlock(demo, "decoration", {"timber": 6})
         lute = craft(
@@ -571,9 +571,42 @@ class Command(BaseCommand):
             {"timber": 1},
         )
         items += [lute, lantern]
+        unlock(demo, "companions", {"timber": 9})
+        bird = craft(
+            demo,
+            "companions",
+            "companion",
+            crafting.COMPANION_NAME,
+            crafting.COMPANION_DESC,
+            {},
+            {"timber": 2},
+            verbs=[
+                {
+                    "key": "activatable",
+                    "niche": "music",
+                    "configuration": {"modes": {"bow": [crafting.COMPANION_TRICK]}},
+                }
+            ],
+        )
+        items.append(bird)
+        if apps.is_installed("evennia_economy"):
+            from evennia_rp_crafting.modifiers import accept, propose
+
+            grant(demo, "ember", 20, "staff", note="Sandbox Modifier inputs")
+            unlock(demo, "enchanting", {"ember": 12})
+            service = propose(
+                demo,
+                demo,
+                lute,
+                "enchanting",
+                "modifier_aura",
+                {"line": "A faint silver shimmer follows the strings."},
+                {"ember": 1},
+            )
+            accept(demo, service.pk)
         for item in items:
             item.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
-            if item != lantern:
+            if item not in (lantern, bird):
                 item.move_to(rooms["market"], quiet=True)
         from evennia_rp_crafting.fixtures import install
 
@@ -583,6 +616,9 @@ class Command(BaseCommand):
         demo.permissions.add("Builder")
         try:
             install(demo, lantern, rooms["market"])
+            from evennia_rp_crafting.companions import set_mode
+
+            set_mode(demo, bird, "stay")
         finally:
             demo.location = original
             if not had_builder:

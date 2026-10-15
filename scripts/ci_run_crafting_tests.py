@@ -72,6 +72,7 @@ def main(argv=None):
             "evennia_rp_crafting",
             "world.sandbox.test_crafting",
             "world.sandbox.test_wave_two",
+            "world.sandbox.test_wave_three",
             "world.sandbox.test_pages",
         ],
         cwd=game,

@@ -24,6 +24,9 @@ class CraftingConfig(AppConfig):
 
             closed.connect(scene_closed, dispatch_uid="crafting_temporary_scene_close")
         if self.apps.is_installed("evennia_economy"):
-            from evennia_economy.signals import economy_figures
+            from evennia_economy.signals import asset_providers, economy_figures
+
+            from .modifiers import service_assets
 
             economy_figures.connect(figures, dispatch_uid="crafting_economy_figures")
+            asset_providers.connect(service_assets, dispatch_uid="crafting_modifier_services")

@@ -1,5 +1,6 @@
 """Host deletion guards run before crafting/equipment/DefaultObject hooks."""
 
+from evennia_rp_crafting.companions import CompanionObject
 from evennia_rp_crafting.typeclasses import Broadcast, Consumable, Installable, Readable
 from evennia_rp_crafting.wearables import Wearable
 
@@ -24,3 +25,7 @@ class CraftedBroadcast(ObjectParent, Broadcast):
 
 class CraftedFixture(ObjectParent, Installable):
     pass
+
+
+class CraftedCompanion(ObjectParent, CompanionObject):
+    """Host stock guards run before Companion/DefaultObject deletion hooks."""

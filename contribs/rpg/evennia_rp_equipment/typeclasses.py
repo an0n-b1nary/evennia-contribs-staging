@@ -27,6 +27,8 @@ unconditionally (equipment as an optional partner) calls
 
 from __future__ import annotations
 
+from importlib.util import find_spec
+
 from evennia.objects.objects import DefaultCharacter, DefaultObject
 from evennia.typeclasses.attributes import AttributeProperty
 
@@ -68,7 +70,30 @@ class EquipmentMixin:
         return [Requirement.from_dict(data) for data in self.requirement_data or ()]
 
     def get_worn_line(self, looker=None) -> str:
-        return self.worn_line or self.get_display_name(looker)
+        from django.apps import apps
+
+        line = self.worn_line or self.get_display_name(looker)
+        if apps.is_installed("evennia_rp_crafting") and find_spec("evennia_rp_crafting.modifiers"):
+            from evennia_rp_crafting.modifiers import display
+
+            extra = display(self)
+            if extra:
+                line = f"{line}\n  {extra}"
+        return line
+
+    def get_display_desc(self, looker, **kwargs):
+        from django.apps import apps
+
+        desc = super().get_display_desc(looker, **kwargs)
+        if apps.is_installed("evennia_rp_crafting") and find_spec("evennia_rp_crafting.modifiers"):
+            from evennia_rp_crafting.modifiers import display
+            from evennia_rp_crafting.typeclasses import ModificationDisplayMixin
+
+            if not isinstance(self, ModificationDisplayMixin):
+                extra = display(self)
+                if extra:
+                    desc = f"{desc}\n\n{extra}"
+        return desc
 
     # -- staying put while worn -----------------------------------------------
 

@@ -12,6 +12,8 @@ class AmbientScript(DefaultScript):
         self.start_delay = True
 
     def at_repeat(self):
+        from .companions import ambient_tick as companion_tick
         from .fixtures import ambient_tick
 
         ambient_tick()
+        companion_tick()

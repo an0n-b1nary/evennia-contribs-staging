@@ -5,7 +5,18 @@
 from evennia.objects.objects import DefaultObject
 
 
-class CraftedItemMixin:
+class ModificationDisplayMixin:
+    """Place before the host object/character; base prose remains host-owned."""
+
+    def get_display_desc(self, looker, **kwargs):
+        from .modifiers import display
+
+        desc = super().get_display_desc(looker, **kwargs)
+        extra = display(self)
+        return f"{desc}\n\n{extra}" if extra else desc
+
+
+class CraftedItemMixin(ModificationDisplayMixin):
     @property
     def craft_record(self):
         from .models import CraftRecord
