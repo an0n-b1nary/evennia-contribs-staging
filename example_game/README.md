@@ -394,7 +394,7 @@ carries one command family and one brass plaque naming its commands:
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
 | Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
-| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-equipment`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen`, `+gear`, `+wear`, `+remove`, `+worn` |
+| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-equipment`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen`, `+gear`, `+wear`, `+remove`, `+worn`, `+outfit` |
 
 ### RP checks in the Proving Grounds
 
@@ -472,6 +472,26 @@ longer resolve; `+gear/audit` lists the same for staff.
 The Character typeclass calls the contrib's display helpers rather than mixing
 in `EquipmentCharacterMixin`, because equipment requires chargen and is absent
 whenever chargen is.
+
+Equipment also supplies free outfits and slot covering for plain and crafted
+gear. The sandbox configures `cloak` to cover `body`. The first demonstration
+character wears a practice tunic beneath an overcloak: ordinary `look` and
+`+worn` show the cloak, while `+worn/all <character>` includes the tunic.
+Remove the overcloak to reveal it. Each demonstration character has a saved
+`Practice` outfit, including hidden gear. For your own gear, use:
+
+```text
++outfit/save Travel
++outfit/show Travel
++outfit Travel
++outfit/delete Travel
+```
+
+Applying a set replaces everything worn and refuses the whole change if an
+item is missing, a requirement is unmet or your build is locked. Covered gear
+continues to hold its requirements. `world/sandbox/test_rp_partners.py` checks
+seeded layers and optional equipment absence; `test_crafting.py` checks a set
+mixing a sealed crafted cloak with a plain shirt without changing provenance.
 
 Every name above belongs to the game, not the contribs. Stats, domains, styles
 and abilities are named in `world/ruleset.py`. The sheet's nouns (pips,

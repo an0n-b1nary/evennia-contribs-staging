@@ -149,7 +149,7 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
                     "chargen",
                 ),
             ),
-            ("evennia_rp_equipment", ("gear", "wear", "remove", "worn")),
+            ("evennia_rp_equipment", ("gear", "wear", "remove", "worn", "outfit")),
             ("evennia_scenes", ("scene", "log")),
             ("evennia_rptracker", ("activity",)),
             ("evennia_xp", ("xp",)),
@@ -206,6 +206,23 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
 
             self.assertTrue(locks.is_locked(sample))
         sample.at_post_unpuppet()
+
+    def test_seeded_outfit_reveals_inner_layer_on_removal_and_restores_it(self):
+        if not apps.is_installed("evennia_rp_equipment"):
+            self.assertFalse(search_object("practice overcloak").exists())
+            return
+        from evennia_rp_equipment import outfits, services
+
+        wearer = self.samples[0]
+        cloak = search_object("practice overcloak")[0]
+        tunic = search_object("practice tunic")[0]
+        self.assertIn(tunic, [item for _, item in outfits.items(wearer, "Practice")])
+        self.assertNotIn("a quilted practice tunic", wearer.return_appearance(self.char1))
+        services.remove(wearer, cloak)
+        self.assertIn("a quilted practice tunic", wearer.return_appearance(self.char1))
+        outfits.apply(wearer, "Practice")
+        self.assertTrue(cloak.is_worn)
+        self.assertNotIn("a quilted practice tunic", wearer.return_appearance(self.char1))
 
     def test_dummy_can_resolve_a_real_test(self):
         if not apps.is_installed("evennia_rp_contest"):

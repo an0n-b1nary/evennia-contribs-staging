@@ -37,8 +37,25 @@ def worn_items(character) -> list:
     return sorted(items, key=_slot_order)
 
 
-def worn_lines(character, looker=None) -> list[str]:
-    return [item.get_worn_line(looker) for item in worn_items(character)]
+def covered_slots(character) -> set[str]:
+    """Slots hidden by actually worn gear, including gear under another layer.
+
+    A hidden cloak still covers the shirt underneath it. Merely configuring a
+    cloak->body rule doesn't hide anything until a cloak is worn.
+    """
+    rules = conf.slot_covers()
+    return {target for item in worn_items(character) for target in rules.get(item.slot, ())}
+
+
+def visible_worn_items(character) -> list:
+    """Visible worn gear for ordinary looks; never use this list for build guards."""
+    hidden = covered_slots(character)
+    return [item for item in worn_items(character) if item.slot not in hidden]
+
+
+def worn_lines(character, looker=None, *, include_covered=False) -> list[str]:
+    items = worn_items(character) if include_covered else visible_worn_items(character)
+    return [item.get_worn_line(looker) for item in items]
 
 
 def with_worn(character, looker, desc: str) -> str:
@@ -54,4 +71,12 @@ def hide_worn(objects) -> list:
     return [obj for obj in objects if not (is_equipment(obj) and obj.is_worn)]
 
 
-__all__ = ["hide_worn", "is_equipment", "with_worn", "worn_items", "worn_lines"]
+__all__ = [
+    "covered_slots",
+    "hide_worn",
+    "is_equipment",
+    "visible_worn_items",
+    "with_worn",
+    "worn_items",
+    "worn_lines",
+]

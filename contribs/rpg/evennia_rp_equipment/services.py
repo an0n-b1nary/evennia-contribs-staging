@@ -199,6 +199,16 @@ def wear(character, item) -> list[str]:
     if item.is_worn:
         raise GearError(f"You're already wearing {_name(item, character)}.")
     _check_unfrozen(character)
+    notices = check_wear_requirements(character, item)
+    item.tags.add(WORN_TAG, category=TAG_CATEGORY)
+    character.msg(f"You put on {_name(item, character)}.")
+    _announce(character, "{actor} puts on {item}.", item)
+    return notices
+
+
+def check_wear_requirements(character, item) -> list[str]:
+    """Validate held gear without changing it; shared by wear and outfit preflight."""
+    _check_held(character, item)
     results = report(character, item)
     unknown = [describe(r) for r, s in results if s == UNKNOWN]
     if unknown:
@@ -209,9 +219,6 @@ def wear(character, item) -> list[str]:
     unmet = [describe(r) for r, s in results if s == UNMET]
     if unmet:
         raise GearError(f"Wearing {_name(item, character)} needs {', '.join(unmet)}.")
-    item.tags.add(WORN_TAG, category=TAG_CATEGORY)
-    character.msg(f"You put on {_name(item, character)}.")
-    _announce(character, "{actor} puts on {item}.", item)
     return [
         f"You aren't fully attuned to {_name(item, character)}; full attunement needs {describe(r)}."
         for r, s in results

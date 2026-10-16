@@ -13,15 +13,93 @@ from unittest.mock import patch
 from django.core.management import call_command
 from evennia.commands.default.general import CmdDrop, CmdGive
 
-from evennia_rp_equipment import services
+from evennia_rp_equipment import outfits, services
 from evennia_rp_equipment.audit import log_problems, problems
-from evennia_rp_equipment.commands import CmdGear, CmdRemove, CmdWear, CmdWorn
+from evennia_rp_equipment.commands import (
+    CmdGear,
+    CmdOutfit,
+    CmdRemove,
+    CmdWear,
+    CmdWorn,
+    EquipmentCmdSet,
+)
 from evennia_rp_equipment.requirements import PIPS, Requirement
 
 from .base import GearCommandTest
 
 
 class GearCommandTests(GearCommandTest):
+    def test_invalid_or_combined_outfit_switches_never_change_gear_or_saved_sets(self):
+        cloak = self.make_item(self.char2, "cloak")
+        services.wear(self.char2, cloak)
+        outfits.save(self.char2, "Travel")
+        services.remove(self.char2, cloak)
+        hat = self.make_item(self.char2, "hat")
+        services.wear(self.char2, hat)
+        original = outfits.saved(self.char2)
+        for switches in ("svae", "s", "save/show", "delete/typo"):
+            with self.subTest(switches=switches), patch.object(self.char1, "msg") as room:
+                self.call(CmdOutfit(), f"/{switches} Travel", caller=self.char2)
+                self.assertFalse(cloak.is_worn)
+                self.assertTrue(hat.is_worn)
+                self.assertEqual(outfits.saved(self.char2), original)
+                room.assert_not_called()
+        # Keep the framework's unambiguous switch abbreviations working.
+        self.call(CmdOutfit(), "/sh Travel", "Outfit Travel\n  cloak", caller=self.char2)
+
+    def test_outfit_commands_save_show_apply_replace_and_delete(self):
+        self.assertTrue(any(command.key == "+outfit" for command in EquipmentCmdSet().commands))
+        item = self.make_item(self.char2, "cloak")
+        services.wear(self.char2, item)
+        self.call(CmdOutfit(), "", "No saved outfits.", caller=self.char2)
+        self.call(CmdOutfit(), "/save Travel", "Saved outfit Travel.", caller=self.char2)
+        self.call(CmdOutfit(), "", "Your outfits\n  Travel (items: 1)", caller=self.char2)
+        self.call(CmdOutfit(), "/show travel", "Outfit Travel\n  cloak", caller=self.char2)
+        services.remove(self.char2, item)
+        self.call(CmdOutfit(), "TRAVEL", "You change into outfit Travel.", caller=self.char2)
+        self.assertTrue(item.is_worn)
+        services.remove(self.char2, item)
+        item.move_to(self.char1, quiet=True)
+        self.call(
+            CmdOutfit(),
+            "/show travel",
+            f"Outfit Travel\n  #{item.pk} (not carried)",
+            caller=self.char2,
+        )
+        self.call(
+            CmdOutfit(),
+            "Travel",
+            "Outfit Travel needs items you no longer carry:",
+            caller=self.char2,
+        )
+        self.call(CmdOutfit(), "/delete travel", "Deleted outfit travel.", caller=self.char2)
+        self.call(CmdOutfit(), "travel", "You have no outfit named travel.", caller=self.char2)
+        self.call(CmdOutfit(), "/save", "Give the outfit a name", caller=self.char2)
+
+    def test_worn_all_shows_covered_items_to_owner_and_nearby_looker(self):
+        with self.settings(
+            RP_EQUIPMENT_SLOTS=("body", "cloak"),
+            RP_EQUIPMENT_SLOT_COVERS={"cloak": ("body",)},
+        ):
+            shirt = self.make_item(self.char2, "shirt", slot="body", line="a linen shirt")
+            cloak = self.make_item(self.char2, "cloak", slot="cloak")
+            for item in (shirt, cloak):
+                services.wear(self.char2, item)
+            self.call(CmdWorn(), "", "You are wearing:\n  cloak", caller=self.char2)
+            self.call(
+                CmdWorn(),
+                "/all",
+                "You are wearing:\n  a linen shirt (shirt) (covered)\n  cloak",
+                caller=self.char2,
+            )
+            self.call(CmdWorn(), "Char2", "Char2 is wearing:\n  cloak", caller=self.char1)
+            self.call(
+                CmdWorn(),
+                "/all Char2",
+                "Char2 is wearing:\n  a linen shirt (covered)\n  cloak",
+                caller=self.char1,
+            )
+
     def test_info_includes_optional_verified_provenance_without_crafting_installed(self):
         from evennia_rp_equipment.commands import render_info
 

@@ -15,11 +15,12 @@ Modules:
     services     — make, edit, wear and remove (raises GearError)
     typeclasses  — EquipmentMixin, Equipment, EquipmentCharacterMixin
     display      — worn_items, with_worn, hide_worn
+    outfits      — private named sets; save, inspect, delete and apply
     guard        — the build_change_requested receiver
     audit        — worn gear whose requirements no longer hold
-    commands     — +gear, +wear, +remove, +worn
+    commands     — +gear, +wear, +remove, +worn, +outfit
 
 Importing the package imports no models; import the modules you need.
 """
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"

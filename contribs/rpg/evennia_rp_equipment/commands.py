@@ -15,8 +15,8 @@ from __future__ import annotations
 from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 
-from evennia_rp_equipment import conf, services
-from evennia_rp_equipment.display import is_equipment, worn_items
+from evennia_rp_equipment import conf, outfits, services
+from evennia_rp_equipment.display import covered_slots, is_equipment, visible_worn_items, worn_items
 from evennia_rp_equipment.requirements import MET, UNATTUNED, UNKNOWN, describe
 from evennia_rp_equipment.services import GearError
 
@@ -69,7 +69,8 @@ class CmdGear(_GearCommand):
 
     Anyone can make a plain item. Its worn line is what others see in your
     description while you wear it ("a cloak of deep indigo"). Slots are only
-    for ordering; wear as many things in one slot as you like.
+    for display order and host-configured covering; wear as many things in
+    one slot as you like. +worn/all includes covered gear.
 
     A requirement ties wearing the item to your build:
       <stat> +2          at least two + pips on that stat
@@ -299,13 +300,16 @@ class CmdWorn(_GearCommand):
     Usage:
       +worn
       +worn <character>
+      +worn/all [<character>]
 
     Without a name, lists what you're wearing. With one, shows what someone
-    here is wearing, as their description does.
+    here is wearing, as their description does. /all looks closely, including
+    covered gear. Covered items still count as worn and hold build requirements.
     """
 
     key = "+worn"
     aliases = ["worn"]  # noqa: RUF012
+    switch_options = ("all",)
 
     def func(self):
         caller = self.caller
@@ -315,7 +319,9 @@ class CmdWorn(_GearCommand):
                 return
         else:
             target = caller
-        items = worn_items(target)
+        include_covered = "all" in self.switches
+        items = worn_items(target) if include_covered else visible_worn_items(target)
+        hidden = covered_slots(target) if include_covered else set()
         own = target == caller
         if not items:
             self.msg(
@@ -329,16 +335,93 @@ class CmdWorn(_GearCommand):
         for item in items:
             line = item.get_worn_line(caller)
             label = f" ({item.get_display_name(caller)})" if own and item.worn_line else ""
-            rows.append(f"  {line}{label}")
+            covered = " (covered)" if item.slot in hidden else ""
+            rows.append(f"  {line}{label}{covered}")
         self.msg("\n".join(rows))
+
+
+class CmdOutfit(_GearCommand):
+    """
+    Save and change outfits, using plain or crafted gear.
+
+    Usage:
+      +outfit
+      +outfit/save <name>
+      +outfit/show <name>
+      +outfit/delete <name>
+      +outfit <name>
+
+    /save stores everything currently worn, including covered items; saving
+    the same name replaces it. An empty set lets you take everything off.
+    Changing outfits removes other worn items and puts on the saved set.
+    You must still carry every saved item and meet all its requirements.
+    If anything is missing, unmet or build-locked, nothing changes.
+    Sets are private to your character. Names are case-insensitive.
+    """
+
+    key = "+outfit"
+    aliases = ["outfit"]  # noqa: RUF012
+    switch_options = ("save", "show", "delete")
+
+    def func(self):
+        # MuxCommand discards unknown and ambiguous switches. Do not let a
+        # mistyped /save or /show fall through to applying an outfit instead.
+        if self.raw.startswith("/"):
+            supplied = self.raw.split(None, 1)[0][1:].split("/")
+            if len(supplied) != 1 or len(self.switches) != 1:
+                self.msg("Use one outfit switch: /save, /show or /delete.")
+                return
+        name = self.args.strip()
+        switch = self.switches[0] if self.switches else ""
+        try:
+            if not name and not switch:
+                data = sorted(
+                    outfits.saved(self.caller).values(), key=lambda row: row["name"].casefold()
+                )
+                if not data:
+                    self.msg("No saved outfits. Use +outfit/save <name> to save what you wear.")
+                else:
+                    self.msg(
+                        "|wYour outfits|n\n"
+                        + "\n".join(f"  {row['name']} (items: {len(row['items'])})" for row in data)
+                    )
+            elif switch == "save":
+                outfits.save(self.caller, name)
+                self.msg(f"Saved outfit {name}.")
+            elif switch == "delete":
+                outfits.delete(self.caller, name)
+                self.msg(f"Deleted outfit {name}.")
+            elif switch == "show":
+                outfit = outfits.get(self.caller, name)
+                rows = [f"|wOutfit {outfit['name']}|n"]
+                for pk, item in outfits.items(self.caller, name):
+                    rows.append(
+                        f"  {item.get_display_name(self.caller)}"
+                        if item
+                        else f"  #{pk} (not carried)"
+                    )
+                self.msg("\n".join(rows) if len(rows) > 1 else f"{rows[0]}\n  (empty)")
+            else:
+                for notice in outfits.apply(self.caller, name):
+                    self.msg(f"|y{notice}|n")
+        except GearError as exc:
+            self.msg(f"|r{exc}|n")
 
 
 class EquipmentCmdSet(CmdSet):
     key = "rp_equipment"
 
     def at_cmdset_creation(self):
-        for command in (CmdGear, CmdWear, CmdRemove, CmdWorn):
+        for command in (CmdGear, CmdWear, CmdRemove, CmdWorn, CmdOutfit):
             self.add(command())
 
 
-__all__ = ["CmdGear", "CmdRemove", "CmdWear", "CmdWorn", "EquipmentCmdSet", "render_info"]
+__all__ = [
+    "CmdGear",
+    "CmdOutfit",
+    "CmdRemove",
+    "CmdWear",
+    "CmdWorn",
+    "EquipmentCmdSet",
+    "render_info",
+]
