@@ -477,10 +477,16 @@ ambient fixtures; its physical absence silences existing emitters. Automatic
 ambients respect ambient mute, avoid empty rooms, pause in open room fights,
 and stop while Crafting is hidden/frozen or the room is archived. Item/room
 cooldowns and emitter timestamps survive reloads. Delivery occurs after commit.
-New activation/fixture emissions use the actor/current owner as `from_obj`,
-respect Social ignore, and are logged as scene emits without becoming poses or
-RP session activity. Broader legacy emission and reading-mode integration remain
-tracked follow-ups. Screen readers receive plain item labels and EVENT text.
+All crafted emissions, including Consumable/Broadcast, use the actor/current
+owner as `from_obj` and respect Social ignore. With Scenes 0.8.2 or newer
+(`pip install evennia-rp-crafting[scenes]`), each affected room's newest
+open/active scene receives one attributed emit, including adjacent Broadcast
+rooms. Viewer mute/ignore does not remove shared log entries. Item output does
+not start an open scene, create/rejoin participants, increment scene pose counts,
+advance pose order or record RP session activity. Owner-written pet poses retain
+their ordinary posing exception. Scenes remains optional; no scene capture is
+attempted without it. Reading-mode integration remains a separate follow-up.
+Screen readers receive plain item labels and EVENT text.
 
 ### Furnishing credit and host ownership
 

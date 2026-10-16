@@ -75,7 +75,8 @@ class EventTests(EventFixture, EvenniaTest):
         with patch.object(self.char2, "msg") as msg, self.captureOnCommitCallbacks(execute=True):
             result = use(self.char1, item)
         msg.assert_called_once_with(
-            "<EVENT> First light.\n<EVENT> Then darkness.", options={"type": "crafting_event"}
+            ("<EVENT> First light.\n<EVENT> Then darkness.", {"type": "crafting_event"}),
+            from_obj=self.char1,
         )
         self.assertFalse(ObjectDB.objects.filter(pk=item_id).exists())
         self.assertEqual(result.craft_id, record_id)
@@ -83,6 +84,34 @@ class EventTests(EventFixture, EvenniaTest):
         with self.assertRaises(CraftingError):
             use(self.char1, item)
         self.assertEqual(EventUse.objects.count(), 1)
+
+    def test_broadcast_logs_each_room_without_creating_remote_participation(self):
+        if not HAS_ACCESSIBILITY or not apps.is_installed("evennia_scenes"):
+            self.skipTest("Scenes and Accessibility required")
+        from evennia_scenes.models import LogEntry, Scene, SceneParticipant
+
+        scenes = [
+            Scene.objects.create(title=room.key, room=room, creator=self.char2)
+            for room in (self.room1, self.room2)
+        ]
+        create_object(
+            "evennia.objects.objects.DefaultExit", location=self.room1, destination=self.room2
+        )
+        self.char2.move_to(self.room2, quiet=True)
+        self.unmute(self.account2)
+        self.account2.options.set("mute_ambient_effects", "True")
+        participants = list(SceneParticipant.objects.order_by("pk").values())
+        with self.captureOnCommitCallbacks(execute=True):
+            use(self.char1, self.item("broadcast", beats=["First light.", "Then darkness."]))
+        self.assertEqual(LogEntry.objects.count(), 2)
+        for scene in scenes:
+            entry = LogEntry.objects.get(scene=scene)
+            self.assertEqual(entry.author, self.char1)
+            self.assertEqual(entry.content, "<EVENT> First light.\n<EVENT> Then darkness.")
+            self.assertEqual(entry.log_type, "emit")
+            scene.refresh_from_db()
+            self.assertEqual(scene.status, Scene.Status.OPEN)
+        self.assertEqual(list(SceneParticipant.objects.order_by("pk").values()), participants)
 
     def test_rate_limit_refuses_second_item_without_consuming_it_and_expires(self):
         first, second = self.item(), self.item()
@@ -171,6 +200,36 @@ class EventTests(EventFixture, EvenniaTest):
             self.char2.move_to(self.room2, quiet=True)
             msg.reset_mock()
         msg.assert_not_called()
+
+    def test_commit_time_freeze_hide_and_archive_suppress_delivery(self):
+        for control in (
+            {"RP_CRAFTING_FROZEN": True},
+            {"RP_CRAFTING_REVEALED": False},
+            {"LINKS_ROOM_LIVE": lambda room: False},
+        ):
+            with self.subTest(control=control):
+                self.expire()
+                with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                    use(self.char1, self.item())
+                with override_settings(**control), patch.object(self.char2, "msg") as msg:
+                    for callback in callbacks:
+                        callback()
+                msg.assert_not_called()
+
+    def test_broadcast_account_deduplication_does_not_duplicate_local_delivery(self):
+        if not HAS_ACCESSIBILITY:
+            self.skipTest("Accessibility required for remote output")
+        self.char2.move_to(self.room2, quiet=True)
+        self.char2.account = self.account
+        self.unmute(self.account)
+        with (
+            patch.object(self.char1, "msg") as local,
+            patch.object(self.char2, "msg") as remote,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            use(self.char1, self.item("broadcast"))
+        local.assert_called_once()
+        remote.assert_not_called()
 
     def test_cost_each_extra_beat_and_reject_invalid_prose_before_spending(self):
         cost = behaviour("consumable").cost("consumable", {"beats": ["a", "b", "c"]})

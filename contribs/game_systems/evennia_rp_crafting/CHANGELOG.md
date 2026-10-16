@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 - 2026-10-16
+
+- Share attributed delivery across Consumable/Broadcast, activations, fixtures
+  and Companion events so Social ignore applies to their user/current owner.
+- Log each affected room once, including adjacent Broadcast scenes, without
+  creating participation, incrementing scene pose counts or recording RP
+  activity. Owner-written pet poses retain the ordinary posing path.
+- Keep wave-specific gates, ambient mute, remote account deduplication and
+  post-commit delivery. Recipient or scene-capture failures do not prevent other
+  deliveries. Scene logging uses the optional Scenes 0.8.2 capture API.
+
 ## 0.8.0 - 2026-10-15
 
 - Add optional facet validation, costs, immutable snapshot metadata and explicit

@@ -9,10 +9,10 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
-from evennia.utils import logger
 
 from evennia_links.runtime import get
 
+from .emissions import deliver
 from .errors import CraftingError
 from .models import CraftRecord, EventRoomLimit, EventUse
 from .services import _require
@@ -35,41 +35,6 @@ def _remote(record, actor, room):
         and exit.access(actor, "traverse", default=False)
     }
     return list(destinations.values())
-
-
-def _deliver(source_id, destination_ids, message):
-    # Hiding suppresses notifications even if a host defers its outer commit.
-    if not get("RP_CRAFTING_REVEALED"):
-        return
-    source = ObjectDB.objects.filter(pk=source_id).first()
-    local = list(source.contents) if source else []
-    remote = [
-        obj for room in ObjectDB.objects.filter(pk__in=destination_ids) for obj in room.contents
-    ]
-    local_accounts = {obj.account.pk for obj in local if getattr(obj, "account", None)}
-    targets = [(obj, False) for obj in local] + [(obj, True) for obj in remote]
-    seen = set()
-    delivered_accounts = set(local_accounts)
-    for target, ambient in targets:
-        account = getattr(target, "account", target)
-        account_id = getattr(account, "pk", None)
-        if ambient and account_id in delivered_accounts:
-            continue
-        identity = (target.__dbclass__, target.pk)
-        if identity in seen:
-            continue
-        seen.add(identity)
-        if ambient:
-            from evennia_accessibility import mutes_ambient
-
-            if mutes_ambient(target):
-                continue
-        try:
-            target.msg(message, options={"type": "crafting_event"})
-            if account_id:
-                delivered_accounts.add(account_id)
-        except Exception:
-            logger.log_trace("Crafting EVENT delivery failed after consumption.")
 
 
 @transaction.atomic
@@ -132,5 +97,9 @@ def use(actor, item):
     if not item.delete():
         raise CraftingError("The item cannot be consumed right now.")
     EventRoomLimit.objects.filter(pk__in=[limit.pk for limit in limits]).update(last_used=now)
-    transaction.on_commit(lambda: _deliver(room.pk, destination_ids, message))
+    transaction.on_commit(
+        lambda room_id=room.pk, actor_id=actor.pk: deliver(
+            room_id, actor_id, message, destination_ids=destination_ids
+        )
+    )
     return result

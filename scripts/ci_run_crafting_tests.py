@@ -71,6 +71,7 @@ def main(argv=None):
             "--settings=test_settings.py",
             "evennia_rp_crafting",
             "world.sandbox.test_crafting",
+            "world.sandbox.test_emissions",
             "world.sandbox.test_wave_two",
             "world.sandbox.test_wave_three",
             "world.sandbox.test_pages",

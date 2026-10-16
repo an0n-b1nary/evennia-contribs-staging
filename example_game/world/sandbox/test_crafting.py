@@ -130,7 +130,8 @@ class CraftingSeams(EvenniaTest):
         item_id = item.pk
         with patch.object(self.char2, "msg") as msg, self.captureOnCommitCallbacks(execute=True):
             use(self.char1, item)
-        self.assertIn("<EVENT>", msg.call_args.args[0])
+        self.assertIn("<EVENT>", msg.call_args.args[0][0])
+        self.assertEqual(msg.call_args.kwargs["from_obj"], self.char1)
         self.assertFalse(ObjectDB.objects.filter(pk=item_id).exists())
         self.assertTrue(CraftRecord.objects.filter(pk=record.pk).exists())
         self.assertTrue(EventUse.objects.filter(craft=record).exists())

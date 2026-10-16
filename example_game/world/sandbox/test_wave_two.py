@@ -121,7 +121,7 @@ class WaveTwoSeams(WaveTwoFixture, EvenniaTest):
 
     @skipUnless(apps.is_installed("evennia_scenes"), "scenes absent")
     def test_emission_is_logged_ignored_and_never_counted_as_a_pose(self):
-        from evennia_scenes.models import LogEntry, Scene
+        from evennia_scenes.models import LogEntry, Scene, SceneParticipant
 
         scene = Scene.objects.create(title="An evening tune", room=self.home, creator=self.char1)
         item = self.instrument()
@@ -145,6 +145,9 @@ class WaveTwoSeams(WaveTwoFixture, EvenniaTest):
         entry = LogEntry.objects.get(scene=scene)
         self.assertEqual(entry.author_id, self.char1.pk)
         self.assertEqual(entry.log_type, "emit")
+        self.assertFalse(SceneParticipant.objects.filter(scene=scene).exists())
+        scene.refresh_from_db()
+        self.assertEqual(scene.status, Scene.Status.OPEN)
         self.assertEqual(self.char1.last_pose_time, last_pose)
         if apps.is_installed("evennia_rptracker"):
             self.assertEqual(RPSession.objects.count(), sessions_before)

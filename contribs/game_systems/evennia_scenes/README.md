@@ -109,7 +109,7 @@ This avoids a hard dependency on `evennia_scenes` being installed.
 
 ### Capture hooks
 
-Two functions in `evennia_scenes.capture` form the public hook API:
+Three functions in `evennia_scenes.capture` form the public hook API:
 
 - **`capture_to_scene(character, content, log_type)`** — call from your
   character's pose/say/emit recording point. No-op if the room has no active
@@ -120,12 +120,25 @@ Two functions in `evennia_scenes.capture` form the public hook API:
   participants. **Cannot be auto-wired**: Evennia ships no room-receive
   signal; you must call this manually.
 
+- **`capture_room_event(room, author, content)`** — capture attributed item or
+  environmental output in the room's newest open/active scene, even when its
+  author is elsewhere. Returns the `emit` entry, or `None` without an eligible
+  scene. It preserves scene privacy, does not start an open scene, and does not
+  register/rejoin participants or increment pose counts. Individual viewers'
+  ignore/mute preferences do not change the shared log.
+
+`LogEntry.create_entry(..., counts_as_activity=False)` exposes the same opt-out
+for integrations that already resolved their scene. Ordering, authorship and
+`log_entry_created` signals remain intact. The default is `True`, so ordinary
+player-authored emits and existing capture hooks retain their activity behavior.
+These APIs were added in 0.8.2 and require no migration or historical recount.
+
 ### Why no bridges ship in this contrib
 
 `evennia_scenes` deliberately owns zero cross-domain foreign keys. If you
 want to link scenes to XP awards, calendar events, or RP sessions, create
-bridge models in your own `world/links/` app. The `active_scene_id` integer
-attribute is the only surface this contrib exposes to consumers.
+bridge models in your own `world/links/` app. Capture hooks and the
+`active_scene_id` integer attribute provide the integration surfaces.
 
 ---
 

@@ -346,7 +346,7 @@ class LogEntry(models.Model):
         self.save(update_fields=["is_deleted"])
 
     @classmethod
-    def create_entry(cls, scene, author, content, log_type="pose"):
+    def create_entry(cls, scene, author, content, log_type="pose", *, counts_as_activity=True):
         """
         Create a new log entry in the scene.
 
@@ -359,6 +359,10 @@ class LogEntry(models.Model):
             author: The ObjectDB instance (Character), or None for system entries.
             content: The text content of the entry.
             log_type: One of the LogType choices.
+            counts_as_activity: False for attributed environmental/item events.
+                These retain ordering and signals without starting the scene,
+                registering/rejoining a participant, or incrementing pose counts.
+                Ordinary player-authored emits retain the default True.
 
         Returns:
             The newly created LogEntry instance.
@@ -379,12 +383,13 @@ class LogEntry(models.Model):
         )
 
         # Transition scene OPEN -> ACTIVE on first non-system, non-web-ooc entry.
-        if log_type not in (cls.LogType.SYSTEM, cls.LogType.WEB_OOC):
+        activity = counts_as_activity and log_type not in (cls.LogType.SYSTEM, cls.LogType.WEB_OOC)
+        if activity:
             scene.start()
 
         # Auto-register author as participant and increment pose count.
         # WEB_OOC authors are not room participants — skip registration.
-        if author and log_type not in (cls.LogType.SYSTEM, cls.LogType.WEB_OOC):
+        if author and activity:
             participant, _created = SceneParticipant.objects.get_or_create(
                 scene=scene,
                 character=author,
