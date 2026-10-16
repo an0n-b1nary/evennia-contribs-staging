@@ -212,6 +212,19 @@ class CraftedLoreTests(CraftingFixture, EvenniaCommandTest):
             self.book_with_lore()
         self.assertEqual(self.held(), before)
 
+    def test_journal_citations_wait_for_revision_scoped_support(self):
+        from evennia_rp_crafting.errors import CraftingError
+        from evennia_rp_crafting.models import CraftRecord
+
+        before = self.held(), CraftRecord.objects.count()
+        with self.assertRaisesMessage(CraftingError, "fixed authored pages"):
+            self.book(
+                configuration={"journal": 2},
+                selected={"wood": 2},
+                facets={"lore_citations": [{"entry": self.lore.pk}]},
+            )
+        self.assertEqual((self.held(), CraftRecord.objects.count()), before)
+
     def test_custom_redaction_denial_and_failed_reads_cannot_grant(self):
         from evennia_rp_crafting import conf
         from evennia_rp_crafting.test_pages import DeniedReadable, RedactedReadable

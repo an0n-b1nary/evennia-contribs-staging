@@ -19,6 +19,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with an additive migration, and exercise real host and absent-partner seams.
 - Journal revision citations and citation-preserving editions remain a separate
   bridge; these features do not yet extend to owner-written journals or copies.
+- Reject citations on blank journals before spending, and preserve journal and
+  edition OOC text attribution through the shared read command.
 
 ## [0.7.2] - 2026-10-11
 

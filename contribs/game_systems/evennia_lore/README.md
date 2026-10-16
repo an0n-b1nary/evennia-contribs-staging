@@ -383,6 +383,7 @@ without requiring the copier to hold them, while copying itself grants nothing.
 Journal citations belong to a particular revision, with explicit retain/replace
 choices on revision and frozen citation snapshots in editions. Recipe teaching
 remains separate. Do not assume text-only copying already carries these facets.
+Blank journal drafts reject citations until revision-scoped support is available.
 
 ### Staff tomes without crafting
 

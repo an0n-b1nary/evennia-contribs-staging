@@ -26,8 +26,24 @@ class LoreItemSeams(EvenniaCommandTest):
 
         command = type(next(row for row in CharacterCmdSet().commands if row.key == "read"))
         if apps.is_installed("evennia_rp_crafting"):
+            from evennia_rp_crafting.errors import CraftingError
+            from evennia_rp_crafting.services import craft_cost
+
             book = ObjectDB.objects.get(db_key=crafting.LORE_BOOK_NAME)
             self.assertNotIn("familiar sign", book.get_display_desc(self.char2))
+            author = ObjectDB.objects.get(pk=book.craft_record.crafter_id)
+            with self.assertRaisesMessage(CraftingError, "fixed authored pages"):
+                craft_cost(
+                    author,
+                    "writing",
+                    "readable",
+                    {"journal": 2},
+                    facets={"lore_citations": book.craft_record.prose["facets"]["lore_citations"]},
+                )
+            for name in (crafting.JOURNAL_NAME, crafting.EDITION_NAME):
+                output = self.call(command(), f"{name} 1", f"{name}\n", caller=self.char2)
+                self.assertIn("Text by (OOC):", output)
+            self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
         self.call(
             command(), f"/contents {tome.key}", f"{tome.key}\nContents (2 pages)", caller=self.char2
         )

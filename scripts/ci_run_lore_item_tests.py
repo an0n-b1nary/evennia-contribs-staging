@@ -61,6 +61,7 @@ def main(argv=None):
         labels = ["evennia_lore", "world.sandbox.test_lore_items"]
         if not args.absent:
             labels += [
+                "world.sandbox.test_readables",
                 "evennia_rp_crafting",
                 "evennia_rp_equipment",
                 "evennia_links.test_pagination",

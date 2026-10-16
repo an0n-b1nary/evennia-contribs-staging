@@ -332,7 +332,7 @@ their original output when no partner contributes a line.
 Owner-written journal revisions and citation-preserving copies require their
 separate bridge; the fixed-page hooks do not yet implement those workflows.
 
-Items show a separate **Craft hallmark** line from their immutable CraftRecord,
+Items show a separate **Craft hallmark (OOC)** line from their immutable CraftRecord,
 for example `Made by Morgan (Weaver)`. An item's editable description or
 `db.hallmark` cannot alter this verified line. Wearables show it in `+gear/info`
 through equipment's `get_display_provenance` hook. Item typeclasses put

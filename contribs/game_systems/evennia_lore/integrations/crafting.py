@@ -29,6 +29,8 @@ class Citations:
         entry = next((row for row in composition.verbs if row["key"] == "readable"), None)
         if entry is None:
             raise CraftingError("Citations require a Readable verb.")
+        if "journal" in entry["configuration"]:
+            raise CraftingError("Citations require fixed authored pages, not a blank journal.")
         return validate_citations(actor, value, len(authored_pages(entry["configuration"]))), {}
 
     def display(self, looker, value):
