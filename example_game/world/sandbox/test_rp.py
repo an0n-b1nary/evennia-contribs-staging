@@ -26,6 +26,23 @@ from world.sandbox.test_rp_partners import RPSeedMixin
     "Full RP playground requires its partners",
 )
 class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
+    @skipUnless(apps.is_installed("evennia_rp_equipment"), "equipment absent")
+    def test_outfit_switch_typo_preserves_the_current_equipment(self):
+        from commands.default_cmdsets import CharacterCmdSet
+        from evennia_rp_equipment import outfits
+        from evennia_rp_equipment import services as gear
+
+        command = type(next(row for row in CharacterCmdSet().commands if row.key == "+outfit"))
+        cloak = gear.make(self.char2, "travel cloak", slot="cloak")
+        gear.wear(self.char2, cloak)
+        outfits.save(self.char2, "Travel")
+        gear.remove(self.char2, cloak)
+        output = self.call(command(), "/svae Travel", caller=self.char2)
+        self.assertIn("Use one outfit switch", output)
+        self.assertFalse(cloak.is_worn)
+        self.call(command(), "Travel", "You change into outfit Travel.", caller=self.char2)
+        self.assertTrue(cloak.is_worn)
+
     def build_player(self):
         from evennia_rp_chargen import services
 

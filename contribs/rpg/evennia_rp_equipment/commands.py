@@ -364,6 +364,13 @@ class CmdOutfit(_GearCommand):
     switch_options = ("save", "show", "delete")
 
     def func(self):
+        # MuxCommand discards unknown and ambiguous switches. Do not let a
+        # mistyped /save or /show fall through to applying an outfit instead.
+        if self.raw.startswith("/"):
+            supplied = self.raw.split(None, 1)[0][1:].split("/")
+            if len(supplied) != 1 or len(self.switches) != 1:
+                self.msg("Use one outfit switch: /save, /show or /delete.")
+                return
         name = self.args.strip()
         switch = self.switches[0] if self.switches else ""
         try:

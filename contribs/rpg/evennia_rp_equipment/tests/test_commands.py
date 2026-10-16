@@ -13,7 +13,7 @@ from unittest.mock import patch
 from django.core.management import call_command
 from evennia.commands.default.general import CmdDrop, CmdGive
 
-from evennia_rp_equipment import services
+from evennia_rp_equipment import outfits, services
 from evennia_rp_equipment.audit import log_problems, problems
 from evennia_rp_equipment.commands import (
     CmdGear,
@@ -29,6 +29,24 @@ from .base import GearCommandTest
 
 
 class GearCommandTests(GearCommandTest):
+    def test_invalid_or_combined_outfit_switches_never_change_gear_or_saved_sets(self):
+        cloak = self.make_item(self.char2, "cloak")
+        services.wear(self.char2, cloak)
+        outfits.save(self.char2, "Travel")
+        services.remove(self.char2, cloak)
+        hat = self.make_item(self.char2, "hat")
+        services.wear(self.char2, hat)
+        original = outfits.saved(self.char2)
+        for switches in ("svae", "s", "save/show", "delete/typo"):
+            with self.subTest(switches=switches), patch.object(self.char1, "msg") as room:
+                self.call(CmdOutfit(), f"/{switches} Travel", caller=self.char2)
+                self.assertFalse(cloak.is_worn)
+                self.assertTrue(hat.is_worn)
+                self.assertEqual(outfits.saved(self.char2), original)
+                room.assert_not_called()
+        # Keep the framework's unambiguous switch abbreviations working.
+        self.call(CmdOutfit(), "/sh Travel", "Outfit Travel\n  cloak", caller=self.char2)
+
     def test_outfit_commands_save_show_apply_replace_and_delete(self):
         self.assertTrue(any(command.key == "+outfit" for command in EquipmentCmdSet().commands))
         item = self.make_item(self.char2, "cloak")

@@ -9,6 +9,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Invalid, ambiguous or combined `+outfit` switches leave worn gear and saved
+  sets unchanged instead of accidentally applying or modifying an outfit.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added
