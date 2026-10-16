@@ -16,7 +16,52 @@ from .errors import CraftingError
 from .models import ActivationUse, FixtureInstallation
 from .test_wave_three import WaveThreeFixture
 from .test_wave_two import WaveTwoFixture
+from .tests import CraftingFixture
 from .wave_two import activate
+
+
+class JournalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        self.unlock()
+        self.journal = self.book(configuration={"journal": 2}, selected={"wood": 2})
+
+    def test_last_page_capacity_serializes_committed_writers(self):
+        from .models import JournalRevision
+        from .readables import write
+
+        write(self.char1, self.journal, "One", "First.")
+        with self.assertRaisesMessage(CraftingError, "unused pages"):
+            committed_race(
+                lambda: write(self.char1, self.journal, "Two", "Winner."),
+                lambda: write(self.char1, self.journal, "Three", "Over capacity."),
+            )
+        self.assertEqual(JournalRevision.objects.filter(craft=self.journal.craft_record).count(), 2)
+
+    def test_committed_revision_invalidates_competing_copy_before_payment(self):
+        from .models import ReadableEdition
+        from .readables import copy_book, snapshot, write
+
+        write(self.char1, self.journal, "One", "First.")
+        expected = snapshot(self.char1, self.journal)[3]
+        before = self.held()
+        with self.assertRaisesMessage(CraftingError, "source has changed"):
+            committed_race(
+                lambda: write(self.char1, self.journal, "One", "Changed.", page=1),
+                lambda: copy_book(
+                    self.char1,
+                    self.journal,
+                    "writing-0",
+                    "Edition",
+                    "A copy.",
+                    {"wood": 1},
+                    expected=expected,
+                ),
+            )
+        self.assertEqual(self.held(), before)
+        self.assertFalse(ReadableEdition.objects.exists())
 
 
 @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")

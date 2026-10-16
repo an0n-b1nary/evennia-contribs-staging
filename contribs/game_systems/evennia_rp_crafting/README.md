@@ -57,10 +57,10 @@ Authored pages use `+craft/page [title] = page text` repeatedly, then
 pages; a standalone `---PAGE---` line in new text creates an explicit page
 break. Page numbers do not depend on terminal width. Up to 100 pages fit within
 the existing 12,000-character total, including titles (80 characters each).
-Published pages stay in the immutable CraftRecord; these are not editable
-journals. Each additional page costs `readable.extra_page`, defaulting to one
-material input. Hosts with a custom cost map must configure that rule before
-crafting multiple pages; old single-text books retain their original price.
+Published pages stay in the immutable CraftRecord. Each additional page costs
+`readable.extra_page`, defaulting to one material input. Hosts with a custom
+cost map must configure that rule before crafting multiple pages; old
+single-text books retain their original price.
 
 `read <item> 3` or `read <item> = 3` selects a page. The equals form also works
 for item names ending in numbers: exact whole-name matches take precedence.
@@ -84,11 +84,70 @@ recover the raw text behind that provider's denial or redaction.
 `item.read(reader, page=None, contents=False)` uses these reading rules.
 `composition.invoke(reader, item, "readable")` retains the plain full-text
 dispatch API for existing integrations, with page bodies joined by blank
-lines. These operations do not grant lore or record poses. Journal authorship,
-copies, seals, mail and library access remain separate follow-ups.
+lines. These operations do not grant lore or record poses. Seals, mail and
+library access remain separate follow-ups.
 Drafts persist across logins and reloads. Preview consumes nothing; finish
 revalidates current costs, niche access, freeze settings, inputs and funds.
 Success clears the draft, so repeating finish cannot duplicate the craft.
+
+### Journals and editions
+
+For a blank journal, start a Readable draft, set `/desc`, then
+`+craft/journal = 10` and select resources for ten pages. Capacity is 1–100;
+the base and extra-page rules price the binding and capacity up front. This
+replaces any authored draft text. `/text` or `/page` replaces the blank journal
+with an ordinary fixed Readable. Blank capacity also works on deliberately
+allowed composed Readables; other components retain their own costs.
+
+```
++journal/write journal = Arrival | We reached the market at dawn.
++journal/revise journal = 1 | Arrival | We reached the well at dawn.
++journal/history journal = 1
+```
+
+Any current holder can write without a niche, fee or material payment. Carry
+the journal; view, read and write locks apply, as do crafting reveal/freeze
+controls. Writing appends a page or revises one of that character's own pages.
+Gifts and sales transfer writing rights through actual possession. A new owner
+may add entries but cannot revise earlier owners' words; returning a journal
+lets a previous writer revise their own entries again. Titles and current text
+share the 12,000-character limit. Page numbers remain stable; deletion and
+reordering are not supported. Existing printed books do not become editable.
+
+Each revision snapshots its writer and timestamp in append-only history,
+separate from the binding's CraftRecord. Every authorized history reader can
+see earlier revisions, including replaced words; revisions are not erasure.
+Reading shows the actual page writer under an explicit OOC label. Gifting or
+renaming a writer never attributes old text to the binding maker or new owner.
+
+```
++craft/copy journal = writing/a journal edition
++craft
++craft/resources = timber:2
++craft/finish
+```
+
+Copying needs the ordinary Scribe niche and full current Readable costs/fees.
+There is no author-permission flag. Carry the source or stand beside it, and
+retain view/read access through completion. The draft previews the authorized
+pages, writers and price; changing source text requires a new draft. Copies
+freeze the current text, titles and page authors. They remain unchanged after
+source revisions, transfers or deletion. Copying an edition retains its writers
+and records the intermediate source, rather than making its copier the author.
+Only text is copied: other verbs, equipment rules, journal capacity, modifiers
+and fixture properties are excluded. Copy drafts start with the source's
+description; `+craft/desc` replaces it, since the binding is the copier's own
+work. They otherwise accept resource selection, completion or cancellation;
+rewritten pages start a new authored craft.
+
+Custom reader denials and redaction remain authoritative. A provider's changed
+text is copied exactly as exposed, with unknown authorship explicitly credited
+to the host reader instead of guessing a page writer. Such providers cannot
+expose raw journal history through the standard history command. No reading or
+copy operation grants lore. The API entry points are `readables.write`,
+`readables.history` and `readables.copy_book`; copy preview uses `snapshot` and
+passes its fingerprint as `expected` at completion. Services revalidate locks,
+possession, capacity, niches and costs within their transactions.
 
 Wearable also accepts `/aura` and repeated `/require` equipment rules;
 `/unrequire <number>` removes a draft rule. Aura lines are cosmetic and appear
@@ -248,7 +307,7 @@ work; wave-three services preserve those original records.
 
 ## Provenance and review
 
-Items show a separate **Craft hallmark** line from their immutable CraftRecord,
+Items show a separate **Craft hallmark (OOC)** line from their immutable CraftRecord,
 for example `Made by Morgan (Weaver)`. An item's editable description or
 `db.hallmark` cannot alter this verified line. Wearables show it in `+gear/info`
 through equipment's `get_display_provenance` hook. Item typeclasses put
@@ -266,6 +325,9 @@ configuration, inputs, maker/account snapshots and the timestamp. No approval is
 required. Records retain their original hallmark after a maker or niche is renamed
 and survive deletion of the maker/item through integer soft references. Staff
 administrative SQL is outside the player-service protection boundary.
+Journal bindings list their actual writers separately. Editions add verified
+"Copied by; text by" attribution and their source craft identity; these lines
+come from append-only history, never item Attributes or the owner's prose.
 
 New records store the lifecycle in `behaviour`, the verb configurations in
 `verbs`, and all contributing niche keys/names/component grants in `contributors`.

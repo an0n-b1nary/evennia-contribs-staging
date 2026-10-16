@@ -6,6 +6,8 @@ BOOK_NAME = "a sample field book"
 BOOK_DESC = "A small bound notebook with a plain paper cover."
 BOOK_TEXT = "Field notes: the market opens onto the common road."
 PAGED_BOOK_NAME = "a sample travel book"
+JOURNAL_NAME = "a sample field journal"
+EDITION_NAME = "a sample journal edition"
 BOOK_PAGES = [
     {"title": "Market Row", "text": "Stalls line the road beside the well."},
     {"title": "The Common Road", "text": "The road bends towards a stand of trees."},

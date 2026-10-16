@@ -10,10 +10,8 @@ from django.test import TransactionTestCase
 class CompositionUpgradeTests(TransactionTestCase):
     def test_wave_two_populated_upgrade_keeps_fixture_placement_and_value(self):
         old_target = [("evennia_rp_crafting", "0004_wave_two")]
-        new_target = [
-            ("evennia_rp_crafting", "0005_companionstate_modificationoffer_modificationlayer")
-        ]
         executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("evennia_rp_crafting")
         executor.migrate(old_target)
         try:
             old = executor.loader.project_state(old_target).apps
@@ -51,10 +49,8 @@ class CompositionUpgradeTests(TransactionTestCase):
 
     def test_populated_upgrade_keeps_original_snapshots_and_consumption(self):
         old_target = [("evennia_rp_crafting", "0002_eventroomlimit_eventuse")]
-        new_target = [
-            ("evennia_rp_crafting", "0005_companionstate_modificationoffer_modificationlayer")
-        ]
         executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("evennia_rp_crafting")
         executor.migrate(old_target)
         try:
             old = executor.loader.project_state(old_target).apps
@@ -102,3 +98,45 @@ class CompositionUpgradeTests(TransactionTestCase):
         readable = CraftRecord.objects.get(pk=ids[0])
         self.assertEqual(readable.lifecycle, "carried")
         self.assertEqual(readable.verb_data[0]["configuration"]["text"], "Old text.")
+
+    def test_populated_page_upgrade_preserves_printed_pages_without_creating_authorship(self):
+        old_target = [
+            ("evennia_rp_crafting", "0005_companionstate_modificationoffer_modificationlayer")
+        ]
+        executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("evennia_rp_crafting")
+        executor.migrate(old_target)
+        try:
+            old = executor.loader.project_state(old_target).apps
+            niche = old.get_model("evennia_rp_crafting", "NicheDefinition").objects.create(
+                key="upgrade-pages", name="Scribe", behaviours=["readable"]
+            )
+            record = old.get_model("evennia_rp_crafting", "CraftRecord").objects.create(
+                crafter_id=820000,
+                crafter_name="Original writer",
+                niche=niche,
+                niche_name=niche.name,
+                behaviour="carried",
+                item_id=820001,
+                hallmark="Original hallmark",
+                verbs=[
+                    {
+                        "key": "readable",
+                        "niche": niche.key,
+                        "configuration": {"pages": [{"title": "One", "text": "Original page."}]},
+                    }
+                ],
+            )
+            before = (
+                old.get_model("evennia_rp_crafting", "CraftRecord")
+                .objects.filter(pk=record.pk)
+                .values()
+                .get()
+            )
+        finally:
+            MigrationExecutor(connection).migrate(new_target)
+        from .models import CraftRecord, JournalRevision, ReadableEdition
+
+        self.assertEqual(CraftRecord.objects.filter(pk=record.pk).values().get(), before)
+        self.assertFalse(JournalRevision.objects.exists())
+        self.assertFalse(ReadableEdition.objects.exists())

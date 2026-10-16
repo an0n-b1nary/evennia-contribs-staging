@@ -9,9 +9,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Changed
+## [0.1.4] - 2026-10-15
 
-- Accept chargen 0.4 while retaining compatibility with chargen 0.3.
+### Fixed
+
+- Label verified craft hallmarks as OOC in equipment inspection, matching the
+  crafted item's appearance and keeping them distinct from IC maker's marks.
 
 ## [0.1.3] - 2026-10-14
 
@@ -20,6 +23,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Display optional crafting layers on plain gear and worn lines without
   changing sealed prose or requirements. Equipment remains independent
   when Crafting is absent.
+
+### Changed
+
+- Accept chargen 0.4 while retaining compatibility with chargen 0.3.
 
 ## [0.1.2] - 2026-10-09
 

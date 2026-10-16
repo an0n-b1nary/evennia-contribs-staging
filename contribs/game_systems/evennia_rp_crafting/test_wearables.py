@@ -48,6 +48,7 @@ class WearableTests(CraftingFixture, EvenniaCommandTest):
         hallmark = cloak.get_display_provenance()
         equipment.set_desc(self.char1, cloak, "Revised prose.")
         self.assertIn(hallmark, render_info(cloak, self.char2))
+        self.assertIn("Craft hallmark (OOC):", render_info(cloak, self.char2))
         cloak.move_to(self.char2, quiet=True, move_type="give")
         self.assertTrue(cloak.sealed)
         cloak.move_to(self.char1, quiet=True, move_type="give")

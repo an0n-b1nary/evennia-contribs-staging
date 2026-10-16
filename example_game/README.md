@@ -169,6 +169,15 @@ The sample travel book demonstrates two titled pages:
 `read a sample travel book` to resume that character's bookmark. Create pages
 with repeated `+craft/page title = text`; each extra page costs one additional
 material by default. The shared pagination helper comes from Links 0.8.7.
+The sample field journal has three prepaid pages and one attributed entry;
+the sample journal edition freezes that entry. Pick up the journal, then try
+`+journal/write a sample field journal = Visit | I stopped by the well.`
+Use `/revise` and `/history` to see preserved revisions. Gifting or selling
+the journal lets its new holder append entries while keeping earlier writers'
+attribution. Create your own with `+craft/journal = 3` in a Readable draft.
+`+craft/copy a sample field journal = writing/a journal edition` starts a
+copy draft: preview it with `+craft`, select resources and `/finish` at normal
+crafting cost. Source revisions never change completed editions.
 The market also holds a sample spice cake and spark globe. Pick one up and
 `use <item>` emits its EVENT and consumes it. Compose your own through
 `+craft/new cooking/consumable`, `/desc`, repeated `/beat`, `/resources`, preview

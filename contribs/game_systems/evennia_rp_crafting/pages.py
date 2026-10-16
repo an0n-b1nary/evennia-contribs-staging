@@ -3,7 +3,7 @@
 """Immutable authored pages and personal reading progress.
 
 Read from the verified verb configuration, never mutable item attributes.
-This module deliberately does not implement journals, copying or lore grants.
+Journal text and edition attribution are resolved from verified history.
 """
 
 from evennia_links.pagination import Page, contents, page_at, split_pages
@@ -18,6 +18,17 @@ BOOKMARK_CATEGORY = "rp_crafting_reading"
 
 
 def validate(config):
+    if "journal" in config:
+        capacity = config["journal"]
+        if (
+            set(config) != {"journal"}
+            or type(capacity) is not int
+            or not 1 <= capacity <= MAX_PAGES
+        ):
+            raise CraftingError(
+                f"Choose a blank journal capacity from 1 to {MAX_PAGES}, without authored text."
+            )
+        return {"journal": capacity}
     if "pages" in config and "text" in config:
         raise CraftingError("Choose readable text or pages, not both.")
     if "pages" not in config:
@@ -51,6 +62,8 @@ def validate(config):
 
 def authored_pages(config):
     """Legacy text remains one page, including old delimiter-shaped prose."""
+    if "journal" in config:
+        return ()
     if "pages" in config:
         return tuple(Page(entry["text"], entry.get("title", "")) for entry in config["pages"])
     return (Page(config["text"]),)
@@ -85,6 +98,10 @@ def configuration(actor, item):
 
 def read(actor, item, number=None, *, table=False):
     record, pages = configuration(actor, item)
+    if not pages:
+        if number is not None:
+            raise CraftingError("This journal has no written pages to select.")
+        return "This journal has no entries yet."
     if table:
         noun = "page" if len(pages) == 1 else "pages"
         return f"Contents ({len(pages)} {noun}):\n{contents(pages)}"
@@ -103,6 +120,11 @@ def read(actor, item, number=None, *, table=False):
         actor.attributes.add(bookmark_key, number, category=BOOKMARK_CATEGORY)
     # Retain the original single-text read output exactly.
     if len(pages) == 1 and not page.title:
-        return page.text
-    title = f": {page.title}" if page.title else ""
-    return f"Page {number} of {len(pages)}{title}\n{page.text}"
+        result = page.text
+    else:
+        title = f": {page.title}" if page.title else ""
+        result = f"Page {number} of {len(pages)}{title}\n{page.text}"
+    from .readables import page_credit
+
+    credit = page_credit(record, pages, number)
+    return f"{result}\n{credit}" if credit else result

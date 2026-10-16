@@ -471,7 +471,7 @@ class Command(BaseCommand):
 
         owner = authors[-1]
         counts = {"crafting_niches": len(seed_catalog(update=True))}
-        grant(owner, "timber", 14, "staff", note="Sandbox Workshop inputs")
+        grant(owner, "timber", 18, "staff", note="Sandbox Workshop inputs")
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
@@ -495,7 +495,27 @@ class Command(BaseCommand):
             {"pages": crafting.BOOK_PAGES},
             {"timber": 2},
         )
-        items = [book, paged_book]
+        from evennia_rp_crafting.readables import copy_book, write
+
+        journal = craft(
+            owner,
+            "writing",
+            "readable",
+            crafting.JOURNAL_NAME,
+            "A field journal with room for three entries.",
+            {"journal": 3},
+            {"timber": 3},
+        )
+        write(owner, journal, "At the well", "The first stalls opened beside the well.")
+        edition = copy_book(
+            owner,
+            journal,
+            "writing",
+            crafting.EDITION_NAME,
+            "A fixed copy of the journal's first entry.",
+            {"timber": 1},
+        )
+        items = [book, paged_book, journal, edition]
         if apps.is_installed("evennia_rp_equipment"):
             unlock(owner, "weaving", {"timber": 6})
             cloak = craft(

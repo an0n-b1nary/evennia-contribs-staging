@@ -1,5 +1,8 @@
 # evennia-rp-equipment
 
+Verified craft hallmarks in `+gear/info` are explicitly labelled OOC; an IC
+maker's mark remains part of the item's description.
+
 When optional `evennia-rp-crafting>=0.5` is installed, plain gear and worn
 lines display its attributed cosmetic layers. These never rewrite sealed
 prose, change requirements or supply mechanics. Equipment works independently

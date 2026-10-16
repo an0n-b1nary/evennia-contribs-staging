@@ -11,6 +11,7 @@ from .command_base import CraftCommand as _CraftCommand
 from .composition import specifications
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, Workshop
+from .readable_commands import CmdJournal as CmdJournal
 from .room_commands import CmdFixture as CmdFixture
 from .room_commands import CmdListen as CmdListen
 from .room_commands import CmdSense as CmdSense
@@ -135,6 +136,8 @@ class CmdCraft(_CraftCommand):
       +craft/require = <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
       +craft/text = <readable text>
+      +craft/journal = <blank page capacity>
+      +craft/copy <source item> = <niche key>/<new item name>
       +craft/page [title] = <page text>  (repeat to append authored pages)
       +craft/unpage <number>
       +craft/verb <niche key>/<verb key>  (only an allowed combination)
@@ -161,6 +164,11 @@ class CmdCraft(_CraftCommand):
     key = "+craft"
 
     def run(self, switch):
+        if switch == "copy":
+            from .readable_commands import copy_draft
+
+            copy_draft(self)
+            return
         if switch == "new":
             if self.rhs is None or "/" not in self.lhs:
                 raise CraftingError("Usage: +craft/new niche/behaviour = item name")
@@ -193,6 +201,11 @@ class CmdCraft(_CraftCommand):
             from evennia.utils.dbserialize import deserialize
 
             draft = deserialize(stored)
+            if "copy_source" in draft:
+                from .readable_commands import continue_copy
+
+                continue_copy(self, switch, draft)
+                return
             if switch == "finish":
                 item = services.craft(
                     self.caller,
@@ -205,9 +218,25 @@ class CmdCraft(_CraftCommand):
                     verbs=draft.get("verbs"),
                 )
                 self.caller.attributes.remove(DRAFT_KEY)
-                self.msg(f"You craft {item.key}. {item.get_display_provenance(self.caller)}.")
+                self.msg(
+                    f"You craft {item.key}. Hallmark (OOC): {item.get_display_provenance(self.caller)}."
+                )
                 return
-            if switch in ("page", "unpage"):
+            if switch == "journal":
+                from .pages import validate
+
+                entry = next(
+                    (entry for entry in draft.get("verbs", []) if entry["key"] == "readable"), None
+                )
+                implementation = registry().get(entry["key"] if entry else draft["behaviour"])
+                if implementation is None or "journal" not in implementation.fields:
+                    raise CraftingError("Add a Readable verb first.")
+                value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
+                normalized = validate({"journal": int(value)})
+                target = entry["configuration"] if entry else draft["configuration"]
+                target.clear()
+                target.update(normalized)
+            elif switch in ("page", "unpage"):
                 from .pages import authored_pages, validate
 
                 entry = next(
@@ -406,6 +435,10 @@ class CmdCraft(_CraftCommand):
                         rows.append("Pages:")
                         for number, page in enumerate(authored_pages(config), 1):
                             rows.append(f"{number}. {page.title or f'Page {number}'}\n{page.text}")
+                    if config.get("journal"):
+                        rows.append(
+                            f"Blank journal: {config['journal']} pages; owner writing is free."
+                        )
                 for entry in draft.get("verbs", []):
                     rows.append(f"{entry['key']} ({entry['niche']})")
                     for field, label in labels.items():
@@ -546,7 +579,22 @@ class CmdCrafting(_CraftCommand):
                 self.msg(
                     f"Craft #{row.pk}: {row.hallmark}, item #{row.item_id}, {row.created.isoformat()}\nMaker: {row.crafter_name} (#{row.crafter_id}), accounts {row.crafter_accounts}\nContributors: {row.contributor_data}\nLifecycle: {row.lifecycle}; verbs: {row.verb_data}\nSpent: {dict(row.resources_spent)}, money {row.money_spent}\n{dict(row.prose)}"
                 )
-                from .models import EventUse
+                from .models import EventUse, JournalRevision, ReadableEdition
+
+                edition = ReadableEdition.objects.filter(craft=row).first()
+                if edition:
+                    self.msg(
+                        f"Edition of craft #{edition.source_id}; page authors: {edition.authors}; source fingerprint {edition.source_fingerprint}."
+                    )
+                revisions = JournalRevision.objects.filter(craft=row)
+                if revisions.exists():
+                    self.msg(
+                        "Journal revisions (OOC):\n"
+                        + "\n".join(
+                            f"Page {revision.page}, revision {revision.revision}, {revision.author_name} (#{revision.author_id}) at {revision.created.isoformat()}: {revision.title}\n{revision.text}"
+                            for revision in revisions
+                        )
+                    )
 
                 used = EventUse.objects.filter(craft=row).first()
                 if used:
@@ -576,3 +624,4 @@ class CraftingCmdSet(CmdSet):
             self.add(command())
         self.add(CmdModify())
         self.add(CmdPet())
+        self.add(CmdJournal())

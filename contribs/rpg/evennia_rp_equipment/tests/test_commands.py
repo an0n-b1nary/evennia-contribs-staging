@@ -32,7 +32,9 @@ class GearCommandTests(GearCommandTest):
             return_value="Made by Morgan (Weaver)",
             create=True,
         ):
-            self.assertIn("Craft hallmark: Made by Morgan (Weaver)", render_info(item, self.char1))
+            self.assertIn(
+                "Craft hallmark (OOC): Made by Morgan (Weaver)", render_info(item, self.char1)
+            )
 
     def test_make_describe_require_and_inspect(self):
         self.call(CmdGear(), "/make Cursed Axe=weapon", "You make Cursed Axe.", caller=self.char2)
