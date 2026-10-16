@@ -298,6 +298,46 @@ class CraftedLoreTests(CraftingFixture, EvenniaCommandTest):
             book.read(self.char2, 2)
         self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
 
+    def test_stale_draft_features_can_be_removed_without_revalidating_the_others(self):
+        from evennia_rp_crafting.commands import DRAFT_KEY, CmdCraft
+        from evennia_rp_crafting.models import CraftRecord
+
+        for args in ("/new writing-0/readable = Codex", "/desc = A codex.", "/text = An account."):
+            self.call(CmdCraft(), args, "Craft draft saved")
+        self.call(CmdLoreCraft(), f"/cite = #{self.lore.entry_number}", "Draft lore facets saved")
+        for line in ("A hidden sign.", "Another sign."):
+            self.call(
+                CmdLoreCraft(),
+                f"/recognise = #{self.lore.entry_number} | {line}",
+                "Draft lore facets saved",
+            )
+        LoreAcquisition.objects.filter(character=self.char1, entry=self.lore).delete()
+        before = self.held(), CraftRecord.objects.count()
+        self.call(CmdCraft(), "/finish", "You must hold that lore entry")
+        self.call(CmdLoreCraft(), "/uncite 1", "Draft lore facets saved")
+        self.call(CmdLoreCraft(), "/unrecognise 1", "Draft lore facets saved")
+        self.call(CmdLoreCraft(), "/unrecognise 1", "Draft lore facets saved")
+        self.assertEqual(dict(self.char1.attributes.get(DRAFT_KEY)["facets"]), {})
+        self.assertEqual((self.held(), CraftRecord.objects.count()), before)
+        self.call(CmdCraft(), "/resources = wood:1", "Craft draft saved")
+        self.call(CmdCraft(), "/finish", "You craft Codex")
+
+    def test_citations_can_be_cleared_after_changing_a_draft_to_a_journal(self):
+        from evennia_rp_crafting.commands import DRAFT_KEY, CmdCraft
+
+        for args in (
+            "/new writing-0/readable = Journal",
+            "/desc = A journal.",
+            "/text = An account.",
+        ):
+            self.call(CmdCraft(), args, "Craft draft saved")
+        self.call(CmdLoreCraft(), f"/cite = #{self.lore.entry_number}", "Draft lore facets saved")
+        self.call(CmdCraft(), "/journal = 2", "Craft draft saved")
+        self.call(CmdLoreCraft(), "/uncite 1", "Draft lore facets saved")
+        self.assertNotIn("lore_citations", self.char1.attributes.get(DRAFT_KEY)["facets"])
+        self.call(CmdCraft(), "/resources = wood:2", "Craft draft saved")
+        self.call(CmdCraft(), "/finish", "You craft Journal")
+
     def test_shared_read_command_refuses_hidden_crafts_and_lorecraft_is_hidden(self):
         book = self.book_with_lore()
         book.move_to(self.room1, quiet=True)

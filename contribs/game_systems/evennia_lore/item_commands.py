@@ -141,15 +141,21 @@ class CmdLoreCraft(ItemCommand):
                 f"Draft lore facets: {facets or 'none'}. Use +craft to review the combined cost."
             )
             return
-        facets[key] = rows
-        services.craft_cost(
-            self.caller,
-            draft["niche"],
-            draft["behaviour"],
-            draft["configuration"],
-            verbs=draft.get("verbs"),
-            facets=facets,
-        )
+        if rows:
+            facets[key] = rows
+        else:
+            facets.pop(key, None)
+        # Removal must remain possible while other facets or draft pages are
+        # invalid. Additions, previews and completion still validate the whole.
+        if switch in ("cite", "recognise"):
+            services.craft_cost(
+                self.caller,
+                draft["niche"],
+                draft["behaviour"],
+                draft["configuration"],
+                verbs=draft.get("verbs"),
+                facets=facets,
+            )
         self.caller.attributes.add(DRAFT_KEY, draft)
         self.msg("Draft lore facets saved. Use +craft to preview, then /finish.")
 

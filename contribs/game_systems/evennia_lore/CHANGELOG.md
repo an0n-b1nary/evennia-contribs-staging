@@ -21,6 +21,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bridge; these features do not yet extend to owner-written journals or copies.
 - Reject citations on blank journals before spending, and preserve journal and
   edition OOC text attribution through the shared read command.
+- Let authors remove stale draft citations and recognition after changing pages
+  or losing lore holdings; clear empty facets without discarding the draft.
 
 ## [0.7.2] - 2026-10-11
 

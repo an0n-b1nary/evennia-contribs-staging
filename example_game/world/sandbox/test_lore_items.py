@@ -2,6 +2,8 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Actual host page commands, recognition inspection and persistent seed history."""
 
+from unittest import skipUnless
+
 from django.apps import apps
 from django.core.management import call_command
 from evennia.objects.models import ObjectDB
@@ -79,3 +81,29 @@ class LoreItemSeams(EvenniaCommandTest):
         self.assertTrue(LoreTomeRecord.objects.filter(pk=record.pk).exists())
         new = ObjectDB.objects.get(db_key=crafting.TOME_NAME)
         self.assertNotEqual(LoreTomeRecord.objects.get(item_id=new.pk).pk, record.pk)
+
+    @skipUnless(apps.is_installed("evennia_rp_crafting"), "crafting absent")
+    def test_real_draft_commands_clear_stale_citations_before_publishing_a_journal(self):
+        call_command("seed_sandbox", verbosity=0)
+        book = ObjectDB.objects.get(db_key=crafting.LORE_BOOK_NAME)
+        record = book.craft_record
+        author = ObjectDB.objects.get(pk=record.crafter_id)
+        lore = LoreEntry.objects.get(pk=record.prose["facets"]["lore_citations"][0]["entry"])
+        from commands.default_cmdsets import CharacterCmdSet
+
+        commands = {row.key: type(row) for row in CharacterCmdSet().commands}
+        for args in ("/new writing/readable = New journal", "/desc = A journal.", "/text = Notes."):
+            self.call(commands["+craft"](), args, "Craft draft saved", caller=author)
+        self.call(
+            commands["+lorecraft"](),
+            f"/cite = #{lore.entry_number}",
+            "Draft lore facets saved",
+            caller=author,
+        )
+        self.call(commands["+craft"](), "/journal = 2", "Craft draft saved", caller=author)
+        self.call(commands["+lorecraft"](), "/uncite 1", "Draft lore facets saved", caller=author)
+        self.call(commands["+craft"](), "/resources = timber:2", "Craft draft saved", caller=author)
+        self.call(commands["+craft"](), "/finish", "You craft New journal", caller=author)
+        journal = ObjectDB.objects.get(db_key="New journal")
+        self.assertNotIn("facets", journal.craft_record.prose)
+        self.assertIn("no entries", journal.read(self.char2))
