@@ -77,7 +77,10 @@ class GearCommandTests(GearCommandTest):
         self.call(CmdOutfit(), "/save", "Give the outfit a name", caller=self.char2)
 
     def test_worn_all_shows_covered_items_to_owner_and_nearby_looker(self):
-        with self.settings(RP_EQUIPMENT_SLOT_COVERS={"cloak": ("body",)}):
+        with self.settings(
+            RP_EQUIPMENT_SLOTS=("body", "cloak"),
+            RP_EQUIPMENT_SLOT_COVERS={"cloak": ("body",)},
+        ):
             shirt = self.make_item(self.char2, "shirt", slot="body", line="a linen shirt")
             cloak = self.make_item(self.char2, "cloak", slot="cloak")
             for item in (shirt, cloak):
