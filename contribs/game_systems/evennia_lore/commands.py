@@ -22,6 +22,9 @@ from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
 from evennia_lore import layers
+from evennia_lore.item_commands import CmdLoreCraft as CmdLoreCraft
+from evennia_lore.item_commands import CmdReadTome as CmdReadTome
+from evennia_lore.item_commands import CmdTome as CmdTome
 from evennia_lore.layers import LoreLayerError
 from evennia_lore.models import (
     LoreAcquisition,
@@ -896,6 +899,9 @@ class CmdLore(EditingMixin, MuxCommand):
         target = caller.search(obj_ref, global_search=True)
         if not target:
             return
+        if not is_staff(caller) and not target.access(caller, "control", default=False):
+            caller.msg("Only staff or an object controller can change its lore tags.")
+            return
         entry.objects_tagged.add(target)
         caller.msg(f"|gTagged '{target.key}' on #{entry.entry_number}.|n")
 
@@ -910,6 +916,9 @@ class CmdLore(EditingMixin, MuxCommand):
             return
         target = caller.search(obj_ref, global_search=True)
         if not target:
+            return
+        if not is_staff(caller) and not target.access(caller, "control", default=False):
+            caller.msg("Only staff or an object controller can change its lore tags.")
             return
         entry.objects_tagged.remove(target)
         caller.msg(f"Removed '{target.key}' from #{entry.entry_number}.")

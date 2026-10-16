@@ -1,5 +1,13 @@
 # Contributing
 
+For lore/readable integration, run
+`python scripts/ci_run_lore_item_tests.py ci_game/lore_items` in a fresh installed
+environment. The `lore-items-partners` CI matrix also starts fresh environments
+with either `evennia-rp-crafting` or `evennia-lore` actually excluded by
+`ci_install_contribs.py --exclude`, then uses the matching `--absent` app label.
+This exercises staff tomes without crafting and existing crafted metadata
+without lore; changing only `INSTALLED_APPS` does not prove physical absence.
+
 Thanks for your interest. This repo is a staging ground — its primary job is to surface friction *before* a contrib gets submitted upstream to [`evennia/evennia`](https://github.com/evennia/evennia), so the most valuable contribution is usually an honest install report.
 
 ## Trying a contrib in your game

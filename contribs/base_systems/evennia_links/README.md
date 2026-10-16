@@ -316,6 +316,12 @@ games migrating HTTP staff checks should set the one web-wide setting instead.
 
 ## Authored pages
 
+`pagination.reading_target(actor, name, value=None, table=False)` shares local
+book/page command resolution. It searches carried and current-room objects,
+preserves exact item names ending in numbers, and accepts an explicit page via
+`value`. The host's search method supplies identity matching; the resolved
+reader still checks access. The module imports no engine or Django code.
+
 Helpers in `evennia_links.pagination` import without Django or Evennia
 initialization. `Page(text, title="")` is immutable; `split_pages(text)` splits
 only standalone `---PAGE---` lines, preserving paragraphs and retaining empty

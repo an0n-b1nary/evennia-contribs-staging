@@ -307,6 +307,31 @@ work; wave-three services preserve those original records.
 
 ## Provenance and review
 
+Optional partners register paid metadata through `signals.collect_facets`.
+`craft` and `craft_cost` accept a `facets` mapping; providers validate actor
+rights and configuration and add their resource costs to the same transaction.
+Normalized metadata is captured under `CraftRecord.prose["facets"]`. Unknown or
+missing providers refuse new requested features. Existing records keep their
+metadata but lose the absent provider's display/learning effects.
+
+Lore 0.8 supplies `lore_citations` and `lore_recognition`, with `+lorecraft`
+draft commands. Crafters must hold the referenced published lore. Recognition
+adds one input per feature; citations do not change the Readable price. Refer
+to lore's README for commands and limits. Metadata does not enter market
+keywords or room rosters. Detailed look and equipment inspection use
+`get_display_recognition(looker)` so holders see their own gated lines.
+
+`signals.page_read` fires only for a selected, valid page, after access/provider
+checks. It includes the actor, item, record, one-based number and a `canonical`
+flag. Redacted/reordered custom provider output is not canonical and does not
+authorize lore grants. Contents and raw `composition.invoke`/provider enumeration
+never fire it. Reads are atomic with reading progress; hook responses can append
+system-owned lines without replacing the crafter's text. Plain books retain
+their original output when no partner contributes a line.
+
+Owner-written journal revisions and citation-preserving copies require their
+separate bridge; the fixed-page hooks do not yet implement those workflows.
+
 Items show a separate **Craft hallmark (OOC)** line from their immutable CraftRecord,
 for example `Made by Morgan (Weaver)`. An item's editable description or
 `db.hallmark` cannot alter this verified line. Wearables show it in `+gear/info`

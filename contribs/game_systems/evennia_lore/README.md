@@ -321,6 +321,104 @@ Privacy rules:
 
 ## Programmatic API
 
+### Crafted citations and recognition
+
+Install compatible crafting 0.8 or newer (`pip install evennia-lore[crafting]`)
+to enable two optional facets. Lore registers them through crafting's collector
+only when both apps are installed. Existing crafting 0.6 continues without the
+integration; upgrading lore alone never creates a hard crafting dependency.
+
+Complete an ordinary `+craft` draft, then attach lore before paying:
+
+```
++lorecraft/cite 2 = #14
++lorecraft/cite = #20
++lorecraft/recognise = #14 | A familiar sign is woven into the hem.
++craft
++craft/resources = timber:3
++craft/finish
+```
+
+Register `CmdLoreCraft` alongside your other lore commands. `/uncite N` and
+`/unrecognise N` remove draft features. A numbered citation applies to that
+authored page; an unnumbered citation applies on any successful page read.
+The crafter must actually hold the published entry, even if it is public.
+Staff may author references to any published entry. Restricted references are
+permitted and stay in the immutable CraftRecord for review. A change to the
+entry's publication state or the crafter's holdings is rechecked at completion.
+
+Citations are free. Recognition costs one additional input per feature, from
+a contributing niche. An optional niche on `/recognise` chooses that contributor;
+otherwise the first contributor supplies it. The category defaults to a category
+already used by that niche's craft inputs; `LORE_RECOGNITION_CATEGORIES` can map
+niche keys to permitted categories. Features are plain single-line text, up to
+400 characters each, at most 20 per item. Up to 100 citations may be attached.
+
+Successful `item.read(reader, page=...)` operations acquire cited entries with
+source `read`. Existing acquisitions retain their original source. Contents,
+previews, provider enumeration, plain full-text dispatch and failed or redacted
+reads do not acquire lore. Reading and bookmark writes commit together; a
+failed read rolls both back. Reading creates no XP or inspiration links, and is
+not subject to the passive weekly ceiling. `+forget` removes the acquisition;
+rereading a qualifying page reacquires it. Citations reference the current entry,
+not a copied body or frozen truth. Withdrawn/deleted entries stop granting;
+sealed notes stay staff-only under the ordinary lore privacy rules.
+
+Recognition appears on deliberate look/inspection only for viewers holding the
+entry. Staff see all available features with their gates labelled. Recognition
+never grants lore and does not enter object names, room rosters, market keywords
+or automatic emissions. An item's mutable Attributes cannot forge either facet.
+When lore is removed, metadata remains in craft history while its effects hide;
+new crafts requesting those missing facets are refused without spending.
+
+The API adds `facets={"lore_citations": [{"entry": entry.pk, "page": 2}],
+"lore_recognition": [{"entry": entry.pk, "text": "..."}]}` to crafting's
+`craft_cost` and `craft`. Entry values are internal PKs; commands resolve human
+`#entry_number` identifiers. Staff review includes these facets in the record.
+
+**Journal/copy bridge:** this release covers fixed authored books and staff
+tomes. Citation-preserving copies and citations on journal revisions remain a
+separate integration step. Copies should preserve verified source citations
+without requiring the copier to hold them, while copying itself grants nothing.
+Journal citations belong to a particular revision, with explicit retain/replace
+choices on revision and frozen citation snapshots in editions. Recipe teaching
+remains separate. Do not assume text-only copying already carries these facets.
+Blank journal drafts reject citations until revision-scoped support is available.
+
+### Staff tomes without crafting
+
+Register `CmdTome` and `CmdReadTome`. Add the latter after any crafting cmdset
+to provide a shared `read` command: staff tomes remain readable while crafting
+is hidden, and hidden crafted items are still refused. `+lorecraft` remains
+hidden until crafting is revealed.
+The staff permission uses the existing `LORE_STAFF_LOCK`.
+
+```
++tome/new an old chronicle
++tome/desc = A dusty book bound in dark leather.
++tome/page Preface = A traveller's introduction.
++tome/page The Exile = An old account, possibly unreliable.
++tome/cite 2 = #14
++tome
++tome/publish
+read an old chronicle 2
+```
+
+Tomes have 1-100 fixed pages and at most 12,000 characters including their
+titles (up to 80 characters each). This book limit does not limit lore entries.
+Each publication creates an append-only `LoreTomeRecord`; changing item
+Attributes cannot rewrite its pages or authorize citations. Bookmarks are
+personal and keyed to the record, so replacement books do not inherit progress.
+Staff create a new tome to publish different text. There is no crafting niche,
+resource cost or Workshop requirement. `items.create_tome` exposes the same
+validated staff-only operation to builders and seed scripts. Set
+`LORE_TOME_TYPECLASS` to a subclass of `items.LoreTome` to add host hooks; put
+your stock/deletion guard mixin before it in the MRO.
+
+`+lore/object` and `/unobject` now require both entry-editing rights and control
+of the target, unless staff. Object tags remain builder/discovery metadata;
+they never supply crafted recognition or overwrite another maker's prose.
+
 ```python
 from evennia_lore.models import LoreEntry, LoreAcquisition, LoreSceneLink
 

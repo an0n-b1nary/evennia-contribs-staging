@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-lore"
-version = "0.7.2"
+version = "0.8.0"
 description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,9 +22,10 @@ classifiers = [
 # Core: models + commands + trickle engine + 4 bridge models. No web/API deps.
 # evennia-links is HARD because shipped models inherit AbstractArchived,
 # AbstractVersion, AbstractAuthoredLink, and use connect_soft_ref_cleanup.
-dependencies = ["evennia>=6.0", "evennia-links>=0.8"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.8,<0.9"]
 
 [project.optional-dependencies]
+crafting = ["evennia-rp-crafting>=0.8,<0.9"]
 # [web] enables website views, DRF API, and accessible forms/templates.
 web = [
     "evennia-accessibility>=0.3.1",

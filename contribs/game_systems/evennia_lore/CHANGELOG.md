@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.0] - 2026-10-15
+
+- Add page-specific and book-wide citations with the `read` acquisition source,
+  and paid recognition features visible only to holders or staff. Crafters must
+  hold published lore; restricted citations are recorded for review.
+- Add fixed staff LoreTomes and persistent authoring drafts without requiring
+  crafting. Successful reads grant knowledge; previews, contents, custom
+  redaction, failed reads and inspection never grant knowledge or XP.
+- Limit object lore tagging to staff or controllers, preserve shipped history
+  with an additive migration, and exercise real host and absent-partner seams.
+- Journal revision citations and citation-preserving editions remain a separate
+  bridge; these features do not yet extend to owner-written journals or copies.
+- Reject citations on blank journals before spending, and preserve journal and
+  edition OOC text attribution through the shared read command.
+- Let authors remove stale draft citations and recognition after changing pages
+  or losing lore holdings; clear empty facets without discarding the draft.
+
 ## [0.7.2] - 2026-10-11
 
 - **Changed:** player-facing wording says "plot" where it said "plot thread",

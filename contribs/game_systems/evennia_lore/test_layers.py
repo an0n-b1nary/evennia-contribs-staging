@@ -87,7 +87,11 @@ class TestLayerRules(EvenniaTest):
         with self.assertRaisesMessage(LoreLayerError, "Fact, Rumor, Legend"):
             layers.validate("myth", "open")
 
-    @override_settings(LORE_KINDS={"truth": "Truth", "gossip": "Gossip"}, LORE_ACCURATE_KINDS=())
+    @override_settings(
+        LORE_KINDS={"truth": "Truth", "gossip": "Gossip"},
+        LORE_ACCURATE_KINDS=(),
+        LORE_DEFAULT_KIND=None,
+    )
     def test_a_game_defines_its_own_kinds(self):
         self.assertEqual(layers.match_kind("GOSSIP"), "gossip")
         self.assertEqual(layers.default_kind(), "truth")

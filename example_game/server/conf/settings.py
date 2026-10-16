@@ -554,6 +554,9 @@ from world.sandbox.content import JOBS_REQUEST_FORMS as JOBS_REQUEST_FORMS
 
 LORE_STAFF_LOCK = "cmd:perm(Builder)"
 LORE_REQUIRE_APPROVAL = False
+LORE_TOME_TYPECLASS = "typeclasses.lore_items.StaffTome"
+# Recognition adds one input per feature, from a contributing niche's category.
+LORE_RECOGNITION_CATEGORIES = {"writing": "materials", "weaving": "materials"}
 LORE_PASSIVE_WEEKLY_CEILING = 5
 
 from decimal import Decimal

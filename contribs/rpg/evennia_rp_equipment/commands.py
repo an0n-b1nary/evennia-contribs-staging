@@ -233,6 +233,9 @@ def render_info(item, looker) -> str:
     if item.is_worn and item.location is not None:
         lines.append(f"Worn by {item.location.get_display_name(looker)}.")
     lines.append(item.db.desc or "No description yet.")
+    recognition = getattr(item, "get_display_recognition", None)
+    if callable(recognition) and (extra := recognition(looker)):
+        lines.append(extra)
     lines.append(f"Worn line: {item.worn_line or '(none; its name is shown)'}")
     results = services.report(looker, item)
     if results:

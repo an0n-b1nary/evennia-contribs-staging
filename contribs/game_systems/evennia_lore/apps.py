@@ -36,6 +36,19 @@ class LoreConfig(AppConfig):
         # --- notices kept for offline characters arrive at their next puppet ---
         notices.connect()
 
+        if _app_present("evennia_rp_crafting"):
+            try:
+                from evennia_rp_crafting import signals as crafting_signals
+            except ImportError:
+                crafting_signals = None
+            if all(hasattr(crafting_signals, key) for key in ("collect_facets", "page_read")):
+                from evennia_lore.integrations import crafting
+
+                crafting_signals.collect_facets.connect(
+                    crafting.provide, dispatch_uid="lore.craft_facets"
+                )
+                crafting_signals.page_read.connect(crafting.on_read, dispatch_uid="lore.page_read")
+
         # --- rptracker: register the passive-trickle listener ---
         rptracker_label = getattr(settings, "LORE_RPTRACKER_APP_LABEL", "evennia_rptracker")
         if _app_present(rptracker_label):

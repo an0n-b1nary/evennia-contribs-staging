@@ -84,6 +84,36 @@ jobs:
         run: python ../scripts/ci_run_tests.py
 
 
+  lore-items-partners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: all-present
+            excludes: ""
+            absent: ""
+          - profile: no-crafting
+            excludes: "--exclude evennia-rp-crafting"
+            absent: "--absent evennia_rp_crafting"
+          - profile: no-lore
+            excludes: "--exclude evennia-lore"
+            absent: "--absent evennia_lore"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned Evennia
+        run: pip install evennia==6.0.0
+      - name: Initialize throwaway game
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected partners
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Lore and crafted-item seams with verified partner absence
+        run: python scripts/ci_run_lore_item_tests.py ci_game/lore_items ${{ matrix.absent }}
+
   partners:
     runs-on: ubuntu-latest
     timeout-minutes: 30

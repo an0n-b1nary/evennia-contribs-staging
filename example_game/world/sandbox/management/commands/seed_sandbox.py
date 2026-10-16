@@ -405,6 +405,7 @@ class Command(BaseCommand):
                 counts.update(seed_m6(market))
         if apps.is_installed("evennia_rp_crafting"):
             counts.update(self._create_crafting(authors, rooms))
+        counts.update(self._create_lore_items(authors, rooms, entries))
         if apps.is_installed("evennia_npcs"):
             counts.update(self._create_npcs(authors, rooms))
         if apps.is_installed("evennia_jobs"):
@@ -425,6 +426,65 @@ class Command(BaseCommand):
             ServerConfig.objects.conf("sandbox_request_demo_id", submission.job_id)
             counts["request_proposals"] = 1
         return counts
+
+    def _create_lore_items(self, authors, rooms, entries):
+        from django.apps import apps
+        from evennia_lore.items import create_tome
+        from evennia_lore.models import LoreAcquisition
+
+        from world.sandbox import crafting
+
+        owner = authors[-1]
+        lore = next(iter(entries.values()))
+        LoreAcquisition.objects.get_or_create(
+            entry=lore, character=owner, defaults={"character_name": owner.key, "source": "seed"}
+        )
+        had_builder = owner.permissions.check("Builder")
+        owner.permissions.add("Builder")
+        try:
+            tome = create_tome(
+                owner,
+                crafting.TOME_NAME,
+                "An old chronicle with two authored pages.",
+                [
+                    {"title": "The Market", "text": "Traders once met beside the well."},
+                    {"title": "A Local Tradition", "text": "A short account of a local tradition."},
+                ],
+                [{"entry": lore.pk, "page": 2}],
+            )
+        finally:
+            if not had_builder:
+                owner.permissions.remove("Builder")
+        self._tag(tome)
+        tome.move_to(rooms["market"], quiet=True)
+        if apps.is_installed("evennia_rp_crafting"):
+            from evennia_rp_crafting.services import craft
+            from evennia_rp_resources.services import grant
+
+            grant(owner, "timber", 3, "staff", note="Sandbox annotated guide")
+            book = craft(
+                owner,
+                "writing",
+                "readable",
+                crafting.LORE_BOOK_NAME,
+                "A guide with a small sign worked into its cover.",
+                {
+                    "pages": [
+                        {"title": "Preface", "text": "An introduction to the market."},
+                        {"title": "Tradition", "text": "A local tradition is described here."},
+                    ]
+                },
+                {"timber": 3},
+                facets={
+                    "lore_citations": [{"entry": lore.pk, "page": 2}],
+                    "lore_recognition": [
+                        {"entry": lore.pk, "text": "A familiar sign is worked into the cover."}
+                    ],
+                },
+            )
+            self._tag(book)
+            book.move_to(rooms["market"], quiet=True)
+        return {"lore_tomes": 1}
 
     def _create_npcs(self, authors, rooms):
         from evennia_npcs import services
