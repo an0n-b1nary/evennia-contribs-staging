@@ -584,7 +584,7 @@ class Command(BaseCommand):
                 "wearable",
                 crafting.CLOAK_NAME,
                 crafting.CLOAK_DESC,
-                {"worn_line": crafting.CLOAK_LINE, "slot": "body"},
+                {"worn_line": crafting.CLOAK_LINE, "slot": "cloak"},
                 {"timber": 1},
             )
             items.append(cloak)
@@ -822,6 +822,7 @@ class Command(BaseCommand):
         """
         from evennia.utils.create import create_object
         from evennia_rp_equipment import conf as gear_conf
+        from evennia_rp_equipment import outfits
         from evennia_rp_equipment import services as gear
         from evennia_rp_equipment.requirements import parse
 
@@ -842,6 +843,8 @@ class Command(BaseCommand):
             item.sealed = True  # the quartermaster's work; nobody edits it
             if wearer is not None:
                 gear.wear(wearer, item)
+        for author in authors:
+            outfits.save(author, "Practice")
         return len(content.RP_GEAR)
 
     def _tag(self, obj):

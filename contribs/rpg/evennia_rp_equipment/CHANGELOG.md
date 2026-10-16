@@ -9,6 +9,21 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
+### Added
+
+- Private named outfits for plain and crafted gear: save everything worn,
+  inspect saved references, replace or delete a set, and change in one command.
+  Changes validate every item before writing and roll back together on failure.
+  Missing items and build locks refuse the whole change; wear requirements,
+  unattuned notices and build-change guards keep their existing behavior.
+- Optional host-configured slot covering hides inner worn lines from ordinary
+  looks and `+worn`. `+worn/all` shows covered gear on close inspection. Covered
+  items remain worn for requirements, build guards, movement and audits.
+- Reference-game cloak/body layering, saved demonstration outfits, mixed
+  plain/crafted gear seams and command wiring. No models or migrations added.
+
 ## [0.1.5] - 2026-10-15
 
 ### Added

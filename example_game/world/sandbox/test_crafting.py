@@ -16,6 +16,37 @@ class CraftingSeams(EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
 
+    def test_outfits_mix_plain_and_crafted_gear_without_changing_cost_or_provenance(self):
+        if not apps.is_installed("evennia_rp_equipment"):
+            self.skipTest("equipment absent")
+        from evennia.objects.models import ObjectDB
+        from evennia_rp_equipment import outfits
+        from evennia_rp_equipment import services as gear
+        from evennia_rp_equipment.display import worn_lines
+
+        from world.sandbox.crafting import CLOAK_NAME
+
+        call_command("seed_sandbox", verbosity=0)
+        cloak = ObjectDB.objects.get(db_key=CLOAK_NAME)
+        cloak.move_to(self.char2, quiet=True)
+        shirt = gear.make(self.char2, "plain shirt", slot="body")
+        original = (cloak.db.desc, cloak.worn_line, cloak.get_display_provenance(self.char1))
+        count = CraftRecord.objects.count()
+        for item in (shirt, cloak):
+            gear.wear(self.char2, item)
+        outfits.save(self.char2, "Mixed")
+        self.assertNotIn("plain shirt", worn_lines(self.char2))
+        gear.remove(self.char2, cloak)
+        self.assertIn("plain shirt", worn_lines(self.char2))
+        outfits.apply(self.char2, "Mixed")
+        self.assertTrue(cloak.is_worn and shirt.is_worn)
+        self.assertTrue(cloak.sealed)
+        self.assertNotIn("plain shirt", worn_lines(self.char2))
+        self.assertEqual(CraftRecord.objects.count(), count)
+        self.assertEqual(
+            (cloak.db.desc, cloak.worn_line, cloak.get_display_provenance(self.char1)), original
+        )
+
     def test_host_cmdset_exposes_player_and_staff_crafting_commands(self):
         from commands.default_cmdsets import CharacterCmdSet
 

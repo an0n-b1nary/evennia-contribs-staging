@@ -233,7 +233,8 @@ RP_CHARGEN_XP_LEDGER = "evennia_rp_chargen.integrations.xp.EvenniaXPLedger"
 
 # Plain gear anyone can make; requirements commit a build and grant nothing.
 RP_EQUIPMENT_TYPECLASS = "evennia_rp_equipment.typeclasses.Equipment"
-RP_EQUIPMENT_SLOTS = ("head", "body", "hands", "feet", "weapon", "accessory")
+RP_EQUIPMENT_SLOTS = ("head", "cloak", "body", "hands", "feet", "weapon", "accessory")
+RP_EQUIPMENT_SLOT_COVERS = {"cloak": ("body",)}
 RP_EQUIPMENT_ITEM_CAP = 20
 RP_EQUIPMENT_STAFF_LOCK = "cmd:perm(Builder)"
 

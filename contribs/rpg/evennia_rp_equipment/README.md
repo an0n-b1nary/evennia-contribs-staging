@@ -13,7 +13,7 @@ Detailed `+gear/info` inspection also calls an optional
 only for eligible viewers; ordinary names, worn rosters and requirements stay
 independent of lore. Removing the lore partner hides its recognition features.
 
-> **Preview (0.1.0, Pre-Alpha).** This package was written directly as a
+> **Preview (0.2.0, Pre-Alpha).** This package was written directly as a
 > contrib, and its API may move while the rest of the rp- cluster is built on
 > it. Pin an exact commit.
 
@@ -52,8 +52,30 @@ cloak of deep indigo", shown in the wearer's description while it's worn. When
 there's no worn line, the item's name is shown. Each character may have up to
 `RP_EQUIPMENT_ITEM_CAP` items of their making in the world at once.
 
-**Slots** are flavour. `RP_EQUIPMENT_SLOTS` only sets the order worn lines are
+**Slots** are flavour. `RP_EQUIPMENT_SLOTS` sets the order worn lines are
 shown in (unlisted slots come last). Any number of items can share a slot.
+Hosts can opt into covering with `RP_EQUIPMENT_SLOT_COVERS`, for example
+`{"cloak": ("body",)}`. A worn cloak then hides all body-slot worn lines in
+ordinary looks and `+worn`; `+worn/all [<character>]` looks closely and includes
+them, labelled covered. Removing or moving the cloak reveals the inner lines.
+A covered cloak still covers its own inner layers. Rules must have no cycles,
+including self-covering; invalid host configuration raises `ImproperlyConfigured`.
+The default is no covering, preserving existing games' display.
+
+Covering only changes display. Hidden items stay worn: their requirements,
+build guards, movement restrictions and audit checks all remain active. They
+stay out of loose inventory in descriptions, and can still be inspected with
+`+gear/info`. Configure different slots for inner and outer layers.
+
+**Outfits** are private named sets of everything currently worn, including
+covered gear. `+outfit/save Travel` saves or replaces a set; `+outfit Travel`
+removes other worn gear and puts on that set. Names are case-insensitive. Saving
+an empty set provides a way to take everything off together. A set holds item
+references, so renaming an item doesn't break it. Every saved item must still
+be carried: missing, given-away or destroyed items refuse the whole change.
+All requirements are checked before any change; a build lock refuses it too,
+including an empty set. The set never adjusts a build to fit the clothes.
+These features are free for all gear, without a Workshop or crafting partner.
 
 **Requirements.**
 
@@ -115,6 +137,8 @@ INSTALLED_APPS += [
     "evennia_rp_equipment",
 ]
 RP_EQUIPMENT_SLOTS = ("head", "body", "hands", "feet", "weapon", "accessory")
+# Optional outer layer (add "cloak" to RP_EQUIPMENT_SLOTS for display ordering):
+RP_EQUIPMENT_SLOT_COVERS = {"cloak": ("body",)}
 ```
 
 There are no models and no migrations. The guard connects itself in `ready()`.
@@ -171,6 +195,10 @@ class Gear(EquipmentMixin, ObjectParent, DefaultObject):
 | `+gear/audit` | staff | Worn gear whose requirements no longer hold |
 | `+wear <item>`, `+remove <item>` | wearer | Put on or take off; announced to the room |
 | `+worn [<character>]` | anyone | What you, or someone here, is wearing |
+| `+worn/all [<character>]` | anyone | Look closely, including covered worn gear |
+| `+outfit` | wearer | List your saved outfits |
+| `+outfit/save <name>`, `/show <name>`, `/delete <name>` | wearer | Save/replace, inspect or delete a private set |
+| `+outfit <name>` | wearer | Replace all worn gear with a saved set, together |
 
 ---
 
@@ -186,12 +214,21 @@ services.add_requirement(char, item, "Strength +2")   # returns the Requirement
 notices = services.wear(char, item)                   # "not fully attuned" notices
 services.remove(char, item)
 services.report(char, item)                           # [(Requirement, status), ...]
+
+from evennia_rp_equipment import outfits
+outfits.save(char, "Travel")                          # includes covered worn items
+outfits.items(char, "Travel")                         # [(saved_id, carried_item_or_None), ...]
+notices = outfits.apply(char, "Travel")               # preflight, then change together
+outfits.delete(char, "Travel")
 ```
 
 Every service raises `GearError` with a message fit to show the player.
 `requirements.parse()`, `describe()` and `status()` work on single requirements.
 The statuses are `MET`, `UNMET`, `UNATTUNED` and `UNKNOWN`.
-`display.worn_items(char)` lists what a character wears, in slot order.
+`display.worn_items(char)` lists all worn gear in slot order, including covered
+items; guards and audits must use this list. `display.visible_worn_items(char)`
+is the presentation subset. `display.worn_lines(char, looker, include_covered=True)`
+includes the inner layers; by default it follows ordinary looks.
 `audit.problems()` returns the audit's lines, and `audit.log_problems()` also
 logs them.
 
@@ -203,6 +240,7 @@ logs them.
 |---|---|---|
 | `RP_EQUIPMENT_TYPECLASS` | `"evennia_rp_equipment.typeclasses.Equipment"` | What `+gear/make` creates |
 | `RP_EQUIPMENT_SLOTS` | `("head", "body", "hands", "feet", "weapon", "accessory")` | Order of worn lines; slots are flavour |
+| `RP_EQUIPMENT_SLOT_COVERS` | `{}` | Mapping of outer slot to inner slots it hides when worn; acyclic, e.g. `{"cloak": ("body",)}` |
 | `RP_EQUIPMENT_ITEM_CAP` | `20` | Items of one character's making in the world at once (`None`: no cap) |
 | `RP_EQUIPMENT_STAFF_LOCK` | `"cmd:perm(Builder)"` | Who may run `+gear/audit` |
 

@@ -208,7 +208,10 @@ OOC_ROOMS = (
             "lets you inspect them with +sheet <name> or puppet the stat-block dummy. "
             "The practice gear here grants nothing; +gear/info shows what it asks of "
             "your build, and while you wear it those pips and abilities can't move. "
-            "Make your own with +gear/make."
+            "Make your own with +gear/make. Save a set with +outfit/save <name>, "
+            "then change into it with +outfit <name>. The demonstration characters "
+            "have a Practice outfit. Cloaks cover body-slot worn lines; "
+            "+worn/all looks closely and includes the inner layers."
         ),
         commands=(
             "+sheet",
@@ -233,6 +236,9 @@ OOC_ROOMS = (
             "+wear",
             "+remove",
             "+worn",
+            "+worn/all",
+            "+outfit",
+            "+outfit/save",
             "+resources",
             "+resources/catalog",
             "+balance",
@@ -726,8 +732,24 @@ MARKET_STOCK_NAME = "sample market satchel"
 RP_GEAR_MAKER = "the Proving Grounds quartermaster"
 RP_GEAR = (
     {
-        "key": "travelling cloak",
+        "key": "practice tunic",
         "slot": "body",
+        "line": "a quilted practice tunic",
+        "desc": "[Placeholder] A plain inner layer. Use +worn/all to see it under the cloak.",
+        "requires": (),
+        "worn_by": 0,
+    },
+    {
+        "key": "practice overcloak",
+        "slot": "cloak",
+        "line": "a slate-grey practice overcloak",
+        "desc": "[Placeholder] Covers the body slot. Remove it to reveal the tunic.",
+        "requires": (),
+        "worn_by": 0,
+    },
+    {
+        "key": "travelling cloak",
+        "slot": "cloak",
         "line": "a weatherworn travelling cloak",
         "desc": "[Placeholder] Plain oiled wool. It asks nothing of whoever wears it.",
         "requires": (),
