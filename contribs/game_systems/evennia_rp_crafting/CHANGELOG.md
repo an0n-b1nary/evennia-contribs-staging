@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.0 - 2026-10-16
+
+- Add paid, niche-gated signet designs and descriptive letter addressees.
+  Using a signet requires custody, not a Workshop unlock; IC designs may be
+  duplicated without claiming OOC identity.
+- Open seals on successful page reads alongside optional lore grants. Contents,
+  failed reads and previews leave them intact. Copying and journal history
+  cannot bypass an intact seal.
+- Permanently freeze enclosed journal writing and addressees when sealing.
+  Resealing retains a previously-opened marker and impression count.
+- Copies preserve editable addressees and honest text/source provenance, start
+  unsealed and inherit no signet design or lore-citation authority.
+- Add an additive LetterState migration and reference-game commands, seed
+  examples, integration coverage and committed concurrency checks.
+
 ## 0.8.1 - 2026-10-16
 
 - Share attributed delivery across Consumable/Broadcast, activations, fixtures

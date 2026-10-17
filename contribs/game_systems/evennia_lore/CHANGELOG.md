@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.1] - 2026-10-16
+
+- Permit Crafting 0.9 in the optional crafting extra. The successful-page-read
+  integration remains compatible with physical letter seals.
+
 ## [0.8.0] - 2026-10-15
 
 - Add page-specific and book-wide citations with the `read` acquisition source,

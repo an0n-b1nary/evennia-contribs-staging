@@ -264,6 +264,9 @@ def craft(
         hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
     )
     Workshop.objects.filter(pk=workshop.pk).update(last_craft=record.created)
+    from .letters import initialize
+
+    initialize(record)
     if implementation.lifecycle_key == "companion":
         from .fixtures import ensure_script
 

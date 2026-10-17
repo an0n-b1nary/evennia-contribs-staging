@@ -151,6 +151,10 @@ def invoke(actor, item, key):
     """Dispatch from verified provenance; production settings never revoke items."""
     from .models import CraftRecord
 
+    if key == "readable":
+        from .pages import read
+
+        return read(actor, item)
     record = CraftRecord.objects.filter(item_id=item.pk).first()
     entry = (
         next((entry for entry in record.verb_data if entry["key"] == key), None) if record else None

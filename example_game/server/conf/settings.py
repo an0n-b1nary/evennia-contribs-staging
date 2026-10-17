@@ -144,6 +144,7 @@ RP_CRAFTING_WAVE_TWO_REVEALED = True
 RP_CRAFTING_WAVE_THREE_REVEALED = True
 RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
+RP_CRAFTING_SIGNET_NICHES = ["jewellery"]
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
 # Complete verb sets: original products and the tested wave-two combinations.
 RP_CRAFTING_COMBINATIONS = {

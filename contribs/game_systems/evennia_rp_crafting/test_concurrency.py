@@ -203,3 +203,84 @@ class FixtureAuthorityRaces(WaveTwoFixture, EvenniaTestMixin, TransactionTestCas
         with self.assertRaisesMessage(CraftingError, "item was just used"):
             committed_race(lambda: activate(self.char1, item), lambda: activate(self.char2, item))
         self.assertEqual(ActivationUse.objects.count(), 1)
+
+
+class LetterRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        self.unlock()
+        from .models import CraftRecord
+
+        self.signet = self.book()
+        CraftRecord.objects.filter(pk=self.signet.craft_record.pk).update(
+            behaviour="wearable",
+            verbs=[],
+            prose={"facets": {"signet": {"design": "A Rose", "niche": "jewellery"}}},
+        )
+        self.letter = self.book(configuration={"journal": 2}, selected={"wood": 2})
+        from .readables import write
+
+        write(self.char1, self.letter, "One", "Original text.")
+
+    def test_committed_sealing_freezes_a_competing_journal_write(self):
+        from .letters import seal
+        from .models import JournalRevision
+        from .readables import write
+
+        with self.assertRaisesMessage(CraftingError, "permanently freezes"):
+            committed_race(
+                lambda: seal(self.char1, self.letter, self.signet),
+                lambda: write(self.char1, self.letter, "One", "Changed.", page=1),
+            )
+        self.assertEqual(JournalRevision.objects.filter(craft=self.letter.craft_record).count(), 1)
+        self.assertIn("Original text.", self.letter.read(self.char1))
+
+    def test_committed_writing_is_included_in_the_competing_seal(self):
+        from .letters import seal
+        from .readables import write
+
+        committed_race(
+            lambda: write(self.char1, self.letter, "One", "Committed text.", page=1),
+            lambda: seal(self.char1, self.letter, self.signet),
+        )
+        self.assertIn("Committed text.", self.letter.read(self.char1))
+
+    def test_sealing_blocks_a_competing_copy_before_payment(self):
+        from .letters import seal
+        from .models import ReadableEdition
+        from .readables import copy_book, snapshot
+
+        expected = snapshot(self.char1, self.letter)[3]
+        before = self.held()
+        with self.assertRaisesMessage(CraftingError, "intact seal"):
+            committed_race(
+                lambda: seal(self.char1, self.letter, self.signet),
+                lambda: copy_book(
+                    self.char1,
+                    self.letter,
+                    "writing-0",
+                    "Edition",
+                    "A copy.",
+                    {"wood": 1},
+                    expected=expected,
+                ),
+            )
+        self.assertFalse(ReadableEdition.objects.exists())
+        self.assertEqual(self.held(), before)
+
+    def test_two_readers_break_the_same_seal_only_once(self):
+        from .letters import seal
+        from .models import LetterState
+
+        seal(self.char1, self.letter, self.signet)
+        second = committed_race(
+            lambda: self.letter.read(self.char1),
+            lambda: self.letter.read(self.char2),
+        )
+        self.assertIn("Original text.", second)
+        self.assertNotIn("You break the seal", second)
+        state = LetterState.objects.get(craft=self.letter.craft_record)
+        self.assertFalse(state.intact)
+        self.assertEqual(state.opened_at, state.first_opened_at)
