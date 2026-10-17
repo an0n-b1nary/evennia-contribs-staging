@@ -37,6 +37,11 @@ def copy_draft(command):
         "description": record.prose.get("description") or "A bound copy.",
         "selected": {},
     }
+    from .models import LetterState
+
+    state = LetterState.objects.filter(craft=record).first()
+    if state is not None:
+        draft["addressee"] = state.addressee
     command.caller.attributes.add(DRAFT_KEY, draft)
     command.msg(
         f"Copy draft saved: {draft['name']}. It starts with the source's description; "
@@ -47,9 +52,9 @@ def copy_draft(command):
 def continue_copy(command, switch, draft):
     from .commands import DRAFT_KEY, costs_text, resource_spec
 
-    if switch not in ("", "desc", "resources", "finish"):
+    if switch not in ("", "desc", "resources", "finish", "addressee"):
         raise CraftingError(
-            "Copy drafts allow /desc, /resources, /finish or /cancel. Start a new craft for rewritten text."
+            "Copy drafts allow /desc, /addressee, /resources, /finish or /cancel. Start a new craft for rewritten text."
         )
     if switch == "desc":
         from .behaviours import text
@@ -72,6 +77,7 @@ def continue_copy(command, switch, draft):
             draft["description"],
             draft["selected"],
             expected=draft["copy_fingerprint"],
+            addressee=draft.get("addressee"),
         )
         command.caller.attributes.remove(DRAFT_KEY)
         command.msg(
@@ -81,6 +87,14 @@ def continue_copy(command, switch, draft):
     record, config, authors, fingerprint = snapshot(command.caller, source)
     if fingerprint != draft["copy_fingerprint"]:
         raise CraftingError("The source has changed. Start a new copy draft.")
+    if switch == "addressee":
+        from .letters import line
+
+        value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
+        draft["addressee"] = line(value, "Addressee")
+        command.caller.attributes.add(DRAFT_KEY, draft)
+        command.msg(f"Copy draft saved: {draft['name']}.")
+        return
     if switch == "resources":
         value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
         draft["selected"] = resource_spec(value)
@@ -89,6 +103,10 @@ def continue_copy(command, switch, draft):
         return
     _, _, _, cost = services.craft_cost(command.caller, draft["niche"], "readable", config)
     rows = [f"Copy draft: {draft['name']} (source craft #{record.pk})", draft["description"]]
+    if "addressee" in draft:
+        rows.append(
+            f"Addressee (IC): {draft['addressee'] or '(unspecified)'} — copy starts unsealed."
+        )
     for number, (page, author) in enumerate(zip(config["pages"], authors, strict=True), 1):
         rows.append(
             f"{number}. {page['title'] or f'Page {number}'}\n{page['text']}\nText by (OOC): {author['name']}"

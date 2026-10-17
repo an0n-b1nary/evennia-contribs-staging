@@ -60,7 +60,9 @@ def cost(key, count, composition):
     if not conf.positive(amount) or amount * count > conf.MAX_AMOUNT:
         raise CraftingError("Item facets need a positive, bounded unit cost.")
     primary = composition.definitions[0]
-    category = next((key for key in composition.resources if key in primary.input_categories), None)
+    category = next(
+        (name for name in composition.resources if name in primary.input_categories), None
+    )
     if category is None:
         raise CraftingError("Item facets need a permitted input category.")
     return {category: amount * count}

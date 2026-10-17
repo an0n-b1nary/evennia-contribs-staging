@@ -15,11 +15,11 @@ class CraftingConfig(AppConfig):
         from .contributions import caps, figures
 
         register_controls()
-        from . import signals
-        from .item_details import provide
-
-        signals.collect_facets.connect(provide, dispatch_uid="crafting_item_details")
         cap_contributions.connect(caps, dispatch_uid="crafting_workshop_caps")
+        from . import item_details, letters, signals
+
+        signals.collect_facets.connect(item_details.provide, dispatch_uid="crafting_item_details")
+        signals.collect_facets.connect(letters.provide, dispatch_uid="crafting_letter_facets")
         from .fixtures import furnishing_caps, scene_closed
 
         cap_contributions.connect(furnishing_caps, dispatch_uid="crafting_furnishing_caps")

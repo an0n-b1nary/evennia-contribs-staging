@@ -1821,6 +1821,24 @@ pause offline/in combat. Real partner seams live in `world.sandbox.test_wave_thr
 and run in the crafting partner matrix. The generated golden snapshot includes
 the additive migration and synthetic demonstrations.
 
+### Letters and signets
+
+Market Row includes `a sample sealed letter`, addressed descriptively to the
+Market Keeper, and `a sample rose signet` when Equipment is installed. The
+Jeweller niche is explicitly permitted to make signets. Inspect the letter,
+then use `read/contents` (keeps its seal intact) and `read` (opens it). The real
+read command also handles cited letters through Lore's successful-read hook.
+
+Carry the letter and signet to reseal with
+`+letter/seal a sample sealed letter = a sample rose signet`. Its prior opening
+remains visible, and enclosed journal writing/addressee stay frozen. Anybody
+with normal read access may open it; the addressee is IC prose. Copies require
+opening first, retain an editable addressee and honest authorship, and start
+unsealed. `+craft/signet` adds a paid design to a Jeweller wearable draft;
+`+craft/addressee` addresses a Readable or copy draft. `+letter` is wired in the
+character cmdset. Without Equipment, the sample letter remains unsealed.
+The synthetic golden database includes the new additive seal-state table and
+these examples; reseeding retains earlier craft, opening and copy records.
 
 ### Item details and senses
 

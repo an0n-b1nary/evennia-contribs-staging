@@ -638,6 +638,66 @@ Additive migration 0005 preserves earlier craft, fixture and use history.
 Letterboxes, libraries, places, map markers, radius/bearings and remaining
 facets remain separate milestones.
 
+## Letters and signets
+
+A letter is a carried Readable, including an owner-written journal. Set its
+optional, descriptive IC addressee with `+craft/addressee = The Keeper` while
+crafting, or `+letter/address <item> = The Keeper` while carrying it. Addressing
+adds no resource surcharge and confers no exclusive reading permission;
+normal object/view/read access still applies.
+
+Hosts opt wearable niches into signet production with
+`RP_CRAFTING_SIGNET_NICHES = ["jewellery"]` (default: no permitted niches).
+Craft a Wearable from a permitted niche and add
+`+craft/signet = The Courier's Rose`; `/unsignet` removes that draft feature.
+The immutable `signet` facet records its design and contributing niche.
+`RP_CRAFTING_COSTS["signet"]["base"]` adds one material input by default, on top
+of wearable costs; custom cost maps must supply this rule. The contributing
+niche must permit those categories and be unlocked. The service API accepts
+`facets={"signet": {"design": "The Courier's Rose", "niche": "jewellery"}}`.
+The existing combination allow-list still applies; no new verb combination
+is enabled by a signet.
+
+`+letter/seal <letter> = <signet>` requires carrying both items, write/read
+access to the letter and view/use access to the signet. A worn signet counts
+as carried. Using an existing signet requires no Workshop unlock and no
+additional material or currency charge. Existing designs remain usable if
+the host later removes the niche permission or Equipment package. New signet
+production requires Equipment for the Wearable lifecycle. Sealing an empty
+journal is refused.
+
+The first successful text-page read breaks an intact seal and tells the
+reader. Inspection and successful reads show its IC addressee, design and
+intact/broken state; later readers also see any resealing marker. Contents shows a sealed notice without page titles; it does not
+open the letter. Invalid page selections, denied reads and previews never
+open it or grant lore. Seal breaking occurs inside the shared successful-read
+transaction before optional lore grants. Copying and journal-history access
+require opening an intact seal with an explicit page read first. They do not
+silently open it, grant lore or move bookmarks.
+
+Sealing permanently freezes **all enclosed journal writing and the addressee**,
+even after opening. Resealing is allowed with a carried signet, but a permanent
+"previously opened; resealed" marker and impression count remain visible.
+The first-opening timestamp is retained. These bounded state fields avoid an
+unbounded full-text or per-opening log. Craft and text authorship remain
+unchanged. A design can be forged or shared IC; it never authenticates the
+sender OOC. The seal is a physical roleplay affordance, not encryption.
+
+Copies start unsealed with the source's descriptive addressee, editable with
+`+craft/addressee` in the copy draft or `+letter/address` afterward. Copying
+never clones a signet design, physical seal or lore-citation authority. Apply
+a fresh seal using a possessed signet. Real page authors and source lineage
+remain in OOC provenance. Draft review and completion recheck source access,
+text/attribution, addressee and seal generation; resealing invalidates an old
+draft even if the source is opened again before completion. Letterboxes,
+delivery notices and journal-revision citation copying are separate features.
+
+`LetterState` stores the physical addressee and seal state beside, rather
+than inside, the immutable CraftRecord. Its additive migration preserves old
+Readables, journal revisions and editions. Any carried Readable can be
+addressed or sealed; `facets={"letter": {"addressee": "The Keeper"}}` initializes
+that state at craft time. Existing books need no backfill. Object deletion
+preserves state and signet provenance for staff review.
 
 ## Item details and senses
 

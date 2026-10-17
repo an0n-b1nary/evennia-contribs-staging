@@ -175,6 +175,31 @@ class ReadableEdition(models.Model):
         raise ValidationError("Readable editions are append-only.")
 
 
+class LetterState(models.Model):
+    """Physical seal state; opening never changes the immutable craft record.
+
+    A nonzero seal number permanently freezes journal writing. The first
+    opening and impression count survive resealing without a growing text log.
+    """
+
+    craft = models.OneToOneField(CraftRecord, on_delete=models.PROTECT, related_name="letter")
+    addressee = models.CharField(max_length=255, blank=True)
+    seal_design = models.CharField(max_length=255, blank=True)
+    signet = models.ForeignKey(
+        CraftRecord, on_delete=models.PROTECT, null=True, related_name="sealed_letters"
+    )
+    sealed_by_id = models.PositiveBigIntegerField(null=True)
+    sealed_by_name = models.CharField(max_length=255, blank=True)
+    seal_number = models.PositiveBigIntegerField(default=0)
+    sealed_at = models.DateTimeField(null=True)
+    opened_at = models.DateTimeField(null=True)
+    first_opened_at = models.DateTimeField(null=True)
+
+    @property
+    def intact(self):
+        return bool(self.seal_number and self.opened_at is None)
+
+
 class EventUse(models.Model):
     """One lifetime use per item; soft identities survive consumption."""
 

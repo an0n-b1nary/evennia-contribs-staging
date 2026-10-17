@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.2 - 2026-10-16
+## 0.9.1 - 2026-10-17
 
 - Add paid named exterior details and self-directed smell, sound and touch
   facets on crafted items. Validate and capture bounded prose in the immutable
@@ -9,6 +9,23 @@
   Keep ordinary looking and wave-two room senses, check local custody/view and
   sense locks, and keep inspection private and free of reading/consumption effects.
 - Wire seeded reference-game examples, command seams and optional-partner checks.
+
+## 0.9.0 - 2026-10-16
+
+- Add paid, niche-gated signet designs and descriptive letter addressees.
+  Using a signet requires custody, not a Workshop unlock; IC designs may be
+  duplicated without claiming OOC identity.
+- Open seals on successful page reads alongside optional lore grants. Contents,
+  failed reads and previews leave them intact. Copying and journal history
+  cannot bypass an intact seal. `composition.invoke(actor, item, "readable")`
+  now performs that successful read: it returns the bookmarked page rather
+  than the full text, moves the bookmark and notifies page-read partners.
+- Permanently freeze enclosed journal writing and addressees when sealing.
+  Resealing retains a previously-opened marker and impression count.
+- Copies preserve editable addressees and honest text/source provenance, start
+  unsealed and inherit no signet design or lore-citation authority.
+- Add an additive LetterState migration and reference-game commands, seed
+  examples, integration coverage and committed concurrency checks.
 
 ## 0.8.1 - 2026-10-16
 
