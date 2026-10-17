@@ -10,6 +10,7 @@ from .catalog import seed_catalog
 from .command_base import CraftCommand as _CraftCommand
 from .composition import specifications
 from .errors import CraftingError
+from .letter_commands import CmdLetter as CmdLetter
 from .models import CraftRecord, NicheDefinition, Workshop
 from .readable_commands import CmdJournal as CmdJournal
 from .room_commands import CmdFixture as CmdFixture
@@ -137,6 +138,9 @@ class CmdCraft(_CraftCommand):
       +craft/unrequire <number>
       +craft/text = <readable text>
       +craft/journal = <blank page capacity>
+      +craft/addressee = <descriptive IC addressee>  (blank clears)
+      +craft/signet = <named IC seal design>  (permitted wearable niche)
+      +craft/unsignet
       +craft/copy <source item> = <niche key>/<new item name>
       +craft/page [title] = <page text>  (repeat to append authored pages)
       +craft/unpage <number>
@@ -223,7 +227,25 @@ class CmdCraft(_CraftCommand):
                     f"You craft {item.key}. Hallmark (OOC): {item.get_display_provenance(self.caller)}."
                 )
                 return
-            if switch == "journal":
+            if switch in ("addressee", "signet", "unsignet"):
+                from .letters import line
+
+                facets = dict(draft.get("facets", {}))
+                if switch == "unsignet":
+                    facets.pop("signet", None)
+                else:
+                    value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
+                    if switch == "addressee":
+                        addressee = line(value, "Addressee")
+                        # Blank clears it, so a non-Readable draft is never stuck.
+                        if addressee:
+                            facets["letter"] = {"addressee": addressee}
+                        else:
+                            facets.pop("letter", None)
+                    else:
+                        facets["signet"] = {"design": line(value, "Seal design", required=True)}
+                draft["facets"] = facets
+            elif switch == "journal":
                 from .pages import validate
 
                 entry = next(
@@ -573,7 +595,16 @@ class CmdCrafting(_CraftCommand):
                 self.msg(
                     f"Craft #{row.pk}: {row.hallmark}, item #{row.item_id}, {row.created.isoformat()}\nMaker: {row.crafter_name} (#{row.crafter_id}), accounts {row.crafter_accounts}\nContributors: {row.contributor_data}\nLifecycle: {row.lifecycle}; verbs: {row.verb_data}\nSpent: {dict(row.resources_spent)}, money {row.money_spent}\n{dict(row.prose)}"
                 )
-                from .models import EventUse, JournalRevision, ReadableEdition
+                from .models import EventUse, JournalRevision, LetterState, ReadableEdition
+
+                letter = LetterState.objects.filter(craft=row).first()
+                if letter:
+                    self.msg(
+                        f"Letter state (OOC): addressee {letter.addressee!r}; seal {letter.seal_design!r}; "
+                        f"impression {letter.seal_number}; intact {letter.intact}; signet craft #{letter.signet_id}; "
+                        f"sealed by {letter.sealed_by_name} (#{letter.sealed_by_id}) at {letter.sealed_at}; "
+                        f"opened {letter.opened_at}; first opened {letter.first_opened_at}."
+                    )
 
                 edition = ReadableEdition.objects.filter(craft=row).first()
                 if edition:
@@ -619,3 +650,4 @@ class CraftingCmdSet(CmdSet):
         self.add(CmdModify())
         self.add(CmdPet())
         self.add(CmdJournal())
+        self.add(CmdLetter())

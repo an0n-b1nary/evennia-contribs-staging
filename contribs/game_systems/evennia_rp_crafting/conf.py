@@ -31,6 +31,7 @@ DEFAULT_COMBINATIONS = {
     "companion": [[], ["activatable"]],
 }
 DEFAULT_COSTS = {
+    "signet": {"base": {"materials": 1}},
     "companion": {"base": {"materials": 1}, "ambient": {"essences": 1}},
     "modifier_aura": {"base": {"essences": 1}},
     "modifier_mark": {"base": {"essences": 1}},

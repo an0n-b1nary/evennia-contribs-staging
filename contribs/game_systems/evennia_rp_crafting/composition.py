@@ -151,14 +151,16 @@ def invoke(actor, item, key):
     """Dispatch from verified provenance; production settings never revoke items."""
     from .models import CraftRecord
 
+    if key == "readable":
+        from .pages import read
+
+        return read(actor, item)
     record = CraftRecord.objects.filter(item_id=item.pk).first()
     entry = (
         next((entry for entry in record.verb_data if entry["key"] == key), None) if record else None
     )
     if entry is None:
-        raise CraftingError(
-            "There is nothing written here." if key == "readable" else "That action is unavailable."
-        )
+        raise CraftingError("That action is unavailable.")
     implementation = behaviour(key)
     if implementation.role != "verb":
         raise CraftingError("That action is unavailable.")

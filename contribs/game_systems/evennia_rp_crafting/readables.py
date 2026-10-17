@@ -79,9 +79,15 @@ def nearby(actor, item):
         raise CraftingError("Carry the source or visit it first.")
 
 
+@atomic_objects
 def snapshot(actor, item):
     """Copy only the authorized provider output, never its underlying raw prose."""
+    from .letters import lock_objects, require_open
+
+    lock_objects(actor, item)
     nearby(actor, item)
+    source = CraftRecord.objects.filter(item_id=item.pk).first()
+    state = require_open(source) if source else None
     record, pages = configuration(actor, item)
     pages = tuple(pages)
     if not pages:
@@ -93,6 +99,8 @@ def snapshot(actor, item):
         else [{"id": None, "name": "host reader"} for _ in pages]
     )
     payload = {"source": record.pk, "configuration": config, "authors": authors}
+    if state is not None:
+        payload["letter"] = {"addressee": state.addressee, "seal_number": state.seal_number}
     fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     return record, config, authors, fingerprint
 
@@ -116,6 +124,10 @@ def write(actor, item, title, body, *, page=None):
     if holder != actor.pk:
         raise CraftingError("Carry the journal to write in it.")
     record, _ = configuration(actor, item)
+    from .models import LetterState
+
+    if LetterState.objects.filter(craft=record, seal_number__gt=0).exists():
+        raise CraftingError("Sealing permanently freezes the enclosed text.")
     config = readable_config(record)
     if "journal" not in config:
         raise CraftingError("Only blank journals accept new writing.")
@@ -150,8 +162,15 @@ def write(actor, item, title, body, *, page=None):
     )
 
 
+@atomic_objects
 def history(actor, item, page):
+    from .letters import lock_objects, require_open
+
+    lock_objects(actor, item)
     nearby(actor, item)
+    source = CraftRecord.objects.filter(item_id=item.pk).first()
+    if source:
+        require_open(source)
     record, pages = configuration(actor, item)
     if "journal" not in readable_config(record):
         raise CraftingError("That is not a journal.")
@@ -168,7 +187,7 @@ def history(actor, item, page):
 
 
 @atomic_objects
-def copy_book(actor, source, key, name, description, selected, *, expected=None):
+def copy_book(actor, source, key, name, description, selected, *, expected=None, addressee=None):
     from .services import craft
 
     ObjectDB.objects.filter(pk=actor.pk).update(db_key=F("db_key"))
@@ -179,7 +198,15 @@ def copy_book(actor, source, key, name, description, selected, *, expected=None)
         raise CraftingError("The source has changed. Start a new copy draft.")
     # Always a carried readable: copying words never clones equipment, fixtures,
     # journal capacity, modifiers or a companion's other components.
-    item = craft(actor, key, "readable", name, description, config, selected)
+    from .models import LetterState
+
+    state = LetterState.objects.filter(craft=record).first()
+    facets = (
+        {"letter": {"addressee": state.addressee if addressee is None else addressee}}
+        if state or addressee is not None
+        else None
+    )
+    item = craft(actor, key, "readable", name, description, config, selected, facets=facets)
     ReadableEdition.objects.create(
         craft=item.craft_record,
         source=record,

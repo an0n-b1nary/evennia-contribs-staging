@@ -54,6 +54,13 @@ class CraftedItemMixin(ModificationDisplayMixin):
     def get_display_desc(self, looker, **kwargs):
         desc = super().get_display_desc(looker, **kwargs)
         recognition = self.get_display_recognition(looker)
+        from .letters import display
+
+        record = self.craft_record
+        if record and looker is not None and self.access(looker, "view", default=True):
+            letter = display(record)
+            if letter:
+                desc = f"{desc}\n\n{letter}"
         if recognition:
             desc = f"{desc}\n{recognition}"
         hallmark = self.get_display_provenance(looker)

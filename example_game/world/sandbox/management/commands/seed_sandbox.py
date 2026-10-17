@@ -531,7 +531,7 @@ class Command(BaseCommand):
 
         owner = authors[-1]
         counts = {"crafting_niches": len(seed_catalog(update=True))}
-        grant(owner, "timber", 18, "staff", note="Sandbox Workshop inputs")
+        grant(owner, "timber", 20, "staff", note="Sandbox Workshop inputs")
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
@@ -575,7 +575,17 @@ class Command(BaseCommand):
             "A fixed copy of the journal's first entry.",
             {"timber": 1},
         )
-        items = [book, paged_book, journal, edition]
+        letter = craft(
+            owner,
+            "writing",
+            "readable",
+            crafting.LETTER_NAME,
+            "A folded letter addressed to the market keeper.",
+            {"text": crafting.LETTER_TEXT},
+            {"timber": 1},
+            facets={"letter": {"addressee": "The Market Keeper"}},
+        )
+        items = [book, paged_book, journal, edition, letter]
         if apps.is_installed("evennia_rp_equipment"):
             unlock(owner, "weaving", {"timber": 6})
             cloak = craft(
@@ -684,6 +694,24 @@ class Command(BaseCommand):
                 {"ember": 1},
             )
             accept(demo, service.pk)
+        if apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_crafting.letters import seal
+
+            count = active_unlocks(Workshop.objects.get(character=demo)).count()
+            unlock(demo, "jewellery", {"timber": 3 * (count + 1)})
+            signet = craft(
+                demo,
+                "jewellery",
+                "wearable",
+                crafting.SIGNET_NAME,
+                "A silver ring engraved with a rose.",
+                {"worn_line": "a rose signet ring", "slot": "finger"},
+                {"timber": 2},
+                facets={"signet": {"design": crafting.SEAL_DESIGN}},
+            )
+            signet.move_to(owner, quiet=True)
+            seal(owner, letter, signet)
+            items.append(signet)
         for item in items:
             item.tags.add(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
             if item not in (lantern, bird):

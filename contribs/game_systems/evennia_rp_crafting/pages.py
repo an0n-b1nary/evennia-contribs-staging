@@ -100,12 +100,19 @@ def configuration(actor, item):
 
 @atomic_objects
 def read(actor, item, number=None, *, table=False):
+    from .letters import lock_objects, open_on_read
+    from .models import LetterState
+
+    lock_objects(actor, item)
     record, pages = configuration(actor, item)
     if not pages:
         if number is not None:
             raise CraftingError("This journal has no written pages to select.")
         return "This journal has no entries yet."
     if table:
+        state = LetterState.objects.filter(craft=record).first()
+        if state and state.intact:
+            return "The letter is sealed. Read a page to open it."
         noun = "page" if len(pages) == 1 else "pages"
         return f"Contents ({len(pages)} {noun}):\n{contents(pages)}"
     bookmark_key = f"craft_{record.pk}"
@@ -123,7 +130,6 @@ def read(actor, item, number=None, *, table=False):
     config = next(
         entry["configuration"] for entry in record.verb_data if entry["key"] == "readable"
     )
-    extra = read_lines(actor, item, record, number, tuple(pages) == authored_pages(config))
     # Single-page books have nothing to resume, so they never store progress.
     if len(pages) > 1:
         actor.attributes.add(bookmark_key, number, category=BOOKMARK_CATEGORY)
@@ -136,4 +142,6 @@ def read(actor, item, number=None, *, table=False):
     from .readables import page_credit
 
     credit = page_credit(record, pages, number)
-    return "\n".join(part for part in (result, credit, extra) if part)
+    opened = open_on_read(record)
+    extra = read_lines(actor, item, record, number, tuple(pages) == authored_pages(config))
+    return "\n".join(part for part in (opened, result, credit, extra) if part)
