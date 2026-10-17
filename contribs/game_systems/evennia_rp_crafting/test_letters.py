@@ -322,6 +322,13 @@ class LetterTests(LetterFixture, EvenniaCommandTest):
                 self.book(facets={"letter": value})
         self.assertEqual((self.held(), CraftRecord.objects.count()), before)
 
+    def test_blank_draft_addressee_clears_the_letter_facet(self):
+        self.call(CmdCraft(), "/new writing-0/readable = Message", "Craft draft saved")
+        self.call(CmdCraft(), "/addressee = The Keeper", "Craft draft saved")
+        self.assertIn("letter", self.char1.attributes.get(DRAFT_KEY)["facets"])
+        self.call(CmdCraft(), "/addressee =", "Craft draft saved")
+        self.assertNotIn("letter", self.char1.attributes.get(DRAFT_KEY)["facets"])
+
 
 @skipUnless(
     apps.is_installed("evennia_rp_equipment"),

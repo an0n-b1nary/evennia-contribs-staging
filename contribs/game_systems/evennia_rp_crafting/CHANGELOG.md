@@ -7,7 +7,9 @@
   duplicated without claiming OOC identity.
 - Open seals on successful page reads alongside optional lore grants. Contents,
   failed reads and previews leave them intact. Copying and journal history
-  cannot bypass an intact seal.
+  cannot bypass an intact seal. `composition.invoke(actor, item, "readable")`
+  now performs that successful read: it returns the bookmarked page rather
+  than the full text, moves the bookmark and notifies page-read partners.
 - Permanently freeze enclosed journal writing and addressees when sealing.
   Resealing retains a previously-opened marker and impression count.
 - Copies preserve editable addressees and honest text/source provenance, start

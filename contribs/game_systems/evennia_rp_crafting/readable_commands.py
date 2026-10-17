@@ -104,7 +104,9 @@ def continue_copy(command, switch, draft):
     _, _, _, cost = services.craft_cost(command.caller, draft["niche"], "readable", config)
     rows = [f"Copy draft: {draft['name']} (source craft #{record.pk})", draft["description"]]
     if "addressee" in draft:
-        rows.append(f"Addressee (IC): {draft['addressee']} — copy starts unsealed.")
+        rows.append(
+            f"Addressee (IC): {draft['addressee'] or '(unspecified)'} — copy starts unsealed."
+        )
     for number, (page, author) in enumerate(zip(config["pages"], authors, strict=True), 1):
         rows.append(
             f"{number}. {page['title'] or f'Page {number}'}\n{page['text']}\nText by (OOC): {author['name']}"

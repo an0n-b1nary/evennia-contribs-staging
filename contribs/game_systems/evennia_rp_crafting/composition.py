@@ -160,9 +160,7 @@ def invoke(actor, item, key):
         next((entry for entry in record.verb_data if entry["key"] == key), None) if record else None
     )
     if entry is None:
-        raise CraftingError(
-            "There is nothing written here." if key == "readable" else "That action is unavailable."
-        )
+        raise CraftingError("That action is unavailable.")
     implementation = behaviour(key)
     if implementation.role != "verb":
         raise CraftingError("That action is unavailable.")

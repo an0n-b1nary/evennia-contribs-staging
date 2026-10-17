@@ -138,7 +138,7 @@ class CmdCraft(_CraftCommand):
       +craft/unrequire <number>
       +craft/text = <readable text>
       +craft/journal = <blank page capacity>
-      +craft/addressee = <descriptive IC addressee>
+      +craft/addressee = <descriptive IC addressee>  (blank clears)
       +craft/signet = <named IC seal design>  (permitted wearable niche)
       +craft/unsignet
       +craft/copy <source item> = <niche key>/<new item name>
@@ -236,7 +236,12 @@ class CmdCraft(_CraftCommand):
                 else:
                     value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
                     if switch == "addressee":
-                        facets["letter"] = {"addressee": line(value, "Addressee")}
+                        addressee = line(value, "Addressee")
+                        # Blank clears it, so a non-Readable draft is never stuck.
+                        if addressee:
+                            facets["letter"] = {"addressee": addressee}
+                        else:
+                            facets.pop("letter", None)
                     else:
                         facets["signet"] = {"design": line(value, "Seal design", required=True)}
                 draft["facets"] = facets
