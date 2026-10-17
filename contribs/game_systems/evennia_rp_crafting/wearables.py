@@ -18,7 +18,11 @@ else:
 
 class Wearable(CraftedItemMixin, EquipmentMixin, DefaultObject):
     def get_worn_line(self, looker=None):
+        from .item_display import equipment_renders, render
+
         line = super().get_worn_line(looker)
+        if not equipment_renders(self):
+            line = render(self, looker, "worn", line)
         record = self.craft_record
         aura = record.prose["configuration"].get("aura_line", "") if record else ""
         return f"{line}\n  {aura}" if aura else line

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2 - 2026-10-17
+
+- Add paid wearable states with fixed crafter-authored variants and persistent holder selection through +adjust. Preserve craft snapshots, requirements, auras and Modifier layers. Worn selection follows the build lock. Use Equipment's neutral item-display seam; fixture/companion state consumers and automatic transitions remain separate.
+
 ## 0.9.1 - 2026-10-17
 
 - Add paid named exterior details and self-directed smell, sound and touch

@@ -17,6 +17,16 @@ class CraftingConfig(AppConfig):
         register_controls()
         cap_contributions.connect(caps, dispatch_uid="crafting_workshop_caps")
         from . import item_details, letters, signals
+        from .states import provide as state_facets
+
+        signals.collect_facets.connect(state_facets, dispatch_uid="crafting_state_facets")
+        if self.apps.is_installed("evennia_rp_equipment"):
+            from evennia_rp_equipment.item_display import register
+
+            from .item_display import layers, state
+
+            register("crafting_states", state, phase="base")
+            register("crafting_modifiers", layers)
 
         signals.collect_facets.connect(item_details.provide, dispatch_uid="crafting_item_details")
         signals.collect_facets.connect(letters.provide, dispatch_uid="crafting_letter_facets")

@@ -14,6 +14,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Invalid, ambiguous or combined `+outfit` switches leave worn gear and saved
   sets unchanged instead of accidentally applying or modifying an outfit.
 
+## [0.2.1] - 2026-10-17
+
+- Add a keyed item-display provider API for descriptions and worn lines. Remove Equipment's imports of Crafting; optional providers preserve ordinary gear behavior and fail independently.
+
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

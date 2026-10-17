@@ -284,3 +284,51 @@ class LetterRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         state = LetterState.objects.get(craft=self.letter.craft_record)
         self.assertFalse(state.intact)
         self.assertEqual(state.opened_at, state.first_opened_at)
+
+
+@skipUnless(apps.is_installed("evennia_rp_equipment"), "Equipment absent")
+class WearableStateRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        from .test_states import FACET
+
+        self.unlock("weaving")
+        self.cloak = services.craft(
+            self.char1,
+            "weaving",
+            "wearable",
+            "racing cloak",
+            "A cloak.",
+            {"worn_line": "a cloak"},
+            {"wood": 3},
+            facets={"states": FACET},
+        )
+
+    def test_concurrent_selections_commit_one_valid_key_without_rewriting_prose(self):
+        from . import states
+
+        original = self.cloak.craft_record.prose
+        committed_race(
+            lambda: states.select(self.char1, self.cloak, "up"),
+            lambda: states.select(self.char1, self.cloak, "down"),
+        )
+        self.cloak.attributes.reset_cache()
+        self.assertEqual(states.current(self.cloak, states.configuration(self.cloak)), "down")
+        self.assertEqual(self.cloak.craft_record.prose, original)
+
+    def test_committed_transfer_refuses_old_holders_competing_selection(self):
+        from evennia.objects.models import ObjectDB
+
+        from . import states
+
+        with self.assertRaisesMessage(CraftingError, "carrying"):
+            committed_race(
+                lambda: ObjectDB.objects.filter(pk=self.cloak.pk).update(
+                    db_location_id=self.char2.pk
+                ),
+                lambda: states.select(self.char1, self.cloak, "up"),
+            )
+        self.cloak.attributes.reset_cache()
+        self.assertEqual(states.current(self.cloak, states.configuration(self.cloak)), "down")

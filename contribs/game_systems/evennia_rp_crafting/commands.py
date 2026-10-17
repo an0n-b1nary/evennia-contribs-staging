@@ -135,6 +135,10 @@ class CmdCraft(_CraftCommand):
       +craft/desc = <description>
       +craft/line = <worn line>
       +craft/aura = <optional aura line>
+      +craft/state <name> = <worn line>
+      +craft/statedesc <name> = <description>
+      +craft/defaultstate <name>
+      +craft/unstate <name>
       +craft/slot = <flavour slot>
       +craft/require = <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
@@ -235,6 +239,10 @@ class CmdCraft(_CraftCommand):
                 return
             if switch in ("detail", "undetail", "sense", "unsense"):
                 from .item_details import edit_draft
+
+                edit_draft(self, switch, draft)
+            elif switch in ("state", "statedesc", "defaultstate", "unstate"):
+                from .states import edit_draft
 
                 edit_draft(self, switch, draft)
             elif switch in ("addressee", "signet", "unsignet"):
@@ -665,3 +673,6 @@ class CraftingCmdSet(CmdSet):
         self.add(CmdPet())
         self.add(CmdJournal())
         self.add(CmdLetter())
+        from .state_commands import CmdAdjust
+
+        self.add(CmdAdjust())

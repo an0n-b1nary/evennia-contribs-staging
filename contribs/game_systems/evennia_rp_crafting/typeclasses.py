@@ -9,11 +9,10 @@ class ModificationDisplayMixin:
     """Place before the host object/character; base prose remains host-owned."""
 
     def get_display_desc(self, looker, **kwargs):
-        from .modifiers import display
+        from .item_display import equipment_renders, render
 
         desc = super().get_display_desc(looker, **kwargs)
-        extra = display(self)
-        return f"{desc}\n\n{extra}" if extra else desc
+        return desc if equipment_renders(self) else render(self, looker, "desc", desc)
 
 
 class CraftedItemMixin(ModificationDisplayMixin):

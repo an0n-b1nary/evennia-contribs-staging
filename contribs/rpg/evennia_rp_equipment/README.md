@@ -259,3 +259,23 @@ tag, so they do not consume `RP_EQUIPMENT_ITEM_CAP`. They still use equipment's
 wear, editing, sealing and build-change safeguards.
 
 Linking items to lore entries is planned for a later minor version.
+
+## Optional item display providers
+
+A partner may register an independent display transform in `AppConfig.ready()`:
+
+```python
+from evennia_rp_equipment.item_display import register
+register("my_partner", render_item)
+```
+
+`render_item(item, looker, context, text) -> str` receives `context="desc"`
+or `"worn"` and returns the complete transformed text. Base transforms register with `phase="base"`; other transforms use the default
+`phase="extra"`. Base transforms run first, so choosing a variant preserves
+other providers' extra lines. Stable keys run in alphabetical order within
+each phase; registration replaces the same key so repeated
+startup does not duplicate output. A failed provider is logged and leaves
+the prior text intact while later providers continue. Providers own their
+access checks and must preserve other partners' prose. Equipment imports no
+optional partner. Crafting registers its states/Modifier provider through
+this API, so plain and crafted gear both show Modifier layers exactly once.
