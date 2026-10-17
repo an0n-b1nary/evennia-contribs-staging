@@ -562,7 +562,13 @@ acceptance and zero commission, but still consume materials and the craft fee.
 
 Service numbers and layer numbers are separate. Accept/cancel the returned
 service number with `+modify/accept` or `/cancel`; its underlying Economy offer
-also supports Economy's acceptance/cancellation commands. Aura, dye and
+also supports Economy's acceptance/cancellation commands. The recent-service
+list labels each service as open, completed, cancelled or expired using both
+its own deadline and the Economy offer's status/deadline. Listing changes no
+records. Either participant can close an unapplied service with `/cancel`
+after Economy has cancelled or expired its offer; completed services cannot
+be cancelled. Repeated cancellation preserves the original cancellation time.
+Aura, dye and
 engraving have one active layer per kind; replacements explicitly name it as
 the fifth offer term. Marks can coexist. Undo targets one existing layer with
 the current owner's consent. Base prose, original aura lines, requirements

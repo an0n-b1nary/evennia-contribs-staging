@@ -11,6 +11,19 @@ from .errors import CraftingError
 from .models import CompanionState, ModificationLayer, ModificationOffer
 
 
+def _number(value, message, *, minimum=1, prefix=False):
+    value = value.strip()
+    if prefix:
+        value = value.removeprefix("#")
+    try:
+        number = int(value)
+    except ValueError:
+        raise CraftingError(message) from None
+    if number < minimum or number > 2**63 - 1:
+        raise CraftingError(message)
+    return number
+
+
 class CmdModify(CraftCommand):
     """Offer and accept cosmetic layers without changing base descriptions.
 
@@ -38,7 +51,12 @@ class CmdModify(CraftCommand):
         from .commands import resource_spec
 
         if switch in ("accept", "cancel", "hide", "show"):
-            number = int(self.args.strip().lstrip("#"))
+            kind = "service" if switch in ("accept", "cancel") else "layer"
+            number = _number(
+                self.args,
+                f"Use a {kind} number, e.g. +modify/{switch} 3.",
+                prefix=True,
+            )
             if switch == "accept":
                 modifiers.accept(self.caller, number)
                 self.msg(f"Service #{number} completed.")
@@ -71,7 +89,14 @@ class CmdModify(CraftCommand):
                 if len(parts) != 4:
                     raise CraftingError("Use niche ; layer ; resources ; commission.")
                 niche, layer_id, materials, price = parts
-                modifier, configuration = "modifier_undo", {"layer_id": int(layer_id)}
+                modifier, configuration = (
+                    "modifier_undo",
+                    {
+                        "layer_id": _number(
+                            layer_id, "Use a layer number; see help +modify/undo.", prefix=True
+                        )
+                    },
+                )
             else:
                 if len(parts) < 4 or "/" not in parts[0]:
                     raise CraftingError(
@@ -80,12 +105,14 @@ class CmdModify(CraftCommand):
                 niche, modifier = parts[0].split("/", 1)
                 # Read fixed terms from the right, preserving semicolons in
                 # authored prose. Resource terms contain keys, never just an int.
-                replacement = len(parts) >= 5 and parts[-2].isdecimal()
+                replacement = len(parts) >= 5 and ":" in parts[-3] and ":" not in parts[-2]
                 tail = 3 if replacement else 2
                 configuration = {"line": "; ".join(parts[1:-tail])}
                 materials, price = parts[-tail:-1] if replacement else parts[-2:]
                 if replacement:
-                    configuration["layer_id"] = int(parts[-1])
+                    configuration["layer_id"] = _number(
+                        parts[-1], "Use a layer number; see help +modify/offer.", prefix=True
+                    )
             row = modifiers.propose(
                 self.caller,
                 customer,
@@ -94,7 +121,9 @@ class CmdModify(CraftCommand):
                 modifier,
                 configuration,
                 resource_spec(materials),
-                commission=int(price),
+                commission=_number(
+                    price, "Use a nonnegative whole-number commission; see help +modify.", minimum=0
+                ),
             )
             details = modifiers.ServiceAsset().describe(str(row.pk))
             self.msg(details)
@@ -115,20 +144,16 @@ class CmdModify(CraftCommand):
                     )
                 )
         elif not switch:
-            rows = ModificationOffer.objects.filter(
-                Q(maker_id=self.caller.pk) | Q(customer_id=self.caller.pk)
-            ).order_by("-pk")[:30]
+            rows = list(
+                ModificationOffer.objects.filter(
+                    Q(maker_id=self.caller.pk) | Q(customer_id=self.caller.pk)
+                ).order_by("-pk")[:30]
+            )
+            statuses = modifiers.offer_statuses(rows)
             self.msg(
                 "Your recent services:\n"
                 + "\n".join(
-                    modifiers.ServiceAsset().describe(str(row.pk))
-                    + (
-                        " [completed]"
-                        if row.applied_at
-                        else " [cancelled]"
-                        if row.cancelled_at
-                        else ""
-                    )
+                    modifiers.ServiceAsset().describe(str(row.pk)) + f" [{statuses[row.pk]}]"
                     for row in rows
                 )
             )

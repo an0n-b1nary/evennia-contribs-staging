@@ -102,15 +102,31 @@ def _snapshot(target):
     }
 
 
-def _lock(maker, customer, target):
+_UNLOCKED = object()
+
+
+def _installation_room(target_id):
+    placement = FixtureInstallation.objects.filter(craft__item_id=target_id, active=True).first()
+    return ObjectDB.objects.filter(pk=placement.room_id).first() if placement else None
+
+
+def _lock_installation(target_id):
+    room = _installation_room(target_id)
+    if room:
+        lock_state(room)
+    return room
+
+
+def _lock(maker, customer, target, *, locked_room=_UNLOCKED):
     from evennia_economy.services import lock_characters, same_account
 
     # Match fixture/property services: host ownership before characters/items.
-    placement = FixtureInstallation.objects.filter(craft__item_id=target.pk, active=True).first()
-    if placement:
-        room = ObjectDB.objects.filter(pk=placement.room_id).first()
-        if room:
-            lock_state(room)
+    if locked_room is _UNLOCKED:
+        _lock_installation(target.pk)
+    elif _installation_room(target.pk) != locked_room:
+        # Self acceptance acquired this context before any character write.
+        # Never acquire a different property lock while holding character locks.
+        raise CraftingError("The installation changed; request a new offer.")
     lock_characters(maker, customer)
     target = ObjectDB.objects.select_for_update().filter(pk=target.pk).first()
     if target is None:
@@ -253,7 +269,7 @@ def propose(
     return row
 
 
-def _validate(row):
+def _validate(row, *, locked_room=_UNLOCKED):
     from evennia_economy.services import fee
 
     maker = ObjectDB.objects.filter(pk=row.maker_id).first()
@@ -261,7 +277,7 @@ def _validate(row):
     target = ObjectDB.objects.filter(pk=row.target_id).first()
     if not maker or not customer or not target:
         raise CraftingError("A service participant or target no longer exists.")
-    target, room_id = _lock(maker, customer, target)
+    target, room_id = _lock(maker, customer, target, locked_room=locked_room)
     row = ModificationOffer.objects.select_for_update().get(pk=row.pk)
     if row.applied_at or row.cancelled_at or row.expires_at <= timezone.now():
         raise CraftingError("That service is no longer open.")
@@ -283,10 +299,10 @@ def _validate(row):
     return row, maker, customer, target, implementation, config
 
 
-def _apply(row):
+def _apply(row, *, locked_room=_UNLOCKED):
     from evennia_economy.services import charge_fee
 
-    row, maker, _, target, implementation, config = _validate(row)
+    row, maker, _, target, implementation, config = _validate(row, locked_room=locked_room)
     services._spend(maker, row.resources, f"Modifier service #{row.pk}: {row.modifier}")
     charged = charge_fee("craft", maker, {"behaviour": row.modifier, "target_id": target.pk})
     if charged != row.craft_fee:
@@ -326,9 +342,13 @@ def accept(customer, service_id):
     # Economy owns its external acceptance transaction. An enclosing read
     # transaction here would prevent its SQLite expiry write from waiting for
     # a competing acceptance to commit. Self services serialize before reading.
+    # Resolve outside atomic: SQLite must acquire the writer before any reads.
+    room = _installation_room(row.target_id)
     with transaction.atomic():
+        if room:
+            lock_state(room)
         ObjectDB.objects.filter(pk=row.maker_id).update(db_key=F("db_key"))
-        return _apply(row)
+        return _apply(row, locked_room=room)
 
 
 def cancel(actor, service_id):
@@ -336,19 +356,59 @@ def cancel(actor, service_id):
     if row is None or actor.pk not in (row.maker_id, row.customer_id) or row.applied_at:
         raise CraftingError("No open service belonging to you.")
     with transaction.atomic():
-        # Match acceptance's order: Economy offer before service row. Start
-        # with a write so SQLite can wait without holding a read transaction.
+        # Economy offer before service row, matching acceptance. A no-op write
+        # also waits for a competing SQLite writer without retaining a read snapshot.
+        economy_offer = None
         if row.economy_offer_id and apps.is_installed("evennia_economy"):
-            from evennia_economy.exchange import cancel_offer
+            from evennia_economy.models import Offer
 
-            cancel_offer(actor, row.economy_offer_id)
+            Offer.objects.filter(pk=row.economy_offer_id).update(status=F("status"))
+            economy_offer = Offer.objects.filter(pk=row.economy_offer_id).first()
+            if economy_offer is None:
+                raise CraftingError("The linked Economy offer no longer exists.")
         else:
             ObjectDB.objects.filter(pk=row.maker_id).update(db_key=F("db_key"))
         row = ModificationOffer.objects.select_for_update().get(pk=row.pk)
-        if row.applied_at:
+        if row.applied_at or (economy_offer and economy_offer.status == "accepted"):
             raise CraftingError("That service was already accepted.")
-        row.cancelled_at = timezone.now()
-        row.save(update_fields=["cancelled_at"])
+        if economy_offer:
+            if economy_offer.status == "open":
+                from evennia_economy.exchange import cancel_offer
+
+                cancel_offer(actor, economy_offer.pk)
+            elif economy_offer.status not in ("cancelled", "expired"):
+                raise CraftingError("That Economy offer cannot be cancelled.")
+        if not row.cancelled_at:
+            row.cancelled_at = timezone.now()
+            row.save(update_fields=["cancelled_at"])
+
+
+def offer_statuses(rows):
+    """Read-only lifecycle labels, including Economy's independently closed offers."""
+    offers = {}
+    ids = {row.economy_offer_id for row in rows if row.economy_offer_id}
+    if ids and apps.is_installed("evennia_economy"):
+        from evennia_economy.models import Offer
+
+        offers = Offer.objects.in_bulk(ids)
+    now = timezone.now()
+    statuses = {}
+    for row in rows:
+        offer = offers.get(row.economy_offer_id)
+        if row.applied_at or (offer and offer.status == "accepted"):
+            status = "completed"
+        elif row.cancelled_at or (offer and offer.status == "cancelled"):
+            status = "cancelled"
+        elif (
+            row.expires_at <= now
+            or (offer and (offer.status == "expired" or offer.expires <= now))
+            or (row.economy_offer_id and offer is None)
+        ):
+            status = "expired"
+        else:
+            status = "open"
+        statuses[row.pk] = status
+    return statuses
 
 
 @transaction.atomic
@@ -356,13 +416,7 @@ def set_hidden(actor, layer_id, hidden):
     row = ModificationLayer.objects.filter(pk=layer_id).first()
     target = ObjectDB.objects.filter(pk=row.target_id).first() if row else None
     if target:
-        placement = FixtureInstallation.objects.filter(
-            craft__item_id=target.pk, active=True
-        ).first()
-        if placement:
-            room = ObjectDB.objects.filter(pk=placement.room_id).first()
-            if room:
-                lock_state(room)
+        _lock_installation(target.pk)
         target = ObjectDB.objects.select_for_update().get(pk=target.pk)
     if not target or _owner(target) != actor:
         raise CraftingError("Only the current owner may hide or show this layer.")
@@ -389,13 +443,7 @@ class ServiceAsset:
     def lock_context(self, giver, recipient, key, quantity):
         row = ModificationOffer.objects.filter(pk=int(key)).first() if key.isdecimal() else None
         if row:
-            placement = FixtureInstallation.objects.filter(
-                craft__item_id=row.target_id, active=True
-            ).first()
-            if placement:
-                room = ObjectDB.objects.filter(pk=placement.room_id).first()
-                if room:
-                    lock_state(room)
+            _lock_installation(row.target_id)
 
     def describe(self, key):
         row = ModificationOffer.objects.filter(pk=int(key)).first() if key.isdecimal() else None
