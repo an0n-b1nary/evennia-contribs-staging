@@ -698,3 +698,77 @@ Readables, journal revisions and editions. Any carried Readable can be
 addressed or sealed; `facets={"letter": {"addressee": "The Keeper"}}` initializes
 that state at craft time. Existing books need no backfill. Object deletion
 preserves state and signet provenance for staff review.
+
+## Item details and senses
+
+Every lifecycle may carry optional exterior `details` and `senses` facets.
+These are immutable, attributed craft prose. Add them to an ordinary craft
+draft before paying:
+
+```text
++craft/detail hem = Tiny blue stitches follow the edge.
++craft/sense smell = A faint scent of cedar.
++craft/sense sound = Small beads click softly together.
++craft/sense touch = Soft cloth with a rough woven border.
++craft/undetail hem
++craft/unsense sound
+```
+
+Repeating a name replaces its draft entry. Preview with `+craft`; the detail and
+sensory descriptions and combined cost are shown before `+craft/finish`. Removing the
+last entry removes that facet. Existing `/smell` and `/sound` draft fields still
+configure an Installable's room layers; `/sense` configures the item itself.
+Copy drafts retain their existing text/binding workflow; exterior facets are
+not automatically copied from the source.
+
+The service API accepts:
+
+```python
+facets={
+    "details": {"hem": "Tiny blue stitches follow the edge."},
+    "senses": {"smell": "A faint scent of cedar.", "touch": "Soft woven cloth."},
+}
+```
+
+Names match exactly after trimming and case folding. Up to eight details are
+allowed, with names of 1–40 characters and prose of 1–1,000 characters. The three
+optional sense keys are `smell`, `sound` and `touch`, each with 1–400 characters.
+Names and prose must be plain single-line text without terminal markup; detail
+names cannot contain `=`. Duplicate normalized names are refused.
+
+`RP_CRAFTING_FACET_UNIT_COSTS = {"details": 1, "senses": 1}` sets positive integer
+costs **per entry**. Each entry uses the first paid input category permitted by
+the first contributing niche, in the existing composition order. A Cook therefore
+pays provisions, an Illusionist essences, and an ordinary Scribe materials.
+Custom settings must provide the applicable facet's positive unit cost. Costs
+are revalidated at completion and captured in the ordinary craft record; there
+is no ongoing cost for inspecting an item. Existing records need no migration.
+
+Register `CmdLook`, `CmdSense`, `CmdListen` and `CmdTouch` from
+`evennia_rp_crafting.commands`, or use `CraftingCmdSet`. `CmdLook` extends the
+stock Evennia look command; hosts with their own look implementation can call
+`item_details.examine(actor, item, name)` from it instead.
+
+```text
+look cloak = hem
+look cloak hem
+smell cloak
+listen cloak
+touch cloak
+```
+
+The complete object name takes precedence in the space-separated look form;
+use `=` to disambiguate an item name and a detail. Ordinary object descriptions
+list the available detail and sense names. `+smell`, `+listen` and `+touch` are
+also accepted. With no target, `+smell` and `+listen` retain the wave-two room
+prose and attributed fixture layers. Item senses follow the main crafting reveal
+switch and work even when wave two is hidden. `touch` requires an item target.
+
+Inspection requires an item in the character's inventory or current room,
+`view` access, and the corresponding `smell`, `listen` or `touch` lock (default:
+allowed). It cannot inspect another character's inventory or a remote dbref.
+Only the caller receives output. It does not emit to the room, count as RP,
+consume a use, activate an item, read a page, move a bookmark or grant lore.
+These are exterior details: they convey no authority to read enclosed text.
+Stored snapshots continue to work after gifting, freezing new crafting or
+changing production costs. Plain objects cannot supply facets via Attributes.

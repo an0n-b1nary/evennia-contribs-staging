@@ -1839,3 +1839,18 @@ unsealed. `+craft/signet` adds a paid design to a Jeweller wearable draft;
 character cmdset. Without Equipment, the sample letter remains unsealed.
 The synthetic golden database includes the new additive seal-state table and
 these examples; reseeding retains earlier craft, opening and copy records.
+
+### Item details and senses
+
+Market Row's sample field book has a stitched `cover` detail, a paper-and-cedar
+smell and a cloth texture. The sample lute has a quiet string sound and polished
+wood texture. Try `look a sample field book = cover`, `smell a sample field book`,
+`touch a sample field book` and `listen a sample carved lute`. Ordinary `look`,
+`+smell` and `+listen` with no target retain the room's existing behavior.
+
+The character cmdset installs Crafting's stock-look extension and shared sensory
+commands. Item prose is private, comes from immutable paid craft metadata, and
+never reads the book, activates the lute or produces room/RP output. Drafts use
+`+craft/detail`, `/undetail`, `/sense` and `/unsense`; the reference setting charges
+one extra resource unit per detail or sense. The generated synthetic golden
+snapshot includes the seeded examples. Reseeding preserves earlier craft history.

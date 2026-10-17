@@ -136,6 +136,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdFixture",
             "CmdSense",
             "CmdListen",
+            "CmdTouch",
+            "CmdLook",
             "CmdModify",
             "CmdPet",
             "CmdJournal",

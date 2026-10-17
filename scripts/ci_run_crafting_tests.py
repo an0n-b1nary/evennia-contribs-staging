@@ -77,6 +77,7 @@ def main(argv=None):
             "world.sandbox.test_pages",
             "world.sandbox.test_readables",
             "world.sandbox.test_letters",
+            "world.sandbox.test_item_details",
         ],
         cwd=game,
         stdin=subprocess.DEVNULL,

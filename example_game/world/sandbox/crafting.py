@@ -5,6 +5,8 @@
 BOOK_NAME = "a sample field book"
 BOOK_DESC = "A small bound notebook with a plain paper cover."
 BOOK_TEXT = "Field notes: the market opens onto the common road."
+BOOK_DETAILS = {"cover": "A tiny stitched map marks the cloth cover."}
+BOOK_SENSES = {"smell": "Dry paper and cedar.", "touch": "Soft cloth over stiff boards."}
 PAGED_BOOK_NAME = "a sample travel book"
 JOURNAL_NAME = "a sample field journal"
 EDITION_NAME = "a sample journal edition"
@@ -24,6 +26,7 @@ CLOAK_LINE = "a grey cloak with a woven border"
 LUTE_NAME = "a sample carved lute"
 LUTE_DESC = "A small lute carved from pale wood."
 LUTE_MODE = "A bright melody rings from the little lute."
+LUTE_SENSES = {"sound": "The loose strings hum faintly.", "touch": "Smooth, polished wood."}
 FIXTURE_NAME = "a sample brass lantern"
 FIXTURE_DESC = "A brass lantern with a beeswax candle."
 FIXTURE_LINE = "Warm lamplight falls across the market stalls."
