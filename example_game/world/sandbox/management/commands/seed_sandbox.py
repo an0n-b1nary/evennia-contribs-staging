@@ -531,7 +531,7 @@ class Command(BaseCommand):
 
         owner = authors[-1]
         counts = {"crafting_niches": len(seed_catalog(update=True))}
-        grant(owner, "timber", 18, "staff", note="Sandbox Workshop inputs")
+        grant(owner, "timber", 30, "staff", note="Sandbox Workshop inputs")
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
@@ -544,7 +544,8 @@ class Command(BaseCommand):
             crafting.BOOK_NAME,
             crafting.BOOK_DESC,
             {"text": crafting.BOOK_TEXT},
-            {"timber": 1},
+            {"timber": 4},
+            facets={"details": crafting.BOOK_DETAILS, "senses": crafting.BOOK_SENSES},
         )
         paged_book = craft(
             owner,
@@ -635,7 +636,8 @@ class Command(BaseCommand):
             crafting.LUTE_NAME,
             crafting.LUTE_DESC,
             {"modes": {"play": [crafting.LUTE_MODE]}},
-            {"timber": 1},
+            {"timber": 3},
+            facets={"senses": crafting.LUTE_SENSES},
         )
         lantern = craft(
             demo,

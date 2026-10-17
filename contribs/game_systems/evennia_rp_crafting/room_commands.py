@@ -66,17 +66,35 @@ class CmdFixture(_CraftCommand):
 
 
 class CmdSense(_CraftCommand):
-    """+smell or +listen: room prose first, followed by attributed fixture lines."""
+    """Inspect the room or one local item's sensory prose.
+
+    Usage: +smell [item], +listen [item], +touch <item>
+
+    No target: room prose followed by attributed fixture lines (wave two).
+    An item target: private, immutable sensory prose with no emissions.
+    """
 
     key = "+smell"
+    aliases = ["smell"]  # noqa: RUF012
     sense = "smell"
-    wave_two = True
 
     def run(self, switch):
-        if switch or self.args.strip():
-            raise CraftingError(f"Usage: {self.key}")
+        if switch or self.rhs is not None:
+            raise CraftingError(f"Usage: {self.key} [item]")
+        if self.args.strip():
+            from .item_details import local_items, sense
+
+            item = self.caller.search(self.args.strip(), candidates=local_items(self.caller))
+            if item is not None:
+                self.msg(f"{item.key}\n{sense(self.caller, item, self.sense)}")
+            return
+        if self.sense == "touch":
+            raise CraftingError("Usage: +touch <item>")
+        from . import conf
         from .fixtures import layers
 
+        if not conf.wave_two_visible(self.caller):
+            return
         room = self.caller.location
         if room is None:
             raise CraftingError("Visit a room first.")
@@ -89,4 +107,13 @@ class CmdSense(_CraftCommand):
 
 class CmdListen(CmdSense):
     key = "+listen"
+    aliases = ["listen"]  # noqa: RUF012
     sense = "sound"
+
+
+class CmdTouch(CmdSense):
+    """Privately inspect a carried or locally visible crafted item's texture."""
+
+    key = "+touch"
+    aliases = ["touch"]  # noqa: RUF012
+    sense = "touch"

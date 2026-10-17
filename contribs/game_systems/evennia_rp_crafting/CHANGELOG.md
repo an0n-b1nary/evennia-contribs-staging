@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.2 - 2026-10-16
+
+- Add paid named exterior details and self-directed smell, sound and touch
+  facets on crafted items. Validate and capture bounded prose in the immutable
+  craft snapshot; each entry adds a configurable resource cost.
+- Add draft editing/removal, item-detail looking and targeted sensory commands.
+  Keep ordinary looking and wave-two room senses, check local custody/view and
+  sense locks, and keep inspection private and free of reading/consumption effects.
+- Wire seeded reference-game examples, command seams and optional-partner checks.
+
 ## 0.8.1 - 2026-10-16
 
 - Share attributed delivery across Consumable/Broadcast, activations, fixtures

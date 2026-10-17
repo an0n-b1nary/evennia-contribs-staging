@@ -1820,3 +1820,19 @@ uses mute/ignore and scene emit logs without generating RP activity; ambients
 pause offline/in combat. Real partner seams live in `world.sandbox.test_wave_three`
 and run in the crafting partner matrix. The generated golden snapshot includes
 the additive migration and synthetic demonstrations.
+
+
+### Item details and senses
+
+Market Row's sample field book has a stitched `cover` detail, a paper-and-cedar
+smell and a cloth texture. The sample lute has a quiet string sound and polished
+wood texture. Try `look a sample field book = cover`, `smell a sample field book`,
+`touch a sample field book` and `listen a sample carved lute`. Ordinary `look`,
+`+smell` and `+listen` with no target retain the room's existing behavior.
+
+The character cmdset installs Crafting's stock-look extension and shared sensory
+commands. Item prose is private, comes from immutable paid craft metadata, and
+never reads the book, activates the lute or produces room/RP output. Drafts use
+`+craft/detail`, `/undetail`, `/sense` and `/unsense`; the reference setting charges
+one extra resource unit per detail or sense. The generated synthetic golden
+snapshot includes the seeded examples. Reseeding preserves earlier craft history.

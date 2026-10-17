@@ -9,12 +9,14 @@ from .behaviours import registry
 from .catalog import seed_catalog
 from .command_base import CraftCommand as _CraftCommand
 from .composition import specifications
+from .detail_commands import CmdLook as CmdLook
 from .errors import CraftingError
 from .models import CraftRecord, NicheDefinition, Workshop
 from .readable_commands import CmdJournal as CmdJournal
 from .room_commands import CmdFixture as CmdFixture
 from .room_commands import CmdListen as CmdListen
 from .room_commands import CmdSense as CmdSense
+from .room_commands import CmdTouch as CmdTouch
 from .wave_three_commands import CmdModify as CmdModify
 from .wave_three_commands import CmdPet as CmdPet
 
@@ -137,6 +139,10 @@ class CmdCraft(_CraftCommand):
       +craft/unrequire <number>
       +craft/text = <readable text>
       +craft/journal = <blank page capacity>
+      +craft/detail <name> = <exterior detail prose>
+      +craft/undetail <name>
+      +craft/sense <smell|sound|touch> = <item sensory prose>
+      +craft/unsense <smell|sound|touch>
       +craft/copy <source item> = <niche key>/<new item name>
       +craft/page [title] = <page text>  (repeat to append authored pages)
       +craft/unpage <number>
@@ -223,7 +229,11 @@ class CmdCraft(_CraftCommand):
                     f"You craft {item.key}. Hallmark (OOC): {item.get_display_provenance(self.caller)}."
                 )
                 return
-            if switch == "journal":
+            if switch in ("detail", "undetail", "sense", "unsense"):
+                from .item_details import edit_draft
+
+                edit_draft(self, switch, draft)
+            elif switch == "journal":
                 from .pages import validate
 
                 entry = next(
@@ -450,8 +460,12 @@ class CmdCraft(_CraftCommand):
                     rows.append(f"Requirement {number}: {rule}")
                 for number, beat in enumerate(draft["configuration"].get("beats", []), 1):
                     rows.append(f"EVENT beat {number}: {beat}")
-                if composition.facets:
-                    rows.append(f"Facets: {composition.facets}")
+                remaining_facets = dict(composition.facets)
+                for key, label in (("details", "Detail"), ("senses", "Item sense")):
+                    for name, value in remaining_facets.pop(key, {}).items():
+                        rows.append(f"{label} {name}: {value}")
+                if remaining_facets:
+                    rows.append(f"Facets: {remaining_facets}")
                 selected = (
                     ", ".join(f"{amount} {key}" for key, amount in draft["selected"].items())
                     or "none"
@@ -614,7 +628,7 @@ class CraftingCmdSet(CmdSet):
     def at_cmdset_creation(self):
         for command in (CmdWorkshop, CmdCraft, CmdRead, CmdUse, CmdCrafting):
             self.add(command())
-        for command in (CmdFixture, CmdListen, CmdSense):
+        for command in (CmdFixture, CmdListen, CmdSense, CmdTouch, CmdLook):
             self.add(command())
         self.add(CmdModify())
         self.add(CmdPet())
