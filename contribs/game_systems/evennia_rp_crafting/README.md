@@ -772,3 +772,48 @@ consume a use, activate an item, read a page, move a bookmark or grant lore.
 These are exterior details: they convey no authority to read enclosed text.
 Stored snapshots continue to work after gifting, freezing new crafting or
 changing production costs. Plain objects cannot supply facets via Attributes.
+
+## Wearable states
+
+Wearables may carry a paid `states` facet: at most eight named, fixed variants
+of their description and/or worn line, with one default. State names are
+case-insensitive (1–40 characters), worn lines allow 200 characters and
+variant descriptions 2,000. Prose is plain single-line text. Variants do not
+change slots, requirements, auras, access, lore, item details/senses or verbs.
+Base prose and the immutable craft snapshot remain intact.
+
+```
++craft/new weaving/wearable = a hooded cloak
++craft/desc = A grey cloak.
++craft/line = a grey cloak
++craft/state hood down = a grey cloak, hood down
++craft/state hood up = a grey cloak, hood raised
++craft/statedesc hood up = A cloak with its hood raised.
++craft/defaultstate hood down
++craft/resources = timber:3
++craft
++craft/finish
++adjust a hooded cloak
++adjust a hooded cloak = hood up
+```
+
+`+craft/unstate <name>` removes a draft variant; removing the default selects
+another remaining variant. Removing the last variant removes the facet.
+Each variant adds `RP_CRAFTING_STATE_UNIT_COST` units (default 1, positive
+integer) in the first contributing niche's first already-paid permitted
+resource category. The preview includes this cost; each craft pays it once.
+
+The holder may select a variant even after the item has changed hands and
+its authored prose is sealed. `view:` and `adjust:` locks apply. Selecting a
+worn item's state follows the character build lock; crafting pause/reveal
+controls also apply. Selection produces only confirmation to the actor and
+persists through restart, outfit changes and transfers. It does not activate
+an item, consume it, emit room text or count as RP. Existing items without
+states keep their current display. Previously crafted variants remain
+inspectable if Equipment is removed. No schema migration is required.
+
+Equipment 0.2.1 provides `evennia_rp_equipment.item_display.register`; Crafting
+registers a base-state provider and a Modifier-extra provider during startup. Descriptions and worn lines apply
+state presentation and visible Modifier layers once, with auras retained.
+Wearable states are the first consumer; fixture, companion and activatable
+state consumers, automatic transitions and timed states are separate work.

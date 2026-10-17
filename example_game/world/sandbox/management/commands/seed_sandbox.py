@@ -596,7 +596,8 @@ class Command(BaseCommand):
                 crafting.CLOAK_NAME,
                 crafting.CLOAK_DESC,
                 {"worn_line": crafting.CLOAK_LINE, "slot": "cloak"},
-                {"timber": 1},
+                {"timber": 3},
+                facets={"states": crafting.CLOAK_STATES},
             )
             items.append(cloak)
         grant(owner, "grain", 20, "staff", note="Sandbox Consumables")

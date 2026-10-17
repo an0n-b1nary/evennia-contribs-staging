@@ -1854,3 +1854,13 @@ never reads the book, activates the lute or produces room/RP output. Drafts use
 `+craft/detail`, `/undetail`, `/sense` and `/unsense`; the reference setting charges
 one extra resource unit per detail or sense. The generated synthetic golden
 snapshot includes the seeded examples. Reseeding preserves earlier craft history.
+
+### Wearable state demonstration
+
+The sample woven cloak has `hood down` and `hood up` states. Carry it and use
+`+adjust a sample woven cloak`, then `+adjust a sample woven cloak = hood up`.
+Wearing it displays the selected variant. `+craft/state`, `/statedesc`,
+`/defaultstate` and `/unstate` edit paid variants in a wearable draft. State
+selection respects worn-item build locks and persists through outfits and
+market sales. The host's CraftingCmdSet includes +adjust; Equipment's neutral
+display provider seam keeps auras and Modifier layers visible once.

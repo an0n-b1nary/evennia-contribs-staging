@@ -23,6 +23,16 @@ BOOK_PAGES = [
 CLOAK_NAME = "a sample woven cloak"
 CLOAK_DESC = "A grey cloak with a simple woven border."
 CLOAK_LINE = "a grey cloak with a woven border"
+CLOAK_STATES = {
+    "default": "hood down",
+    "variants": {
+        "hood down": {"worn_line": CLOAK_LINE},
+        "hood up": {
+            "worn_line": "a grey cloak with its hood raised",
+            "description": "A grey cloak with a raised hood and a simple woven border.",
+        },
+    },
+}
 LUTE_NAME = "a sample carved lute"
 LUTE_DESC = "A small lute carved from pale wood."
 LUTE_MODE = "A bright melody rings from the little lute."
