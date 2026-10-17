@@ -90,16 +90,21 @@ class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
 
     @skipUnless(apps.is_installed("evennia_scenes"), "Scenes absent")
     def test_owner_pose_is_logged_and_updates_owner_pose_state(self):
-        from evennia_scenes.models import LogEntry, Scene
+        from evennia_scenes.models import LogEntry, Scene, SceneParticipant
 
         scene = Scene.objects.create(title="A bird's greeting", room=self.room1, creator=self.char1)
         self.room1.active_scene_id = scene.pk
         pet = self.pet()
-        companions.pose(self.char1, pet, "bows politely.")
+        with patch.object(self.char1, "record_pose", wraps=self.char1.record_pose) as recorded:
+            companions.pose(self.char1, pet, "bows politely.")
+        recorded.assert_called_once_with("a brass bird bows politely.", pose_type="emit")
         self.assertEqual(self.char1.last_pose_text, "a brass bird bows politely.")
         log = LogEntry.objects.get(scene=scene)
         self.assertEqual(log.author_id, self.char1.pk)
         self.assertEqual(log.log_type, "emit")
+        self.assertEqual(
+            SceneParticipant.objects.get(scene=scene, character=self.char1).pose_count, 1
+        )
 
     @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility absent")
     def test_trick_output_is_muted_ignored_and_never_owner_activity(self):
@@ -133,6 +138,10 @@ class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
         companions.set_mode(self.char1, pet, "stay")
         self.account2.db.ignore_list = [self.account.pk]
         before = self.char1.last_pose_time
+        if apps.is_installed("evennia_scenes"):
+            from evennia_scenes.models import LogEntry, Scene, SceneParticipant
+
+            scene = Scene.objects.create(title="A trick", room=self.room1, creator=self.char2)
         received = []
         with (
             patch.object(
@@ -147,6 +156,82 @@ class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
         self.assertFalse(pet.access(self.char2, "view"))
         self.assertEqual(self.char1.last_pose_time, before)
         self.assertEqual(ActivationUse.objects.count(), 1)
+        if apps.is_installed("evennia_scenes"):
+            self.assertEqual(LogEntry.objects.get(scene=scene).author, self.char1)
+            self.assertFalse(SceneParticipant.objects.filter(scene=scene).exists())
+
+    @skipUnless(
+        apps.is_installed("evennia_scenes") and apps.is_installed("evennia_accessibility"),
+        "Scenes and Accessibility required",
+    )
+    def test_transferred_companion_ambient_logs_current_owner_without_pose_counts(self):
+        from evennia import SESSION_HANDLER
+        from evennia.server.serversession import ServerSession
+        from evennia_scenes.models import LogEntry, Scene, SceneParticipant
+
+        # EvenniaTest connects only the first account. The new owner must be
+        # online: offline companions correctly remain silent.
+        with patch.dict(SESSION_HANDLER):
+            dummy = ServerSession()
+            dummy.init_session("telnet", ("localhost", "testmode"), SESSION_HANDLER)
+            dummy.sessid = 2
+            SESSION_HANDLER.portal_connect(dummy.get_sync_data())
+            SESSION_HANDLER.login(
+                SESSION_HANDLER.session_from_sessid(2), self.account2, testmode=True
+            )
+            self.char2.locks.add(f"puppet:pid({self.account2.pk})")
+            self.account2.puppet_object(SESSION_HANDLER.session_from_sessid(2), self.char2)
+            self.assertTrue(self.char2.has_account)
+            pet = self.pet(ambient="A brass feather clicks.")
+            pet.move_to(self.char2, quiet=True)
+            companions.set_mode(self.char2, pet, "stay")
+            self.account.db.ignore_list = [self.account2.pk]
+            self.account.options.set("mute_ambient_effects", "False")
+            scene = Scene.objects.create(
+                title="A new companion owner", room=self.room1, creator=self.char1
+            )
+            before = self.char2.last_pose_time
+            received = []
+            with (
+                patch.object(
+                    DefaultCharacter,
+                    "msg",
+                    lambda target, text=None, **kw: received.append(target.pk),
+                ),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                self.assertEqual(companions.ambient_tick(), 1)
+            self.assertNotIn(self.char1.pk, received)
+            self.assertEqual(LogEntry.objects.get(scene=scene).author, self.char2)
+            self.assertFalse(SceneParticipant.objects.filter(scene=scene).exists())
+            self.assertEqual(self.char2.last_pose_time, before)
+
+    @skipUnless(
+        apps.is_installed("evennia_scenes") and apps.is_installed("evennia_accessibility"),
+        "Scenes and Accessibility required",
+    )
+    def test_companion_arrival_is_ignored_but_logged_without_participation(self):
+        from evennia_scenes.models import LogEntry, Scene, SceneParticipant
+
+        pet = self.pet(arrival="A brass bird flutters in.")
+        companions.set_mode(self.char1, pet, "follow")
+        self.char2.move_to(self.room2, quiet=True)
+        self.account2.db.ignore_list = [self.account.pk]
+        self.account2.options.set("mute_ambient_effects", "False")
+        scene = Scene.objects.create(title="A bird arrives", room=self.room2, creator=self.char2)
+        received = []
+        with patch.object(
+            DefaultCharacter,
+            "msg",
+            lambda target, text=None, **kw: received.append((target.pk, text)),
+        ):
+            self.char1.move_to(self.room2, quiet=True)
+        self.assertEqual(pet.location, self.room2)
+        self.assertFalse(
+            any(pk == self.char2.pk and "<EVENT>" in str(text) for pk, text in received)
+        )
+        self.assertEqual(LogEntry.objects.get(scene=scene).author, self.char1)
+        self.assertFalse(SceneParticipant.objects.filter(scene=scene).exists())
 
     @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility absent")
     def test_ambients_pause_offline_and_during_real_fights(self):

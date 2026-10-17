@@ -31,7 +31,7 @@ from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
 
-from evennia_scenes.capture import capture_to_scene, register_room_entry
+from evennia_scenes.capture import capture_room_event, capture_to_scene, register_room_entry
 from evennia_scenes.display import render_scene_ref
 from evennia_scenes.integrations import maps as maps_overlays
 from evennia_scenes.models import LogEntry, LogEntryVersion, Scene, SceneParticipant
@@ -252,6 +252,42 @@ class TestSceneParticipantModel(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
+class TestRoomEventCapture(EvenniaTest):
+    def test_capture_uses_event_room_and_newest_live_scene_despite_stale_host_reference(self):
+        old = _open_scene(self.room1, self.char2, "Older")
+        current = _open_scene(self.room1, self.char2, "Current")
+        elsewhere = _open_scene(self.room2, self.char2, "Elsewhere")
+        self.char1.location = self.room2
+        self.room1.active_scene_id = elsewhere.pk
+        entry = capture_room_event(self.room1, self.char1, "<EVENT> A distant bell.")
+        self.assertEqual(entry.scene, current)
+        self.assertEqual(entry.author, self.char1)
+        self.assertFalse(LogEntry.objects.filter(scene__in=(old, elsewhere)).exists())
+        self.assertFalse(SceneParticipant.objects.exists())
+
+    def test_closed_or_missing_scene_is_not_captured(self):
+        scene = _open_scene(self.room1, self.char1)
+        scene.status = Scene.Status.CLOSED
+        scene.save(update_fields=["status"])
+        for room in (self.room1, self.room2, None):
+            self.assertIsNone(capture_room_event(room, self.char1, "<EVENT> Silence."))
+        self.assertFalse(LogEntry.objects.exists())
+
+    def test_capture_preserves_private_scene_and_existing_active_participation(self):
+        scene = _open_scene(self.room1, self.char2)
+        scene.privacy = Scene.Privacy.VIEW_PRIVATE
+        scene.start()
+        scene.save(update_fields=["privacy"])
+        participant = _add_participant(scene, self.char1)
+        participant.increment_pose_count()
+        before = SceneParticipant.objects.filter(pk=participant.pk).values().get()
+        capture_room_event(self.room1, self.char1, "<EVENT> A chime.")
+        scene.refresh_from_db()
+        self.assertEqual(scene.privacy, Scene.Privacy.VIEW_PRIVATE)
+        self.assertEqual(scene.status, Scene.Status.ACTIVE)
+        self.assertEqual(SceneParticipant.objects.filter(pk=participant.pk).values().get(), before)
+
+
 class TestLogEntryModel(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -294,6 +330,42 @@ class TestLogEntryModel(EvenniaTest):
         LogEntry.create_entry(scene=self.scene, author=self.char1, content="Pose 2.")
         p = SceneParticipant.objects.get(scene=self.scene, character=self.char1)
         self.assertEqual(p.pose_count, 2)
+
+    def test_non_activity_entry_retains_author_order_and_signal_without_participation(self):
+        from evennia_scenes.signals import log_entry_created
+
+        with patch.object(log_entry_created, "send", wraps=log_entry_created.send) as signal:
+            entry = LogEntry.create_entry(
+                scene=self.scene,
+                author=self.char2,
+                content="<EVENT> A bell rings.",
+                log_type="emit",
+                counts_as_activity=False,
+            )
+        self.assertEqual(entry.author, self.char2)
+        self.assertEqual(entry.author_name, self.char2.key)
+        self.assertEqual(entry.order, 1)
+        signal.assert_called_once_with(sender=LogEntry, entry=entry, scene=self.scene)
+        self.scene.refresh_from_db()
+        self.assertEqual(self.scene.status, Scene.Status.OPEN)
+        self.assertFalse(SceneParticipant.objects.filter(scene=self.scene).exists())
+
+    def test_non_activity_does_not_rejoin_or_increment_an_existing_participant(self):
+        participant = _add_participant(self.scene, self.char2)
+        participant.leave()
+        before = SceneParticipant.objects.filter(pk=participant.pk).values().get()
+        LogEntry.create_entry(
+            self.scene, self.char2, "<EVENT> A chime.", "emit", counts_as_activity=False
+        )
+        self.assertEqual(SceneParticipant.objects.filter(pk=participant.pk).values().get(), before)
+
+    def test_ordinary_authored_emit_still_counts_as_a_pose(self):
+        LogEntry.create_entry(self.scene, self.char2, "A carefully written emit.", "emit")
+        self.assertEqual(
+            SceneParticipant.objects.get(scene=self.scene, character=self.char2).pose_count, 1
+        )
+        self.scene.refresh_from_db()
+        self.assertEqual(self.scene.status, Scene.Status.ACTIVE)
 
     def test_order_increments(self):
         e1 = LogEntry.create_entry(scene=self.scene, author=self.char1, content="A")

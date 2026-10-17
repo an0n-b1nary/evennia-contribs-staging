@@ -194,6 +194,12 @@ and `/finish`. Broadcast uses `illusions/broadcast` with essence inputs.
 `+ambient/mute` suppresses effects arriving from another room; your current
 scene remains visible. Broadcasts reach adjacent rooms only, never channels.
 Persistent audience limits default to 30 seconds and survive server reloads.
+Crafted EVENTs respect Social ignore through their user/current owner. Scenes
+0.8.2 records one attributed entry per affected room, including adjacent
+Broadcast rooms, without starting scenes or adding participation/pose counts.
+They leave pose order and RP activity unchanged; owner-written `+pet/pose`
+continues through the ordinary owner posing path. The actual-partner assertions
+live in `world.sandbox.test_emissions` and the wave-two/three seam suites.
 
 Use `+workshop/catalog` for current unlock costs, then
 `+workshop/unlock writing = timber:3`. A second active niche costs twice its

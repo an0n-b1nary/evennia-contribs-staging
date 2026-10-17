@@ -11,6 +11,10 @@ games call these functions from their own typeclasses.
 character's pose/emit/say recording hook whenever the character performs an IC
 action.
 
+``capture_room_event(room, author, content)`` — log an attributed item or
+environmental event without counting participation or activity. The author
+need not be in the room (for example, a neighbouring room's Broadcast).
+
 ``register_room_entry(room, character)`` — call from your Room.at_object_receive
 inside whatever guard identifies player characters. Evennia ships no room-receive
 signal, so this hook cannot be auto-wired in ScenesConfig.ready() — the game
@@ -104,3 +108,26 @@ def register_room_entry(room, character):
     )
     if not created and not participant.is_active:
         participant.rejoin()
+
+
+def capture_room_event(room, author, content):
+    """Capture one non-activity emit in the room's newest open/active scene.
+
+    Resolve the scene by its actual room, independently of the author's
+    location or stale host ``active_scene_id`` attributes. Keep the scene's
+    privacy and lifecycle unchanged. Return the entry, or None without a scene.
+    """
+    if room is None:
+        return None
+    from evennia_scenes.models import LogEntry, Scene
+
+    scene = (
+        Scene.objects.filter(room=room, status__in=(Scene.Status.OPEN, Scene.Status.ACTIVE))
+        .order_by("-created_at", "-pk")
+        .first()
+    )
+    if scene is None:
+        return None
+    return LogEntry.create_entry(
+        scene=scene, author=author, content=content, log_type="emit", counts_as_activity=False
+    )

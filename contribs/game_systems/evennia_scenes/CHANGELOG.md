@@ -1,5 +1,13 @@
 # Changelog — evennia-scenes
 
+## [0.8.2] - 2026-10-16
+
+- Add explicit non-activity entry capture with preserved authorship, ordering
+  and signals, without starting scenes, creating/rejoining participants or
+  incrementing pose counts. Ordinary player-authored emits retain their behavior.
+- Add `capture_room_event` for environmental output attributed to a character
+  who may be elsewhere, using the event room's newest open/active scene.
+
 ## [0.8.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `scenes` (opening a scene,
