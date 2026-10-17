@@ -142,6 +142,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdPet",
             "CmdJournal",
             "CmdLetter",
+            "CmdPattern",
         ):
             self.add(command)
         self.add(CmdReadTome)

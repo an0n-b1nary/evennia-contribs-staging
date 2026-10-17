@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.0 - 2026-10-17
+
+- Add Patterns: crafter knowledge with lineage. `+craft/pattern` stamps a
+  verified "Worked in <Pattern>" hallmark, captured at craft time, and opens
+  the Pattern's gated lifecycle/verb combinations for its listed niches only.
+  Every contributing niche and cost still applies; there is no surcharge.
+- Stages move forward only: Recovered until the origin plot thread concludes,
+  then Spreading, then Common after `RP_CRAFTING_PATTERN_COMMON_DAYS` (runtime,
+  default 90). Staff may advance a stage early; every change is logged.
+- Teaching is offered and accepted, and needs a logged scene both characters
+  posed in, active or closed within `RP_CRAFTING_PATTERN_TEACH_DAYS` (runtime,
+  default 7). Same-account characters and guests cannot teach each other.
+- Staff create and curate Patterns, grant them directly or attach them to plot
+  threads, whose active participants learn them at conclusion. Players see
+  only Patterns somebody knows, and only their own lineage.
+- Add `RP_CRAFTING_PATTERNS_REVEALED`, an additive migration, a `plots` extra,
+  reference-game examples and seams. Copies and Modifier services never carry a
+  Pattern; existing records are unchanged.
+
 ## 0.9.3 - 2026-10-17
 
 - Fix self-service Modifier acceptance to lock installed fixtures’ host property

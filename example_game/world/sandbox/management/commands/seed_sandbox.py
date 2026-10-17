@@ -531,7 +531,8 @@ class Command(BaseCommand):
 
         owner = authors[-1]
         counts = {"crafting_niches": len(seed_catalog(update=True))}
-        grant(owner, "timber", 32, "staff", note="Sandbox Workshop inputs")
+        grant(owner, "timber", 35, "staff", note="Sandbox Workshop inputs")
+        self._seed_patterns(owner)
         if apps.is_installed("evennia_economy"):
             from evennia_economy.services import credit
 
@@ -587,6 +588,18 @@ class Command(BaseCommand):
             facets={"letter": {"addressee": "The Market Keeper"}},
         )
         items = [book, paged_book, journal, edition, letter]
+        items.append(
+            craft(
+                owner,
+                "writing",
+                "readable",
+                crafting.PLACARD_NAME,
+                crafting.PLACARD_DESC,
+                {"text": crafting.PLACARD_TEXT},
+                {"timber": 1},
+                pattern="market-lettering",
+            )
+        )
         if apps.is_installed("evennia_rp_equipment"):
             unlock(owner, "weaving", {"timber": 6})
             cloak = craft(
@@ -600,6 +613,26 @@ class Command(BaseCommand):
                 facets={"states": crafting.CLOAK_STATES},
             )
             items.append(cloak)
+            # Verse Embroidery opens wearable + readable, closed to everyone else.
+            items.append(
+                craft(
+                    owner,
+                    "weaving",
+                    "wearable",
+                    crafting.SCARF_NAME,
+                    crafting.SCARF_DESC,
+                    {"worn_line": crafting.SCARF_LINE, "slot": "accessory"},
+                    {"timber": 2},
+                    verbs=[
+                        {
+                            "key": "readable",
+                            "niche": "writing",
+                            "configuration": {"text": crafting.SCARF_TEXT},
+                        }
+                    ],
+                    pattern="verse-embroidery",
+                )
+            )
         grant(owner, "grain", 20, "staff", note="Sandbox Consumables")
         grant(owner, "ember", 20, "staff", note="Sandbox Broadcasts")
         from evennia_rp_crafting.models import Workshop
@@ -736,6 +769,25 @@ class Command(BaseCommand):
                 demo.permissions.remove("Builder")
         counts["crafted_items"] = len(items)
         return counts
+
+    def _seed_patterns(self, owner):
+        """Spreading demonstration Patterns; definitions are updated, never duplicated."""
+        from django.utils import timezone
+        from evennia_rp_crafting.models import Pattern, PatternKnowledge
+
+        from world.sandbox import crafting
+
+        for key, spec in crafting.PATTERNS.items():
+            pattern, _ = Pattern.objects.update_or_create(
+                key=key,
+                defaults=spec | {"archived": False},
+                create_defaults=spec | {"stage": "spreading", "stage_changed_at": timezone.now()},
+            )
+            PatternKnowledge.objects.get_or_create(
+                pattern=pattern,
+                character=owner,
+                defaults={"character_name": owner.key, "learned_via": "staff"},
+            )
 
     def _create_rp_playground(self, rooms, authors):
         """Catalog, finalized demo builds, a stat-block dummy and two challenges."""

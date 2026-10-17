@@ -45,6 +45,27 @@ FIXTURE_SOUND = "The soft hiss of a candlewick."
 COMPANION_NAME = "a sample clockwork bird"
 COMPANION_DESC = "A little brass bird with decorative clockwork feathers."
 COMPANION_TRICK = "The little brass bird bows and spreads its wings."
+PATTERNS = {
+    "market-lettering": {
+        "name": "Market Lettering",
+        "description": "The crisp sign-writer's hand used on Market Row's stalls.",
+        "niches": ["writing"],
+        "combinations": {},
+    },
+    "verse-embroidery": {
+        "name": "Verse Embroidery",
+        "description": "Lines of verse stitched into cloth, so a garment can be read.",
+        "niches": ["weaving"],
+        "combinations": {"wearable": [["readable"]]},
+    },
+}
+PLACARD_NAME = "a sample lettered placard"
+PLACARD_DESC = "A small wooden placard painted in a crisp, even hand."
+PLACARD_TEXT = "Fresh bread and honest measures, every market day."
+SCARF_NAME = "a sample verse scarf"
+SCARF_DESC = "A pale scarf with a line of verse stitched along its hem."
+SCARF_LINE = "a pale verse-stitched scarf"
+SCARF_TEXT = "Walk softly, and the road remembers you."
 
 
 def catalog():

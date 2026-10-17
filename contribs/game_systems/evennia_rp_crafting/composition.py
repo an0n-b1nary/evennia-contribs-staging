@@ -13,11 +13,14 @@ from .catalog import validate_niche
 from .errors import CraftingError
 
 
-def check_combination(lifecycle, keys, *, partial=False):
+def check_combination(lifecycle, keys, *, partial=False, extra=None):
+    """`extra` holds a known Pattern's gated sets, open only to crafts worked in it."""
     allowed = getattr(settings, "RP_CRAFTING_COMBINATIONS", conf.DEFAULT_COMBINATIONS)
     if not isinstance(allowed, dict):
         raise CraftingError("The crafting combinations setting must be a mapping.")
     choices = allowed.get(lifecycle, [])
+    if extra and isinstance(choices, (list, tuple)):
+        choices = [*choices, *extra.get(lifecycle, [])]
     if not isinstance(choices, (list, tuple)) or any(
         not isinstance(choice, (list, tuple))
         or any(not isinstance(key, str) for key in choice)
@@ -33,7 +36,7 @@ def check_combination(lifecycle, keys, *, partial=False):
         raise CraftingError("That lifecycle and verb combination is unavailable.")
 
 
-def specifications(key, behaviour_key, configuration, verbs=None, *, partial=False):
+def specifications(key, behaviour_key, configuration, verbs=None, *, partial=False, extra=None):
     """The single-behaviour entry point remains shorthand for the same product."""
     implementation = behaviour(behaviour_key)
     if verbs is not None and not isinstance(verbs, list):
@@ -55,7 +58,9 @@ def specifications(key, behaviour_key, configuration, verbs=None, *, partial=Fal
             raise CraftingError("Each verb needs a key, contributing niche and configuration.")
         if behaviour(entry["key"]).role != "verb":
             raise CraftingError("A lifecycle cannot be added as a verb.")
-    check_combination(behaviour_key, [entry["key"] for entry in entries], partial=partial)
+    check_combination(
+        behaviour_key, [entry["key"] for entry in entries], partial=partial, extra=extra
+    )
     return behaviour_key, implementation, configuration, entries
 
 
@@ -70,6 +75,7 @@ class Composition:
     resources: dict
     input_categories: set
     facets: dict = field(default_factory=dict)
+    pattern: object = None
 
     def create(self, actor, name, description, config):
         return self.implementation.create(actor, name, description, config)
@@ -84,11 +90,11 @@ class Composition:
         } | ({"facets": self.facets} if self.facets else {})
 
 
-def prepare(key, behaviour_key, configuration, verbs=None):
+def prepare(key, behaviour_key, configuration, verbs=None, *, extra=None):
     from .services import niche
 
     lifecycle, implementation, config, entries = specifications(
-        key, behaviour_key, configuration, verbs
+        key, behaviour_key, configuration, verbs, extra=extra
     )
     primary = niche(key)
     validate_niche(primary)

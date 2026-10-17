@@ -146,6 +146,8 @@ RP_CRAFTING_FROZEN = False
 RP_CRAFTING_CATALOG = "world.sandbox.crafting.catalog"
 RP_CRAFTING_SIGNET_NICHES = ["jewellery"]
 RP_CRAFTING_FACET_UNIT_COSTS = {"details": 1, "senses": 1}
+# Patterns: Spreading becomes Common after six weeks here (contrib default 90 days).
+RP_CRAFTING_PATTERN_COMMON_DAYS = 42
 RP_CRAFTING_READABLE_TYPECLASS = "typeclasses.craft_items.CraftedBook"
 # Complete verb sets: original products and the tested wave-two combinations.
 RP_CRAFTING_COMBINATIONS = {

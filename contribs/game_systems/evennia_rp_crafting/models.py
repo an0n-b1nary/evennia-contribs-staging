@@ -298,3 +298,116 @@ class CompanionState(models.Model):
     owner_id = models.PositiveBigIntegerField(db_index=True)
     mode = models.CharField(max_length=10, default="stay")
     last_emitted = models.DateTimeField(null=True)
+
+
+class Pattern(models.Model):
+    """Crafter knowledge: a verified hallmark and optional gated combinations."""
+
+    class Stage(models.TextChoices):
+        RECOVERED = "recovered", "Recovered"
+        SPREADING = "spreading", "Spreading"
+        COMMON = "common", "Common"
+
+    key = models.SlugField(max_length=80, unique=True)
+    name = models.CharField(max_length=80)
+    description = models.TextField(blank=True)
+    niches = models.JSONField(default=list)
+    # {lifecycle: [[verb, ...], ...]}: complete verb sets, as RP_CRAFTING_COMBINATIONS.
+    combinations = models.JSONField(default=dict)
+    stage = models.CharField(max_length=12, choices=Stage.choices, default=Stage.RECOVERED)
+    stage_changed_at = models.DateTimeField()
+    origin_thread_id = models.PositiveBigIntegerField(null=True)
+    archived = models.BooleanField(default=False)
+    created_by_id = models.PositiveBigIntegerField(null=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering: ClassVar = ["key"]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exclude(key=self.key).exists():
+            raise ValidationError("Pattern keys are permanent; archive the old Pattern instead.")
+        return super().save(*args, **kwargs)
+
+
+class PatternKnowledge(models.Model):
+    """One character knowing one Pattern, and how they came to know it."""
+
+    class Via(models.TextChoices):
+        STAFF = "staff", "Staff grant"
+        THREAD = "thread", "Plot thread"
+        TAUGHT = "taught", "Taught"
+
+    pattern = models.ForeignKey(Pattern, on_delete=models.PROTECT, related_name="knowledge")
+    character = models.ForeignKey(
+        "objects.ObjectDB", on_delete=models.CASCADE, related_name="crafting_patterns"
+    )
+    character_name = models.CharField(max_length=255)
+    learned_via = models.CharField(max_length=12, choices=Via.choices)
+    # Soft references: lineage survives a teacher, scene or thread being removed.
+    taught_by_id = models.PositiveBigIntegerField(null=True)
+    taught_by_name = models.CharField(max_length=255, blank=True)
+    teaching_scene_id = models.PositiveBigIntegerField(null=True)
+    thread_id = models.PositiveBigIntegerField(null=True)
+    granted_by_id = models.PositiveBigIntegerField(null=True)
+    learned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering: ClassVar = ["learned_at", "pk"]
+        constraints: ClassVar = [
+            models.UniqueConstraint(fields=["pattern", "character"], name="crafting_one_knowledge")
+        ]
+
+
+class PatternOffer(models.Model):
+    """A pending teaching offer; acceptance revalidates every condition."""
+
+    pattern = models.ForeignKey(Pattern, on_delete=models.CASCADE, related_name="offers")
+    teacher_id = models.PositiveBigIntegerField()
+    teacher_name = models.CharField(max_length=255)
+    student_id = models.PositiveBigIntegerField(db_index=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.UniqueConstraint(
+                fields=["pattern", "teacher_id", "student_id"], name="crafting_one_pattern_offer"
+            )
+        ]
+
+
+class PatternThreadGrant(models.Model):
+    """A staff-attached thread grant, frozen when the thread concludes."""
+
+    pattern = models.ForeignKey(Pattern, on_delete=models.PROTECT, related_name="thread_grants")
+    thread_id = models.PositiveBigIntegerField(db_index=True)
+    thread_name = models.CharField(max_length=255, blank=True)
+    granted_by_id = models.PositiveBigIntegerField()
+    created = models.DateTimeField(auto_now_add=True)
+    applied_at = models.DateTimeField(null=True)
+    recipients = models.JSONField(default=list)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.UniqueConstraint(fields=["pattern", "thread_id"], name="crafting_one_grant")
+        ]
+
+
+class PatternStageChange(models.Model):
+    """Append-only stage history; stages only ever move forward."""
+
+    pattern = models.ForeignKey(Pattern, on_delete=models.PROTECT, related_name="stage_changes")
+    from_stage = models.CharField(max_length=12)
+    to_stage = models.CharField(max_length=12)
+    # Null for the clock or a thread conclusion; otherwise the staff character.
+    changed_by_id = models.PositiveBigIntegerField(null=True)
+    reason = models.CharField(max_length=255)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Pattern stage changes are append-only.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Pattern stage changes are append-only.")

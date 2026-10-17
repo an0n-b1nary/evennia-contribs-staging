@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.2] - 2026-10-17
+
+- Permit Crafting 0.10 (Patterns) in the optional crafting extra. Lore's
+  crafting integration is unchanged.
+
 ## [0.8.1] - 2026-10-16
 
 - Permit Crafting 0.9 in the optional crafting extra. The successful-page-read

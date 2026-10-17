@@ -33,6 +33,14 @@ class CraftingConfig(AppConfig):
         from .fixtures import furnishing_caps, scene_closed
 
         cap_contributions.connect(furnishing_caps, dispatch_uid="crafting_furnishing_caps")
+        if self.apps.is_installed("evennia_plots"):
+            from evennia_plots.signals import plot_thread_concluded
+
+            from .patterns import on_concluded
+
+            plot_thread_concluded.connect(
+                on_concluded, dispatch_uid="crafting_pattern_grants", weak=False
+            )
         if self.apps.is_installed("evennia_scenes"):
             from evennia_scenes.signals import scene_closed as closed
 
