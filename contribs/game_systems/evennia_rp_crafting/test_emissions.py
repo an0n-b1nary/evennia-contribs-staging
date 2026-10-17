@@ -2,11 +2,14 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Shared delivery gates and independent room capture after committed actions."""
 
+import sys
+from types import ModuleType
 from unittest import skipUnless
 from unittest.mock import patch
 
 from django.apps import apps
 from django.test import override_settings
+from evennia.utils import logger
 from evennia.utils.test_resources import EvenniaTest
 
 from .emissions import deliver, emit
@@ -40,6 +43,31 @@ class EmissionDeliveryTests(CraftingFixture, EvenniaTest):
             heard.assert_called_once_with(
                 (message, {"type": "crafting_event"}), from_obj=self.char1
             )
+
+    @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility required")
+    def test_older_partners_keep_local_output_without_errors_or_activity_logging(self):
+        # Partners predating mutes_ambient/capture_room_event lack these names.
+        older = {"evennia_accessibility": ModuleType("evennia_accessibility")}
+        if apps.is_installed("evennia_scenes"):
+            from evennia_scenes.models import LogEntry, Scene
+
+            Scene.objects.create(room=self.room1, creator=self.char2, title="An older partner")
+            older["evennia_scenes.capture"] = ModuleType("evennia_scenes.capture")
+        with (
+            patch.dict(sys.modules, older),
+            patch.object(self.char2, "msg") as heard,
+            patch.object(logger, "log_trace") as trace,
+        ):
+            deliver(
+                self.room1.pk, self.char1.pk, "<EVENT> A tune.", destination_ids=[self.room2.pk]
+            )
+            deliver(self.room1.pk, self.char1.pk, "<EVENT> A hum.", ambient=True)
+        heard.assert_called_once_with(
+            ("<EVENT> A tune.", {"type": "crafting_event"}), from_obj=self.char1
+        )
+        trace.assert_not_called()
+        if apps.is_installed("evennia_scenes"):
+            self.assertFalse(LogEntry.objects.exists())
 
     @skipUnless(apps.is_installed("evennia_accessibility"), "Accessibility required")
     def test_archived_remote_room_receives_neither_output_nor_capture(self):

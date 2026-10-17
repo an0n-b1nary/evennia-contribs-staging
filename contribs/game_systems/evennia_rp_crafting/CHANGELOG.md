@@ -9,7 +9,8 @@
   activity. Owner-written pet poses retain the ordinary posing path.
 - Keep wave-specific gates, ambient mute, remote account deduplication and
   post-commit delivery. Recipient or scene-capture failures do not prevent other
-  deliveries. Scene logging uses the optional Scenes 0.8.2 capture API.
+  deliveries. Scene logging uses the optional Scenes 0.8.2 capture API; older
+  Accessibility or Scenes partners keep local output and skip what they lack.
 
 ## 0.8.0 - 2026-10-15
 

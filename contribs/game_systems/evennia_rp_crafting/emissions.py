@@ -2,6 +2,8 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Attributed item output: scene content, never posing or RP activity."""
 
+from contextlib import suppress
+
 from django.apps import apps
 from django.conf import settings
 from evennia.objects.models import ObjectDB
@@ -39,9 +41,17 @@ def deliver(source_id, actor_id, message, *, ambient=False, destination_ids=()):
         return
     mute = None
     if apps.is_installed("evennia_accessibility"):
-        from evennia_accessibility import mutes_ambient
-
-        mute = mutes_ambient
+        try:
+            from evennia_accessibility import mutes_ambient
+        except ImportError:
+            pass  # Older partners have no working opt-out: local output only.
+        else:
+            mute = mutes_ambient
+    capture = None
+    if apps.is_installed("evennia_scenes"):
+        # Scenes before 0.8.2 cannot log without counting activity.
+        with suppress(ImportError):
+            from evennia_scenes.capture import capture_room_event as capture
     if ambient and mute is None:
         return
     rooms = [source]
@@ -73,10 +83,8 @@ def deliver(source_id, actor_id, message, *, ambient=False, destination_ids=()):
                     delivered_accounts.add(account_id)
             except Exception:
                 logger.log_trace("Crafted emission delivery failed.")
-        if apps.is_installed("evennia_scenes"):
+        if capture is not None:
             try:
-                from evennia_scenes.capture import capture_room_event
-
-                capture_room_event(room, actor, message)
+                capture(room, actor, message)
             except Exception:
                 logger.log_trace("Crafted emission scene capture failed.")
