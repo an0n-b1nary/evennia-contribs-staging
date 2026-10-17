@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.3 - 2026-10-17
+
+- Fix self-service Modifier acceptance to lock installed fixtures’ host property
+  before characters, preserving SQLite write-first serialization and ownership checks.
+- Show accurate open/completed/cancelled/expired service status across Economy
+  and Crafting; allow local cancellation of already cancelled or expired offers
+  without racing a completed acceptance.
+- Replace raw numeric parsing errors in `+modify` with specific usage messages,
+  preserving semicolons in service prose and explicit replacement terms.
+
 ## 0.9.2 - 2026-10-17
 
 - Add paid wearable states with fixed crafter-authored variants and persistent holder selection through +adjust. Preserve craft snapshots, requirements, auras and Modifier layers. Worn selection follows the build lock. Use Equipment's neutral item-display seam; fixture/companion state consumers and automatic transitions remain separate.

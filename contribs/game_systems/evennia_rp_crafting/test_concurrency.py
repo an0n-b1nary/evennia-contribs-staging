@@ -113,6 +113,37 @@ class ModifierAcceptanceRaces(WaveThreeFixture, EvenniaTestMixin, TransactionTes
         self.assertEqual(ModificationLayer.objects.filter(service=offer).count(), 1)
         self.assertEqual(balance(self.char1), before + 30)
 
+    def test_self_cancellation_waits_for_committed_acceptance(self):
+        from . import modifiers
+        from .models import ModificationLayer
+
+        row = self.offer(
+            customer=self.char1, target=self.char1, modifier_key="modifier_mark", commission=0
+        )
+        with self.assertRaises(CraftingError):
+            committed_race(
+                lambda: modifiers.accept(self.char1, row.pk),
+                lambda: modifiers.cancel(self.char1, row.pk),
+            )
+        row.refresh_from_db()
+        self.assertIsNotNone(row.applied_at)
+        self.assertIsNone(row.cancelled_at)
+        self.assertEqual(ModificationLayer.objects.filter(service=row).count(), 1)
+
+    def test_economy_cancellation_then_local_cleanup_serializes(self):
+        from evennia_economy.exchange import cancel_offer
+
+        from . import modifiers
+
+        row = self.offer()
+        committed_race(
+            lambda: cancel_offer(self.char2, row.economy_offer_id),
+            lambda: modifiers.cancel(self.char1, row.pk),
+        )
+        row.refresh_from_db()
+        self.assertIsNotNone(row.cancelled_at)
+        self.assertIsNone(row.applied_at)
+
 
 @skipUnless(apps.is_installed("evennia_building"), "building absent")
 class FixtureAuthorityRaces(WaveTwoFixture, EvenniaTestMixin, TransactionTestCase):
@@ -181,6 +212,59 @@ class FixtureAuthorityRaces(WaveTwoFixture, EvenniaTestMixin, TransactionTestCas
         committed_race(lambda: fixtures.uninstall(self.char1, self.item), self.transfer)
         self.assertFalse(FixtureInstallation.objects.filter(active=True).exists())
         self.assertEqual(self.item.location, self.char1)
+
+    def modifier_offer(self):
+        from . import modifiers
+        from .models import NicheDefinition
+
+        NicheDefinition.objects.create(
+            key="layers",
+            name="Layers",
+            behaviours=["modifier_aura"],
+            input_categories=["materials", "essences"],
+            unlock_resources={"materials": 3},
+            unlock_money=0,
+        )
+        self.unlock("layers")
+        with override_settings(RP_CRAFTING_WAVE_THREE_REVEALED=True):
+            return modifiers.propose(
+                self.char1,
+                self.char1,
+                self.item,
+                "layers",
+                "modifier_aura",
+                {"line": "A silver shimmer."},
+                {"spark": 1},
+            )
+
+    @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+    def test_transfer_commits_first_denies_former_owners_self_service(self):
+        from . import modifiers
+        from .models import ModificationLayer
+
+        row = self.modifier_offer()
+        before = self.held("spark")
+        with (
+            override_settings(RP_CRAFTING_WAVE_THREE_REVEALED=True),
+            self.assertRaisesMessage(CraftingError, "currently own"),
+        ):
+            committed_race(self.transfer, lambda: modifiers.accept(self.char1, row.pk))
+        self.assertEqual(self.held("spark"), before)
+        self.assertFalse(ModificationLayer.objects.filter(service=row).exists())
+
+    @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+    def test_self_service_commits_before_transfer_and_keeps_hallmark(self):
+        from . import modifiers
+        from .models import ModificationLayer
+
+        row = self.modifier_offer()
+        with override_settings(RP_CRAFTING_WAVE_THREE_REVEALED=True):
+            committed_race(lambda: modifiers.accept(self.char1, row.pk), self.transfer)
+        self.assertEqual(
+            ModificationLayer.objects.filter(service=row, maker_id=self.char1.pk).count(), 1
+        )
+        self.property.refresh_from_db()
+        self.assertEqual(self.property.owner_id, self.char2.pk)
 
     def test_simultaneous_visitors_cannot_bypass_activation_cooldown(self):
         item = services.craft(

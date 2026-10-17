@@ -10,7 +10,7 @@ from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia_rp_crafting import companions, modifiers, services
 from evennia_rp_crafting.models import ActivationUse, CompanionState, ModificationLayer
 from evennia_rp_crafting.test_wave_three import WaveThreeFixture
@@ -267,3 +267,24 @@ class WaveThreeSeedSeams(EvenniaTest):
         from evennia_rp_crafting.models import CraftRecord
 
         self.assertTrue(CraftRecord.objects.filter(pk=record.pk).exists())
+
+
+@skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
+class ModifierCommandSeams(WaveThreeFixture, EvenniaCommandTest):
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_economy_cancellation_is_visible_and_can_be_closed_locally(self):
+        from evennia_economy.exchange import cancel_offer
+        from evennia_economy.models import Offer
+        from evennia_rp_crafting.wave_three_commands import CmdModify
+
+        row = self.offer()
+        cancel_offer(self.char2, row.economy_offer_id)
+        self.assertIn("[cancelled]", self.call(CmdModify(), "", caller=self.char2))
+        self.call(
+            CmdModify(), f"/cancel {row.pk}", f"Service #{row.pk} cancelled.", caller=self.char2
+        )
+        row.refresh_from_db()
+        self.assertIsNotNone(row.cancelled_at)
+        self.assertEqual(Offer.objects.get(pk=row.economy_offer_id).status, "cancelled")
