@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-moderation"
-version = "0.1.1"
+version = "0.1.2"
 description = "Account moderation, staff notes, and reviewed guest admissions for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,3 +22,6 @@ packages = ["evennia_moderation", "evennia_moderation.migrations"]
 [tool.setuptools.package-dir]
 evennia_moderation = "."
 "evennia_moderation.migrations" = "migrations"
+
+[tool.setuptools.package-data]
+evennia_moderation = ["guides/*.md"]
