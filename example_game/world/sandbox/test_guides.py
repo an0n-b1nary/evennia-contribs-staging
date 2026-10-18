@@ -72,6 +72,113 @@ class TestGuidesInTheSandbox(EvenniaTest):
     def test_the_menu_links_the_guide(self):
         self.assertContains(self.client.get("/"), 'href="/guide/"')
 
+    def _reader(self, account, *permissions):
+        for permission in account.permissions.all():
+            account.permissions.remove(permission)
+        for permission in permissions:
+            account.permissions.add(permission)
+        self.client.force_login(account)
+
+    def _guide_menu(self, path="/", user=None):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+        from web.website.nav import build_menu
+
+        request = RequestFactory().get(path)
+        request.user = user or AnonymousUser()
+        groups = {group["label"]: group for group in build_menu(request)["groups"]}
+        self.assertNotIn("Guide", [item["label"] for item in groups["Community"]["items"]])
+        return groups["Guide"]
+
+    def test_the_guide_has_its_own_dropdown(self):
+        """Start here, the index, principles and glossary for everyone."""
+        items = self._guide_menu()["items"]
+        self.assertEqual(
+            [(item["label"], item["url"]) for item in items],
+            [
+                ("Start here", "/guide/start-here/"),
+                ("All guides", "/guide/"),
+                ("Design principles", "/guide/principles/"),
+                ("Glossary", "/guide/glossary/"),
+            ],
+        )
+
+    def test_staff_get_the_staff_guides_entry(self):
+        self._reader(self.account2)
+        self.assertNotIn(
+            "Staff guides", [i["label"] for i in self._guide_menu(user=self.account2)["items"]]
+        )
+        self.assertNotContains(self.client.get("/"), 'href="/guide/staff-start-here/"')
+
+        self._reader(self.account, "Builder")
+        items = self._guide_menu(user=self.account)["items"]
+        self.assertEqual(
+            items[-1], {"label": "Staff guides", "url": "/guide/staff-start-here/", "active": False}
+        )
+        self.assertContains(self.client.get("/"), 'href="/guide/staff-start-here/"')
+
+    def test_a_guide_page_activates_its_own_entry(self):
+        """/guide/start-here/ lights Start here, not All guides as well."""
+        group = self._guide_menu("/guide/start-here/")
+        self.assertTrue(group["active"])
+        self.assertEqual([i["label"] for i in group["items"] if i["active"]], ["Start here"])
+        group = self._guide_menu("/guide/combat/")
+        self.assertEqual([i["label"] for i in group["items"] if i["active"]], ["All guides"])
+
+    def test_staff_pages_are_for_builders_only(self):
+        """GUIDES_STAFF_LOCK is Builder here, matching every staff command."""
+        for url in ("/guide/staff-start-here/", "/guide/writing-guides/"):
+            with self.subTest(url, reader="anonymous"):
+                self.assertEqual(self.client.get(url).status_code, 404)
+        self._reader(self.account2)
+        for url in ("/guide/staff-start-here/", "/guide/writing-guides/"):
+            with self.subTest(url, reader="player"):
+                self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertNotContains(self.client.get("/guide/"), "/guide/staff-start-here/")
+
+        self._reader(self.account, "Builder")
+        self.assertContains(self.client.get("/guide/staff-start-here/"), "Moderation and safety")
+        self.assertContains(self.client.get("/guide/writing-guides/"), "Staff pages")
+        index = self.client.get("/guide/").content.decode()
+        staff = index[index.index('id="guide-staff-heading"') :]
+        self.assertIn("/guide/staff-start-here/", staff)
+
+    def test_the_home_page_starts_with_the_guide(self):
+        response = self.client.get("/")
+        self.assertContains(response, 'href="/guide/start-here/">Start with the guide</a>')
+
+    def test_the_systems_table_links_each_visible_guide_page(self):
+        """In-game-only contribs are listed too, and a hidden page isn't linked."""
+        html = self.client.get("/").content.decode()
+        for app_label, url in (
+            ("evennia_boards", "/guide/boards/"),
+            ("evennia_rp_chargen", "/guide/character-sheet/"),
+            ("evennia_rp_combat", "/guide/combat/"),
+            ("evennia_building", "/guide/building/"),
+        ):
+            with self.subTest(app_label):
+                self.assertIn(f'href="{url}" aria-label="Guide page for {app_label}"', html)
+        for app_label in ("evennia_rp_crafting", "evennia_economy", "evennia_moderation"):
+            with self.subTest(app_label):
+                self.assertIn(f"<code>{app_label}</code>", html)
+        self.assertNotIn('aria-label="Guide page for evennia_guides"', html)
+
+        with override_settings(RP_COMBAT_REVEALED=False):
+            html = self.client.get("/").content.decode()
+        self.assertIn("<code>evennia_rp_combat</code>", html)
+        self.assertNotIn('aria-label="Guide page for evennia_rp_combat"', html)
+
+    def test_start_here_links_every_system_page(self):
+        from evennia_guides.pages import all_pages, get_page
+
+        links = set(get_page("start-here").document.links())
+        systems = {
+            page.key
+            for page in all_pages()
+            if page.kind == "guide" and page.audience == "player" and page.origin != "host"
+        }
+        self.assertEqual(systems - links, set())
+
     def test_the_launch_system_pages_render_through_the_site(self):
         """Each contrib's player page, through the real site templates."""
         for key, text in (

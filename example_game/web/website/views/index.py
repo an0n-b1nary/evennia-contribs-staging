@@ -53,6 +53,20 @@ IN_GAME_ONLY = (
     ("evennia_rp_rules", "Shared graded ratings and RP check resolution"),
     ("evennia_rp_chargen", "Private character sheets, pips and ability loadouts"),
     ("evennia_rp_contest", "Player-led tests, room challenges and result history"),
+    ("evennia_rp_equipment", "Cosmetic gear, wearing and outfits"),
+    ("evennia_economy", "Purses, offers, stalls and shops"),
+    ("evennia_rp_resources", "Weekly resource income and gathering choices"),
+    ("evennia_rp_crafting", "Workshops, crafted items, fixtures, letters and Patterns"),
+    ("evennia_npcs", "Shared NPCs and attributed portrayal"),
+    ("evennia_rp_combat", "Consent-based personal-turn combat"),
+    ("evennia_rp_party", "Party tactics within combat"),
+    ("evennia_moderation", "Reviewed admissions, referrals and staff moderation"),
+)
+
+# Contribs whose web pages are account state, reached from the account menu
+# rather than the navbar groups: (app label, blurb, route).
+ACCOUNT_ONLY = (
+    ("evennia_building", "Building projects, after logging in", "evennia_building:index"),
 )
 
 
@@ -273,8 +287,29 @@ def _current_arc():
     return {"name": arc.name, "description": arc.description}
 
 
+def _guide_urls():
+    """{app label: URL of that contrib's first player guide page players can see}.
+
+    A page hidden behind a reveal switch is left out, so the table never links
+    to a page that would 404. Empty without evennia_guides.
+    """
+    if not apps.is_installed("evennia_guides"):
+        return {}
+    from evennia_guides.checks import page_visible
+    from evennia_guides.pages import all_pages
+
+    first = {}
+    for page in all_pages():
+        if page.kind != "guide" or not page_visible(page):
+            continue
+        best = first.get(page.origin)
+        if best is None or (page.order, page.title.lower()) < (best.order, best.title.lower()):
+            first[page.origin] = page
+    return {origin: _url("evennia_guides:guide-page", page.key) for origin, page in first.items()}
+
+
 def _systems():
-    """The install inventory: what is here, and where it surfaces on the web.
+    """The install inventory: what is here, where it surfaces on the web, and its guide page.
 
     Built from nav.NAV_GROUPS so it cannot drift from the menu - a contrib that
     gains a page and a menu entry appears here without touching this function.
@@ -285,6 +320,8 @@ def _systems():
     rows = []
     for _group, table in NAV_GROUPS:
         for label, route, _gate in table:
+            if not isinstance(route, str):
+                continue  # One page of a route (Start here), not a system's landing page.
             # Namespaced routes name their app directly. The bare ones (lore,
             # jobs, xp) do not, so fall back to the label - and Characters and
             # Channels resolve to nothing, which is correct: they are Evennia's
@@ -302,12 +339,33 @@ def _systems():
                 }
             )
 
+    for app_label, blurb, route in ACCOUNT_ONLY:
+        if apps.is_installed(app_label) and app_label not in seen:
+            rows.append(
+                {"name": app_label, "version": _dist(app_label), "label": blurb, "url": _url(route)}
+            )
     for app_label, blurb in IN_GAME_ONLY:
         if apps.is_installed(app_label):
             rows.append(
                 {"name": app_label, "version": _dist(app_label), "label": blurb, "url": None}
             )
+    guides = _guide_urls()
+    for row in rows:
+        row["guide_url"] = guides.get(row["name"])
     return rows
+
+
+def _guide_start_url():
+    """The Start here page, if players can see it; the landing page's guide link."""
+    if not apps.is_installed("evennia_guides"):
+        return None
+    from evennia_guides.checks import page_visible
+    from evennia_guides.pages import get_page
+
+    page = get_page("start-here")
+    if page is None or not page_visible(page):
+        return None
+    return _url("evennia_guides:guide-page", page.key)
 
 
 def _without_dark(accounts):
@@ -348,6 +406,7 @@ class SandboxIndexView(EvenniaIndexView):
                 "current_arc": _current_arc(),
                 "plot_list_url": _url("evennia_plots:plot-list"),
                 "systems": _systems(),
+                "guide_start_url": _guide_start_url(),
             }
         )
         return context

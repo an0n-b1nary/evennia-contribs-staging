@@ -21,6 +21,10 @@ outbound links. Unmount a contrib in ``web/website/urls.py`` and its entry
 disappears from the menu; the site keeps rendering. That is the behaviour
 ``TestNavCoversEveryWebSurface`` pins down.
 
+Guide gets its own group rather than a Community entry, because it is where a
+new player starts: Start here, the full index, the principles and glossary, and
+(for staff) the staff task index.
+
 Grouping is by *kind of thing*, deliberately not by in-character vs
 out-of-character. ``evennia_boards`` is the reason: ``Board.board_type`` is
 ``ic``/``ooc`` per board, so Boards is one surface serving both, and an IC/OOC
@@ -73,7 +77,18 @@ NAV_GROUPS = (
             ("Boards", "evennia_boards:board-list", PUBLIC),
             ("Characters", "characters", PUBLIC),
             ("Channels", "channels", PUBLIC),
-            ("Guide", "evennia_guides:guide-index", PUBLIC),
+        ),
+    ),
+    (
+        "Guide",
+        (
+            # A route is a name, or (name, args) for one page of a route that
+            # takes a key. Both pages live in world/guides/.
+            ("Start here", ("evennia_guides:guide-page", ("start-here",)), PUBLIC),
+            ("All guides", "evennia_guides:guide-index", PUBLIC),
+            ("Design principles", "evennia_guides:guide-principles", PUBLIC),
+            ("Glossary", "evennia_guides:guide-glossary", PUBLIC),
+            ("Staff guides", ("evennia_guides:guide-page", ("staff-start-here",)), STAFF),
         ),
     ),
 )
@@ -104,15 +119,16 @@ def _passes_gate(request, gate):
     return True
 
 
-def _resolve(name):
-    """``reverse(name)``, or None if the route is not mounted.
+def _resolve(route):
+    """``reverse()`` of a route name or ``(name, args)``, or None if it is not mounted.
 
     Not an error: a game that drops a contrib from ``web/website/urls.py`` should
     lose one menu entry, not every page. Debug-level because during development
     the log line is the only clue that a nav entry silently vanished.
     """
+    name, args = (route, ()) if isinstance(route, str) else route
     try:
-        return reverse(name)
+        return reverse(name, args=args)
     except NoReverseMatch:
         logger.debug("nav: no route named %r; omitting it from the menu", name)
         return None
