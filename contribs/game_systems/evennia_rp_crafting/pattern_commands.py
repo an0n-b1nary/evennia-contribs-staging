@@ -41,6 +41,7 @@ class CmdPattern(CraftCommand):
     closed; the student accepts. Recovered Patterns can't be taught until their
     origin thread concludes. Spreading Patterns become Common over time.
     Use one with +craft/pattern; it never makes an item better, only different.
+    Where the game offers it, propose a new one with +request/form pattern=<title>.
     """
 
     key = "+pattern"

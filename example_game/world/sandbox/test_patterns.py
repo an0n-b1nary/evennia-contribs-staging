@@ -111,3 +111,37 @@ class PatternSeams(EvenniaCommandTest):
             "Your lineage: Char2: recovered in The guild hall",
             self.call(command(), "/info guild-knots", caller=self.char2),
         )
+
+    @skipUnless(apps.is_installed("evennia_jobs"), "Optional Jobs is absent")
+    def test_a_player_proposal_through_the_host_form_becomes_a_known_pattern(self):
+        from evennia_jobs.models import Job
+
+        request, jobs, pattern = (self.commands()[key] for key in ("+request", "+jobs", "+pattern"))
+        self.call(
+            request(),
+            "/form pattern=Knotted cords",
+            "Propose a Pattern: Knotted cords",
+            caller=self.char2,
+        )
+        for answer in (
+            "name=Knotted Cords",
+            "description=Cords knotted in counting patterns.",
+            "origin=Market traders tally with them.",
+            "niches=Weaver",
+            "recognisable=A run of tally knots.",
+            "combination=",
+            "reuse=yes",
+        ):
+            self.call(request(), f"/answer {answer}", None, caller=self.char2)
+        self.call(request(), "/submit", None, caller=self.char2)
+        job = Job.objects.get(title="Knotted cords")
+        self.assertIn(
+            "Knotted Cords (knotted-cords), Spreading", self.call(jobs(), str(job.job_number))
+        )
+        self.call(jobs(), f"/approve {job.job_number} 1=Welcome to the market.", None)
+        known = PatternKnowledge.objects.get(pattern__key="knotted-cords")
+        self.assertEqual((known.character, known.learned_via), (self.char2, "proposal"))
+        self.assertIn(
+            "Your lineage: Char2: proposed it.",
+            self.call(pattern(), "/info knotted-cords", caller=self.char2),
+        )

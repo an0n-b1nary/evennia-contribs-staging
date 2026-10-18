@@ -1881,3 +1881,13 @@ Pattern to a plot thread with `+pattern/thread`, and conclude the thread to
 grant it to its participants. The reference setting moves Spreading Patterns to
 Common after 42 days. `world.sandbox.test_patterns` covers the real posing,
 scene and plot seams; the synthetic golden snapshot includes the examples.
+
+Players propose new Patterns with the Jobs form registered in settings:
+`+request/form pattern=<title>`, then `/answer` each question (name,
+description, origin, niches such as `Weaver`, what makes it recognisable, an
+optional combination and the reuse acknowledgement) and `/submit`. The web
+form is at `/jobs/forms/pattern/`. Staff see what approval would create in
+`+jobs <number>`; `+jobs/approve <number> <revision>=<reason>` creates the
+Pattern at Spreading, known to the proposer. Staff add tested combinations
+afterwards with `+pattern/combo`. The reference game enables the form because
+it reveals Patterns; a dark-launching game sets `"enabled": False` until then.

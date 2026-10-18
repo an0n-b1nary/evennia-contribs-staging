@@ -434,6 +434,8 @@ def describe_source(row):
             pattern_id=row.pattern_id, thread_id=row.thread_id
         ).first()
         return f"recovered in {grant.thread_name if grant else f'thread #{row.thread_id}'}"
+    if row.learned_via == PatternKnowledge.Via.PROPOSAL:
+        return "proposed it"
     return "granted by staff"
 
 
@@ -478,9 +480,25 @@ def info(looker, pattern):
     return "\n".join(rows)
 
 
+def proposal_source(pattern):
+    submission = (
+        apps.get_model("evennia_jobs", "RequestSubmission")
+        .objects.filter(pk=pattern.proposal_submission_id)
+        .select_related("job")
+        .first()
+        if apps.is_installed("evennia_jobs")
+        else None
+    )
+    if submission is None:
+        return f"request submission #{pattern.proposal_submission_id}"
+    return f"request #{submission.job.job_number}, revision {submission.revision}"
+
+
 def roster(actor, pattern):
     _require(actor, staff=True)
     rows = [f"{pattern.name}: stage history and knowers (OOC)."]
+    if pattern.proposal_submission_id:
+        rows.append(f"Proposed by a player: {proposal_source(pattern)}.")
     rows += [
         f"{change.created:%Y-%m-%d} {change.from_stage} → {change.to_stage}: {change.reason}"
         for change in pattern.stage_changes.order_by("pk")

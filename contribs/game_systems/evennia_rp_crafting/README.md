@@ -901,3 +901,35 @@ own lineage. Only staff see other characters' lineage, with `/roster`.
 Additive migration 0008 adds `Pattern`, `PatternKnowledge`, `PatternOffer`,
 `PatternThreadGrant` and `PatternStageChange`. Existing craft records and
 items are unchanged.
+
+### Player proposals
+
+With `evennia-jobs` installed (the `jobs` extra), players can propose a
+Pattern through an ordinary Jobs request form, on the web or with
+`+request/form pattern=<title>`. Jobs owns the questionnaire, revisions and
+withdrawal. Register the shipped form in settings; it is settings-safe:
+
+```python
+from evennia_rp_crafting.pattern_form import FORM as PATTERN_REQUEST_FORM
+
+JOBS_REQUEST_FORMS = {"pattern": PATTERN_REQUEST_FORM}
+```
+
+It asks for a name, a description shown in `+pattern/info`, an origin in the
+setting, niches (names or keys), what makes the work recognisable, an
+optional requested combination and a reuse acknowledgement. Set
+`"enabled": False` on the form until you reveal Patterns: the runtime reveal
+does not hide a Jobs form. `RP_CRAFTING_PATTERN_FORM` (default `"pattern"`)
+names the form key Crafting listens for.
+
+Approval needs Jobs staff who are also Crafting staff. It creates the Pattern
+at Spreading, known to the ticket's author ("proposed it" in their lineage),
+with its key made from the name. Staff then add tested combinations with
+`+pattern/combo`; a requested combination is never opened automatically.
+Approval is refused, and the decision rolled back so staff can request
+changes, when the key or name is taken, a niche is unknown, or the proposer
+is gone, unplayable or a guest. Staff review pages show what approval would
+create, or what blocks it. Declined requests and other forms create nothing.
+
+Additive migration 0009 adds `Pattern.proposal_submission_id` and the
+`proposal` learning route. Existing Patterns and knowledge are unchanged.

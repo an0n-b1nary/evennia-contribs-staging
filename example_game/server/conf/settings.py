@@ -761,6 +761,13 @@ if "evennia_building" in INSTALLED_APPS:
 
     JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, BUILDING_REQUEST_FORM_KEY: BUILDING_REQUEST_FORM}
 
+if "evennia_rp_crafting" in INSTALLED_APPS:
+    # Player Pattern proposals use an ordinary Jobs request form.
+    from evennia_rp_crafting.pattern_form import FORM as PATTERN_REQUEST_FORM
+    from evennia_rp_crafting.pattern_form import FORM_KEY as PATTERN_REQUEST_FORM_KEY
+
+    JOBS_REQUEST_FORMS = {**JOBS_REQUEST_FORMS, PATTERN_REQUEST_FORM_KEY: PATTERN_REQUEST_FORM}
+
 ######################################################################
 # Combat (evennia-rp-combat) - personal turns, consent and reaction queues
 ######################################################################

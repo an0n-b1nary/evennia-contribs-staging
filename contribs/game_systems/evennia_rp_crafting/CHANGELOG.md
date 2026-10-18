@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.1 - 2026-10-18
+
+- Add player Pattern proposals through an ordinary Jobs request form (the new
+  `jobs` extra) with a settings-safe `pattern_form.FORM`. Approval by Crafting
+  staff creates the Pattern at Spreading, known to its proposer; problems such
+  as a taken key or name or an unknown niche roll the decision back, and staff
+  review pages preview the result. Requested combinations stay staff-curated.
+- Add `RP_CRAFTING_PATTERN_FORM` and additive migration 0009; existing Patterns
+  and knowledge are unchanged.
+
 ## 0.10.0 - 2026-10-17
 
 - Add Patterns: crafter knowledge with lineage. `+craft/pattern` stamps a
