@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-combat"
-version = "0.2.3"
+version = "0.2.4"
 description = "Consent-based RP combat with durable tactics, bounded exchanges and host-defined stat sources."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
