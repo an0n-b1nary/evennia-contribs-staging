@@ -1019,17 +1019,6 @@ JOBS_REQUEST_FORMS = {
             },
         ],
     },
-    "pattern": {
-        "label": "Propose a Pattern",
-        "enabled": False,
-        "questions": [
-            ("name", "Pattern name"),
-            ("origin", "Origin in the setting"),
-            ("niches", "Applicable niches"),
-            ("behavior", "What does it allow?"),
-            ("hallmark", "Proposed hallmark"),
-        ],
-    },
     "region": {
         "label": "Propose a Region",
         "enabled": False,

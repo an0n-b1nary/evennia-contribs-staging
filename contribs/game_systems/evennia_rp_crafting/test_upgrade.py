@@ -178,3 +178,35 @@ class CompositionUpgradeTests(TransactionTestCase):
         self.assertEqual(CraftRecord.objects.filter(pk=record.pk).values().get(), before)
         self.assertEqual(LetterState.objects.get(pk=letter.pk).seal_number, 1)
         self.assertFalse(Pattern.objects.exists() or PatternKnowledge.objects.exists())
+
+    def test_proposal_upgrade_keeps_patterns_and_lineage_unproposed(self):
+        old_target = [("evennia_rp_crafting", "0008_patterns")]
+        executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("evennia_rp_crafting")
+        executor.migrate(old_target)
+        try:
+            from django.utils import timezone
+            from evennia.utils.create import create_object
+
+            character = create_object("evennia.objects.objects.DefaultCharacter", key="Knower")
+            old = executor.loader.project_state(old_target).apps
+            pattern = old.get_model("evennia_rp_crafting", "Pattern").objects.create(
+                key="old-pattern",
+                name="Old Pattern",
+                niches=["upgrade-letters"],
+                stage="spreading",
+                stage_changed_at=timezone.now(),
+            )
+            row = old.get_model("evennia_rp_crafting", "PatternKnowledge").objects.create(
+                pattern=pattern,
+                character_id=character.pk,
+                character_name=character.key,
+                learned_via="staff",
+            )
+        finally:
+            MigrationExecutor(connection).migrate(new_target)
+        from .models import Pattern, PatternKnowledge
+
+        upgraded = Pattern.objects.get(pk=pattern.pk)
+        self.assertEqual((upgraded.stage, upgraded.proposal_submission_id), ("spreading", None))
+        self.assertEqual(PatternKnowledge.objects.get(pk=row.pk).learned_via, "staff")

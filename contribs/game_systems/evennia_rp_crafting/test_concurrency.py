@@ -464,3 +464,53 @@ class PatternRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
                 lambda: patterns.accept(self.char2, self.pattern),
             )
         self.assertFalse(PatternKnowledge.objects.filter(character=self.char2).exists())
+
+
+@skipUnless(apps.is_installed("evennia_jobs"), "jobs absent")
+class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        from evennia.utils.create import create_object
+        from evennia_jobs.review import submit_request
+
+        from .pattern_form import FORM
+        from .test_proposals import ANSWERS
+
+        override = override_settings(JOBS_REQUEST_FORMS={"pattern": FORM})
+        override.enable()
+        self.addCleanup(override.disable)
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        self.staff = create_object("evennia.objects.objects.DefaultCharacter", key="Keeper")
+        self.staff.permissions.add("Builder")
+        self.submissions = [
+            submit_request(author=author, form_key="pattern", title="Same", answers=ANSWERS)
+            for author in (self.char1, self.char2)
+        ]
+
+    def approve(self, submission):
+        from evennia_jobs.review import review_request
+
+        return review_request(
+            job=submission.job,
+            reviewer=self.staff,
+            outcome="approved",
+            reason="Approved.",
+            expected_revision=submission.revision,
+        )
+
+    def test_competing_proposals_for_one_name_create_one_pattern(self):
+        from django.core.exceptions import ValidationError
+        from evennia_jobs.models import RequestDecision
+
+        from .models import Pattern, PatternKnowledge
+
+        first, second = self.submissions
+        with self.assertRaisesMessage(ValidationError, "verse-embroidery is taken"):
+            committed_race(lambda: self.approve(first), lambda: self.approve(second))
+        pattern = Pattern.objects.get(key="verse-embroidery")
+        self.assertEqual(pattern.proposal_submission_id, first.pk)
+        self.assertEqual(PatternKnowledge.objects.get(pattern=pattern).character, self.char1)
+        self.assertFalse(RequestDecision.objects.filter(submission=second).exists())

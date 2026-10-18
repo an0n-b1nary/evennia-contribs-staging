@@ -41,6 +41,17 @@ class CraftingConfig(AppConfig):
             plot_thread_concluded.connect(
                 on_concluded, dispatch_uid="crafting_pattern_grants", weak=False
             )
+        if self.apps.is_installed("evennia_jobs"):
+            from evennia_jobs.signals import request_approved, request_review_context
+
+            from .proposals import approved, review_context
+
+            request_approved.connect(
+                approved, dispatch_uid="crafting_pattern_proposals", weak=False
+            )
+            request_review_context.connect(
+                review_context, dispatch_uid="crafting_pattern_proposal_context", weak=False
+            )
         if self.apps.is_installed("evennia_scenes"):
             from evennia_scenes.signals import scene_closed as closed
 

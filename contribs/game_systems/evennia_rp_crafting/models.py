@@ -317,6 +317,8 @@ class Pattern(models.Model):
     stage = models.CharField(max_length=12, choices=Stage.choices, default=Stage.RECOVERED)
     stage_changed_at = models.DateTimeField()
     origin_thread_id = models.PositiveBigIntegerField(null=True)
+    # Soft reference to the approved Jobs request revision, when players proposed it.
+    proposal_submission_id = models.PositiveBigIntegerField(null=True, unique=True)
     archived = models.BooleanField(default=False)
     created_by_id = models.PositiveBigIntegerField(null=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -337,6 +339,7 @@ class PatternKnowledge(models.Model):
         STAFF = "staff", "Staff grant"
         THREAD = "thread", "Plot thread"
         TAUGHT = "taught", "Taught"
+        PROPOSAL = "proposal", "Proposal"
 
     pattern = models.ForeignKey(Pattern, on_delete=models.PROTECT, related_name="knowledge")
     character = models.ForeignKey(
