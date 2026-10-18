@@ -44,6 +44,18 @@ The part in `{...}` is optional and names one or more principle pages (`kind: pr
 
 `[[key]]` links to another page by its key, and `[[key|some words]]` sets the link text.
 
+## Staff pages
+
+A contrib's staff page explains its staff tools in general terms, for any game that installs it. Give it the key `<contrib>-staff`, `audience: staff` and `category: Staff`, and no `requires:`: staff can read every page anyway. Lay it out in this order:
+
+1. **What it's for:** a sentence or two on what staff use the system's tools for.
+2. **Tasks and commands:** grouped by the job, not a full command list. `help <command>` has the full usage.
+3. **What's safe to change:** what staff may edit, and what never to edit by hand, such as permanent keys or history.
+4. **Privacy:** what players can hide, what staff can see, and why it stays with staff.
+5. **Review jobs:** which jobs the system files, and how to answer them.
+
+The same link rule applies as for player pages, and the numbers stay in broad strokes. A game links its contribs' staff pages from its own staff index.
+
 ## Other kinds of page
 
 - `kind: principle` is a design principle, listed on the Design principles page.

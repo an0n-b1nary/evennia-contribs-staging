@@ -100,7 +100,9 @@ file that fails to load is logged and skipped rather than taking the guide
 down.
 
 This package ships one staff page, `writing-guides`, a short guide to
-writing pages for whoever writes them.
+writing pages for whoever writes them. It includes the layout for a contrib's
+staff page (`<contrib>-staff`, `audience: staff`), which explains the
+contrib's staff tools for any game that installs it.
 
 ## Checks
 

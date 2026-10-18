@@ -20,6 +20,12 @@ migrated database with nothing in it.
 {% block content %}
 <h1 class="sr-only">Home</h1>
 
+{% if guide_start_url %}
+<p class="lead">
+  New here? <a href="{{ guide_start_url }}">Start with the guide</a>: what this sandbox is, and where to look first.
+</p>
+{% endif %}
+
 <div class="row widget-row">
   <div class="col-12 col-md-4 mb-3">
     {% include "website/homepage/happening-now-widget.html" %}

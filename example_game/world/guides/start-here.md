@@ -19,6 +19,22 @@ Contribs are tested on their own, but most problems show up only when they meet.
 - **Lore**, **Plots** and the **Calendar** hold the world's memory and what's coming.
 - [[trading]] covers money in this sandbox.
 
+## What do you want to do?
+
+Each system has its own page. Pages for systems this game hasn't opened yet show as plain text.
+
+- **Make a character:** [[character-sheet]], [[checks]] and [[tests]].
+- **Roleplay:** [[posing]], [[scenes]], [[social]] and [[npcs]].
+- **Grow:** [[rp-sessions]] and [[xp]].
+- **Follow the story:** [[plots]], [[lore]] and [[calendar]].
+- **Find your way around:** [[map]] and [[regions]]. For a place of your own, see [[building]].
+- **Make and trade:** [[trading]].
+- **Fight, or play as a team:** [[combat]] and [[party]].
+- **Talk to the community or ask staff:** [[boards]] and [[requests]].
+- **Change how the game reads to you:** [[accessibility]].
+
+[[numbers]] explains why these pages describe values in broad strokes.
+
 ## Words you'll see
 
 The [[glossary-coin|coin]] is this sandbox's currency. The [glossary](/guide/glossary/) has the rest.

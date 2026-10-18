@@ -371,9 +371,18 @@ name the same character, and that a filed job lists it as the author.
 the installed contribs ship: a player page for each system (`checks`,
 `character-sheet`, `tests`, `posing`, `scenes`, `social`, `rp-sessions`, `xp`,
 `lore`, `plots`, `calendar`, `map`, `regions`, `boards`, `requests`,
-`accessibility`, `npcs`), a few principles and glossary terms, and guides' own
-staff page, `writing-guides`. A page here with the same key as a contrib's page
-replaces it. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
+`accessibility`, `npcs`, `building`, `combat`, `party`), a few principles and
+glossary terms, and guides' own staff page, `writing-guides`. A page here with
+the same key as a contrib's page replaces it.
+
+The navbar's **Guide** dropdown links Start here, the full index, the design
+principles and the glossary. Staff also get **Staff guides**, which opens
+`staff-start-here`: an index of the staff tools by task. The home page links
+Start here, and the systems table links each contrib's player page when players
+can see it. `start-here` links every system page by what a player wants to do.
+`GUIDES_STAFF_LOCK` is `perm(Builder)`, matching the staff commands, so anyone
+who can run a staff command can read the staff pages. In this sandbox,
+`+sandbox/builder on` grants that. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
 turn it off with `+runtime RP_ECONOMY_REVEALED=false` and the page, and the
 links to it, disappear without a reload. Every page's "Ask about this page"
 opens the jobs request form, prefilled. The guide is web-only and separate from in-game `help`. Run

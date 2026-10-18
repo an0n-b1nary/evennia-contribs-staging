@@ -185,8 +185,10 @@ RP_CRAFTING_STAFF_LOCK = "cmd:perm(Builder)"
 # Read after each contrib's own guides/, so a page here replaces a contrib page
 # with the same key. "Ask about this page" opens the jobs request form
 # (GUIDES_ASK_URL's default, "job-create"), prefilled.
+# Staff pages are readable by anyone who can run the staff commands they explain:
+# every *_STAFF_LOCK here is Builder.
 GUIDES_DIRS = [os.path.join(GAME_DIR, "world", "guides")]
-GUIDES_STAFF_LOCK = "perm(Admin)"
+GUIDES_STAFF_LOCK = "perm(Builder)"
 
 ######################################################################
 # RP rules (evennia-rp-rules) — game values and optional sheet/stat-block seams
