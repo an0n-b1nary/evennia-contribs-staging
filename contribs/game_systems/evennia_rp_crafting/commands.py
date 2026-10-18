@@ -13,6 +13,7 @@ from .detail_commands import CmdLook as CmdLook
 from .errors import CraftingError
 from .letter_commands import CmdLetter as CmdLetter
 from .models import CraftRecord, NicheDefinition, Workshop
+from .pattern_commands import CmdPattern as CmdPattern
 from .readable_commands import CmdJournal as CmdJournal
 from .room_commands import CmdFixture as CmdFixture
 from .room_commands import CmdListen as CmdListen
@@ -155,6 +156,8 @@ class CmdCraft(_CraftCommand):
       +craft/page [title] = <page text>  (repeat to append authored pages)
       +craft/unpage <number>
       +craft/verb <niche key>/<verb key>  (only an allowed combination)
+      +craft/pattern <Pattern>  (one you know; stamps its hallmark)
+      +craft/unpattern
       +craft/unverb <verb key>
       +craft/beat = <EVENT prose>  (repeat for up to three beats)
       +craft/unbeat <number>
@@ -231,6 +234,7 @@ class CmdCraft(_CraftCommand):
                     draft["selected"],
                     verbs=draft.get("verbs"),
                     facets=draft.get("facets"),
+                    pattern=draft.get("pattern"),
                 )
                 self.caller.attributes.remove(DRAFT_KEY)
                 self.msg(
@@ -318,10 +322,25 @@ class CmdCraft(_CraftCommand):
                 if kind not in definition.behaviours:
                     raise CraftingError("That niche doesn't grant this behaviour.")
                 verbs = [*draft.get("verbs", []), {"key": kind, "niche": key, "configuration": {}}]
+                from .patterns import for_craft
+
+                worked = for_craft(self.caller, draft.get("pattern"), draft["niche"])
                 specifications(
-                    draft["niche"], draft["behaviour"], draft["configuration"], verbs, partial=True
+                    draft["niche"],
+                    draft["behaviour"],
+                    draft["configuration"],
+                    verbs,
+                    partial=True,
+                    extra=worked.combinations if worked else None,
                 )
                 draft["verbs"] = verbs
+            elif switch == "pattern":
+                from .patterns import for_craft
+
+                draft["pattern"] = for_craft(self.caller, self.args, draft["niche"]).key
+            elif switch == "unpattern":
+                if draft.pop("pattern", None) is None:
+                    raise CraftingError("The draft names no Pattern.")
             elif switch == "unverb":
                 kind = self.args.strip()
                 entries = draft.get("verbs", [])
@@ -444,12 +463,14 @@ class CmdCraft(_CraftCommand):
                     draft["configuration"],
                     verbs=draft.get("verbs"),
                     facets=draft.get("facets"),
+                    pattern=draft.get("pattern"),
                 )
                 rows = [
                     f"Draft: {draft['name']} ({draft['niche']}/{draft['behaviour']})",
                     draft["description"],
                     f"Lifecycle: {composition.lifecycle_key}; verbs: {', '.join(entry['key'] for entry in composition.verbs) or 'none'}.",
                     f"Contributing niches: {', '.join(row['name'] for row in composition.contributors)}.",
+                    f"Hallmark (OOC): {services.hallmark(self.caller, composition)}.",
                 ]
                 labels = {
                     "worn_line": "Worn line",
@@ -671,6 +692,7 @@ class CraftingCmdSet(CmdSet):
             self.add(command())
         self.add(CmdModify())
         self.add(CmdPet())
+        self.add(CmdPattern())
         self.add(CmdJournal())
         self.add(CmdLetter())
         from .state_commands import CmdAdjust

@@ -1864,3 +1864,20 @@ Wearing it displays the selected variant. `+craft/state`, `/statedesc`,
 selection respects worn-item build locks and persists through outfits and
 market sales. The host's CraftingCmdSet includes +adjust; Equipment's neutral
 display provider seam keeps auras and Modifier layers visible once.
+
+### Patterns
+
+The seed adds two Spreading Patterns known to the seeded Sandbox Visitor.
+**Market Lettering** is hallmark-only: `a sample lettered placard` shows
+*"Worked in Market Lettering by Sandbox Visitor (Scribe)"*. With Equipment installed, **Verse Embroidery** opens
+the otherwise closed wearable + readable combination for Weavers: `read a
+sample verse scarf` reads the verse stitched into a wearable scarf. Both
+niches still contribute and are paid for.
+
+Try `+pattern/info market-lettering`. To teach, open a scene, have both
+characters pose, then `+pattern/teach <character> = market-lettering` and
+`+pattern/accept market-lettering`. Staff can `+pattern/create`, attach a
+Pattern to a plot thread with `+pattern/thread`, and conclude the thread to
+grant it to its participants. The reference setting moves Spreading Patterns to
+Common after 42 days. `world.sandbox.test_patterns` covers the real posing,
+scene and plot seams; the synthetic golden snapshot includes the examples.

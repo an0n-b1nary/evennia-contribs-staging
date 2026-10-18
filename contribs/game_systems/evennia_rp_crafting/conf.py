@@ -67,6 +67,10 @@ def cooldown(value):
     return type(value) is int and 1 <= value <= 86400
 
 
+def days(value):
+    return type(value) is int and 1 <= value <= 3650
+
+
 def register_controls():
     for name, default, validator in (
         ("REVEALED", True, boolean),
@@ -83,6 +87,9 @@ def register_controls():
         ("TEMPORARY_LAYER_LIMIT", 3, positive),
         ("TEMPORARY_LAYER_SECONDS", 3600, cooldown),
         ("AMBIENT_INTERVAL", 300, cooldown),
+        ("PATTERNS_REVEALED", True, boolean),
+        ("PATTERN_COMMON_DAYS", 90, days),
+        ("PATTERN_TEACH_DAYS", 7, days),
     ):
         register(f"RP_CRAFTING_{name}", default, validator=validator)
 

@@ -140,3 +140,41 @@ class CompositionUpgradeTests(TransactionTestCase):
         self.assertEqual(CraftRecord.objects.filter(pk=record.pk).values().get(), before)
         self.assertFalse(JournalRevision.objects.exists())
         self.assertFalse(ReadableEdition.objects.exists())
+
+    def test_pattern_upgrade_keeps_letters_and_records_without_inventing_knowledge(self):
+        old_target = [("evennia_rp_crafting", "0007_letterstate")]
+        executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("evennia_rp_crafting")
+        executor.migrate(old_target)
+        try:
+            old = executor.loader.project_state(old_target).apps
+            niche = old.get_model("evennia_rp_crafting", "NicheDefinition").objects.create(
+                key="upgrade-letters", name="Letter writer", behaviours=["readable"]
+            )
+            record = old.get_model("evennia_rp_crafting", "CraftRecord").objects.create(
+                crafter_id=820000,
+                crafter_name="Original writer",
+                niche=niche,
+                niche_name=niche.name,
+                behaviour="carried",
+                item_id=820001,
+                resources_spent={"wood": 1},
+                hallmark="Made by Original writer (Letter writer)",
+                prose={"configuration": {}, "facets": {"letter": {"addressee": "Keeper"}}},
+            )
+            letter = old.get_model("evennia_rp_crafting", "LetterState").objects.create(
+                craft_id=record.pk, addressee="Keeper", seal_number=1
+            )
+            before = (
+                old.get_model("evennia_rp_crafting", "CraftRecord")
+                .objects.filter(pk=record.pk)
+                .values()
+                .get()
+            )
+        finally:
+            MigrationExecutor(connection).migrate(new_target)
+        from .models import CraftRecord, LetterState, Pattern, PatternKnowledge
+
+        self.assertEqual(CraftRecord.objects.filter(pk=record.pk).values().get(), before)
+        self.assertEqual(LetterState.objects.get(pk=letter.pk).seal_number, 1)
+        self.assertFalse(Pattern.objects.exists() or PatternKnowledge.objects.exists())

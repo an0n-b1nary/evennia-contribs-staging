@@ -164,9 +164,23 @@ def abandon(actor, key):
 
 
 def craft_cost(
-    actor, key, behaviour_key, configuration, *, include_fee=True, verbs=None, facets=None
+    actor,
+    key,
+    behaviour_key,
+    configuration,
+    *,
+    include_fee=True,
+    verbs=None,
+    facets=None,
+    pattern=None,
 ):
-    definition, composition = prepare(key, behaviour_key, configuration, verbs)
+    from .patterns import for_craft
+
+    worked = for_craft(actor, pattern, key)
+    definition, composition = prepare(
+        key, behaviour_key, configuration, verbs, extra=worked.combinations if worked else None
+    )
+    composition.pattern = worked
     from .facets import prepare as prepare_facets
 
     composition.facets, composition.resources = prepare_facets(actor, facets, composition)
@@ -190,6 +204,14 @@ def craft_cost(
     )
 
 
+def hallmark(actor, composition):
+    """Verified at craft time; a later Pattern rename never rewrites it."""
+    niches = ", ".join(row["name"] for row in composition.contributors)
+    if composition.pattern:
+        return f"Worked in {composition.pattern.name} by {actor.key} ({niches})"
+    return f"Made by {actor.key} ({niches})"
+
+
 @atomic_objects
 def craft(
     actor,
@@ -202,19 +224,32 @@ def craft(
     *,
     verbs=None,
     facets=None,
+    pattern=None,
 ):
     _require(actor)
     workshop = _workshop(actor)
     # Catalogue locks are ordered independently of a draft's component order.
     # The actor lock above serializes concurrent unlock/abandon/craft calls.
-    _, initial = prepare(key, behaviour_key, configuration, verbs)
+    from .patterns import for_craft
+
+    worked = for_craft(actor, pattern, key)
+    _, initial = prepare(
+        key, behaviour_key, configuration, verbs, extra=worked.combinations if worked else None
+    )
     list(
         NicheDefinition.objects.select_for_update()
         .filter(pk__in=[definition.pk for definition in initial.definitions])
         .order_by("pk")
     )
     definition, implementation, config, cost = craft_cost(
-        actor, key, behaviour_key, configuration, include_fee=False, verbs=verbs, facets=facets
+        actor,
+        key,
+        behaviour_key,
+        configuration,
+        include_fee=False,
+        verbs=verbs,
+        facets=facets,
+        pattern=pattern,
     )
     if active_unlocks(workshop).filter(niche__in=implementation.definitions).count() != len(
         implementation.definitions
@@ -260,8 +295,13 @@ def craft(
         money_spent=cost["money"],
         furnishing_weeks=weeks,
         prose={"name": name, "description": description, "configuration": config}
-        | ({"facets": implementation.facets} if implementation.facets else {}),
-        hallmark=f"Made by {actor.key} ({', '.join(row['name'] for row in implementation.contributors)})",
+        | ({"facets": implementation.facets} if implementation.facets else {})
+        | (
+            {"pattern": {"key": implementation.pattern.key, "name": implementation.pattern.name}}
+            if implementation.pattern
+            else {}
+        ),
+        hallmark=hallmark(actor, implementation),
     )
     Workshop.objects.filter(pk=workshop.pk).update(last_craft=record.created)
     from .letters import initialize

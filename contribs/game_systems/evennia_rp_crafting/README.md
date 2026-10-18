@@ -823,3 +823,81 @@ registers a base-state provider and a Modifier-extra provider during startup. De
 state presentation and visible Modifier layers once, with auras retained.
 Wearable states are the first consumer; fixture, companion and activatable
 state consumers, automatic transitions and timed states are separate work.
+
+## Patterns
+
+A Pattern is crafter knowledge, such as a recipe, schematic or weaving method.
+It belongs to the character, not the item. Knowing one unlocks only what the
+system enforces, never words: anyone may write prose in any style.
+
+- **A verified hallmark.** Name a known Pattern in a draft with
+  `+craft/pattern <Pattern>` (`/unpattern` removes it). The item's OOC hallmark
+  reads *"Worked in Verse Embroidery by Kael (Weaver, Scribe)"*. The name is
+  captured at craft time, so renaming a Pattern never rewrites old items.
+- **Gated combinations.** A Pattern may list complete lifecycle/verb sets, in
+  the same shape as `RP_CRAFTING_COMBINATIONS`, that are open only to crafts
+  worked in it. The crafter still needs every contributing niche unlocked and
+  pays the combined cost; a Pattern adds no surcharge and never makes an
+  existing behaviour better. Only open combinations your host has tested. This
+  package ships none by default.
+
+One Pattern per craft. The draft's primary niche must be one the Pattern lists.
+Copies and Modifier services never carry a Pattern.
+
+### Stages
+
+| Stage | How it is reached | Teaching |
+|---|---|---|
+| Recovered | A new Pattern starts here. | Not yet. |
+| Spreading | The Pattern's origin plot thread concludes, or staff advance it. | Yes. |
+| Common | `RP_CRAFTING_PATTERN_COMMON_DAYS` after Spreading (runtime, default 90). | Yes. |
+
+The clock is read when the stage is checked, so retuning it applies to existing
+Patterns. Staff may advance a stage early with `+pattern/advance`. Stages never
+move back, and every change is logged. Later threads can still grant a Pattern
+without resetting its stage. Common-stage learning is by teaching only; lore
+entries, recipe books and premium sources are separate future features.
+
+### Teaching
+
+`+pattern/teach <character> = <Pattern>` offers to teach; the student answers
+with `+pattern/accept <Pattern>` or `/decline`. The offer and the acceptance
+each check that:
+
+- the teacher knows the Pattern, it is Spreading or Common and not archived;
+- the student does not know it yet;
+- neither is a guest, and no account lists both characters;
+- both posed (not just observed) in the same logged scene, which is still
+  running or closed within `RP_CRAFTING_PATTERN_TEACH_DAYS` (runtime, default 7).
+
+One logged scene is enough however long it ran. Whether a lesson costs
+anything is for the players to settle in character. Without `evennia-scenes`
+nobody can teach. The scene is recorded in the student's lineage.
+
+### Curating and granting
+
+Staff (`RP_CRAFTING_STAFF_LOCK`) use `+pattern/create <key> = <name>` (keys are
+permanent), `/describe`, `/rename`, `/niches`, `/combo` and `/uncombo`
+(`<lifecycle>:<verb>[+<verb>...]`), `/grant <Pattern> = <character>`,
+`/archive`, `/unarchive` and `/roster`. Archiving blocks new crafts, grants and
+teaching; existing items and knowledge are unchanged.
+
+With `evennia-plots` installed (the `plots` extra),
+`+pattern/thread <Pattern> = <thread id>` attaches a Pattern to a proposed or
+active thread. The first attached thread is its origin. When the thread
+concludes, its active, playable participants learn the Pattern, the grant is
+frozen with its recipient list, and an origin Pattern moves from Recovered to
+Spreading. Repeated conclusion signals grant nothing twice.
+
+### Visibility
+
+`RP_CRAFTING_PATTERNS_REVEALED` (runtime, default True) hides Patterns from
+players while the main crafting reveal is on. Players see only Patterns that
+somebody knows, so staff can prepare a recovery without spoilers. `+pattern`
+lists your Patterns and offers, `/all` the known ones, and `/info` the name,
+description, niches, gated combinations, stage and number of knowers, plus your
+own lineage. Only staff see other characters' lineage, with `/roster`.
+
+Additive migration 0008 adds `Pattern`, `PatternKnowledge`, `PatternOffer`,
+`PatternThreadGrant` and `PatternStageChange`. Existing craft records and
+items are unchanged.

@@ -416,3 +416,51 @@ class WearableStateRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase)
             )
         self.cloak.attributes.reset_cache()
         self.assertEqual(states.current(self.cloak, states.configuration(self.cloak)), "down")
+
+
+@skipUnless(apps.is_installed("evennia_scenes"), "scenes absent")
+class PatternRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        from evennia.utils.create import create_object
+        from evennia_scenes.models import Scene, SceneParticipant
+
+        from . import patterns
+
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        self.staff = create_object("evennia.objects.objects.DefaultCharacter", key="Keeper")
+        self.staff.permissions.add("Builder")
+        self.pattern = patterns.create(self.staff, "race-pattern", "Race Pattern")
+        patterns.grant(self.staff, self.pattern, self.char1)
+        patterns.advance(self.staff, self.pattern)
+        scene = Scene.objects.create(room=self.room1, creator=self.char1, title="Lesson")
+        for character in (self.char1, self.char2):
+            SceneParticipant.objects.create(
+                scene=scene, character=character, character_name=character.key, pose_count=1
+            )
+        patterns.offer(self.char1, self.char2, self.pattern)
+
+    def test_duplicate_acceptance_learns_once(self):
+        from . import patterns
+        from .models import PatternKnowledge
+
+        with self.assertRaises(CraftingError):
+            committed_race(
+                lambda: patterns.accept(self.char2, self.pattern),
+                lambda: patterns.accept(self.char2, self.pattern),
+            )
+        self.assertEqual(PatternKnowledge.objects.filter(character=self.char2).count(), 1)
+
+    def test_committed_archive_blocks_a_competing_acceptance(self):
+        from . import patterns
+        from .models import PatternKnowledge
+
+        with self.assertRaisesMessage(CraftingError, "archived"):
+            committed_race(
+                lambda: patterns.edit(self.staff, self.pattern, archived=True),
+                lambda: patterns.accept(self.char2, self.pattern),
+            )
+        self.assertFalse(PatternKnowledge.objects.filter(character=self.char2).exists())
