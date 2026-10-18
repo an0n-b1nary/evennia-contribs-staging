@@ -371,10 +371,12 @@ name the same character, and that a filed job lists it as the author.
 the installed contribs ship: a player page for each system (`checks`,
 `character-sheet`, `tests`, `posing`, `scenes`, `social`, `rp-sessions`, `xp`,
 `lore`, `plots`, `calendar`, `map`, `regions`, `boards`, `requests`,
-`accessibility`, `npcs`, `building`, `combat`, `party`, `equipment`), a few
-principles and glossary terms, and staff pages: guides' own `writing-guides`
-and the contribs' `<contrib>-staff` pages (so far `equipment-staff`). A page
-here with the same key as a contrib's page replaces it.
+`accessibility`, `npcs`, `building`, `combat`, `party`, `equipment`,
+`joining`), a few principles and glossary terms, and staff pages: guides' own
+`writing-guides` and the contribs' `<contrib>-staff` pages (so far
+`equipment-staff`, `moderation-staff`, `jobs-staff`, `social-staff` and
+`rptracker-staff`). A page here with the same key as a contrib's page replaces
+it.
 
 The navbar's **Guide** dropdown links Start here, the full index, the design
 principles and the glossary. Staff also get **Staff guides**, which opens

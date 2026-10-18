@@ -302,3 +302,29 @@ class TestGuidesInTheSandbox(EvenniaTest):
                 with self.subTest(page=page.source):
                     self.assertEqual(set(page.document.links()) - keys, set())
                     self.assertEqual(tags - principles, set())
+
+    def test_the_joining_page_renders_and_is_linked_from_start_here(self):
+        self.assertContains(
+            self.client.get("/guide/joining/"), "Your password never enters the application"
+        )
+        self.assertContains(self.client.get("/guide/start-here/"), 'href="/guide/joining/"')
+
+    def test_moderation_and_community_staff_pages_are_for_staff(self):
+        """Each staff page: a 404 for players, readable by Builders, linked from the index."""
+        pages = (
+            ("moderation-staff", "Reviewing applications"),
+            ("jobs-staff", "A decision is separate from status"),
+            ("social-staff", "Going dark"),
+            ("rptracker-staff", "Read activity, never ration it"),
+        )
+        self._reader(self.account2)
+        for key, _text in pages:
+            with self.subTest(key, reader="player"):
+                self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 404)
+
+        self._reader(self.account, "Builder")
+        index = self.client.get("/guide/staff-start-here/")
+        for key, text in pages:
+            with self.subTest(key, reader="staff"):
+                self.assertContains(self.client.get(f"/guide/{key}/"), text)
+                self.assertContains(index, f'href="/guide/{key}/"')
