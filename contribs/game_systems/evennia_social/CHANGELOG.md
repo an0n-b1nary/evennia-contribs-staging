@@ -2,6 +2,10 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## 0.7.6 - 2026-10-18
+
+- Guide pages: a staff page, `social-staff`, covering presence as staff see it, going dark, teleporting, staff rooms, hangouts and moods.
+
 ## 0.7.5 - 2026-10-14
 
 - Share Links decorate permission with Crafting; add free owner-written room sensory prose and suppress ignored crafting events.
