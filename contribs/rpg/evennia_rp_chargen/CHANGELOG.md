@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.2] - 2026-10-18
+
+### Documentation
+
+- A new player guide page, `signature-moves`: designing moves, the library and
+  equipped loadout, and when equipped moves lock. It's hidden while
+  `RP_CHARGEN_MOVES_REVEALED` is off. `character-sheet` now says a new ability
+  is equipped straight away when the loadout has room, and links the new page.
+
 ## 0.4.1 — 2026-10-12
 
 - Optional disposable guest trials support finalized checks without approval inside tagged trial rooms, and +stats/reset for repeated builds. Ordinary approval policy is unchanged.

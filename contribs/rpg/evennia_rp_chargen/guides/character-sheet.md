@@ -32,7 +32,7 @@ A `-` pip doesn't buy you anything: it never earns extra `+` pips. So nobody tak
 Abilities help with checks. Some are chosen per subject, so the same ability for performance and for stealth is two separate copies, each with its own level.
 
 - **Equipped abilities** count against your **loadout**, which has room for only so many, and only equipped abilities apply to checks. `+abilities/equip` and `+abilities/unequip` change what's equipped.
-- **Buying and upgrading** use your starting allowance first. Once that's gone, they use XP if your game has it. Each level costs more than the last, and `+abilities/info <ability>` shows the costs.
+- **Buying and upgrading** use your starting allowance first. A new ability is equipped straight away if your loadout has room. Once that's gone, they use XP if your game has it. Each level costs more than the last, and `+abilities/info <ability>` shows the costs.
 - **Flaws** are free and always in effect, and they give nothing back. Take one with `+abilities/flaw` and drop it with `+abilities/unflaw`. Some flaws are set by staff, and only staff can remove those.
 
 ## Locking
@@ -44,3 +44,7 @@ To change something mid-scene, `+unlock`. The room is told, so everyone knows yo
 :::insight[Out in the open, not behind a gate]
 Nothing stops you from adjusting mid-scene. It's just announced. Openness keeps it fair without making anyone wait for staff, and the announcement is enough for the people you're playing with.
 :::
+
+## How it connects
+
+Checks read your sheet, as [[checks]] explains. If your game offers them, [[signature-moves]] are moves you design yourself, and they lock with your loadout.

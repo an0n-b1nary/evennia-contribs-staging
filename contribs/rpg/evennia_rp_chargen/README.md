@@ -1,6 +1,6 @@
 # evennia-rp-chargen
 
-> **Preview (0.4.0, Pre-Alpha).** This package was written directly as a
+> **Preview (0.4.2, Pre-Alpha).** This package was written directly as a
 > contrib rather than extracted from a running game, and its API will move
 > while the rest of the rp- cluster is built on it. Pin an exact commit.
 
@@ -372,11 +372,11 @@ new effect kinds, rather than defining an ability model of its own.
 ## Guide pages
 
 The `guides/` directory holds player guide pages for
-[evennia-guides](../../utils/evennia_guides/README.md): `character-sheet`. They
-explain the system to players in general terms, without exact numbers, and link
-only to pages this contrib or its required dependencies ship. With
-evennia-guides installed they appear on its web guide; without it they're
-ignored. To restate one for your game, add a page with the same key to
+[evennia-guides](../../utils/evennia_guides/README.md): `character-sheet` and
+`signature-moves`. They explain the system to players in general terms, without
+exact numbers, and link only to pages this contrib or its required dependencies
+ship. With evennia-guides installed they appear on its web guide; without it
+they're ignored. To restate one for your game, add a page with the same key to
 `GUIDES_DIRS`.
 
 ## Signature Moves
