@@ -243,6 +243,8 @@ RP_EQUIPMENT_SLOTS = ("head", "cloak", "body", "hands", "feet", "weapon", "acces
 RP_EQUIPMENT_SLOT_COVERS = {"cloak": ("body",)}
 RP_EQUIPMENT_ITEM_CAP = 20
 RP_EQUIPMENT_STAFF_LOCK = "cmd:perm(Builder)"
+# Runtime setting: False hides the gear commands and guide page from players.
+RP_EQUIPMENT_REVEALED = True
 
 ######################################################################
 # RP contests (evennia-rp-contest) — informal storytellers and chosen approaches
