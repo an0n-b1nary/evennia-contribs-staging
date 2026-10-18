@@ -88,7 +88,6 @@ class GuestCharacterCmdSet(GuestAccountCmdSet):
             "+sheet",
             "+stats",
             "+pips",
-            "+edge",
             "+abilities",
             "+spend",
             "+upgrade",

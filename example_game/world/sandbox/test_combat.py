@@ -241,4 +241,5 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Consent and corrections", response.content.decode())
         with override_settings(RP_COMBAT_REVEALED=False):
-            self.assertEqual(Client().get("/guide/combat/").status_code, 404)
+            for key in ("combat", "combat-moves", "combat-storytelling"):
+                self.assertEqual(Client().get(f"/guide/{key}/").status_code, 404)

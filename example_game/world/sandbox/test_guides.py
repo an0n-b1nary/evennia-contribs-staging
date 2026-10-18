@@ -244,6 +244,16 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("boards", "In-character boards"),
             ("requests", "Only staff know who reported"),
             ("accessibility", "Colour is never the only signal"),
+            ("signature-moves", "Free to design, fixed in play"),
+            ("combat", "Nobody fights without saying yes"),
+            ("combat-moves", "Standing still"),
+            ("combat-storytelling", "The storyteller asks, the player decides"),
+            ("party", "A team without a boss"),
+            ("party-surge", "Anyone may spend it"),
+            ("party-boss-checks", "A challenge, not a trap"),
+            ("npcs", "Always attributed"),
+            ("building", "What you submit is what"),
+            ("building-frontier", "Everyone agrees to the same thing"),
         ):
             with self.subTest(key):
                 response = self.client.get(f"/guide/{key}/")
@@ -328,3 +338,36 @@ class TestGuidesInTheSandbox(EvenniaTest):
             with self.subTest(key, reader="staff"):
                 self.assertContains(self.client.get(f"/guide/{key}/"), text)
                 self.assertContains(index, f'href="/guide/{key}/"')
+
+    def test_start_here_tours_the_wing_and_guest_visits(self):
+        """The OOC wing's rooms and the guest wing, as the seeder builds them."""
+        from world.sandbox import content
+
+        response = self.client.get("/guide/start-here/")
+        for room in content.OOC_ROOMS:
+            with self.subTest(room.slug):
+                self.assertContains(response, room.name)
+        for _, name, _ in content.GUEST_ROOMS:
+            with self.subTest(name):
+                self.assertContains(response, name)
+        self.assertContains(response, f"<code>{content.IC_BOUNDARY_EXIT_KEYS[0]}</code>")
+
+    def test_each_reveal_switch_hides_its_new_pages(self):
+        from evennia_links import runtime
+
+        for setting, keys in (
+            ("RP_CHARGEN_MOVES_REVEALED", ("signature-moves",)),
+            ("RP_COMBAT_REVEALED", ("combat", "combat-moves", "combat-storytelling")),
+            ("RP_PARTY_REVEALED", ("party", "party-surge", "party-boss-checks")),
+            ("BUILDING_REVEALED", ("building", "building-frontier")),
+        ):
+            runtime.set(setting, False)
+            try:
+                for key in keys:
+                    with self.subTest(key):
+                        self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 404)
+            finally:
+                runtime.reset(setting)
+            for key in keys:
+                with self.subTest(key, revealed=True):
+                    self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 200)
