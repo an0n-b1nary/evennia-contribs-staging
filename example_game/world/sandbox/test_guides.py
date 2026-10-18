@@ -155,6 +155,7 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("evennia_rp_chargen", "/guide/character-sheet/"),
             ("evennia_rp_combat", "/guide/combat/"),
             ("evennia_building", "/guide/building/"),
+            ("evennia_rp_equipment", "/guide/equipment/"),
         ):
             with self.subTest(app_label):
                 self.assertIn(f'href="{url}" aria-label="Guide page for {app_label}"', html)
@@ -167,6 +168,52 @@ class TestGuidesInTheSandbox(EvenniaTest):
             html = self.client.get("/").content.decode()
         self.assertIn("<code>evennia_rp_combat</code>", html)
         self.assertNotIn('aria-label="Guide page for evennia_rp_combat"', html)
+
+    def test_the_equipment_switch_hides_its_commands_and_page(self):
+        """RP_EQUIPMENT_REVEALED hides gear from players at runtime; staff keep it."""
+        from commands.default_cmdsets import CharacterCmdSet
+
+        from evennia_links import runtime
+
+        gear = next(cmd for cmd in CharacterCmdSet().commands if cmd.key == "+gear")
+        self.assertContains(
+            self.client.get("/guide/equipment/"), "Gear commits, it doesn&#x27;t grant"
+        )
+        self.assertContains(self.client.get("/guide/start-here/"), 'href="/guide/equipment/"')
+        self.assertTrue(gear.access(self.char2))
+
+        runtime.set("RP_EQUIPMENT_REVEALED", False)
+        try:
+            self.assertEqual(self.client.get("/guide/equipment/").status_code, 404)
+            start = self.client.get("/guide/start-here/").content.decode()
+            self.assertNotIn('href="/guide/equipment/"', start)
+            self.assertIn("gear and outfits", start)
+            self.assertNotIn(
+                'aria-label="Guide page for evennia_rp_equipment"',
+                self.client.get("/").content.decode(),
+            )
+            for permission in self.char2.permissions.all():
+                self.char2.permissions.remove(permission)
+            self.assertFalse(gear.access(self.char2))
+            self.assertTrue(gear.access(self.char1))
+
+            self._reader(self.account, "Builder")
+            self.assertContains(
+                self.client.get("/guide/equipment/"), "Gear commits, it doesn&#x27;t grant"
+            )
+        finally:
+            runtime.reset("RP_EQUIPMENT_REVEALED")
+        self.assertTrue(gear.access(self.char2))
+
+    def test_the_equipment_staff_page_is_linked_from_the_staff_index(self):
+        self._reader(self.account2)
+        self.assertEqual(self.client.get("/guide/equipment-staff/").status_code, 404)
+
+        self._reader(self.account, "Builder")
+        self.assertContains(self.client.get("/guide/equipment-staff/"), "Finding broken gear")
+        self.assertContains(
+            self.client.get("/guide/staff-start-here/"), 'href="/guide/equipment-staff/"'
+        )
 
     def test_start_here_links_every_system_page(self):
         from evennia_guides.pages import all_pages, get_page

@@ -23,7 +23,7 @@ Contribs are tested on their own, but most problems show up only when they meet.
 
 Each system has its own page. Pages for systems this game hasn't opened yet show as plain text.
 
-- **Make a character:** [[character-sheet]], [[checks]] and [[tests]].
+- **Make a character:** [[character-sheet]], [[checks]] and [[tests]]. Dress them with [[equipment|gear and outfits]].
 - **Roleplay:** [[posing]], [[scenes]], [[social]] and [[npcs]].
 - **Grow:** [[rp-sessions]] and [[xp]].
 - **Follow the story:** [[plots]], [[lore]] and [[calendar]].

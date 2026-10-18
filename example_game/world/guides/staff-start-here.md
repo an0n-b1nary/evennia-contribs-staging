@@ -8,7 +8,7 @@ order: 1
 ---
 These pages are for staff only. In this sandbox anyone can try the staff side with `+sandbox/builder on`, and switch back with `+sandbox/builder off`.
 
-Each system's staff tools are listed below by task. The contribs are adding staff pages of their own, and they'll be linked here as they arrive. Until then, `help <command>` in the game has the full usage for each command.
+Each system's staff tools are listed below by task. Where a contrib has its own staff page, its line links to it; the rest will be linked as they arrive. Until then, `help <command>` in the game has the full usage for each command.
 
 ## Moderation and safety
 
@@ -46,7 +46,7 @@ Each system's staff tools are listed below by task. The contribs are adding staf
 - **Character sheets:** `+chargen` lists, approves and reopens sheets; `+sheet <character>` reads anyone's.
 - **Tests:** `+test/review` is the staff view of a test's history.
 - **Combat:** `+combat/rollback` returns a whole fight to a consistent checkpoint.
-- **Gear:** `+gear/audit` lists worn gear whose requirements no longer hold.
+- **Gear:** `+gear/audit` lists worn gear whose requirements no longer hold. See [[equipment-staff]].
 
 ## Economy and making
 

@@ -7,7 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.2.2] - 2026-10-18
+
+### Added
+
+- `RP_EQUIPMENT_REVEALED`, an `evennia-links` runtime setting (default `True`).
+  While it's `False`, players don't see `+gear`, `+wear`, `+remove`, `+worn` or
+  `+outfit`; staff (`RP_EQUIPMENT_STAFF_LOCK`) keep them. Worn gear, its
+  descriptions and the build-change guard are unaffected. `evennia-links` is
+  now a direct dependency (chargen already required it).
+- Guide pages for `evennia-guides`: a player page, `equipment`, hidden while
+  `RP_EQUIPMENT_REVEALED` is off, and a staff page, `equipment-staff`.
 
 ### Fixed
 

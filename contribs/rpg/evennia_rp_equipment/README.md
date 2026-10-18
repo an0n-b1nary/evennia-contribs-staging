@@ -202,6 +202,15 @@ class Gear(EquipmentMixin, ObjectParent, DefaultObject):
 
 ---
 
+## Guide pages
+
+With [`evennia-guides`](../../utils/evennia_guides/README.md) installed, this
+package ships a player page, `equipment` (hidden while
+`RP_EQUIPMENT_REVEALED` is off), and a staff page, `equipment-staff`. Both
+link only to pages from this package and its required dependencies.
+
+---
+
 ## API
 
 ```python
@@ -242,7 +251,17 @@ logs them.
 | `RP_EQUIPMENT_SLOTS` | `("head", "body", "hands", "feet", "weapon", "accessory")` | Order of worn lines; slots are flavour |
 | `RP_EQUIPMENT_SLOT_COVERS` | `{}` | Mapping of outer slot to inner slots it hides when worn; acyclic, e.g. `{"cloak": ("body",)}` |
 | `RP_EQUIPMENT_ITEM_CAP` | `20` | Items of one character's making in the world at once (`None`: no cap) |
-| `RP_EQUIPMENT_STAFF_LOCK` | `"cmd:perm(Builder)"` | Who may run `+gear/audit` |
+| `RP_EQUIPMENT_STAFF_LOCK` | `"cmd:perm(Builder)"` | Who may run `+gear/audit`, and use the commands while they're hidden |
+| `RP_EQUIPMENT_REVEALED` | `True` | Runtime setting (`evennia-links`): while `False`, players don't see the commands |
+
+**Revealing equipment later.** A game that opens gear partway through sets
+`RP_EQUIPMENT_REVEALED = False`, or turns it off at runtime with
+`+runtime RP_EQUIPMENT_REVEALED=false`. Players then don't see `+gear`,
+`+wear`, `+remove`, `+worn` or `+outfit`, and the player guide page is hidden.
+Staff keep the commands, so gear can be prepared before the reveal. The switch
+only hides commands: gear that is already worn stays worn, keeps its worn
+lines in descriptions and keeps holding its build requirements. Crafted gear
+is worn with the same commands, so it waits for the reveal too.
 
 Requirement wording uses chargen's ruleset and catalog names. The lock refusal
 is chargen's own `locks.locked_message()`.
