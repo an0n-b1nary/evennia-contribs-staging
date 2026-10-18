@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.3 — 2026-10-18
+
+- Guide pages: a staff page, `jobs-staff`, covering triage, deciding structured requests, staff discussions, automated flags and guide questions.
+
 ## 0.7.2 — 2026-10-13
 
 - Configure allowed review outcomes per form, enforced against the saved schema.

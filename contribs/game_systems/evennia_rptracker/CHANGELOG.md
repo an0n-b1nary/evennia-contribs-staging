@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.2.5 — 2026-10-18
+
+- Guide pages: a staff page, `rptracker-staff`, covering session review and flags, automatic flags, the activity report and alt co-presence notices.
+
 ## 0.2.4 — 2026-10-13
 
 - Alt co-presence advisories are limited to one per account per window.

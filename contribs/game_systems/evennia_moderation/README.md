@@ -168,6 +168,17 @@ Any denial wins; receiver errors fail closed. Built-in routes require
 Social >=0.7.4, Posing >=0.1.2, Boards >=0.5.3, RPTracker >=0.2.3, and, when
 present, NPCs >=0.1.2 and Party >=0.2.2. None is a hard Moderation dependency.
 
+## Guide pages
+
+The `guides/` directory holds pages for
+[evennia-guides](../../utils/evennia_guides/README.md): a player page,
+`joining`, on applying, referrals, restrictions and what staff can see, and a
+staff page, `moderation-staff`. They describe the system in general terms,
+without exact numbers, and link only to pages this contrib or its required
+dependencies ship. With evennia-guides installed they appear on its web guide;
+without it they're ignored. To restate one for your game, add a page with the
+same key to `GUIDES_DIRS`.
+
 ## Retention and verification
 
 Approved application addresses are deleted immediately. Declined/lapsed

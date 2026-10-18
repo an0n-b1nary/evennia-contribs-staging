@@ -12,16 +12,16 @@ Each system's staff tools are listed below by task. Where a contrib has its own 
 
 ## Moderation and safety
 
-- **Admissions:** `+admissions` reviews applications to join.
+- **Admissions:** `+admissions` reviews applications to join. See [[moderation-staff]] for bans, mutes, notes and referrals.
 - **Problem accounts:** `+softban` for a timed ban, `+mute` to silence every alt, and `+notes` for staff-only notes on an account. `ban` and `unban` are Evennia's permanent bans.
-- **Activity:** `+rptracker/review` and `+report activity` show how roleplay is being counted, and let you flag sessions that look wrong.
-- **Presence:** staff can go fully dark with `+unfindable dark`.
+- **Activity:** `+rptracker/review` and `+report activity` show how roleplay is being counted, and let you flag sessions that look wrong. See [[rptracker-staff]].
+- **Presence:** staff can go fully dark with `+unfindable dark`. [[social-staff]] covers what else staff see and can do.
 
 ## Requests and review queues
 
-- **The queue:** `+jobs` lists open tickets. `+jobs <number>` shows one, and its switches assign it, set its status and priority, and close it. The web queue is at `/jobs/all/`.
+- **The queue:** `+jobs` lists open tickets. `+jobs <number>` shows one, and its switches assign it, set its status and priority, and close it. The web queue is at `/jobs/all/`. See [[jobs-staff]].
 - **Forms:** structured requests are approved, declined or sent back for changes with `+jobs/approve`, `+jobs/decline` and `+jobs/revise`. Each takes the revision number, so you always decide on the version you read.
-- **Jobs from other systems:** boards, building, lore, plots and moderation file jobs when something needs a staff decision, and Pattern proposals arrive as a request form. Work them like any other ticket.
+- **Jobs from other systems:** boards, building, lore, plots and moderation file jobs when something needs a staff decision, and Pattern proposals arrive as a request form. Work them like any other ticket. Automated flags, such as activity tracking's, arrive as staff discussions with no author; read them with `+discuss`.
 - **Guide questions:** every guide page has an "Ask about this page" link that files a request. See [[requests]] for how players see it.
 
 ## Story and events

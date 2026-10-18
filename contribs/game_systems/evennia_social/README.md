@@ -292,7 +292,7 @@ dependency, not a hard requirement.
 
 The `guides/` directory holds player guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `social`,
-`glossary-hangout`. They explain the system to players in general terms,
+`glossary-hangout`, and the staff page `social-staff`. They explain the system to players in general terms,
 without exact numbers, and link only to pages this contrib or its required
 dependencies ship. With evennia-guides installed they appear on its web guide;
 without it they're ignored. To restate one for your game, add a page with the

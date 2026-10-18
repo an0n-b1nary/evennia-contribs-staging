@@ -300,7 +300,7 @@ the normal `+activity/end` continues to end their room session.
 
 The `guides/` directory holds player guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `rp-sessions`,
-`rp-never-a-quota` (a principle). They explain the system to players in general
+`rp-never-a-quota` (a principle), and the staff page `rptracker-staff`. They explain the system to players in general
 terms, without exact numbers, and link only to pages this contrib or its
 required dependencies ship. With evennia-guides installed they appear on its
 web guide; without it they're ignored. To restate one for your game, add a page

@@ -322,7 +322,8 @@ example are in [evennia-accessibility's README](../../utils/evennia_accessibilit
 ## Guide pages
 
 The `guides/` directory holds player guide pages for
-[evennia-guides](../../utils/evennia_guides/README.md): `requests`. They
+[evennia-guides](../../utils/evennia_guides/README.md): `requests`, and the
+staff page `jobs-staff`. They
 explain the system to players in general terms, without exact numbers, and link
 only to pages this contrib or its required dependencies ship. With
 evennia-guides installed they appear on its web guide; without it they're
