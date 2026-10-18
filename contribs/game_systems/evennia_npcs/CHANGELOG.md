@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 — 2026-10-18
+
+- Refreshed the `npcs` guide page: templates and unique NPCs, sharing and
+  requests, archiving, full puppeting where a game allows it, and plot links.
+- `+npc/plot` help says "plot" where it still said "thread".
+
 ## 0.1.2 — 2026-10-13
 
 - Apply shared communication restrictions to NPC portrayal and fallback room

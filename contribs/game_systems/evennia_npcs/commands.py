@@ -36,7 +36,7 @@ class CmdNPC(MuxCommand):
       +npc/request <name>=<reason>     +npc/requests
       +npc/approve <request #id>       +npc/deny <request #id>
       +npc/history <name>
-      +npc/plot <name>=<thread #id>     +npc/unplot <name>=<thread #id>
+      +npc/plot <name>=<plot #id>       +npc/unplot <name>=<plot #id>
       +npc/profile <name>=<JSON mapping> (separately revealed)
 
     Templates are open to play; unique NPCs need owner permission and can

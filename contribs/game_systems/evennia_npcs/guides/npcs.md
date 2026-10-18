@@ -1,32 +1,43 @@
 ---
-title: Playing NPCs
 key: npcs
+title: Playing NPCs
 category: Roleplaying
 requires: NPCS_REVEALED
-summary: Create, share and portray supporting characters.
+aliases: [npc]
+summary: Creating, sharing and portraying supporting characters.
 ---
+NPCs let you bring supporting characters into a scene: a shopkeeper, a rival, a crowd. Each NPC keeps its description and its history of appearances together, and everyone always sees who is playing it.
 
-# Playing NPCs
+- `+npc` lists NPCs, and `+npc <name>` shows one. `+npc/search <text>` finds them.
+- `+npc/create <name>=template|unique` creates one, and `+npc/desc <name>=<description>` describes it.
+- `+npc/spawn <name>` brings one into your room and tells you its object number.
+- `+npc/puppet #<number>` starts playing it, and `+npc/unpuppet` stops.
+- `+npc/despawn #<number>` sends it away.
 
-NPCs let you bring supporting characters into a scene while keeping their
-identity and appearances together. A template represents a kind of person;
-a unique NPC represents one recurring character.
+## Templates and unique NPCs
 
-Use `+npc` to browse, `+npc/create Name=unique` to create an identity, and
-`+npc/desc Name=Description` to describe it. Its owner can share play access
-with `+npc/permit Name=Character`. Ask an owner through `+npc/request Name=Reason`.
+A **template** is a kind of person, such as a city guard, and anyone can play one. Spawn as many as the scene needs. A **unique** NPC is one recurring character. It can appear in only one place at a time, and only its owner and the players they've permitted can play it.
 
-`+npc/spawn Name` places an instance in your room and prints its object number.
-`+npc/puppet #number` starts virtual portrayal. You stay on your character while
-pose, say, emit, semipose and tests use the NPC. Everyone sees who is playing it.
-`+npc/unpuppet` returns to your normal voice; `+npc/despawn #number` removes the
-instance and preserves its history.
+- **Sharing:** `+npc/permit <name>=<character>` lets someone play your NPC, and `+npc/revoke` takes it back. `+npc/transfer` hands ownership to someone else.
+- **Asking:** `+npc/request <name>=<reason>` asks an NPC's owner for permission. Owners see requests with `+npc/requests` and answer with `+npc/approve` or `+npc/deny`.
+- **Retiring:** `+npc/archive` puts an NPC away, sending any of its spawns away too, and `+npc/restore` brings it back.
 
-A unique NPC can appear only once at a time. Someone already portraying an
-instance must release it before another player takes over. Moving away or
-losing permission ends virtual portrayal. Private scenes still require an
-invitation for your own character.
+An NPC can also have stats and abilities, so it can make tests: `+npc/stats` and `+npc/abilities` set them.
 
-`+npc/history Name` shows appearances you are currently allowed to read.
-`+npc/plot Name=#plot` associates an NPC with an accessible plot.
-NPC play grants no extra RP rewards and needs no combat system.
+## Playing an NPC
+
+While you portray an NPC, your pose, say, emit, semipose and `+test` come from the NPC. You stay on your own character, and the room sees who is playing it. Moving away or losing permission ends the portrayal. If someone is already playing a unique NPC, they release it before anyone else takes over. A spawn nobody has used for a long while may be sent away on its own.
+
+Some games also allow full puppeting, `+npc/fullpuppet`, where you take control of the NPC itself until `+npc/unfullpuppet`.
+
+:::insight[Always attributed]
+An NPC never speaks anonymously. Whoever plays it is named, so a supporting character can't be used to say what nobody would put their own name to.
+:::
+
+## History and plots
+
+`+npc/history <name>` lists an NPC's appearances, showing only the scenes you're allowed to read. If your game has plots, `+npc/plot <name>=<plot number>` links an NPC to a plot you can see, and `+npc/unplot` removes the link.
+
+## How it connects
+
+Despawning keeps an NPC's history. Playing NPCs earns no extra RP rewards. A private scene still needs an invitation for your own character, whatever NPC you bring.
