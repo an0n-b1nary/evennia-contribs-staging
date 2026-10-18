@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-equipment"
-version = "0.2.1"
+version = "0.2.2"
 description = "Wearable gear for Evennia RP games: worn lines, and requirements on the wearer's build that grant nothing."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -22,7 +22,13 @@ classifiers = [
 # evennia-rp-chargen supplies the build that requirements are checked against,
 # its lock, and (from 0.3) the change guard that keeps worn gear's requirements
 # met. evennia-rp-rules supplies the ruleset that stat requirements name.
-dependencies = ["evennia>=6.0", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-chargen>=0.3,<0.5"]
+# evennia-links provides the runtime setting behind RP_EQUIPMENT_REVEALED.
+dependencies = [
+    "evennia>=6.0",
+    "evennia-links>=0.8.4",
+    "evennia-rp-rules>=0.1,<0.2",
+    "evennia-rp-chargen>=0.3,<0.5",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
@@ -43,3 +49,6 @@ packages = [
 "evennia_rp_equipment" = "."
 "evennia_rp_equipment.management" = "management"
 "evennia_rp_equipment.management.commands" = "management/commands"
+
+[tool.setuptools.package-data]
+evennia_rp_equipment = ["guides/*.md"]

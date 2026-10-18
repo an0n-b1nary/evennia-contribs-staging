@@ -10,7 +10,10 @@ Every setting is read when needed, so `override_settings` works in tests.
     RP_EQUIPMENT_SLOT_COVERS  outer slot -> inner slots hidden from ordinary looks
     RP_EQUIPMENT_ITEM_CAP     most items one character's making may have in the
                               world at once (None: no cap)
-    RP_EQUIPMENT_STAFF_LOCK   lockstring for +gear/audit
+    RP_EQUIPMENT_STAFF_LOCK   lockstring for +gear/audit and for using the commands
+                              while they're hidden
+    RP_EQUIPMENT_REVEALED     evennia-links runtime setting (default True): while
+                              False, players don't see the commands; staff keep them
 """
 
 from __future__ import annotations
@@ -30,6 +33,22 @@ DEFAULTS = {
 def get(name: str):
     """`settings.<name>`, or this contrib's default for it."""
     return getattr(settings, name, DEFAULTS[name])
+
+
+def revealed() -> bool:
+    """Whether players see equipment's commands. A runtime setting: no restart."""
+    from evennia_links import runtime
+
+    return runtime.get("RP_EQUIPMENT_REVEALED")
+
+
+def is_staff(caller) -> bool:
+    return caller.locks.check_lockstring(caller, get("RP_EQUIPMENT_STAFF_LOCK"))
+
+
+def visible(caller) -> bool:
+    """Whether `caller` may use the commands: once revealed, or as staff before then."""
+    return revealed() or is_staff(caller)
 
 
 def slots() -> tuple[str, ...]:

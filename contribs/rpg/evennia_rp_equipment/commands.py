@@ -28,12 +28,20 @@ STATUS_TEXT = {
 
 
 def is_staff(caller) -> bool:
-    return caller.locks.check_lockstring(caller, conf.get("RP_EQUIPMENT_STAFF_LOCK"))
+    return conf.is_staff(caller)
 
 
 class _GearCommand(MuxCommand):
     help_category = "Character"
     locks = "cmd:all()"
+
+    def access(self, srcobj, access_type="cmd", default=False, **kwargs):
+        # Hidden from players until RP_EQUIPMENT_REVEALED; staff keep the commands.
+        return super().access(srcobj, access_type, default, **kwargs) and conf.visible(srcobj)
+
+    def at_pre_cmd(self):
+        # A caller that bypasses access() still can't run a hidden command.
+        return not conf.visible(self.caller)
 
     def run(self, action, *args, **kwargs):
         """Call a service, turning `GearError` into a message. Returns None on error."""

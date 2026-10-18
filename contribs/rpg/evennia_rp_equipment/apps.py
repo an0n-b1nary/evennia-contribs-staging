@@ -5,6 +5,10 @@
 from django.apps import AppConfig
 
 
+def boolean(value):
+    return type(value) is bool
+
+
 class RPEquipmentConfig(AppConfig):
     """AppConfig for the evennia_rp_equipment contrib."""
 
@@ -14,6 +18,14 @@ class RPEquipmentConfig(AppConfig):
     verbose_name = "Evennia RP Equipment"
 
     def ready(self):
+        from evennia_links.runtime import register
+
+        register(
+            "RP_EQUIPMENT_REVEALED",
+            True,
+            validator=boolean,
+            description="Expose equipment commands to players.",
+        )
         from evennia_rp_chargen.guards import build_change_requested
 
         from evennia_rp_equipment.guard import DISPATCH_UID, on_build_change
