@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3 - 2026-10-19
+
+- Add a staff guide page for evennia-guides, `crafting-staff`: the craft
+  catalogue, craft records, Pattern curation and stages, reviewing Pattern
+  proposals, fixture removal, and the reveal and freeze switches.
+
 ## 0.10.2 - 2026-10-18
 
 - Add player guide pages for evennia-guides: `crafting` (workshops, drafts,
