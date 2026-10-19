@@ -25,7 +25,7 @@ Each award is tied to the thing that earned it, a session or a storyline, so it 
 
 ## What changes the amount
 
-Your game decides what each source is worth. Some games also scale XP for a while, during a quiet stretch between stories, say. `+xp/sources` and your game's own pages say what applies.
+Your game decides what each source is worth. Some games also scale XP for a while, during a quiet stretch between stories, say. `+xp` says so while XP is reduced, and `+xp/sources` and your game's own pages say what applies.
 
 Staff can also grant XP by hand, with a reason that shows in your log.
 
