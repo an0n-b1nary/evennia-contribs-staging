@@ -19,3 +19,8 @@ from server.conf.settings import *  # noqa: F403
 # unchanged; hashing just stops dominating the run. NEVER copy this into
 # settings.py (see the warning comment in its "Public exposure" section).
 PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)
+
+# Evennia 6.0's test mixin leaves a login task per test that keeps the whole
+# test world in memory, so the run slows with every test. This runner removes
+# it; see evennia_links/testing.py.
+TEST_RUNNER = "evennia_links.testing.TestRunner"
