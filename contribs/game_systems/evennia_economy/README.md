@@ -263,6 +263,17 @@ The review hook runs after commit; failures are logged and flags remain in
 `+economy/flags`. Without jobs, leave the hook unset. Without resources,
 money/items still work. No tracker, crafting, maps or jobs import is required.
 
+## Guide pages
+
+The `guides/` directory holds a player page for
+[evennia-guides](../../utils/evennia_guides/README.md), `economy` (also found
+as `trading` and `money`), on purses and weekly income, trading and gifts,
+stalls, shops and the market. It's hidden while `RP_ECONOMY_REVEALED` is off.
+It describes the system in general terms, without exact numbers, and links
+only to its own pages, since links ships none. With evennia-guides installed it
+appears on its web guide; without it it's ignored. To restate it for your game,
+add a page with the same key to `GUIDES_DIRS`.
+
 ## Verification and scope
 
 Run `evennia test --settings=settings.py evennia_economy` in a migrated test
