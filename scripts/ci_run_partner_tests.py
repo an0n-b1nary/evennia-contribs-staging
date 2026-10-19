@@ -19,6 +19,15 @@ from importlib.util import find_spec
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# For suites long enough to repay worker start-up: one worker per CPU, each
+# with its own copy of the test database (DJANGO_TEST_PROCESSES overrides the
+# count). File-backed race runs stay serial.
+PARALLEL = "--parallel=auto"
+# Evennia 6.0's test mixin leaves a login task per test that keeps the whole
+# test world in memory, so a serial run slows with every test. Hosts that
+# ci_install_contribs.py doesn't configure add this line to their settings;
+# see evennia_links/testing.py.
+LINKS_TEST_RUNNER = 'TEST_RUNNER = "evennia_links.testing.TestRunner"\n'
 
 
 def building_profile(game, absent, launcher):
@@ -45,7 +54,13 @@ def building_profile(game, absent, launcher):
         encoding="utf-8",
     )
     result = subprocess.run(
-        [launcher, "test", "--settings=building_test_settings.py", "ci_building_partner_tests"],
+        [
+            launcher,
+            "test",
+            "--settings=building_test_settings.py",
+            PARALLEL,
+            "ci_building_partner_tests",
+        ],
         cwd=game,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -141,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     result = subprocess.run(
-        [launcher, "test", "--settings=partner_test_settings.py", *args.labels],
+        [launcher, "test", "--settings=partner_test_settings.py", PARALLEL, *args.labels],
         cwd=game,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,

@@ -4,6 +4,7 @@
 
 import contextlib
 import io
+import re
 import subprocess
 import tempfile
 import unittest
@@ -109,6 +110,107 @@ class TestPartnerRunner(unittest.TestCase):
                 "building-races.sqlite3",
                 (game / "server/conf/building_race_settings.py").read_text(encoding="utf-8"),
             )
+
+
+class TestRunnerHosts(unittest.TestCase):
+    """Every host uses the links test runner, and long suites run in parallel."""
+
+    def launch(self, module, argv, game, init=False):
+        """Run a runner's main() with `evennia` mocked; return its test commands.
+
+        `init` lets a mocked `evennia --init` create the game the runner then
+        configures; otherwise `game` is pre-initialized (or must not exist).
+        """
+        commands = []
+
+        def run(command, **kwargs):
+            if init and "--init" in command:
+                (Path(command[-1]) / "server/conf").mkdir(parents=True)
+                (Path(command[-1]) / "server/conf/settings.py").write_text("", encoding="utf-8")
+                return subprocess.CompletedProcess(command, 0)
+            commands.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout="Ran 8 tests\nOK\n")
+
+        with (
+            patch.object(module, "find_spec", return_value=None),
+            patch.object(module.shutil, "which", return_value="evennia"),
+            patch.object(module.subprocess, "run", side_effect=run),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(module.main(argv), 0)
+        return commands
+
+    def settings_text(self, game, command):
+        """Read the settings file a test command names, with the host files it imports."""
+        name = next(
+            part.split("=", 1)[1] if "=" in part else command[command.index(part) + 1]
+            for part in command
+            if part.startswith("--settings")
+        )
+        text = (game / "server/conf" / name).read_text(encoding="utf-8")
+        parent = re.match(r"from server\.conf\.(\w+) import \*", text)
+        if parent and parent.group(1) != "settings":
+            text += self.settings_text(game, [f"--settings={parent.group(1)}.py"])
+        return text
+
+    def initialized_game(self, directory):
+        game = Path(directory) / "game"
+        (game / "server/conf").mkdir(parents=True)
+        (game / "server/conf/settings.py").write_text("", encoding="utf-8")
+        return game
+
+    def test_hosts_without_installer_settings_use_the_links_test_runner(self):
+        """Hosts ci_install_contribs.py doesn't configure write the runner themselves."""
+        import ci_run_combat_tests
+        import ci_run_crafting_core_tests
+        import ci_run_lore_item_tests
+        import ci_run_moderation_tests
+        import ci_run_party_tests
+
+        for module, argv, init in (
+            (ci_run_combat_tests, [], False),
+            (ci_run_crafting_core_tests, [], False),
+            (ci_run_moderation_tests, [], False),
+            (ci_run_party_tests, [], False),
+            (ci_run_lore_item_tests, ["--absent", "evennia_lore"], True),
+        ):
+            with self.subTest(runner=module.__name__), tempfile.TemporaryDirectory() as directory:
+                game = Path(directory) / "game"
+                if not init:
+                    game = self.initialized_game(directory)
+                commands = self.launch(module, [str(game), *argv], game, init)
+                self.assertTrue(commands)
+                for command in commands:
+                    self.assertIn(runner.LINKS_TEST_RUNNER, self.settings_text(game, command))
+
+    def test_long_suites_run_in_parallel_and_file_backed_races_serially(self):
+        import ci_run_crafting_tests
+        import ci_run_lore_item_tests
+        import ci_run_rp_sandbox_tests
+
+        for module, argv, serial_runs in (
+            (ci_run_rp_sandbox_tests, [], 0),
+            (ci_run_crafting_tests, [], 1),
+            (ci_run_lore_item_tests, [], 0),
+        ):
+            with self.subTest(runner=module.__name__), tempfile.TemporaryDirectory() as directory:
+                game = Path(directory) / "game"
+                commands = self.launch(module, [str(game), *argv], game)
+                self.assertIn(runner.PARALLEL, commands[0])
+                self.assertEqual(len(commands), 1 + serial_runs)
+                for command in commands[1:]:
+                    self.assertNotIn(runner.PARALLEL, command)
+                    self.assertIn("races.sqlite3", self.settings_text(game, command))
+
+        for argv, serial_runs in ((["--building"], 1), (["--calendar", "present"], 0)):
+            with self.subTest(argv=argv), tempfile.TemporaryDirectory() as directory:
+                game = self.initialized_game(directory)
+                commands = self.launch(runner, [str(game), *argv], game)
+                self.assertIn(runner.PARALLEL, commands[0])
+                self.assertEqual(len(commands), 1 + serial_runs)
+                for command in commands[1:]:
+                    self.assertNotIn(runner.PARALLEL, command)
+                    self.assertIn("races.sqlite3", self.settings_text(game, command))
 
 
 if __name__ == "__main__":

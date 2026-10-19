@@ -9,7 +9,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import PARALLEL, test_exit_code
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTNERS = (
@@ -69,6 +69,7 @@ def main(argv=None):
             launcher,
             "test",
             "--settings=test_settings.py",
+            PARALLEL,
             "evennia_rp_crafting",
             "world.sandbox.test_crafting",
             "world.sandbox.test_emissions",

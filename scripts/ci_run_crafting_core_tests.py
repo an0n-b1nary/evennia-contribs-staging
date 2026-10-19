@@ -9,7 +9,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
 
 
 def main(argv=None):
@@ -36,7 +36,8 @@ def main(argv=None):
     (game / "server/conf/core_crafting_settings.py").write_text(
         "from server.conf.settings import *\n"
         "INSTALLED_APPS += ['evennia_links', 'evennia_rp_resources', 'evennia_rp_crafting']\n"
-        "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n",
+        "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
+        + LINKS_TEST_RUNNER,
         encoding="utf-8",
     )
     result = subprocess.run(

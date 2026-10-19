@@ -247,17 +247,66 @@ The established pattern:
 - Render the *empty* state as well as the populated one. It is what a fresh install
   shows first, and it is usually the branch that includes a partial.
 
+## Fast local test loop
+
+Run tests from a throwaway game set up like CI's (`evennia --init`,
+`python scripts/ci_install_contribs.py <game>`, then `evennia migrate`), or from
+`example_game` with `--settings test_settings.py`. Both use the links test
+runner, so a long run doesn't slow down as it goes.
+
+- **Narrow labels:** `evennia test --settings settings.py evennia_x.tests.SomeClass`
+  runs one class, and `…SomeClass.test_name` one test.
+- **Parallel workers:** `--parallel auto` runs one worker per CPU, each with its
+  own copy of the test database. Use it for anything larger than one contrib.
+  The whole contrib suite takes about 5 minutes with 6 workers, against over 20
+  serially.
+- **Keep the test database:** every invocation spends most of a minute creating
+  the test database and migrating every app. For repeat runs of a narrow label,
+  point the test database at a file in a test-only settings module and pass
+  `--keepdb`:
+
+  ```python
+  # <game>/server/conf/keepdb_settings.py
+  import os
+  from copy import deepcopy
+
+  from server.conf.settings import *  # noqa: F403
+
+  DATABASES = deepcopy(DATABASES)
+  DATABASES["default"]["TEST"] = {"NAME": os.path.join(GAME_DIR, "server", "keepdb-test.sqlite3")}
+  ```
+
+  `evennia test --settings keepdb_settings.py --keepdb evennia_jobs` then took
+  30 s on a repeat run, against 69 s without. Django applies new migrations to
+  a kept database, but delete the file after switching to a branch whose
+  migrations conflict. Don't combine `--keepdb` with `--parallel`: the workers'
+  kept copies don't get new migrations. Race tests that skip on an in-memory
+  database run against the file.
+- **Profiling:** `--durations 20` lists the slowest tests.
+
 ## CI
 
 Every push and PR runs lint, the full contrib test matrix, and partner integration jobs:
 
 - **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check.
-- **test** (~5–8 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test`.
+- **test** (~9 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test --parallel=auto`.
 
 - **partners**: two fresh Python 3.12 environments, one with every contrib
   and one with calendar omitted from installation and app registration. Each
   runs the maps suite with host settings plus real overlay, URL, command-import,
   rendered static/live map, tile feed, and browsable API checks.
+
+The partner-profile jobs (`*-partners`, `rp-sandbox`, and the
+`*-independent` jobs) each install one combination of partners in a fresh
+environment. The sandbox gate, crafting, lore/items, and building and calendar
+partner suites run with parallel workers; file-backed race runs stay serial.
+Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
+which stops Evennia's test fixture from keeping each finished test's world in
+memory.
+
+The `test`, partner and `live-playtest` jobs have a 30-minute limit, the
+`*-independent` and `moderation-partners` jobs 20 minutes, and lint 5. These
+bounds include installation and migration.
 
 A PR can't merge until the required checks pass.
 
@@ -340,10 +389,6 @@ limits, channel permissions and both mute controls. With accessibility absent,
 Broadcast must remain in its user's room.
 The accessibility-absent profile uses an empty URLconf because unrelated web
 extras require accessibility; crafting's commands and items have no web surface.
-
-The full contrib matrix has a 45-minute job limit; partner jobs have 30 minutes.
-These bounds include installation/migration and allow the suite to grow across
-the supported Python versions without cancelling normal progress.
 
 ### NPC partner profiles
 

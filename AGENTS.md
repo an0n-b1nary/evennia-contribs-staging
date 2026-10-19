@@ -61,6 +61,8 @@ editable (`pip install -e`, in dependency order — see the install loop in
   `evennia --init /tmp/ci_game && python scripts/ci_install_contribs.py /tmp/ci_game && cd /tmp/ci_game && evennia migrate --noinput && evennia test --settings settings.py <app_label> [<app_label> …]`
 - Sandbox integration gate:
   `cd example_game && evennia test --settings test_settings.py typeclasses commands world`
+- Faster iteration (`--parallel auto`, `--keepdb`, narrow labels): see
+  CONTRIBUTING's "Fast local test loop".
 
 ## Evennia invocation gotchas (hard-won — read before running anything)
 

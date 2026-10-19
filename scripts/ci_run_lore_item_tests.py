@@ -9,7 +9,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import LINKS_TEST_RUNNER, PARALLEL, test_exit_code
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,6 +34,7 @@ def main(argv=None):
                 '\nINSTALLED_APPS += ["evennia_links", "evennia_rp_resources", "evennia_rp_crafting"]\n'
             )
             settings.write('PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]\n')
+            settings.write(LINKS_TEST_RUNNER)
         labels, setting_name = ["evennia_rp_crafting"], "settings.py"
     else:
         shutil.copytree(
@@ -68,7 +69,7 @@ def main(argv=None):
             ]
         setting_name = "test_settings.py"
     result = subprocess.run(
-        [launcher, "test", "--noinput", f"--settings={setting_name}", *labels],
+        [launcher, "test", "--noinput", f"--settings={setting_name}", PARALLEL, *labels],
         cwd=game,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,

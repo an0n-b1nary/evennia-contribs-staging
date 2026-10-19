@@ -15,7 +15,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
 
 OPTIONAL = (
     "evennia_rp_contest",
@@ -363,7 +363,8 @@ def main(argv=None):
     (conf / "party_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         "PASSWORD_HASHERS = ('django.contrib.auth.hashers.MD5PasswordHasher',)\n"
-        "RP_COMBAT_REVEALED = True\nRP_PARTY_REVEALED = True\n"
+        + LINKS_TEST_RUNNER
+        + "RP_COMBAT_REVEALED = True\nRP_PARTY_REVEALED = True\n"
         "RP_COMBAT_PARTNERS = {'party': {'app': 'evennia_rp_party', 'provider': 'evennia_rp_party.providers.PROVIDER'}}\n"
         + (
             f"INSTALLED_APPS = [app for app in INSTALLED_APPS if app not in {absent!r}]\n"
