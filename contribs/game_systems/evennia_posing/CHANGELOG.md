@@ -2,6 +2,10 @@
 
 All notable changes to `evennia_posing` are documented here.
 
+## 0.1.3 — 2026-10-18
+
+- Guide pages: `posing` explains that poses, emits and semiposes are refused, with a reason, while the game stops someone speaking in the room.
+
 ## 0.1.2 — 2026-10-13
 
 - Check the Links communication seam before delivering poses, emits and

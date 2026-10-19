@@ -25,3 +25,7 @@ These settings change only what you see. Nobody else sees them.
 
 - **Headers:** `+poseheader/on` puts the poser's name above each pose. `+poseheader/format` changes how it looks, and `+poseheader/separator` adds a line between poses.
 - **Name highlighting:** `+highlight` colours character names inside poses, yours in one colour and everyone else's in another. `+highlight/self <colour>` and `+highlight/others <colour>` choose them.
+
+## When a pose is refused
+
+If your game stops someone speaking in a room, for example while staff have muted them, their poses, emits and semiposes aren't sent, and they're told why.
