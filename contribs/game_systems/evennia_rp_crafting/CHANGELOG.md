@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.2 - 2026-10-18
+
+- Add player guide pages for evennia-guides: `crafting` (workshops, drafts,
+  kinds of item, hallmarks, details, senses and states), `crafting-letters`,
+  `crafting-fixtures`, `companions`, `crafting-modifiers` and `patterns`; the
+  glossary terms `glossary-workshop`, `glossary-hallmark` and
+  `glossary-pattern`; and the design principle `breadth-not-quality`. Each
+  page is hidden while `RP_CRAFTING_REVEALED` is off, and the fixtures,
+  companions, modifiers and Patterns pages also follow their own reveal
+  switches. The pages ship as package data.
+- Require evennia-rp-resources 0.2.1 or newer, whose design principles the
+  pages tag.
+
 ## 0.10.1 - 2026-10-18
 
 - Add player Pattern proposals through an ordinary Jobs request form (the new
