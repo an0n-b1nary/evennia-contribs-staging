@@ -286,15 +286,26 @@ runner, so a long run doesn't slow down as it goes.
 
 ## CI
 
-Every push and PR runs lint, the full contrib test matrix, and partner integration jobs:
+Pushes to `main`, a nightly schedule and manual runs (**Run workflow** on the
+Actions tab, for any branch) run every job. A PR runs less:
 
-- **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check.
-- **test** (~9 min per cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test --parallel=auto`.
+- **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check. Always runs.
+- **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test --parallel=auto`. On a PR only 3.12 runs the full suite; 3.13 and 3.14 run a smoke cell (install, migrate, syntax check, template sweep and the `evennia_links` suite with parallel workers), and run in full on `main` and nightly.
+- **Partner jobs**, selected by `scripts/ci_scope.py` from the PR's changed
+  files. A job runs when a changed contrib, or a contrib depending on it through
+  hard dependencies or optional extras, is one the job installs, or when a file
+  the job reads (its runner script, `example_game/`) changes. Top-level docs and
+  lint-only files select none; any file the script doesn't classify selects
+  every job. The `scope` job's log lists the choice and the reasons. Adding or
+  renaming a partner job means updating `JOBS` in that script;
+  `test_ci_scope.py` checks the two agree.
 
-- **partners**: two fresh Python 3.12 environments, one with every contrib
+- **calendar-partners**: two fresh Python 3.12 environments, one with every contrib
   and one with calendar omitted from installation and app registration. Each
   runs the maps suite with host settings plus real overlay, URL, command-import,
   rendered static/live map, tile feed, and browsable API checks.
+- **sandbox**: the `example_game` gate with every contrib installed. It and
+  `live-playtest` run whenever any contrib or `example_game` changes.
 
 The partner-profile jobs (`*-partners`, `rp-sandbox`, and the
 `*-independent` jobs) each install one combination of partners in a fresh
@@ -304,11 +315,13 @@ Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
 which stops Evennia's test fixture from keeping each finished test's world in
 memory.
 
-The `test`, partner and `live-playtest` jobs have a 30-minute limit, the
-`*-independent` and `moderation-partners` jobs 20 minutes, and lint 5. These
+The `test`, partner, `sandbox` and `live-playtest` jobs have a 30-minute
+limit, the `*-independent` and `moderation-partners` jobs 20 minutes, and
+lint and `scope` 5. These
 bounds include installation and migration.
 
-A PR can't merge until the required checks pass.
+A skipped partner job reports as skipped, not failed. A failure in the nightly
+run shows on the Actions tab and notifies whoever last changed the schedule.
 
 To reproduce the absent-calendar cell, use a **fresh** Python 3.12 venv with
 `evennia==6.0.0` installed and its executables on PATH, from the repo root:

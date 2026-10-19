@@ -13,13 +13,20 @@ import sys
 CONTRIBS_ROOT = pathlib.Path("../contribs")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Discover contrib app labels and invoke `evennia test`.
+
+    Args:
+        argv: App labels to test instead of every contrib (the 3.13/3.14
+            smoke cells on pull requests pass one).
 
     Returns:
         int: Process exit code (0 on success, propagated from `evennia test`).
     """
-    labels = [c.name for c in sorted(CONTRIBS_ROOT.glob("*/*/")) if (c / "pyproject.toml").exists()]
+    labels = sys.argv[1:] if argv is None else argv
+    labels = labels or [
+        c.name for c in sorted(CONTRIBS_ROOT.glob("*/*/")) if (c / "pyproject.toml").exists()
+    ]
     if not labels:
         print("No contribs to test yet — passing trivially.")
         return 0
