@@ -13,7 +13,9 @@ Boards hold posts that stay up: announcements, notices, discussion and in-charac
 - `+bb/edit <board>/<post>` edits your own post.
 - `+bb/subscribe <board>` tells you about new posts when you log in.
 
-Boards can be named or numbered: `+bb 2/5` and `+bb General/5` work alike. Post numbers belong to each board.
+Boards can be named or numbered: `+bb 2/5` and `+bb General/5` work alike. Post numbers belong to each board, and replies are numbered along with the posts they answer. `+bb/unsubscribe <board>` stops the notices.
+
+Some boards are marked **[read-only]**, such as an announcements board. Anyone can read them, but only staff post there.
 
 ## In-character boards
 
@@ -21,7 +23,11 @@ Boards marked **[IC]** hold in-character writing: letters, notices nailed to a d
 
 ## Edits and history
 
-Editing a post keeps every earlier version. Staff can archive a post, which takes it off the board without deleting it.
+Editing a post keeps every earlier version. Staff can archive a post, which takes it off the board without deleting it. Post numbers are never reused, so an archived post leaves a gap.
+
+## Who can post
+
+Guests can read the boards but can't post or reply. If staff have stopped someone communicating, for example with a mute, they can't post, reply or edit until it ends, on the website as well as in game.
 
 ## On the website
 

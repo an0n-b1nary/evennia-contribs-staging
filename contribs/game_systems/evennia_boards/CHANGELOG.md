@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.5.4 — 2026-10-18
+
+- Guide pages: `boards` now covers read-only boards, unsubscribing, reply numbering, and who can't post (guests, and anyone under a communication restriction).
+- README: boards are created in the Django admin. The quickstart documented a `+bb/create` command that doesn't exist.
+
 ## 0.5.3 — 2026-10-13
 
 - Apply shared communication restrictions before posts, replies and edits,
