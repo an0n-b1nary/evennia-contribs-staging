@@ -2,6 +2,10 @@
 
 All notable changes to `evennia-regions` will be documented here.
 
+## 0.5.2 — 2026-10-18
+
+- Guide pages: `regions` covers extra room details other systems add, and private rooms and map links hidden from viewers who can't see them.
+
 ## 0.5.1 — 2026-10-12
 
 - Render optional cooperative `get_extra_room_details(viewer)` metadata on visible

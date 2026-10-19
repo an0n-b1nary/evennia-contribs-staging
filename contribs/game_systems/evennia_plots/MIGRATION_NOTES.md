@@ -126,9 +126,9 @@ summing the yielded `Award` objects filtered to a single `character_id`.
 
 | Setting | Default |
 |---|---|
-| `PLOTS_SCENES_APP_LABEL` | `"scenes"` |
-| `PLOTS_CALENDAR_APP_LABEL` | `"calendar"` |
-| `PLOTS_BOARDS_APP_LABEL` | `"boards"` |
+| `PLOTS_SCENES_APP_LABEL` | `"evennia_scenes"` |
+| `PLOTS_CALENDAR_APP_LABEL` | `"evennia_calendar"` |
+| `PLOTS_BOARDS_APP_LABEL` | `"evennia_boards"` |
 
 Override these if your game uses different app labels for scenes, calendar
 events, or board posts.

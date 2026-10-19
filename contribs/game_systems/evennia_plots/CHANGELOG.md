@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.2 — 2026-10-18
+
+- Guide pages: `plots` now covers OOC notes, requesting and withdrawing threads, sequels and related plots, who can conclude, and `+plot/request-conclude`. It no longer says `+plot/follow` keeps you posted: following records the plot but sends no notices.
+- MIGRATION_NOTES: the partner app-label defaults are `evennia_scenes`, `evennia_calendar` and `evennia_boards`.
+
 ## 0.7.1 — 2026-10-13
 
 - Make conclusion and its required partner snapshots atomic, restoring the plot after a listener failure.

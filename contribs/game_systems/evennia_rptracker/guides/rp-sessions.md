@@ -10,12 +10,14 @@ When you pose in an in-character room alongside someone else who's posing too, t
 
 - `+activity` shows your sessions this week.
 - `+activity/history` shows earlier weeks.
-- `+activity/detail <id>` shows one session.
+- `+activity/detail <id>` shows one session: how long it ran, who you played with, and any scene it was part of.
 - `+activity/end` ends your current session early, if you need to.
 
 ## What makes a session
 
-A session begins after you've posed a few times with at least one other active player in the room. It ends when the room goes quiet for a while, or when you log off. OOC rooms don't count, and neither do NPCs.
+A session begins after you've posed a few times with at least one other active player in the room. It ends when the room goes quiet for a while, or when you log off. OOC rooms don't count, and neither do NPCs or guests.
+
+If a scene is running in the room, the session is linked to it, so you can find the log later. Sessions and scenes are separate, though: a session counts whether or not anyone opened a scene.
 
 What a session is worth is up to your game. Usually sessions with a partner that run for a reasonable stretch count towards XP, and the game adds them up once a week.
 
@@ -30,3 +32,5 @@ Some games have in-character channels that count as roleplay too. A channel sess
 ## Keeping it fair
 
 The tracker watches for a couple of patterns that suggest gaming the count, such as a flood of poses in a very short time, or ending sessions by hand over and over to start new ones. Those sessions are flagged for staff to look at, and they don't count until staff have. Your other sessions aren't affected.
+
+Staff may also get a quiet notice when characters from the same account keep playing together. The notice changes nothing about those sessions or what they earn. It only lets staff decide whether a conversation is needed.

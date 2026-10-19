@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.3] - 2026-10-18
+
+- Guide pages: `lore` now lists its main commands and covers how characters learn lore (sessions, `+investigate` leans, sharing, `+forget`), restricted entries and `+hint`, reading books and tomes that cite lore, edit history, and the XP lore earns.
+- README: a Guide pages section.
+
 ## [0.8.2] - 2026-10-17
 
 - Permit Crafting 0.10 (Patterns) in the optional crafting extra. Lore's

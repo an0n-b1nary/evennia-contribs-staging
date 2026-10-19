@@ -93,14 +93,12 @@ class CharacterCmdSet(CmdSet):
 
 Account-level read and subscription commands also work from AccountCmdSet.
 
-### 4. Create your first board (in-game or Django admin)
+### 4. Create your first board (Django admin)
 
-```
-+bb/create General=General discussion (OOC)
-+bb/create Cutscenes=In-character narrative posts (IC)
-```
-
-Or create `Board` instances via Django admin.
+Boards are created in the Django admin, under **Boards**. Give each a name,
+an optional description, a type (`ooc`, or `ic` for in-character posts) and a
+display order; tick **Is read only** for a board only staff may post to. There
+is no in-game command for creating boards.
 
 ### 5. Optional: web UI
 

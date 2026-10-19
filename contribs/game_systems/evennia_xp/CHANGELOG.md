@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.3] - 2026-10-18
+
+- Guide pages: `xp` notes that `+xp` says so while XP rates are reduced.
+
 ## [0.5.2] - 2026-10-11
 
 - **Changed:** the `thread_bonus` source is labelled "Plot Bonus" (was "Thread

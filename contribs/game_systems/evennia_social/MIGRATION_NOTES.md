@@ -74,8 +74,8 @@ signal-based decoupling).
   place (holding `None`) rather than deleting it, so the lookup still
   returns the room. The source then only filtered on `filter_type`, so a
   cleared room would be listed as an *empty hangout* forever. This contrib
-  adds an `if not hangout: continue` guard. The same bug is still live in
-  the source's `discovery.py` and is a candidate for backporting.
+  adds an `if not hangout: continue` guard. The source has since fixed it
+  the same way, so nothing is owed upstream.
 - **Unread-pages notice: closed an unterminated color code.** The source
   read `"|wYou have N unread pages. Use |wpage/last N|n to view."` — the
   first `|w` is never closed, so the whole sentence rendered highlighted

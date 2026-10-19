@@ -14,7 +14,7 @@ Add to your CharacterCmdSet::
 
 Optional hooks (configure in settings.py):
   RPTRACKER_XP_PROJECTION  — callable(character_pk, window_end) -> list[str] | None
-  RPTRACKER_SCENE_DISPLAY  — callable(scene_id) -> str
+  RPTRACKER_SCENE_DISPLAY  — callable(scene_id) -> str (default: the scene's public number)
   RPTRACKER_STAFF_LOCK     — lock string for CmdRPTrackerStaff (default "cmd:perm(Builder)")
 """
 
@@ -43,6 +43,29 @@ def _resolve_dotted(dotted_path):
 
         logging.getLogger("evennia").exception("rptracker: failed to import hook %r", dotted_path)
         return None
+
+
+def _default_scene_display(scene_id):
+    """Name a linked scene by the public number players use in scene commands.
+
+    Bridge rows store the scene's database pk, which is not the number shown
+    by +scene and +log. Falls back to the pk when the partner app has no
+    ``scene_number`` or the scene is gone.
+    """
+    from django.apps import apps
+    from django.core.exceptions import FieldError
+
+    label = getattr(settings, "RPTRACKER_SCENES_APP_LABEL", "evennia_scenes")
+    try:
+        scene_model = apps.get_model(label, "Scene")
+        number = (
+            scene_model._base_manager.filter(pk=scene_id)
+            .values_list("scene_number", flat=True)
+            .first()
+        )
+    except (LookupError, FieldError):
+        number = None
+    return f"Scene #{scene_id if number is None else number}"
 
 
 def _iso_week(dt):
@@ -164,7 +187,7 @@ class CmdActivity(MuxCommand):
                 if render_scene:
                     scene_strs.append(render_scene(link.scene_id))
                 else:
-                    scene_strs.append(f"Scene #{link.scene_id}")
+                    scene_strs.append(_default_scene_display(link.scene_id))
             lines.append(f"  Scenes   : {', '.join(scene_strs)}")
         else:
             lines.append("  Scenes   : (none linked)")

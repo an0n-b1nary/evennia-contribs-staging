@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.2 — 2026-10-18
+
+- Guide pages: `map` explains that private places, such as homes and drafts, show only to characters allowed to see them, and planes or floors with nothing visible are left out entirely.
+
 ## 0.10.1 ? 2026-10-11
 
 - Hide private floors without visible tiles, including names, details, API and pagination.

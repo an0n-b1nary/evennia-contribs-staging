@@ -4,7 +4,7 @@
 Scene bridge listener for evennia_rptracker.
 
 This module is imported by EvenniaRptrackerConfig.ready() only when the
-configured scenes app (RPTRACKER_SCENES_APP_LABEL, default "scenes") is
+configured scenes app (RPTRACKER_SCENES_APP_LABEL, default "evennia_scenes") is
 in INSTALLED_APPS. Importing it registers the rp_activity_recorded listener
 that creates RPSessionSceneLink rows.
 

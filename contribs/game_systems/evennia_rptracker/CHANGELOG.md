@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.2.6 — 2026-10-18
+
+- `+activity/detail` names a session's scenes by their public scene number, as `+scene` and `+log` do. It showed the database key, which players never see. `RPTRACKER_SCENE_DISPLAY` still overrides it.
+- Guide pages: `rp-sessions` covers what `+activity/detail` shows, how sessions link to scenes, guests, and staff's advisory notices about characters from one account playing together.
+- README: the Scene bridge section and settings table give the real `evennia_scenes` default and describe the soft reference; the old "hardcoded FK" limitation is gone. The bridge module's docstring matches.
+
 ## 0.2.5 — 2026-10-18
 
 - Guide pages: a staff page, `rptracker-staff`, covering session review and flags, automatic flags, the activity report and alt co-presence notices.

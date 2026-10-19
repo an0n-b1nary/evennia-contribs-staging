@@ -322,6 +322,7 @@ class CmdRequest(MuxCommand):
         +request/submit                - Submit the questionnaire
         +request/cancel                - Discard unsubmitted answers
         +request/revise <id>            - Revise after staff request changes
+    +request/withdraw <id> <rev>=<reason> - Withdraw a pending revision
 
     Creates a ticket of type 'request' for staff review. Use this for
     proposals, suggestions, questions, or anything that needs staff input.

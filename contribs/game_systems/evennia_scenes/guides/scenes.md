@@ -7,6 +7,8 @@ summary: Opening a scene, who can pose and read it, and finding logs afterwards.
 ---
 A **scene** is a stretch of roleplay in one room, logged as it happens. Poses, emits and says in the room go into the log while the scene is running, along with OOC chatter, which is kept separate.
 
+Some things that happen in the room are logged too, such as an object being used, credited to whoever caused it. They don't count as anyone's pose.
+
 - `+scene/open <title>` starts a scene in your room, and `+scene` shows the one that's running.
 - `+scene/join` and `+scene/leave` add you to the scene or take you out of it. Arriving in the room while a scene is running usually adds you too.
 - `+scene/close` pauses the scene, and `+scene/resume <number>` picks it up again.
@@ -35,3 +37,7 @@ You can fix a typo in your own log entries with `+log/edit <entry>`. Every versi
 ## Scene numbers
 
 Every scene has a number that never changes. Use it with `+scene/resume`, `+scene/info` and `+log`, and to point other people at a scene.
+
+## How it connects
+
+A scene's page on the website lists the lore, plots and calendar events linked to it. Private plots, unpublished lore and cancelled events stay off it. `+scene/title` and `+scene/desc` set the title and description it shows.

@@ -9,7 +9,7 @@ A **plot** is a storyline that players run, anything from a feud between two fam
 
 - `+plot` lists active public plots, and `+plot <number>` shows one.
 - `+plot/create <name>=<tagline>` proposes a plot, and `+plot/activate <number>` starts it.
-- `+plot/update <number>` adds an in-character update to the plot's story.
+- `+plot/update <number>` adds an in-character update to the plot's story, and `+plot/update/ooc` adds an OOC note that only the plot's participants and staff can read.
 - `+plot/link/scene <number>=<scene>` ties a scene to the plot. `/link/event` and `/link/post` do the same for calendar events and board posts.
 - `+plot/conclude <number>` ends it.
 
@@ -33,7 +33,7 @@ Each plot's owners decide who may add threads:
 | **By request** | Anyone may ask; the owners accept or decline |
 | **Owners only** | The owners |
 
-`+plot/threads <number>=<open|request|owners>` changes it.
+`+plot/threads <number>=<open|request|owners>` changes it. Under **By request**, `+plot/thread` sends your thread to the owners instead, and `+plot/thread/withdraw` takes the request back if you change your mind.
 
 ### Held threads
 
@@ -57,7 +57,11 @@ Threads never earn or cost anything. A plot isn't worth more for having many thr
 | **Invite-only** | Anyone | Its owners, invited characters and staff |
 | **Private** | Its owners and staff | Its owners and staff |
 
-`+plot/privacy` sets it, and `+plot/invite` invites someone. `+plot/follow` keeps you posted on a plot you're not running.
+`+plot/privacy` sets it, and `+plot/invite` invites someone.
+
+## Related plots
+
+Owners can mark their plot as a sequel to an earlier one with `+plot/sequel <number>=<earlier>`. `+plot/relate <number>=<other>` proposes a link to another plot, and it shows once that plot's owners accept it with `+plot/relate/accept`, so nobody's story is tied to yours without their say.
 
 ## Concluding a plot
 
@@ -68,6 +72,8 @@ When a plot concludes, everyone who took part gets a small XP bonus, if your gam
 - **An in-character board post** linked to it adds a little more.
 
 A plot concluded very soon after it was started earns no bonus.
+
+Only a plot's owners and staff can conclude it. If a plot has stalled and its owners have moved on, `+plot/request-conclude <number>` asks staff to conclude or archive it, when your game takes requests to staff.
 
 :::insight[Rewarding the habits that include people]
 The bonus doesn't reward winning, or even finishing quickly. It rewards things that let other people join in: notice, more than one session, and a written account anyone can read.
