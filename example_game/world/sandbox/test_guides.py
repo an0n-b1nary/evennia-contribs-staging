@@ -339,6 +339,27 @@ class TestGuidesInTheSandbox(EvenniaTest):
                 self.assertContains(self.client.get(f"/guide/{key}/"), text)
                 self.assertContains(index, f'href="/guide/{key}/"')
 
+    def test_the_refreshed_community_and_world_pages_render_their_new_text(self):
+        for key, text in (
+            ("boards", "Who can post"),
+            ("requests", "Every revision stays on the record"),
+            ("lore", "You learn what you actually read"),
+            ("plots", "Related plots"),
+            ("scenes", "credited to whoever caused it"),
+            ("posing", "When a pose is refused"),
+            ("social", "into a home or other place"),
+            ("rp-sessions", "characters from the same account"),
+            ("xp", "while XP is reduced"),
+            ("map", "Private places"),
+            ("regions", "who built the place"),
+        ):
+            with self.subTest(key):
+                response = self.client.get(f"/guide/{key}/")
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, text)
+        # Following a plot records it but sends nothing, so the page mustn't promise updates.
+        self.assertNotContains(self.client.get("/guide/plots/"), "keeps you posted")
+
     def test_start_here_tours_the_wing_and_guest_visits(self):
         """The OOC wing's rooms and the guest wing, as the seeder builds them."""
         from world.sandbox import content
