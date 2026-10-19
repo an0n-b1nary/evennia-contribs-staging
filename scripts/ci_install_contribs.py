@@ -215,6 +215,11 @@ def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
         # mirrors Evennia's own dummyrunner profiling mixin. CI/test only.
         f.write("\n# Fast test-only password hasher (see comment in this script).\n")
         f.write('PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)\n')
+        # Evennia 6.0's test mixin leaves a login task per test that pins the
+        # whole test world in memory, so a serial run slows with every test.
+        # The links runner removes it; see evennia_links/testing.py.
+        if "evennia_links" in labels:
+            f.write('TEST_RUNNER = "evennia_links.testing.TestRunner"\n')
         if "evennia_building" in labels:
             f.write('\nLOCK_FUNC_MODULES = (*LOCK_FUNC_MODULES, "evennia_building.lockfuncs")\n')
             if "evennia_jobs" in labels:

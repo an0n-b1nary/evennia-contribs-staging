@@ -27,6 +27,7 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
 | `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
 | `resolve_dotted` | `collect.py` | Import an object from a `"pkg.mod.attr"` settings path |
+| `TestRunner` | `testing.py` | Evennia test runner that stops each test's scheduled tasks outliving it |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
 
@@ -561,3 +562,19 @@ continues to call one positional argument. These seams have no Building import.
 `owned_room_ids(character)` optionally calls `LINKS_OWNED_ROOMS(character)` for
 bulk cap lookup. It returns None without a provider and an empty list on provider
 errors; returned values must be saved positive integer room ids.
+
+## Test runner
+
+Evennia 6.0's `EvenniaTestMixin` leaves one scheduled login task behind per
+test, and that task's session keeps the test's accounts, rooms and objects in
+memory. Every test's `flush_cache()` then garbage-collects a larger heap, so a
+long serial run slows down with each test. Point your test settings at the
+links runner to remove each test's tasks when it ends:
+
+```python
+TEST_RUNNER = "evennia_links.testing.TestRunner"
+```
+
+It behaves like Evennia's own runner otherwise, and also supports
+`evennia test --parallel` when Python spawns its workers rather than forking
+them. Tasks that existed before a test started are left alone.

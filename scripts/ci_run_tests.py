@@ -29,8 +29,10 @@ def main() -> int:
     # gamedir/server/conf/ — passing a dotted path makes the launcher prepend
     # its own "server.conf." prefix, the config import then fails, and the
     # launcher exits 0 having run ZERO tests (a silently-green CI job).
+    # --parallel=auto runs one worker per CPU, each with its own copy of the
+    # test database; DJANGO_TEST_PROCESSES overrides the count.
     result = subprocess.run(
-        ["evennia", "test", "--settings=settings.py", *labels],
+        ["evennia", "test", "--settings=settings.py", "--parallel=auto", *labels],
         stdin=subprocess.DEVNULL,
         check=False,
     )
