@@ -1,5 +1,10 @@
 # Changelog — evennia-links
 
+## 0.8.10 - 2026-10-19
+
+- `TestRunner` stops the reactor's never-started thread pool, so the lock
+  warnings each Evennia test logs are dropped instead of queueing forever.
+
 ## 0.8.9 - 2026-10-18
 
 - Add `evennia_links.testing.TestRunner`, which removes the tasks each Evennia

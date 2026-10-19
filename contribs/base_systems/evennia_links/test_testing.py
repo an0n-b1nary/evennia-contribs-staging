@@ -1,11 +1,12 @@
-"""Evennia tests must not leave scheduled tasks behind when they finish."""
+"""Evennia tests must not leave scheduled tasks or thread work behind when they finish."""
 
 import unittest
+from unittest.mock import patch
 
 from evennia.scripts.taskhandler import TASK_HANDLER
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
-from .testing import TestRunner, _prepare_worker, isolate_tasks
+from .testing import TestRunner, _prepare_worker, discard_thread_work, isolate_tasks
 
 
 class TestTaskIsolation(EvenniaTestCase):
@@ -48,6 +49,35 @@ class TestTaskIsolation(EvenniaTestCase):
         self.run_evennia_test(lambda probe: None)
 
         self.assertIn(task.task_id, TASK_HANDLER.tasks)
+
+    def test_the_test_world_logs_lock_warnings_through_the_thread_pool(self):
+        from evennia.locks.lockhandler import WARNING_LOG
+        from evennia.utils import logger
+
+        with patch.object(logger, "log_file", wraps=logger.log_file) as log_file:
+            self.run_evennia_test(lambda probe: None)
+
+        # Evennia 6.0 replaces default locks while creating the test world and
+        # logs each replacement with log_file, which writes from the reactor's
+        # thread pool. If this stops holding, discard_thread_work can go.
+        warnings = [c for c in log_file.call_args_list if c.args[1:] == (WARNING_LOG,)]
+        self.assertTrue(warnings)
+
+    def test_thread_work_from_a_test_is_not_left_queued(self):
+        from twisted.internet import reactor
+
+        discard_thread_work()
+        pool = reactor.getThreadPool()
+        before = pool.q.qsize()
+
+        self.run_evennia_test(lambda probe: None)
+
+        self.assertFalse(pool.started)
+        self.assertEqual(pool.q.qsize(), before)
+
+    def test_discarding_thread_work_is_idempotent(self):
+        discard_thread_work()
+        discard_thread_work()
 
     def test_spawned_workers_get_the_settings_module_the_parent_loaded(self):
         from django.conf import settings

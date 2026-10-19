@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Test runner that stops Evennia test tasks outliving their test.
+Test runner that stops Evennia tests' leftover work outliving them.
 
 Point a game's test settings at it::
 
@@ -20,7 +20,17 @@ slows down with every test it has already run.
 
 This runner removes, at the end of each Evennia test, the tasks that test
 added. A task scheduled in one test can never run in a later one, so no test
-can observe the difference. It also prepares Django's parallel workers when
+can observe the difference.
+
+The same mixin creates its rooms, exit and characters with default locks that
+their typeclasses then replace, and ``LockHandler`` reports each replacement
+through ``logger.log_file``, which hands the write to the reactor's thread
+pool. Tests never run the reactor or start that pool, so the writes queue
+forever, five per test, each holding its ``Deferred`` and closures. The runner
+stops the never-started pool, which makes it drop new work instead of queueing
+it. That work could never run either way.
+
+It also prepares Django's parallel workers when
 they are spawned instead of forked (the Linux default from Python 3.14), which
 Evennia's own runner setup does not reach.
 
@@ -68,6 +78,25 @@ def isolate_tasks():
     EvenniaTestMixin.tearDown = tearDown
 
 
+def discard_thread_work():
+    """Stop the reactor's thread pool if it never started.
+
+    A stopped pool drops new work, and the ``Deferred`` that ``deferToThread``
+    returns never fires, as it never did while the work sat in the queue. The
+    reactor's shutdown trigger is removed so it doesn't stop the pool again.
+    Safe to call more than once. A started pool is left alone.
+    """
+    from twisted.internet import reactor
+
+    pool = reactor.getThreadPool()
+    if pool.started or pool.joined:
+        return
+    if reactor.threadpoolShutdownID is not None:
+        reactor.removeSystemEventTrigger(reactor.threadpoolShutdownID)
+        reactor.threadpoolShutdownID = None
+    pool.stop()
+
+
 def _prepare_worker(settings_module):
     """Set up a spawned or forkserver test worker the way the parent was.
 
@@ -94,6 +123,7 @@ def _prepare_worker(settings_module):
     evennia._init()
     settings.TEST_ENVIRONMENT = True
     isolate_tasks()
+    discard_thread_work()
 
 
 class _ParallelTestSuite(ParallelTestSuite):
@@ -107,10 +137,11 @@ class _ParallelTestSuite(ParallelTestSuite):
 
 
 class TestRunner(EvenniaTestSuiteRunner):
-    """Evennia's test runner, with test tasks removed at the end of each test."""
+    """Evennia's test runner, with each test's leftover tasks and thread work dropped."""
 
     parallel_test_suite = _ParallelTestSuite
 
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
         isolate_tasks()
+        discard_thread_work()
