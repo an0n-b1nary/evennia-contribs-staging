@@ -31,13 +31,13 @@ class TestGuidesInTheSandbox(EvenniaTest):
         errors = [problem for problem in pages.validate() if problem[0] == "error"]
         self.assertEqual(errors, [])
         keys = {page.key for page in pages.all_pages()}
-        self.assertTrue({"start-here", "trading", "writing-guides"} <= keys)
+        self.assertTrue({"start-here", "economy", "resources", "writing-guides"} <= keys)
 
     def test_pages_render_through_the_site(self):
         for url, text in (
             ("/guide/", "Start here"),
             ("/guide/start-here/", "One game, every contrib"),
-            ("/guide/trading/", "Both sides or neither"),
+            ("/guide/economy/", "Both sides or neither"),
             ("/guide/principles/", "Penalize, don&#x27;t forbid"),
             ("/guide/glossary/", "The unit of money"),
         ):
@@ -47,27 +47,28 @@ class TestGuidesInTheSandbox(EvenniaTest):
                 self.assertContains(response, text)
         self.assertEqual(self.client.get("/guide/writing-guides/").status_code, 404)
 
-    def test_the_economy_reveal_switch_gates_the_trading_page(self):
+    def test_the_economy_reveal_switch_gates_the_economy_page(self):
         """RP_ECONOMY_REVEALED is an evennia_links runtime setting: no restart."""
         from evennia_links import runtime
 
         runtime.set("RP_ECONOMY_REVEALED", False)
         try:
-            self.assertEqual(self.client.get("/guide/trading/").status_code, 404)
+            self.assertEqual(self.client.get("/guide/economy/").status_code, 404)
             start = self.client.get("/guide/start-here/").content.decode()
-            self.assertNotIn("/guide/trading/", start)
-            self.assertIn("trading covers money", start)
+            self.assertNotIn("/guide/economy/", start)
+            self.assertIn("economy covers money", start)
+            self.assertNotContains(self.client.get("/guide/glossary/"), "The unit of money")
         finally:
             runtime.reset("RP_ECONOMY_REVEALED")
-        self.assertEqual(self.client.get("/guide/trading/").status_code, 200)
+        self.assertEqual(self.client.get("/guide/economy/").status_code, 200)
 
     def test_ask_links_to_the_jobs_request_form(self):
         from evennia_guides.pages import get_page
         from evennia_guides.views import ask_url
 
-        url = urlsplit(ask_url(get_page("trading")))
+        url = urlsplit(ask_url(get_page("economy")))
         self.assertEqual(url.path, "/jobs/new/request/")
-        self.assertEqual(parse_qs(url.query)["title"], ["Guide question: Money & trade"])
+        self.assertEqual(parse_qs(url.query)["title"], ["Guide question: Money and trade"])
 
     def test_the_menu_links_the_guide(self):
         self.assertContains(self.client.get("/"), 'href="/guide/"')
@@ -156,10 +157,12 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("evennia_rp_combat", "/guide/combat/"),
             ("evennia_building", "/guide/building/"),
             ("evennia_rp_equipment", "/guide/equipment/"),
+            ("evennia_economy", "/guide/economy/"),
+            ("evennia_rp_resources", "/guide/resources/"),
         ):
             with self.subTest(app_label):
                 self.assertIn(f'href="{url}" aria-label="Guide page for {app_label}"', html)
-        for app_label in ("evennia_rp_crafting", "evennia_economy", "evennia_moderation"):
+        for app_label in ("evennia_rp_crafting", "evennia_moderation"):
             with self.subTest(app_label):
                 self.assertIn(f"<code>{app_label}</code>", html)
         self.assertNotIn('aria-label="Guide page for evennia_guides"', html)
@@ -381,6 +384,8 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("RP_COMBAT_REVEALED", ("combat", "combat-moves", "combat-storytelling")),
             ("RP_PARTY_REVEALED", ("party", "party-surge", "party-boss-checks")),
             ("BUILDING_REVEALED", ("building", "building-frontier")),
+            ("RP_ECONOMY_REVEALED", ("economy", "glossary-coin")),
+            ("RP_RESOURCES_REVEALED", ("resources", "glossary-lean")),
         ):
             runtime.set(setting, False)
             try:
@@ -392,3 +397,34 @@ class TestGuidesInTheSandbox(EvenniaTest):
             for key in keys:
                 with self.subTest(key, revealed=True):
                     self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 200)
+
+    def test_the_economy_and_resources_pages_render_their_text(self):
+        for url, text in (
+            ("/guide/economy/", "Nothing you hold decays"),
+            ("/guide/economy/", "Shops"),
+            ("/guide/resources/", "Time pays quantity, choices shape composition"),
+            ("/guide/resources/", "Plot rewards"),
+            ("/guide/glossary-lean/", "It never changes how much you gather"),
+            ("/guide/principles/", "Time pays quantity"),
+            ("/guide/principles/", "Nothing decays"),
+            ("/guide/time-pays-quantity/", "the same for everyone"),
+        ):
+            with self.subTest(url, text=text):
+                self.assertContains(self.client.get(url), text)
+        # The old key still finds the page from a link, but has no page of its own.
+        self.assertEqual(self.client.get("/guide/trading/").status_code, 404)
+
+    def test_hidden_economy_and_resources_pages_stay_readable_by_staff(self):
+        from evennia_links import runtime
+
+        self._reader(self.account, "Builder")
+        for setting, url, text in (
+            ("RP_ECONOMY_REVEALED", "/guide/economy/", "Both sides or neither"),
+            ("RP_RESOURCES_REVEALED", "/guide/resources/", "Choosing a lean"),
+        ):
+            runtime.set(setting, False)
+            try:
+                with self.subTest(setting):
+                    self.assertContains(self.client.get(url), text)
+            finally:
+                runtime.reset(setting)

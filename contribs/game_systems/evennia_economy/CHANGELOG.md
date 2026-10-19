@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 - 2026-10-18
+
+- Add a player guide page for evennia-guides, `economy`, hidden while `RP_ECONOMY_REVEALED` is off. It ships as package data.
+
 ## 0.3.1 - 2026-10-14
 
 - Let optional asset providers acquire host ownership locks before exchange character locks, so atomic crafting services follow the same lock order as property transfer. Existing providers remain unchanged.
