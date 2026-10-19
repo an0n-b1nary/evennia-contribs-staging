@@ -50,9 +50,9 @@ Each system's staff tools are listed below by task. Where a contrib has its own 
 
 ## Economy and making
 
-- **Money:** `+economy` shows the money totals; `/run` pays weekly income, `/credit` and `/debit` adjust a purse, and `/audit` and `/flags` show what to review. `+shop/reconcile` opens a shop that was approved earlier.
-- **Resources:** `+resources/grant` hands out resources by hand, and `+resources/payoutapprove` approves plot payouts.
-- **Crafting:** `+crafting` seeds and archives the catalogue, and `+crafting/review` shows a crafted item's permanent record. The `+pattern` staff switches create and curate Patterns.
+- **Money:** `+economy` shows the money totals; `/run` pays weekly income, `/credit` and `/debit` adjust a purse, and `/audit` and `/flags` show what to review. `+shop/reconcile` opens a shop that was approved earlier. See [[economy-staff]].
+- **Resources:** `+resources/grant` hands out resources by hand, and `+resources/payoutapprove` approves plot payouts. See [[resources-staff]].
+- **Crafting:** `+crafting` seeds and archives the catalogue, and `+crafting/review` shows a crafted item's permanent record. The `+pattern` staff switches create and curate Patterns, and Pattern proposals arrive as request forms. See [[crafting-staff]].
 
 ## Writing and checking guide pages
 

@@ -378,7 +378,8 @@ the installed contribs ship: player pages for each system (`checks`,
 `patterns`), a few principles and glossary
 terms, and staff pages: guides' own `writing-guides` and the contribs'
 `<contrib>-staff` pages (so far `equipment-staff`, `moderation-staff`,
-`jobs-staff`, `social-staff` and `rptracker-staff`). A page here with the same
+`jobs-staff`, `social-staff`, `rptracker-staff`, `economy-staff`,
+`resources-staff` and `crafting-staff`). A page here with the same
 key as a contrib's page replaces it.
 
 The navbar's **Guide** dropdown links Start here, the full index, the design
