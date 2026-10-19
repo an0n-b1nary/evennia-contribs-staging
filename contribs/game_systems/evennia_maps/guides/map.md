@@ -33,6 +33,7 @@ The **Room list** button under the map lists every room you can see, grouped by 
 ## What the map doesn't show
 
 - **Hidden rooms**, such as staff areas and secret places, are left off for players. The map doesn't hint at how many rooms are hidden, either.
+- **Private places**, such as homes and buildings still being drafted, show only to the characters allowed to see them. A plane or floor with nothing you're allowed to see is left out entirely, name and all.
 - **Private scenes** are left out of the scene notes.
 - **Unfindable characters** aren't counted or named, unless your character is in the same room in game, where you'd see them anyway. Staff see everyone.
 - **Lore your character hasn't learned** is listed without a link, and lore that can only be shared with you is counted, not named.
