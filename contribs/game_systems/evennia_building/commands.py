@@ -26,7 +26,7 @@ from .visibility import room_visibility
 class CmdBuild(MuxCommand):
     """Create and manage a reviewed interior.
 
-    +build/new interior=<name>
+    +build/new interior|frontier=<name>
     +build/list | +build/enter <project> | +build/leave
     +build/dig <project> <source room> <floor> <x> <y>=<name>,<door>,<back>
     +build/door <project> <source room> <target room>=<door>

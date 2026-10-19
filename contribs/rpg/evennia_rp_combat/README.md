@@ -1,6 +1,6 @@
 # evennia-rp-combat
 
-> **Preview (0.2.3, Pre-Alpha).** Pin an exact commit. Initial coefficients
+> **Preview (0.2.4, Pre-Alpha).** Pin an exact commit. Initial coefficients
 > are a playtesting baseline; no human balance result is claimed.
 
 Consent-based room combat for Evennia 6.x: personal turns, queued reactions,
@@ -174,7 +174,7 @@ pressure subtracts .5 chance points and adds .01 to the damage fraction;
 completing your own exchange recovers 6. Failed Resist adds no pressure.
 Evade, Overpower, RPS, support, Burst transfer/debt, Empower and conditions
 use exact Fractions with half-up award boundaries. See
-[the player guide](guides/combat.md) and arithmetic/state-machine tests.
+[the player guide](guides/combat-moves.md) and arithmetic/state-machine tests.
 
 `RP_COMBAT_DOMAIN_EFFECTS` maps host domain keys to the sixteen supported
 behaviors in `engine.DOMAIN_ACTIONS`. `RP_COMBAT_ELEMENT_TRAITS` maps host
@@ -228,7 +228,7 @@ status and actor_id. Companion emitters may pause from it. Mechanics carry
 `type=rp_combat` message metadata for future reading-mode delivery; current
 views are plain text with explicit labels and no color-dependent choices.
 No web endpoints, rewards, PvP ownership, Party or Boss Check subsystem ships.
-The included guide is discovered automatically by optional evennia-guides.
+The included guide pages are discovered automatically by optional evennia-guides.
 
 The [partner contract](PARTNERS.md) provides pure, registered declaration
 modifiers, journaled partner state and plain-text status/help extensions.
@@ -236,6 +236,16 @@ State upgrades happen on load, including rollback, without rewriting old
 snapshots or frozen builds. Uninstalled providers leave their data intact
 and display an unavailable notice. This foundation does not install Party
 or add revival, Boss Checks or new Ability mechanics.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `combat`, `combat-moves` and `combat-storytelling`. They
+explain the system to players in general terms, without exact numbers, and link
+only to pages this contrib or its required dependencies ship. With
+evennia-guides installed they appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.
 
 ## Verification
 

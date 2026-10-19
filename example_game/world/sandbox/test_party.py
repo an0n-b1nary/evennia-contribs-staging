@@ -45,9 +45,12 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
             response = Client().get("/guide/party/")
             self.assertEqual(response.status_code, 200)
             self.assertIn("Position and Cover", response.content.decode())
-            self.assertIn("Boss Checks", response.content.decode())
+            response = Client().get("/guide/party-boss-checks/")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Passing and failing", response.content.decode())
             with override_settings(RP_PARTY_REVEALED=False):
-                self.assertEqual(Client().get("/guide/party/").status_code, 404)
+                for key in ("party", "party-surge", "party-boss-checks"):
+                    self.assertEqual(Client().get(f"/guide/{key}/").status_code, 404)
 
     def test_real_frozen_builds_npc_cover_public_shot_and_ignore_boundary(self):
         from evennia_rp_combat import services as combat

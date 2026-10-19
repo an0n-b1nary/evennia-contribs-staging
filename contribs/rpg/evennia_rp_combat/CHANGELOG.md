@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-18
+
+- Rewrote the player guide in the guide format and split it into three pages,
+  all hidden while `RP_COMBAT_REVEALED` is off: `combat` (joining, turns, going
+  down, stepping out, corrections), `combat-moves` (tiers, reactions, hidden
+  bets, resources, stances) and `combat-storytelling` (storyteller requests,
+  NPCs, ending and shelving). The pages give no exact values.
+
 ## [0.2.3] - 2026-10-12
 
 - Add reusable idempotent encounter damage and mandatory Resist operations,

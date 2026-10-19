@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-18
+
+- Rewrote the player guide in the guide format and split it into three pages,
+  all hidden while `RP_PARTY_REVEALED` is off: `party` (forming a party,
+  Formation and Cover, support), `party-surge` (Synergy and Team Surge) and
+  `party-boss-checks`. The pages give no exact values.
+
 ## [0.2.2] - 2026-10-13
 
 - Party OOC chat honors shared communication restrictions, including when

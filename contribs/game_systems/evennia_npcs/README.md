@@ -146,3 +146,13 @@ From an initialized, migrated disposable game with this app installed:
 `evennia test --settings settings.py evennia_npcs < /dev/null`.
 The repository's NPC partner gate also verifies real host seams with optional
 partners physically absent; see CONTRIBUTING.md.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `npcs`. They
+explain the system to players in general terms, without exact numbers, and link
+only to pages this contrib or its required dependencies ship. With
+evennia-guides installed they appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.

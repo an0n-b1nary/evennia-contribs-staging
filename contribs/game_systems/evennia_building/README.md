@@ -1,6 +1,6 @@
 # evennia-building
 
-Version 0.3.0 supplies reviewed private homes, public frontier and mixed
+Version 0.3.3 supplies reviewed private homes, public frontier and mixed
 settlements. Shared authors draft together under the lead's quotas; every
 contributor acknowledges the exact candidate and content reuse terms. Each
 proposed home owner accepts their own boundary. Staff approve the entire frozen
@@ -250,3 +250,13 @@ fixture recovery; the default lookup still excludes archived rooms. Building
 awards no furnishing credit itself: Crafting owns that collector.
 `LINKS_OWNED_ROOMS = "evennia_building.access.owned_room_ids"` supplies live
 owned room ids in one query, so furnishing credit does not scan the whole grid.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `building` and `building-frontier`. They
+explain the system to players in general terms, without exact numbers, and link
+only to pages this contrib or its required dependencies ship. With
+evennia-guides installed they appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.

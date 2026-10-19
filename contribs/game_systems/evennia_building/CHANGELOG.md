@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3 - 2026-10-18
+
+- Rewrote the player guide in the guide format as two pages, both hidden while
+  `BUILDING_REVEALED` is off: `building` (drafting, review, your home and
+  apartments) and `building-frontier` (public places, collaborators, mixed
+  settlements and stewards).
+- `+build` help lists `+build/new frontier=<name>`, and the README's version
+  line matches the package.
+
 ## 0.3.2 - 2026-10-14
 
 - Expose room lifecycle and transaction locks for fixture consumers; allow explicitly requested inactive-owner lookup without awarding archived furnishing credit.

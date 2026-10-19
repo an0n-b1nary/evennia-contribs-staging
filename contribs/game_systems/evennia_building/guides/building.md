@@ -1,82 +1,49 @@
 ---
 key: building
-title: Building homes and public places
+title: Building a home
 category: Places & travel
 requires: BUILDING_REVEALED
-summary: Draft homes and shared settlements, request staff review, and maintain public places.
+aliases: [homes, property]
+summary: Drafting a home, staff review, and deciding who can come in.
 order: 50
 ---
+You can build a home of your own: draft its rooms, send it to staff for review, and once it's approved, decide who can come in. Building costs nothing, and it never gives you general building powers. You can also build an apartment inside someone else's home, with their agreement, or help [[building-frontier|grow the public world]].
 
-Start with `+build/new interior=My home`, then `+build/enter <project>`.
-Use `+build/check <project>` to see room numbers, the current version, attachment
-warnings and content reuse wording. `+build/dig` adds connected rooms or floors;
-`+build/name` and `+build/desc` edit them. `+build/leave` returns you safely.
-Choose an attachment with `+build/attach <project> <room>=<named entrance>`.
-Building costs nothing and grants no general Builder powers.
+- `+build/new interior=<name>` starts a project, and `+build/list` lists yours.
+- `+build/enter <project>` walks into your draft, and `+build/leave` takes you back out.
+- `+build/dig`, `+build/name` and `+build/desc` add and describe rooms.
+- `+build/check <project>` shows your rooms, the current version and any warnings.
+- `+build/submit <project> <version>=<acknowledgement>` sends it for review.
 
-Submit the displayed version with `+build/submit <project> <version>=<acknowledgement>`.
-Submission freezes the exact rooms, doors, content and attachment. Withdraw the
-displayed submission/revision before editing. Staff may approve, request changes
-or decline with an explanation. A decline preserves your draft and history; a
-later proposal opens a new review cycle. `+build/history` shows the record.
+The website's Building pages offer the same steps.
 
-Approval preserves your room identities and creates an unlocked entrance plus
-an `outside` exit. `+build/lock` prevents unauthorized entry, never departure.
-Residents can enter locked common rooms and install only when explicitly allowed.
-Invitations require the named guest to accept. Neither residents nor guests can
-edit, transfer or own your home. Room overrides can restrict a bedroom; use reset
-to inherit the home defaults again. Physical access does not publish floor plans.
+## Drafting
 
-Use `/property` to list homes. The Building website offers the same actions and
-exact submission pages. Staff transfer preserves rooms and belongings and clears
-ordinary access grants by default. Draft discard displays a confirmation token;
-it refuses stale confirmations and safely returns occupants and loose belongings.
-Withdraw first. Live homes cannot be discarded.
+A draft starts as one room. `+build/dig` adds connected rooms or floors, and `+build/door` joins two rooms you've already made. `+build/attach <project> <room>=<entrance name>` chooses where in the world your front door will go. A project is a home unless you make it a shop with `+build/purpose <project>=shop`. Whether a shop can sell depends on your game.
 
-To propose an apartment inside another home, choose the attachment and passage
-route, then `+build/consent/request <project>`. The parent owner uses
-`+build/consent/list` and `/consent/show <request>` to inspect the exact candidate.
-They grant it with `/consent/grant <request>=<displayed agreement wording>`, or
-decline it. They may revoke before approval. Changes invalidate consent, so ask
-again after editing. The website provides the same inspection and answers.
+## Review
 
-The agreement means the parent owner cannot lock the named passage rooms
-against your apartment, its residents or guests you admit. You control your own
-home and guests; the parent controls theirs. Passage grants no other parent
-rooms, floor plans, editing or installation rights. A guest must accept an
-invitation with entry scope before gaining passage through a locked parent.
-Room overrides and parent locks never prevent departure. Apartments cannot
-contain further separately owned apartments in this release.
+`+build/check` shows the version number and the content reuse wording. Submit that exact version, with that wording as your acknowledgement. Submitting freezes the rooms, doors, descriptions and entrance exactly as they are. To change anything after that, withdraw the submission first.
 
-Staff can archive/restore a live property while preserving rooms, belongings
-and history. Parent archival cannot strand active apartments; staff must handle
-affected homes together or arrange replacement passage with both owners.
-Quiet-property flags after about five weeks without character play are for
-staff review only. They never automatically reclaim or transfer a home.
+Staff approve it, ask for changes or decline it, with a reason. A decline keeps your draft and its history, and you can propose it again later. `+build/history` shows the whole record. To abandon a draft, `+build/discard` asks you to confirm with a token, then returns anyone inside to safety. A home that's live can't be discarded.
 
-Start public growth with `+build/new frontier=New place`, then attach it to a
-public room with a compass direction. Frontier compass doors must agree with
-coordinates. Nearby grid rooms stay unconnected unless the lead explicitly adds
-`+build/connect <project> <draft room> <existing room>=<direction>` before review.
+:::insight[What you submit is what's approved]
+Submitting freezes the exact version you checked, so nothing can change between your acknowledgement and staff's decision. If you want to change it, withdraw and submit again, so the review always matches the home.
+:::
 
-The lead invites collaborators with `+build/collaborator/add <project> <character>`.
-The named character accepts the invitation. Accepted authors may enter, dig and
-edit room text; the lead manages membership, attachment, submission and discard.
-The lead's quotas cover the whole shared project. Groups grant no building rights.
+## Your home
 
-For a mixed settlement the lead adds an independent home with
-`+build/interior <project> <street room> <owner>=<name>;<entrance name>`.
-Every collaborator acknowledges the exact candidate and reuse wording using
-`+build/ack/show` and `/ack/contributor`; every future home owner separately uses
-`/ack/ownership`. The website provides candidate inspection and agreement forms.
-Changes require fresh agreements. Removal cannot erase a retained contribution;
-agreements may be revoked before promotion. Staff approve the entire project at
-once. Each home owner independently manages their property after approval.
+Approval keeps your rooms as they are, and adds an entrance from the world and an `outside` exit back. `+build/property` lists your homes.
 
-Public streets have stewards who may describe them and set temporary moods.
-Stewards cannot lock, admit, install or configure. `/frontier/steward` lets a
-steward explicitly relinquish to staff; staff may record departure or assignment.
-Inactivity only flags a room for staff review. Retirement must preserve access to
-surviving homes and public streets through an explicit coordinated plan.
-The website's Frontier page shows public growth by date. Provenance appears in
-room details and staff inspection, without adding a byline to ordinary look text.
+- **Locking:** `+build/lock <property>` keeps out anyone you haven't let in. A lock never stops anyone leaving.
+- **Residents:** `+build/resident/add <property> <character>` makes someone a resident. Residents can enter locked common rooms. They can install things in the home, such as fixtures, only if you add them with `+build/resident/install`.
+- **Guests:** `+build/invite <property> <character>` invites someone, and they accept or decline with `+build/invite/accept` or `/decline`. An invitation can also let them see the floor plan.
+- **Private rooms:** `+build/override <room>=<characters>` limits one room, such as a bedroom, to the people you name. `+build/override/reset` goes back to the home's defaults.
+
+Nobody you let in can edit, transfer or own your home, and being able to walk in never shows anyone the floor plan. Taking someone's access away never throws them out. A home that sits quiet for a long time may be flagged for staff to look at, but it's never taken from you automatically.
+
+## Apartments
+
+An apartment is a home inside someone else's, reached through their rooms. Choose the entrance and the rooms of theirs you'll pass through with `+build/attach`, then ask with `+build/consent/request <project>`. The other owner looks at exactly what you're proposing with `+build/consent/list` and `+build/consent/show`. They agree with `+build/consent/grant`, using the wording shown, or decline. They can withdraw their agreement until staff approve it. If you change the project afterwards, ask again.
+
+Once approved, the other owner can't lock the rooms you pass through against you, your residents or the guests you let in. That's all the agreement gives: you get no other rooms of theirs, and no right to edit or furnish anything. A guest needs an invitation that includes entry to pass through a locked home. An apartment can't have its own apartments inside it.

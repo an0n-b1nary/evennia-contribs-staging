@@ -276,3 +276,13 @@ initialized host, with closed stdin; verify a positive test count. The
 reference game adds real sheet, NPC, guide and command seams. Acceptance
 also covers combat with Party physically absent and Party without optional
 combat partners. See `scripts/ci_run_party_tests.py`.
+
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `party`, `party-surge` and `party-boss-checks`. They
+explain the system to players in general terms, without exact numbers, and link
+only to pages this contrib or its required dependencies ship. With
+evennia-guides installed they appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.
