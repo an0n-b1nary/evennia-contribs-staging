@@ -15,15 +15,15 @@ from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
 from world.sandbox import crafting
+from world.sandbox.seeding import SeededSandboxMixin
 
 
-class PatternSeams(EvenniaCommandTest):
+class PatternSeams(SeededSandboxMixin, EvenniaCommandTest):
     character_typeclass = Character
     room_typeclass = Room
 
     def setUp(self):
         super().setUp()
-        call_command("seed_sandbox", verbosity=0)
         self.owner = PatternKnowledge.objects.get(pattern__key="market-lettering").character
         self.account2.characters.add(self.char2)
         self.char1.permissions.add("Builder")

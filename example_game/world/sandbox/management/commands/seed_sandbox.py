@@ -132,8 +132,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         # Django passes verbosity to every management command; honouring it
-        # keeps world/sandbox/tests.py (which runs this command for real,
-        # once per test) from burying the test output in seed reports.
+        # keeps the sandbox tests (which run this command for real, once per
+        # test class; see world/sandbox/seeding.py) from burying the test
+        # output in seed reports.
         self.quiet = options.get("verbosity", 1) == 0
         mode = "DRY RUN" if dry_run else "LIVE"
         self._say(self.style.NOTICE(f"seed_sandbox [{mode}]"))

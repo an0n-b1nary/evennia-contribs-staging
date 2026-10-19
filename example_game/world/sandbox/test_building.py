@@ -17,6 +17,7 @@ from evennia_regions.models import Region, RegionMembership
 from evennia_social.commands.roomconfig import _can_configure_room
 from evennia_social.mood import can_set_mood
 from world.sandbox import content
+from world.sandbox.seeding import SeededSandboxMixin
 
 
 def demo_rights(actor, room, action):
@@ -28,13 +29,12 @@ def demo_owner(room):
 
 
 @override_settings(ROOT_URLCONF="world.sandbox.tests")
-class BuildingFoundationSeams(EvenniaTest):
+class BuildingFoundationSeams(SeededSandboxMixin, EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
 
     def setUp(self):
         super().setUp()
-        call_command("seed_sandbox", verbosity=0)
         self.entry = ObjectDB.objects.get(db_key=content.PRIVATE_PREVIEW_ROOMS[0])
         self.account2.characters.add(self.char2)
 
@@ -106,11 +106,7 @@ class BuildingFoundationSeams(EvenniaTest):
         self.assertFalse(can(self.char2, self.room1, "install"))
 
 
-class BuildingFoundationCommandSeams(EvenniaCommandTest):
-    def setUp(self):
-        super().setUp()
-        call_command("seed_sandbox", verbosity=0)
-
+class BuildingFoundationCommandSeams(SeededSandboxMixin, EvenniaCommandTest):
     def test_seeded_transplant_report_is_read_only(self):
         from commands.sandbox import CmdSandbox
 

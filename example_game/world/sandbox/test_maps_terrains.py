@@ -12,7 +12,7 @@ from rest_framework.test import APIClient
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
-from world.sandbox.tests import SeededSandboxMixin
+from world.sandbox.seeding import SeededSandboxMixin
 
 
 class TestSeededTerrainDisplay(SeededSandboxMixin, EvenniaTest):

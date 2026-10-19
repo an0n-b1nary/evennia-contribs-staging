@@ -28,6 +28,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from world.sandbox.seeding import SeededSandboxMixin
 from world.sandbox.test_apartments import ApartmentSeams
 from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
@@ -298,31 +299,6 @@ class TestScreenreaderCommandSeam(EvenniaTest):
                 with mock.patch("builtins.__import__", side_effect=without_accessibility):
                     absent = run_path(consumer.__file__)
                 self.assertFalse(absent["uses_screenreader"](self.char1))
-
-
-class SeededSandboxMixin:
-    """Run seed_sandbox with START_LOCATION pointed at a room that exists.
-
-    In a live game START_LOCATION is "#2" - Limbo, which `evennia migrate`
-    creates and nothing deletes. That is the whole reason the seeder re-dresses
-    that room rather than making a hall whose dbref would drift (see
-    seed_sandbox.py::_spawn_room). Evennia's test fixtures never run
-    initial_setup, so in a test database #2 is whichever object the fixture
-    happened to create second - quite possibly a Character, which has no
-    set_terrain().
-
-    Overriding the setting to room1 for the duration of each test lets the
-    seeder take its real path here instead of some test-only fallback, and it
-    leaves char1 standing in the Arrival Hall, which is what a real player
-    sees on their first connect.
-    """
-
-    def setUp(self):
-        super().setUp()
-        origin = self.settings(START_LOCATION=f"#{self.room1.id}")
-        origin.enable()
-        self.addCleanup(origin.disable)
-        call_command("seed_sandbox", verbosity=0)
 
 
 def _search_room(key):

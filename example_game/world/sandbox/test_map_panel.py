@@ -7,7 +7,8 @@ from rest_framework.test import APIClient
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
-from world.sandbox.tests import SeededSandboxMixin, _search_room
+from world.sandbox.seeding import SeededSandboxMixin
+from world.sandbox.tests import _search_room
 
 
 class TestSeededRoomPanel(SeededSandboxMixin, EvenniaTest):

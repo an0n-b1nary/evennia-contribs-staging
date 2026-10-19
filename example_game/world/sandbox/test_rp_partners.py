@@ -1,10 +1,10 @@
 """Real sandbox seams, runnable after physically uninstalling RP partners."""
 
+from copy import deepcopy
 from importlib import import_module
 from unittest import mock
 
 from django.apps import apps
-from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaTest
@@ -14,6 +14,7 @@ from typeclasses.rooms import Room
 from evennia_rp_rules.dice import ScriptedRoller
 from evennia_rp_rules.subjects import DictStatSource, get_subject
 from world.sandbox import content, glue
+from world.sandbox.seeding import SeededSandboxMixin
 
 
 def scaled_plot_xp(source, **context):
@@ -52,21 +53,38 @@ class TestConfiguredPlotXP(EvenniaTest):
         self.assertEqual(awards[0].multiplier, Decimal("1"))
 
 
-class RPSeedMixin:
+class RPSeedMixin(SeededSandboxMixin):
+    """The class-seeded sandbox, plus the RP tracker state the seed leaves.
+
+    The tracker keeps live sessions in a module-level dict, outside the
+    database, so it is captured after the class seed and restored for each
+    test as if that test had seeded it.
+    """
+
     character_typeclass = Character
     room_typeclass = Room
 
+    @classmethod
+    def seed(cls):
+        cls.seeded_tracker_sessions = {}
+        if not apps.is_installed("evennia_rptracker"):
+            super().seed()
+            return
+        from evennia_rptracker.tracker import _active_sessions
+
+        _active_sessions.clear()
+        super().seed()
+        cls.seeded_tracker_sessions = deepcopy(_active_sessions)
+        _active_sessions.clear()
+
     def setUp(self):
         super().setUp()
-        origin = self.settings(START_LOCATION=f"#{self.room1.id}")
-        origin.enable()
-        self.addCleanup(origin.disable)
         if apps.is_installed("evennia_rptracker"):
             from evennia_rptracker.tracker import _active_sessions
 
             _active_sessions.clear()
+            _active_sessions.update(deepcopy(self.seeded_tracker_sessions))
             self.addCleanup(_active_sessions.clear)
-        call_command("seed_sandbox", verbosity=0)
         self.grounds = search_object("Proving Grounds")[0]
         self.dummy = search_object(content.RP_DUMMY_NAME)[0]
         self.samples = [search_object(name)[0] for name in content.SCENE_SPEAKERS]
