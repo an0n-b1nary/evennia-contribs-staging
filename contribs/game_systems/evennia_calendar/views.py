@@ -556,7 +556,7 @@ class EventInviteView(CalendarAuthoringMixin, FormView):
         if target_char is None:
             form.add_error("character_name", f"No character named '{char_name}' found.")
             return self.form_invalid(form)
-        RSVP.objects.get_or_create(
+        rsvp, created = RSVP.objects.get_or_create(
             event=event,
             character=target_char,
             defaults={
@@ -564,6 +564,13 @@ class EventInviteView(CalendarAuthoringMixin, FormView):
                 "status": RSVP.Status.INVITED,
             },
         )
+        if created:
+            from evennia_calendar import notices
+
+            host = ObjectDB.objects.filter(pk=self.get_character()).first()
+            notices.notify(
+                rsvp, "invited", notices.invited_message(event, host=host.key if host else None)
+            )
         return HttpResponseRedirect(
             reverse("evennia_calendar:calendar-event-invite", kwargs={"pk": event.pk})
         )

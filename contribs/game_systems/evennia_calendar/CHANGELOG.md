@@ -7,6 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.2] - 2026-10-19
+
+- **Fixed:** players are now told about their RSVPs. Being drawn in a lottery
+  or seated by a cluster draw, moving up from the waitlist, being invited or
+  offered a place by a host, and the reminder before an event the player is
+  confirmed for each send a notice: at once if they're connected, otherwise at
+  their next puppet. Before, the scheduler fired its signals with no receiver,
+  so a drawn player could lose the place without knowing they'd had one, and
+  host invites and pings reached only connected players. A waiting notice is
+  dropped if the place has gone or the event was cancelled or has started, and
+  each RSVP gets one reminder however often the sweep runs.
+- **Added:** `evennia_calendar.notices` and the `CalendarNotice` model, in
+  additive migration 0003. No wiring is needed.
+- **Fixed:** the README's signal table gives the kwargs `lottery_drawn`,
+  `cluster_drawn` and `cluster_seat_assigned` actually send.
+
 ## [0.5.1] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `calendar` (scheduling, the

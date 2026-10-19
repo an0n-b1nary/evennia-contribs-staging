@@ -22,6 +22,10 @@ The calendar holds upcoming events: a festival, a trial, a hunt. Anyone can sche
 
 The host of a capped event can invite people ahead of time. A staff event can't be pre-invited, so nobody gets a place by knowing the right person.
 
+## Being told
+
+You're told when you're drawn in a lottery, when a place opens for you on a waitlist, and when a host invites you or offers you a place, along with how long you have to confirm. Events you're confirmed for send a reminder shortly before they start. If you're not connected, you hear the next time you log in, unless the place has gone or the event was cancelled in the meantime.
+
 ## Priority tokens
 
 If you sign up for a lottery event and aren't drawn, you get a **priority token**. `+rsvp/token/use <id>` spends it on a later staff event to be seated before the draw. `+rsvp/token` shows the tokens you have.

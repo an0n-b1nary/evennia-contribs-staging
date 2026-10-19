@@ -28,6 +28,9 @@ Models:
   useful for events in different clusters or cross-cluster scenarios.
 - SceneCalendarLink: cross-domain bridge (owned here) linking a CalendarEvent
   to a Scene via a scene_id integer soft-reference (lore ↔ scenes).
+- CalendarNotice: a notice to a player about their RSVP (drawn, invited,
+  given a seat, reminded). Kept until delivered, so an offline player hears
+  at their next puppet; see ``evennia_calendar.notices``.
 
 ObjectDB FK convention: ForeignKey("objects.ObjectDB",
 on_delete=SET_NULL, null=True) + denormalized *_name CharField. Prevents
@@ -791,6 +794,70 @@ class EventExclusion(models.Model):
         excluded_ids.update(cls.objects.filter(event_a=event).values_list("event_b_id", flat=True))
         excluded_ids.update(cls.objects.filter(event_b=event).values_list("event_a_id", flat=True))
         return CalendarEvent.objects.filter(pk__in=excluded_ids)
+
+
+# ---------------------------------------------------------------------------
+# CalendarNotice
+# ---------------------------------------------------------------------------
+
+
+class CalendarNotice(models.Model):
+    """
+    A notice to a player about one of their RSVPs.
+
+    Written by ``evennia_calendar.notices.notify``. A connected character is
+    told at once and the row is marked delivered; otherwise it waits for the
+    character's next puppet. ``status`` is the RSVP's status when the notice
+    was written: a waiting notice is dropped unread if the RSVP has moved on
+    since, or the event was cancelled or has started, so nobody is asked to
+    confirm a place they've already lost.
+
+    Delivered rows are kept: a reminder is sent at most once per RSVP, and the
+    conditional unique constraint enforces that even if two sweeps overlap.
+    Rows go with their RSVP.
+    """
+
+    class Kind(models.TextChoices):
+        DRAWN = "drawn", "Drawn in a lottery"
+        INVITED = "invited", "Invited"
+        SEATED = "seated", "Given a seat"
+        REMINDER = "reminder", "Reminder"
+
+    rsvp = models.ForeignKey(
+        RSVP,
+        on_delete=models.CASCADE,
+        related_name="notices",
+    )
+    character = models.ForeignKey(
+        "objects.ObjectDB",
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    status = models.CharField(
+        max_length=20,
+        choices=RSVP.Status.choices,
+        help_text="The RSVP's status when the notice was written.",
+    )
+    message = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]  # noqa: RUF012
+        indexes = [  # noqa: RUF012
+            models.Index(fields=["character", "delivered_at"]),
+        ]
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(
+                fields=["rsvp"],
+                condition=models.Q(kind="reminder"),
+                name="evennia_calendar_one_reminder_per_rsvp",
+            ),
+        ]
+
+    def __str__(self):
+        return f"CalendarNotice [{self.kind}] for RSVP #{self.rsvp_id}"
 
 
 # ---------------------------------------------------------------------------
