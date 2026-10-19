@@ -1,5 +1,11 @@
 # Changelog — evennia-links
 
+## 0.8.9 - 2026-10-18
+
+- Add `evennia_links.testing.TestRunner`, which removes the tasks each Evennia
+  test schedules when it ends. Evennia 6.0's test mixin leaves a login task per
+  test that keeps the test's objects alive, slowing long serial runs.
+
 ## 0.8.8 - 2026-10-15
 
 - Share local book/page target resolution between independent readable providers,
