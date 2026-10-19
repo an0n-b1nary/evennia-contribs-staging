@@ -1,9 +1,15 @@
 name: CI
 
+# Pull requests run lint, the full suite on 3.12, 3.13/3.14 smoke cells and
+# the partner jobs scripts/ci_scope.py selects for the change. Pushes to main,
+# the nightly schedule and manual runs run everything.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,15 +47,40 @@ jobs:
         run: python scripts/test_anonymity_push_guard.py
       - name: Issue publication guard tests
         run: python scripts/test_file_issue.py
-      - name: Contrib installer and partner runner tests
+      - name: Contrib installer, partner runner and job selection tests
         run: |
           python scripts/test_ci_install_contribs.py
           python scripts/test_ci_run_partner_tests.py
+          python scripts/test_ci_scope.py
+
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      jobs: ${{ steps.select.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # A pull request checks out its merge commit; the first parent is
+          # the base branch, so HEAD^1..HEAD is exactly the change.
+          fetch-depth: 2
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Select partner jobs
+        id: select
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            python scripts/ci_scope.py --diff HEAD^1 HEAD >> "$GITHUB_OUTPUT"
+          else
+            python scripts/ci_scope.py --all >> "$GITHUB_OUTPUT"
+          fi
 
   test:
     runs-on: ubuntu-latest
-    # A cell takes about 9 minutes with parallel workers; the limit leaves room
-    # for setup, slow runners and suite growth.
+    # A full cell takes about 9 minutes with parallel workers; the limit leaves
+    # room for setup, slow runners and suite growth. On pull requests 3.13 and
+    # 3.14 run a smoke cell; main and nightly run the full suite on all three.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -70,6 +101,9 @@ jobs:
         run: python scripts/check_templates.py --require-django
       - name: Template convention tests
         run: python scripts/test_check_templates.py
+      - name: Python syntax check
+        if: matrix.python-version != '3.12'
+        run: python -m py_compile $(git ls-files '*.py')
 
       - name: Initialize throwaway game directory
         run: evennia --init ci_game < /dev/null
@@ -81,11 +115,18 @@ jobs:
         working-directory: ci_game
         run: evennia migrate --noinput < /dev/null
       - name: Run tests
+        if: matrix.python-version == '3.12' || github.event_name != 'pull_request'
         working-directory: ci_game
         run: python ../scripts/ci_run_tests.py
+      - name: Smoke suite, including the parallel worker start-up
+        if: matrix.python-version != '3.12' && github.event_name == 'pull_request'
+        working-directory: ci_game
+        run: python ../scripts/ci_run_tests.py evennia_links
 
 
   lore-items-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'lore-items-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -115,7 +156,9 @@ jobs:
       - name: Lore and crafted-item seams with verified partner absence
         run: python scripts/ci_run_lore_item_tests.py ci_game/lore_items ${{ matrix.absent }}
 
-  partners:
+  calendar-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'calendar-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -128,6 +171,32 @@ jobs:
           - profile: calendar-absent
             args: "--calendar absent"
             excludes: "--exclude evennia-calendar"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize throwaway game directory
+        run: evennia --init ci_game < /dev/null
+      - name: Install selected partners in dependency order
+        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - name: Migrate
+        working-directory: ci_game
+        run: evennia migrate --noinput < /dev/null
+      - name: Fresh-process partner seams and host-configured maps suite
+        run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
+
+  building-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'building-partners')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - profile: building-present
             args: "--building"
             excludes: ""
@@ -163,10 +232,12 @@ jobs:
       - name: Migrate
         working-directory: ci_game
         run: evennia migrate --noinput < /dev/null
-      - name: Fresh-process partner seams and host-configured maps suite
+      - name: Building suite and partner seams with verified absence
         run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
   resources-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'resources-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -209,6 +280,8 @@ jobs:
         run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
 
   economy-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'economy-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -248,6 +321,8 @@ jobs:
         run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
 
   crafting-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'crafting-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -287,6 +362,8 @@ jobs:
         run: python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox ${{ matrix.absent }}
 
   rp-contest-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'rp-contest-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -325,17 +402,35 @@ jobs:
       - name: Contest seams with verified partner absence
         run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
 
-  rp-sandbox:
+  sandbox:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'sandbox')
     runs-on: ubuntu-latest
-    # The all-present profile runs the full reference game, not just RP seams.
+    # The full reference game, which wires every contrib.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Evennia in a fresh environment
+        run: pip install evennia==6.0.0
+      - name: Initialize dependency installation host
+        run: evennia --init ci_game < /dev/null
+      - name: Install every contrib
+        run: python scripts/ci_install_contribs.py ci_game
+      - name: Sandbox gate
+        run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox
+
+  rp-sandbox:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'rp-sandbox')
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
           - profile: no-scenes
             excludes: "--exclude evennia-scenes"
             absent: "--absent evennia_scenes"
@@ -369,6 +464,8 @@ jobs:
         run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}
 
   crafting-independent:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'crafting-independent')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -387,6 +484,8 @@ jobs:
         run: python scripts/ci_run_crafting_core_tests.py ci_game
 
   npc-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'npc-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -426,7 +525,12 @@ jobs:
         run: python scripts/ci_run_npc_tests.py ci_game ${{ matrix.absent }}
 
   live-playtest:
-    needs: [rp-sandbox]
+    needs: [scope, sandbox]
+    # Runs when selected even if the sandbox gate was skipped, but not after
+    # it failed.
+    if: >-
+      !failure() && !cancelled()
+      && contains(fromJSON(needs.scope.outputs.jobs), 'live-playtest')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -464,6 +568,8 @@ jobs:
 
 
   moderation-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'moderation-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -495,6 +601,8 @@ jobs:
         run: python scripts/ci_run_moderation_tests.py ci_game ${{ matrix.absent }} < /dev/null
 
   combat-independent:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'combat-independent')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -523,6 +631,8 @@ jobs:
           python scripts/ci_run_combat_tests.py ci_game --absent evennia_rp_chargen --absent evennia_scenes --absent evennia_posing --absent evennia_social --absent evennia_accessibility
 
   party-independent:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'party-independent')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

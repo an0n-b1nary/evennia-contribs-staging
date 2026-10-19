@@ -523,8 +523,8 @@ and their contrib defaults are listed there. To rename a command such as
 `+pips`, follow "Renaming things for your game" in the
 [rp-chargen README](../contribs/rpg/evennia_rp_chargen/README.md#renaming-things-for-your-game).
 
-The CI `rp-sandbox` job runs the full sandbox gate with all partners, then
-fresh environments with scenes, tracker, XP, chargen, equipment or contest
+The CI `sandbox` job runs the full sandbox gate with all partners, and the
+`rp-sandbox` job runs fresh environments with scenes, tracker, XP, chargen, equipment or contest
 physically absent (equipment leaves with chargen, which it requires). For a local drill, create a fresh venv, install Evennia 6.0.0, and use
 `ci_install_contribs.py <install-game> --exclude <distribution>` before
 `ci_run_rp_sandbox_tests.py <new-game-dir> --absent <app_label>`.
