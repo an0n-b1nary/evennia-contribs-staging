@@ -7,7 +7,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
 
 PARTNERS = (
     "evennia_posing",
@@ -19,11 +19,11 @@ PARTNERS = (
 )
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("game_dir", type=Path)
     parser.add_argument("--absent", action="append", default=[], choices=PARTNERS)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     game = args.game_dir.resolve()
     for label in args.absent:
         if find_spec(label) is not None:
@@ -38,7 +38,8 @@ def main():
         "from server.conf.settings import *\n"
         f"INSTALLED_APPS += [label for label in {labels!r} if label not in INSTALLED_APPS]\n"
         f"MODERATION_ABSENT_PARTNERS = {args.absent!r}\n"
-        "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n",
+        "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
+        + LINKS_TEST_RUNNER,
         encoding="utf-8",
     )
     for settings_file, labels in (

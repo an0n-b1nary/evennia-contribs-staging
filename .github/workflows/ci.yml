@@ -48,8 +48,9 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    # Full contrib runs exceed an hour; allow setup and variance on all versions.
-    timeout-minutes: 120
+    # A cell takes about 9 minutes with parallel workers; the limit leaves room
+    # for setup, slow runners and suite growth.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -327,8 +328,7 @@ jobs:
   rp-sandbox:
     runs-on: ubuntu-latest
     # The all-present profile runs the full reference game, not just RP seams.
-    # Match the full contrib budget; absent-partner profiles keep a short limit.
-    timeout-minutes: ${{ matrix.profile == 'all-present' && 120 || 30 }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

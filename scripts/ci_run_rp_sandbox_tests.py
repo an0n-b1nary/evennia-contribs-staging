@@ -12,7 +12,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import test_exit_code
+from ci_run_partner_tests import PARALLEL, test_exit_code
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTNERS = (
@@ -66,7 +66,7 @@ def main(argv=None):
         ["world.sandbox.test_rp_partners"] if args.absent else ["typeclasses", "commands", "world"]
     )
     result = subprocess.run(
-        [launcher, "test", "--settings=test_settings.py", *labels],
+        [launcher, "test", "--settings=test_settings.py", PARALLEL, *labels],
         cwd=game,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
