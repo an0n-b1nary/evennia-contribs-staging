@@ -1,6 +1,7 @@
 ---
 key: glossary-coin
 kind: term
+requires: RP_ECONOMY_REVEALED
 title: Coin
 summary: The sandbox's currency, paid out weekly.
 ---

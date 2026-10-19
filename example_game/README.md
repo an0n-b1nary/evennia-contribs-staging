@@ -373,7 +373,7 @@ the installed contribs ship: player pages for each system (`checks`,
 `rp-sessions`, `xp`, `lore`, `plots`, `calendar`, `map`, `regions`, `boards`,
 `requests`, `accessibility`, `npcs`, `building`, `building-frontier`, `combat`,
 `combat-moves`, `combat-storytelling`, `party`, `party-surge`,
-`party-boss-checks`, `equipment`, `joining`), a few principles and glossary
+`party-boss-checks`, `equipment`, `joining`, `economy`, `resources`), a few principles and glossary
 terms, and staff pages: guides' own `writing-guides` and the contribs'
 `<contrib>-staff` pages (so far `equipment-staff`, `moderation-staff`,
 `jobs-staff`, `social-staff` and `rptracker-staff`). A page here with the same
@@ -386,7 +386,7 @@ Start here, and the systems table links each contrib's player page when players
 can see it. `start-here` links every system page by what a player wants to do.
 `GUIDES_STAFF_LOCK` is `perm(Builder)`, matching the staff commands, so anyone
 who can run a staff command can read the staff pages. In this sandbox,
-`+sandbox/builder on` grants that. `trading` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
+`+sandbox/builder on` grants that. `economy` requires `RP_ECONOMY_REVEALED`, which is a runtime setting:
 turn it off with `+runtime RP_ECONOMY_REVEALED=false` and the page, and the
 links to it, disappear without a reload. Every page's "Ask about this page"
 opens the jobs request form, prefilled. The guide is web-only and separate from in-game `help`. Run

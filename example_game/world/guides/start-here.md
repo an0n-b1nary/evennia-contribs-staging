@@ -17,7 +17,7 @@ Contribs are tested on their own, but most problems show up only when they meet.
 - **The map** shows every room, its terrain and what's happening there.
 - **Scenes** and **Happening Now** list the scenes being played.
 - **Lore**, **Plots** and the **Calendar** hold the world's memory and what's coming.
-- [[trading]] covers money in this sandbox.
+- [[economy]] covers money and trade, and [[resources]] what your character gathers each week.
 
 ## In the game
 
@@ -48,7 +48,7 @@ Each system has its own page. Pages for systems this game hasn't opened yet show
 - **Grow:** [[rp-sessions]] and [[xp]].
 - **Follow the story:** [[plots]], [[lore]] and [[calendar]].
 - **Find your way around:** [[map]] and [[regions]]. For a place of your own, see [[building]]. To add to the public world, see [[building-frontier]].
-- **Make and trade:** [[trading]].
+- **Make and trade:** [[economy]] for money, trading, stalls and shops, and [[resources]] for gathering.
 - **Fight, or play as a team:** [[combat]], with [[combat-moves]] for the choices in an exchange and [[combat-storytelling]] for running a fight. Team up with a [[party]], build toward a [[party-surge]], and take on [[party-boss-checks]].
 - **Talk to the community or ask staff:** [[boards]] and [[requests]].
 - **Change how the game reads to you:** [[accessibility]].
