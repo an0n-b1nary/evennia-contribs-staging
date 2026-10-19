@@ -373,7 +373,9 @@ the installed contribs ship: player pages for each system (`checks`,
 `rp-sessions`, `xp`, `lore`, `plots`, `calendar`, `map`, `regions`, `boards`,
 `requests`, `accessibility`, `npcs`, `building`, `building-frontier`, `combat`,
 `combat-moves`, `combat-storytelling`, `party`, `party-surge`,
-`party-boss-checks`, `equipment`, `joining`, `economy`, `resources`), a few principles and glossary
+`party-boss-checks`, `equipment`, `joining`, `economy`, `resources`, `crafting`,
+`crafting-letters`, `crafting-fixtures`, `companions`, `crafting-modifiers`,
+`patterns`), a few principles and glossary
 terms, and staff pages: guides' own `writing-guides` and the contribs'
 `<contrib>-staff` pages (so far `equipment-staff`, `moderation-staff`,
 `jobs-staff`, `social-staff` and `rptracker-staff`). A page here with the same

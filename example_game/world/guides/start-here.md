@@ -48,7 +48,7 @@ Each system has its own page. Pages for systems this game hasn't opened yet show
 - **Grow:** [[rp-sessions]] and [[xp]].
 - **Follow the story:** [[plots]], [[lore]] and [[calendar]].
 - **Find your way around:** [[map]] and [[regions]]. For a place of your own, see [[building]]. To add to the public world, see [[building-frontier]].
-- **Make and trade:** [[economy]] for money, trading, stalls and shops, and [[resources]] for gathering.
+- **Make and trade:** [[economy]] for money, trading, stalls and shops, and [[resources]] for gathering. [[crafting]] covers making things, with [[crafting-letters|books and letters]], [[crafting-fixtures|fixtures]], [[companions]], [[crafting-modifiers|services on finished things]] and [[patterns]].
 - **Fight, or play as a team:** [[combat]], with [[combat-moves]] for the choices in an exchange and [[combat-storytelling]] for running a fight. Team up with a [[party]], build toward a [[party-surge]], and take on [[party-boss-checks]].
 - **Talk to the community or ask staff:** [[boards]] and [[requests]].
 - **Change how the game reads to you:** [[accessibility]].

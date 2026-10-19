@@ -159,10 +159,11 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("evennia_rp_equipment", "/guide/equipment/"),
             ("evennia_economy", "/guide/economy/"),
             ("evennia_rp_resources", "/guide/resources/"),
+            ("evennia_rp_crafting", "/guide/crafting/"),
         ):
             with self.subTest(app_label):
                 self.assertIn(f'href="{url}" aria-label="Guide page for {app_label}"', html)
-        for app_label in ("evennia_rp_crafting", "evennia_moderation"):
+        for app_label in ("evennia_moderation",):
             with self.subTest(app_label):
                 self.assertIn(f"<code>{app_label}</code>", html)
         self.assertNotIn('aria-label="Guide page for evennia_guides"', html)
@@ -386,6 +387,23 @@ class TestGuidesInTheSandbox(EvenniaTest):
             ("BUILDING_REVEALED", ("building", "building-frontier")),
             ("RP_ECONOMY_REVEALED", ("economy", "glossary-coin")),
             ("RP_RESOURCES_REVEALED", ("resources", "glossary-lean")),
+            (
+                "RP_CRAFTING_REVEALED",
+                (
+                    "crafting",
+                    "crafting-letters",
+                    "crafting-fixtures",
+                    "companions",
+                    "crafting-modifiers",
+                    "patterns",
+                    "glossary-workshop",
+                    "glossary-hallmark",
+                    "glossary-pattern",
+                ),
+            ),
+            ("RP_CRAFTING_WAVE_TWO_REVEALED", ("crafting-fixtures",)),
+            ("RP_CRAFTING_WAVE_THREE_REVEALED", ("companions", "crafting-modifiers")),
+            ("RP_CRAFTING_PATTERNS_REVEALED", ("patterns", "glossary-pattern")),
         ):
             runtime.set(setting, False)
             try:
@@ -428,3 +446,39 @@ class TestGuidesInTheSandbox(EvenniaTest):
                     self.assertContains(self.client.get(url), text)
             finally:
                 runtime.reset(setting)
+
+    def test_the_crafting_pages_render_their_text(self):
+        for key, text in (
+            ("crafting", "Breadth, never quality"),
+            ("crafting", "Made to last"),
+            ("crafting-letters", "A seal is a story, not a lock"),
+            ("crafting-fixtures", "Decorating for a scene"),
+            ("companions", "A companion is yours, not a character"),
+            ("crafting-modifiers", "Added, never overwritten"),
+            ("patterns", "Learnt in play"),
+            ("glossary-hallmark", "it travels with the item"),
+            ("principles", "Breadth, never quality"),
+        ):
+            with self.subTest(key, text=text):
+                response = self.client.get(f"/guide/{key}/")
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, text)
+        # The crafting pages tag the resources principles, a hard dependency.
+        self.assertContains(self.client.get("/guide/crafting/"), 'href="/guide/nothing-decays/"')
+
+    def test_a_staged_crafting_page_hides_alone_and_stays_readable_by_staff(self):
+        """Hiding wave three hides companions and services, not the rest of crafting."""
+        from evennia_links import runtime
+
+        runtime.set("RP_CRAFTING_WAVE_THREE_REVEALED", False)
+        try:
+            self.assertEqual(self.client.get("/guide/companions/").status_code, 404)
+            self.assertEqual(self.client.get("/guide/crafting/").status_code, 200)
+            start = self.client.get("/guide/start-here/").content.decode()
+            self.assertNotIn('href="/guide/companions/"', start)
+            self.assertIn('href="/guide/crafting/"', start)
+
+            self._reader(self.account, "Builder")
+            self.assertContains(self.client.get("/guide/companions/"), "Giving it away")
+        finally:
+            runtime.reset("RP_CRAFTING_WAVE_THREE_REVEALED")

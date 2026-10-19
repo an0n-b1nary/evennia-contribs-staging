@@ -361,6 +361,25 @@ component. The additive migration leaves earlier records intact; their Readable
 configuration is interpreted as Carried + Readable without rewriting history.
 Earlier saved drafts continue through the same single-behaviour shorthand.
 
+## Guide pages
+
+The `guides/` directory holds player pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `crafting`,
+`crafting-letters`, `crafting-fixtures`, `companions`, `crafting-modifiers`
+and `patterns`, three glossary terms (`glossary-workshop`,
+`glossary-hallmark`, `glossary-pattern`) and the design principle
+`breadth-not-quality`. Each page requires `RP_CRAFTING_REVEALED`, and pages
+on staged features also require their switch: fixtures
+`RP_CRAFTING_WAVE_TWO_REVEALED`, companions and modifiers
+`RP_CRAFTING_WAVE_THREE_REVEALED`, and Patterns
+`RP_CRAFTING_PATTERNS_REVEALED`. They describe the system in general terms,
+without exact numbers, and link and tag only this contrib's pages and those of
+evennia-rp-resources, a required dependency. Equipment, economy, lore, scenes,
+plots and jobs are named in prose without links, since they're optional. With
+evennia-guides installed the pages appear on its web guide; without it they're
+ignored. To restate one for your game, add a page with the same key to
+`GUIDES_DIRS`.
+
 ## Runtime controls and partners
 
 Use `+runtime` for `RP_CRAFTING_REVEALED` (True), `FROZEN` (False), `NICHE_CAP`
