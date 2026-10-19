@@ -169,6 +169,16 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
             settings.index('"evennia_rp_rules"'), settings.index('"evennia_rp_contest"')
         )
         self.assertIn("MD5PasswordHasher", settings)
+        self.assertNotIn("TEST_RUNNER", settings)
+
+    def test_links_installs_its_task_isolating_test_runner(self):
+        self.add("base_systems", "evennia_links")
+        code, _, _ = self.run_main()
+        self.assertEqual(code, 0)
+        self.assertIn(
+            'TEST_RUNNER = "evennia_links.testing.TestRunner"',
+            self.settings.read_text(encoding="utf-8"),
+        )
 
     def test_optional_partner_is_not_installed_or_registered(self):
         self.add("game_systems", "evennia_calendar")
