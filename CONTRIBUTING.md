@@ -309,7 +309,11 @@ Actions tab, for any branch) run every job. A PR runs less:
 
 The partner-profile jobs (`*-partners`, `rp-sandbox`, and the
 `*-independent` jobs) each install one combination of partners in a fresh
-environment. The sandbox gate, crafting, lore/items, and building and calendar
+environment. `ci_install_contribs.py` installs the selection with one
+`pip install --no-build-isolation -e … -e …` call after the contribs' build
+requirements, every job caches pip downloads, and partner jobs skip
+`evennia migrate` because creating the test database runs the migrations. The
+sandbox gate, crafting, lore/items, and building and calendar
 partner suites run with parallel workers; file-backed race runs stay serial.
 Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
 which stops Evennia's test fixture from keeping each finished test's world in
@@ -317,8 +321,7 @@ memory.
 
 The `test`, partner, `sandbox` and `live-playtest` jobs have a 30-minute
 limit, the `*-independent` and `moderation-partners` jobs 20 minutes, and
-lint and `scope` 5. These
-bounds include installation and migration.
+lint and `scope` 5. These bounds include installation.
 
 A skipped partner job reports as skipped, not failed. A failure in the nightly
 run shows on the Actions tab and notifies whoever last changed the schedule.

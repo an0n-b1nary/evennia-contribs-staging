@@ -41,9 +41,10 @@ every watcher — treat it as an incident alarm, not as cover.
   `server/conf/test_settings.py` is the integration-gate settings module
 - `scripts/ci_install_contribs.py`, `scripts/ci_run_tests.py` — CI harness
   (install all contribs into a throwaway game, run every suite). The installer
-  topo-sorts contribs by their hard `[project] dependencies` on sibling
-  contribs, so declare every hard sibling dependency there — an undeclared one
-  installs in path order and breaks once names stop sorting conveniently
+  installs the selection in one pip call and topo-sorts `INSTALLED_APPS` by
+  the contribs' hard `[project] dependencies` on siblings, so declare every
+  hard sibling dependency there — an undeclared one registers in path order
+  and escapes the check that refuses to exclude a partner something requires
 - `.pre-commit-config.yaml` — anonymity guards + ruff; repo-root
   `pyproject.toml` holds the shared ruff config
 

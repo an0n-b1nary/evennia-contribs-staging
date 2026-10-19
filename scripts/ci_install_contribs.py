@@ -1,13 +1,18 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Iterate contribs, pip-install each, append app labels to INSTALLED_APPS.
+"""Pip-install the contribs in one call, append app labels to INSTALLED_APPS.
 
-Contribs are installed in dependency order: each package's hard
+Contribs are registered in dependency order: each package's hard
 `[project] dependencies` on *other contribs in this repo* are honoured, so a
-contrib is always installed (and registered in INSTALLED_APPS) after every
-contrib it requires. Without this, `pip install -e` of a dependent package
-would try to fetch an unpublished sibling from PyPI and fail. Ties are broken
-by path, which keeps the order stable and close to the old alphabetical one.
+contrib always appears in INSTALLED_APPS after every contrib it requires.
+Ties are broken by path, which keeps the order stable and close to the old
+alphabetical one.
+
+One `pip install -e ... -e ...` call resolves the whole selection at once, so a
+sibling requirement is met by its local path rather than fetched from PyPI. The
+contribs' build requirements are installed first and the builds skip pip's
+per-package isolated build environment, which made installing every contrib
+take several times longer.
 
 Optional dependencies (`[project.optional-dependencies]`) are deliberately not
 ordering edges: optional partners are wired through gated `AppConfig.ready()`
@@ -53,11 +58,13 @@ class Contrib:
         path: The package directory (holds `pyproject.toml`).
         name: The PEP 503-normalized distribution name.
         requires: Normalized names of every hard dependency, local or not.
+        build_requires: The `[build-system] requires` strings.
     """
 
     path: pathlib.Path
     name: str
     requires: frozenset[str]
+    build_requires: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -85,11 +92,19 @@ def requirement_name(requirement: str) -> str:
 def load_contrib(path: pathlib.Path) -> Contrib:
     """Read a contrib's name and hard dependencies from its `pyproject.toml`."""
     with (path / "pyproject.toml").open("rb") as f:
-        project = tomllib.load(f).get("project", {})
+        pyproject = tomllib.load(f)
+    project = pyproject.get("project", {})
     if "name" not in project:
         raise ContribGraphError(f"{path / 'pyproject.toml'} has no [project] name")
     requires = frozenset(requirement_name(req) for req in project.get("dependencies", []))
-    return Contrib(path=path, name=normalize_name(project["name"]), requires=requires)
+    # PEP 518: a project without [build-system] builds with setuptools.
+    build = pyproject.get("build-system", {}).get("requires", ["setuptools>=40.8.0"])
+    return Contrib(
+        path=path,
+        name=normalize_name(project["name"]),
+        requires=requires,
+        build_requires=tuple(build),
+    )
 
 
 def discover_contribs(root: pathlib.Path = CONTRIBS_ROOT) -> list[Contrib]:
@@ -187,19 +202,17 @@ def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
         print(f"Can't order contribs: {exc}", file=sys.stderr)
         return 1
 
-    labels: list[str] = []
-    for contrib in contribs:
-        print(f"Installing {contrib.path}")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-e", str(contrib.path)],
-            check=True,
-            stdin=subprocess.DEVNULL,
-        )
-        labels.append(contrib.label)
-
+    labels = [contrib.label for contrib in contribs]
     if not labels:
         print("No contribs to install yet.")
         return 0
+
+    pip = [sys.executable, "-m", "pip", "install"]
+    build_requires = sorted({req for contrib in contribs for req in contrib.build_requires})
+    subprocess.run([*pip, *build_requires], check=True, stdin=subprocess.DEVNULL)
+    editables = [arg for contrib in contribs for arg in ("-e", str(contrib.path))]
+    print(f"Installing {', '.join(labels)}")
+    subprocess.run([*pip, "--no-build-isolation", *editables], check=True, stdin=subprocess.DEVNULL)
 
     with settings_path.open("a", encoding="utf-8") as f:
         f.write("\n# Auto-added by scripts/ci_install_contribs.py (dependency order)\n")

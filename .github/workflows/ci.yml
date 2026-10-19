@@ -11,6 +11,11 @@ on:
     - cron: "23 7 * * *"
   workflow_dispatch:
 
+# Every job caches pip downloads, keyed on this file (the Evennia pin) and the
+# contribs' pyproject files. Partner jobs don't run `evennia migrate`: creating
+# the test database applies every installed app's migrations, and no partner
+# runner uses the game's own database.
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -24,6 +29,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install pre-commit, ruff and metadata checks
         run: pip install pre-commit ruff==0.16.10 packaging
       - name: Write anonymity patterns from secret
@@ -91,6 +100,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia
         # Pinned to the Evennia version the source project runs on.
         # Bump deliberately, in lockstep with the source project's runtime.
@@ -147,6 +160,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install pinned Evennia
         run: pip install evennia==6.0.0
       - name: Initialize throwaway game
@@ -176,15 +193,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize throwaway game directory
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Fresh-process partner seams and host-configured maps suite
         run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
@@ -223,15 +241,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize throwaway game directory
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Building suite and partner seams with verified absence
         run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
@@ -267,15 +286,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize disposable host
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Resources suite and real partner seams
         run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
 
@@ -308,15 +328,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize disposable host
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Economy suite and real partner seams
         run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
 
@@ -352,6 +373,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize dependency installation host
@@ -390,15 +415,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize disposable game
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Contest seams with verified partner absence
         run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
 
@@ -413,6 +439,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize dependency installation host
@@ -454,6 +484,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize dependency installation host
@@ -473,6 +507,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install only hard partners
         run: |
           pip install evennia==6.0.0
@@ -512,15 +550,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install Evennia in a fresh environment
         run: pip install evennia==6.0.0
       - name: Initialize disposable host
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: NPC suite and verified partner seams
         run: python scripts/ci_run_npc_tests.py ci_game ${{ matrix.absent }}
 
@@ -538,6 +577,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install runtime and live driver
         run: pip install evennia==6.0.0 psutil==7.1.0 playwright==1.62.0
       - name: Install Chromium
@@ -590,6 +633,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install only hard dependencies and selected communication partners
         run: |
           pip install evennia==6.0.0
@@ -610,6 +657,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install combat with only its hard partners
         run: |
           pip install evennia==6.0.0
@@ -640,6 +691,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            contribs/*/*/pyproject.toml
       - name: Install hard partners and packaged combat/Party
         run: |
           pip install evennia==6.0.0
