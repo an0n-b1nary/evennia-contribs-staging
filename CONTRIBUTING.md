@@ -311,7 +311,7 @@ The partner-profile jobs (`*-partners`, `rp-sandbox`, and the
 `*-independent` jobs) each install one combination of partners in a fresh
 environment. `ci_install_contribs.py` installs the selection with one
 `pip install --no-build-isolation -e … -e …` call after the contribs' build
-requirements, every job caches pip downloads, and partner jobs skip
+requirements, and partner jobs skip
 `evennia migrate` because creating the test database runs the migrations. The
 sandbox gate, crafting, lore/items, and building and calendar
 partner suites run with parallel workers; file-backed race runs stay serial.
