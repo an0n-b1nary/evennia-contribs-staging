@@ -23,8 +23,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # with its own copy of the test database (DJANGO_TEST_PROCESSES overrides the
 # count). File-backed race runs stay serial.
 PARALLEL = "--parallel=auto"
-# Evennia 6.0's test mixin leaves a login task per test that keeps the whole
-# test world in memory, so a serial run slows with every test. Hosts that
+# Evennia 6.0's test mixin leaves a login task and queued log writes behind per
+# test, so a serial run slows with every test. Hosts that
 # ci_install_contribs.py doesn't configure add this line to their settings;
 # see evennia_links/testing.py.
 LINKS_TEST_RUNNER = 'TEST_RUNNER = "evennia_links.testing.TestRunner"\n'

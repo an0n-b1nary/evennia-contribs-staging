@@ -20,7 +20,7 @@ from server.conf.settings import *  # noqa: F403
 # settings.py (see the warning comment in its "Public exposure" section).
 PASSWORD_HASHERS = ("django.contrib.auth.hashers.MD5PasswordHasher",)
 
-# Evennia 6.0's test mixin leaves a login task per test that keeps the whole
-# test world in memory, so the run slows with every test. This runner removes
-# it; see evennia_links/testing.py.
+# Evennia 6.0's test mixin leaves a login task and queued log writes behind per
+# test, so the run slows with every test. This runner removes them and freezes
+# the startup heap; see evennia_links/testing.py.
 TEST_RUNNER = "evennia_links.testing.TestRunner"

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Test runner that stops Evennia test tasks outliving their test.
+Test runner that stops Evennia tests' leftover work slowing the run down.
 
 Point a game's test settings at it::
 
@@ -20,7 +20,24 @@ slows down with every test it has already run.
 
 This runner removes, at the end of each Evennia test, the tasks that test
 added. A task scheduled in one test can never run in a later one, so no test
-can observe the difference. It also prepares Django's parallel workers when
+can observe the difference.
+
+The same mixin creates its rooms, exit and characters with default locks that
+their typeclasses then replace, and ``LockHandler`` reports each replacement
+through ``logger.log_file``, which hands the write to the reactor's thread
+pool. Tests never run the reactor or start that pool, so the writes queue
+forever, five per test, each holding its ``Deferred`` and closures. The runner
+stops the never-started pool, which makes it drop new work instead of queueing
+it. That work could never run either way.
+
+The full collection at the end of every test still walks every object Django,
+Evennia and the contribs created at import time. The runner freezes those
+objects (``gc.freeze()``) once the test databases exist, so each collection
+only walks what the tests created. Everything a test creates is collected as
+before; an import-time object that becomes cyclic garbage during the run is
+only kept until the run ends.
+
+It also prepares Django's parallel workers when
 they are spawned instead of forked (the Linux default from Python 3.14), which
 Evennia's own runner setup does not reach.
 
@@ -28,7 +45,9 @@ This works around Evennia 6.0's test harness; drop it once Evennia's
 ``EvenniaTestMixin`` cleans up its own login task.
 """
 
+import contextlib
 import functools
+import gc
 
 from django.test.runner import ParallelTestSuite
 from evennia.server.tests.testrunner import EvenniaTestSuiteRunner
@@ -68,6 +87,43 @@ def isolate_tasks():
     EvenniaTestMixin.tearDown = tearDown
 
 
+def discard_thread_work():
+    """Stop the reactor's thread pool if it never started.
+
+    A stopped pool drops new work, and the ``Deferred`` that ``deferToThread``
+    returns never fires, as it never did while the work sat in the queue. The
+    reactor's shutdown trigger is removed so it doesn't stop the pool again.
+    Safe to call more than once. A started pool is left alone.
+    """
+    from twisted.internet import reactor
+
+    pool = reactor.getThreadPool()
+    if pool.started or pool.joined:
+        return
+    if reactor.threadpoolShutdownID is not None:
+        reactor.removeSystemEventTrigger(reactor.threadpoolShutdownID)
+        reactor.threadpoolShutdownID = None
+    pool.stop()
+
+
+@contextlib.contextmanager
+def frozen_heap():
+    """Freeze every live object for the duration, so collections skip them.
+
+    Garbage is collected first so it isn't frozen. Does nothing when objects
+    are already frozen, for example in a forked worker or a nested run.
+    """
+    if gc.get_freeze_count():
+        yield
+        return
+    gc.collect()
+    gc.freeze()
+    try:
+        yield
+    finally:
+        gc.unfreeze()
+
+
 def _prepare_worker(settings_module):
     """Set up a spawned or forkserver test worker the way the parent was.
 
@@ -94,6 +150,9 @@ def _prepare_worker(settings_module):
     evennia._init()
     settings.TEST_ENVIRONMENT = True
     isolate_tasks()
+    discard_thread_work()
+    gc.collect()
+    gc.freeze()
 
 
 class _ParallelTestSuite(ParallelTestSuite):
@@ -107,10 +166,15 @@ class _ParallelTestSuite(ParallelTestSuite):
 
 
 class TestRunner(EvenniaTestSuiteRunner):
-    """Evennia's test runner, with test tasks removed at the end of each test."""
+    """Evennia's test runner, without the leftover work that slows long runs down."""
 
     parallel_test_suite = _ParallelTestSuite
 
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
         isolate_tasks()
+        discard_thread_work()
+
+    def run_suite(self, suite, **kwargs):
+        with frozen_heap():
+            return super().run_suite(suite, **kwargs)
