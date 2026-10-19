@@ -1311,13 +1311,9 @@ class CmdRsvp(MuxCommand):
             )
 
         self.caller.msg(f"|g{target.key} has been invited to '{event.title}'.|n")
-        if target.has_account:
-            target.msg(
-                f"|y{self.caller.key} has invited you to |w'{event.title}'|n "
-                f"({event.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC).\n"
-                f"Confirm with |w+rsvp/confirm {event.pk}|n "
-                f"(deadline: {event.confirmation_deadline.strftime('%Y-%m-%d %H:%M')} UTC).|n"
-            )
+        from evennia_calendar import notices
+
+        notices.notify(rsvp, "invited", notices.invited_message(event, host=self.caller.key))
 
     # ------------------------------------------------------------------
     # Host: ping
@@ -1345,16 +1341,11 @@ class CmdRsvp(MuxCommand):
         next_up.save(update_fields=["status", "waitlist_position", "updated_at"])
         with contextlib.suppress(Exception):
             waitlist_promoted.send(sender=next_up.__class__, event=event, rsvp=next_up)
+        # The waitlist_promoted receiver in notices tells them, now or at next login.
         self.caller.msg(
             f"|g{next_up.character_name} has been offered the next spot "
             f"for '{event.title}'. They must confirm with +rsvp/confirm {event.pk}.|n"
         )
-        if next_up.character and next_up.character.has_account:
-            next_up.character.msg(
-                f"|yA spot has opened for |w'{event.title}'|n! "
-                f"Use |w+rsvp/confirm {event.pk}|n to accept "
-                f"(deadline: {event.confirmation_deadline.strftime('%Y-%m-%d %H:%M')} UTC).|n"
-            )
 
     # ------------------------------------------------------------------
     # Priority tokens

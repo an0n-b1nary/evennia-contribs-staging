@@ -1668,3 +1668,192 @@ class TestClusterPageWithoutLiveSession(EvenniaTest):
         response = EventCreateView.as_view()(request)
         response.render()
         self.assertIn(f"Posting as <strong>{self.char1.key}</strong>", response.content.decode())
+
+
+# ---------------------------------------------------------------------------
+# Notices: draws, places, invites and reminders reach the player
+# ---------------------------------------------------------------------------
+
+
+class TestNotices(EvenniaTest):
+    """Each notice reaches a connected player now and an offline one at next puppet."""
+
+    def _waiting(self, character, kind=None):
+        from evennia_calendar.models import CalendarNotice
+
+        rows = CalendarNotice.objects.filter(character=character, delivered_at__isnull=True)
+        return rows.filter(kind=kind) if kind else rows
+
+    def _deliver(self, character):
+        """Puppet *character* through Evennia's signal and return what it was told."""
+        from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET
+
+        with patch.object(character, "msg") as msg:
+            SIGNAL_OBJECT_POST_PUPPET.send(sender=character, session=None)
+        return "\n".join(str(call.args[0]) for call in msg.call_args_list)
+
+    def _online(self, *characters):
+        from evennia_calendar import notices
+
+        return patch.object(notices, "is_online", side_effect=lambda char: char in characters)
+
+    def _waitlisted(self, ev, character, position=1):
+        return RSVP.objects.create(
+            event=ev,
+            character=character,
+            character_name=character.key,
+            status=RSVP.Status.WAITLISTED,
+            waitlist_position=position,
+        )
+
+    def test_a_player_drawn_while_offline_is_told_at_next_puppet(self):
+        ev = _make_staff_event(self.char1, cap=2, hours=96)
+        _rsvp_lottery(ev, self.char2)
+        with self._online():
+            run_lottery(ev, rng=_seeded_rng())
+        self.assertEqual(self._waiting(self.char2, "drawn").count(), 1)
+
+        told = self._deliver(self.char2)
+        self.assertIn("You were drawn for", told)
+        self.assertIn(f"+rsvp/confirm {ev.pk}", told)
+        self.assertFalse(self._waiting(self.char2).exists())
+        self.assertEqual(self._deliver(self.char2), "")  # Shown once.
+
+    def test_a_connected_player_is_told_at_once(self):
+        ev = _make_staff_event(self.char1, cap=2, hours=96)
+        _rsvp_lottery(ev, self.char2)
+        with self._online(self.char2), patch.object(self.char2, "msg") as msg:
+            run_lottery(ev, rng=_seeded_rng())
+        msg.assert_called_once()
+        self.assertIn("You were drawn for", msg.call_args.args[0])
+        self.assertFalse(self._waiting(self.char2).exists())
+
+    def test_a_waiting_notice_that_no_longer_applies_is_dropped(self):
+        """Released before they logged in: no request to confirm a lost place."""
+        ev = _make_staff_event(self.char1, cap=2, hours=96)
+        _rsvp_lottery(ev, self.char2)
+        with self._online():
+            run_lottery(ev, rng=_seeded_rng())
+            expire_unconfirmed(ev)
+        self.assertEqual(self._deliver(self.char2), "")
+        self.assertFalse(self._waiting(self.char2).exists())
+
+    def test_a_cancelled_event_drops_its_waiting_notices(self):
+        ev = _make_staff_event(self.char1, cap=2, hours=96)
+        _rsvp_lottery(ev, self.char2)
+        with self._online():
+            run_lottery(ev, rng=_seeded_rng())
+        ev.is_cancelled = True
+        ev.save(update_fields=["is_cancelled"])
+        self.assertEqual(self._deliver(self.char2), "")
+
+    def test_a_cluster_draw_tells_each_seated_player(self):
+        cluster = _make_cluster(self.char1, locked=True)
+        ev = _make_staff_event(self.char1, cap=2, hours=100, cluster=cluster)
+        crsvp = ClusterRSVP.objects.create(
+            cluster=cluster, character=self.char2, character_name=self.char2.key
+        )
+        ClusterRSVPPreference.objects.create(cluster_rsvp=crsvp, event=ev, rank=1)
+        with self._online():
+            run_cluster_lottery(cluster, rng=_seeded_rng())
+        self.assertIn("You were drawn for", self._deliver(self.char2))
+
+    def test_moving_up_the_waitlist_says_the_place_is_yours(self):
+        ev = _make_event(self.char1, participant_cap=1)
+        self._waitlisted(ev, self.char2)
+        with self._online():
+            promote_waitlist(ev, count=1)
+        told = self._deliver(self.char2)
+        self.assertIn("you're confirmed", told)
+        self.assertNotIn("+rsvp/confirm", told)
+
+    def test_a_host_ping_offers_the_place_once(self):
+        from evennia_calendar.commands import CmdRsvp
+
+        ev = _make_event(self.char1, participant_cap=1)
+        self._waitlisted(ev, self.char2)
+        cmd = CmdRsvp()
+        cmd.caller, cmd.switches, cmd.args = self.char1, ["ping"], str(ev.pk)
+        with self._online(self.char2), patch.object(self.char2, "msg") as msg:
+            cmd.func()
+        msg.assert_called_once()
+        self.assertIn("A place has opened", msg.call_args.args[0])
+        self.assertIn(f"+rsvp/confirm {ev.pk}", msg.call_args.args[0])
+
+    def test_a_host_invite_names_the_host_and_waits_for_an_offline_guest(self):
+        from evennia_calendar.commands import CmdRsvp
+
+        ev = _make_event(self.char1, participant_cap=3)
+        cmd = CmdRsvp()
+        cmd.caller, cmd.switches, cmd.args = self.char1, ["invite"], f"{ev.pk}={self.char2.key}"
+        with self._online():
+            cmd.func()
+        told = self._deliver(self.char2)
+        self.assertIn(f"{self.char1.key} has invited you", told)
+        self.assertIn(f"+rsvp/confirm {ev.pk}", told)
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_a_web_invite_tells_the_guest(self):
+        ev = _make_event(self.char1, participant_cap=3)
+        view = EventInviteView()
+        view.request = RequestFactory().post("/")
+        view.kwargs = {"pk": ev.pk}
+        view.get_character = lambda: self.char1.pk
+        form = type("Form", (), {"cleaned_data": {"character_name": self.char2.key}})()
+        with self._online():
+            view.form_valid(form)
+        self.assertIn(f"{self.char1.key} has invited you", self._deliver(self.char2))
+
+    def test_the_sweep_reminds_each_confirmed_player_once(self):
+        from evennia_calendar.scheduler import _sweep_events
+
+        ev = _make_event(self.char1, hours=12)
+        RSVP.objects.create(
+            event=ev,
+            character=self.char2,
+            character_name=self.char2.key,
+            status=RSVP.Status.CONFIRMED,
+        )
+        released = RSVP.objects.create(
+            event=ev,
+            character=self.char1,
+            character_name=self.char1.key,
+            status=RSVP.Status.RELEASED,
+        )
+        with self._online():
+            _sweep_events()
+            _sweep_events()
+        told = self._deliver(self.char2)
+        self.assertEqual(told.count("Reminder:"), 1)
+        self.assertIn(ev.title, told)
+        self.assertFalse(released.notices.exists())
+
+        with self._online():
+            _sweep_events()
+        self.assertEqual(self._deliver(self.char2), "")
+
+    def test_a_cancelled_event_sends_no_reminder(self):
+        from evennia_calendar.scheduler import _sweep_events
+
+        ev = _make_event(self.char1, hours=12)
+        rsvp = RSVP.objects.create(
+            event=ev,
+            character=self.char2,
+            character_name=self.char2.key,
+            status=RSVP.Status.CONFIRMED,
+        )
+        ev.is_cancelled = True
+        ev.save(update_fields=["is_cancelled"])
+        with self._online():
+            _sweep_events()
+        self.assertFalse(rsvp.notices.exists())
+
+    def test_a_failing_notice_never_breaks_the_draw(self):
+        from evennia_calendar import notices
+
+        ev = _make_staff_event(self.char1, cap=2, hours=96)
+        _rsvp_lottery(ev, self.char2)
+        with patch.object(notices, "notify", side_effect=RuntimeError("boom")):
+            run_lottery(ev, rng=_seeded_rng())
+        ev.refresh_from_db()
+        self.assertIsNotNone(ev.lottery_drawn_at)

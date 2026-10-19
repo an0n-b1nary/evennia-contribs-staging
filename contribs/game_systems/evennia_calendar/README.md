@@ -154,13 +154,36 @@ All signals are exported from `evennia_calendar` (safe to import at app-load tim
 | `event_created` | new CalendarEvent saved | `event` |
 | `event_cancelled` | event soft-cancelled | `event` |
 | `event_starting_soon` | 24 h reminder sweep | `event` |
-| `lottery_drawn` | lottery completed for an event | `event`, `selected_pks` |
+| `lottery_drawn` | lottery completed for an event | `event`, `selected`, `lottery_entered_remaining` |
 | `lottery_selected` | individual player selected | `event`, `rsvp` |
 | `lottery_confirmation_expired` | unconfirmed selection released | `event`, `rsvp` |
 | `rsvp_status_changed` | RSVP status transition | `rsvp`, `old_status`, `new_status` |
 | `waitlist_promoted` | waitlisted player offered a seat | `event`, `rsvp` |
-| `cluster_drawn` | cluster lottery completed | `cluster`, `results` |
-| `cluster_seat_assigned` | individual player assigned to event | `cluster`, `cluster_rsvp`, `event` |
+| `cluster_drawn` | cluster lottery completed | `cluster`, `seated_count`, `unseated_count` |
+| `cluster_seat_assigned` | individual player assigned to event | `cluster`, `cluster_rsvp`, `rsvp`, `rank_achieved` |
+
+## Player notices
+
+The calendar tells players about their own RSVPs, with no wiring:
+
+- **Drawn** in a lottery or seated by a cluster draw (`lottery_selected`,
+  `cluster_seat_assigned`), with the confirmation deadline.
+- **Given a place** from the waitlist when someone cancels (`waitlist_promoted`
+  to confirmed), or **offered one** by a host's `+rsvp/ping` (to invited).
+- **Invited** by a host, with `+rsvp/invite` or the web invite form.
+- **Reminded** of an event they're confirmed for, once per RSVP, when the sweep
+  fires `event_starting_soon`.
+
+`evennia_calendar.notices.notify()` messages a connected character at once.
+Otherwise it keeps a `CalendarNotice` row and delivers it the next time the
+character is puppeted, through Evennia's `SIGNAL_OBJECT_POST_PUPPET`. A waiting
+notice is dropped unread if the RSVP's status has changed since, or the event
+has been cancelled or has started. A conditional unique constraint holds
+reminders to one per RSVP, however often the sweep runs. Receivers are
+connected in `CalendarConfig.ready()` with `dispatch_uid`s, and a failing
+notice is logged without interrupting a draw or a command. Game code that
+wants to send its own notice about an RSVP can call `notify(rsvp, kind,
+message)` with a `CalendarNotice.Kind` value.
 
 ## Map tile overlay (optional partner: evennia-maps)
 
