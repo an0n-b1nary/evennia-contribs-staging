@@ -17,8 +17,10 @@ Run:
 
 import time
 from datetime import timedelta
+from unittest import skipUnless
 from unittest.mock import patch
 
+from django.apps import apps
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
 
@@ -703,6 +705,33 @@ class TestSceneBridgeListener(EvenniaTest):
             self.assertEqual(RPSessionSceneLink.objects.count(), 1)
         finally:
             rp_activity_recorded.disconnect(on_rp_activity_recorded)
+
+
+class TestDefaultSceneDisplay(EvenniaTest):
+    """+activity/detail names linked scenes by their public scene number."""
+
+    @skipUnless(apps.is_installed("evennia_scenes"), "requires evennia_scenes")
+    def test_uses_public_scene_number_not_pk(self):
+        from evennia_scenes.models import Scene
+
+        from evennia_rptracker.commands import _default_scene_display
+
+        scene = Scene.objects.create(
+            title="Bridge",
+            scene_number=9001,
+            room=self.room1,
+            room_name=self.room1.key,
+            creator=self.char1,
+            creator_name=self.char1.key,
+        )
+        self.assertNotEqual(scene.pk, 9001)
+        self.assertEqual(_default_scene_display(scene.pk), "Scene #9001")
+
+    def test_falls_back_to_the_stored_id(self):
+        from evennia_rptracker.commands import _default_scene_display
+
+        with self.settings(RPTRACKER_SCENES_APP_LABEL="no_such_scenes_app"):
+            self.assertEqual(_default_scene_display(42), "Scene #42")
 
 
 # ---------------------------------------------------------------------------

@@ -157,7 +157,7 @@ Add any of these to `server/conf/settings.py`. All have sensible defaults.
 | `RPTRACKER_XP_PROJECTION` | `None` | Dotted path: `(char_pk, window_end) → list[str] \| None`. evennia-xp ships `evennia_xp.projection.activity_lines` |
 | `RPTRACKER_SCENE_DISPLAY` | `None` | Dotted path: `(scene_id) → str` |
 | `RPTRACKER_FLAG_REVIEW_HOOK` | `None` | Dotted path: `(title, description) → None`. evennia-jobs ships `evennia_jobs.integrations.staff_review.file_review_job` |
-| `RPTRACKER_SCENES_APP_LABEL` | `"scenes"` | App label for the optional scenes partner |
+| `RPTRACKER_SCENES_APP_LABEL` | `"evennia_scenes"` | App label for the optional scenes partner |
 
 ---
 
@@ -209,28 +209,25 @@ When a scenes contrib is installed, `RPSessionSceneLink` rows are created
 automatically for each session↔scene overlap. This requires:
 
 1. A scenes app installed under the label set by `RPTRACKER_SCENES_APP_LABEL`
-   (default `"scenes"`). The app must have a `Scene` model.
+   (default `"evennia_scenes"`). The app must have a `Scene` model. If the
+   label is installed without one, the bridge is skipped with a warning.
 2. Your room typeclass setting `room.active_scene_id` when a scene is active.
 
-(`evennia-links`, already a required dependency, provides the
-`connect_soft_ref_cleanup` hook that removes orphaned links on scene deletion.)
+`RPSessionSceneLink.scene_id` is a plain integer soft reference to the scene's
+primary key (no FK), so the bridge table has no DB dependency on the scenes
+app and install order doesn't matter. The model is resolved at startup with
+`apps.get_model(label, "Scene")`. When a Scene is hard-deleted, orphaned links
+are removed by evennia-links' `connect_soft_ref_cleanup` hook, registered in
+`ready()`.
 
-`RPSessionSceneLink.scene_id` is a plain integer (no FK), so the bridge table
-has no DB dependency on the scenes app — install order doesn't matter.
-When a Scene is hard-deleted, orphaned links are cleaned by the
-`connect_soft_ref_cleanup` hook (registered in `ready()`).
-
-> **Note:** The `RPTRACKER_SCENES_APP_LABEL` setting gates which app is treated
-> as the scenes partner. The bridge's FK string is hardcoded to `"scenes.Scene"`,
-> so the partner app must be installed under the label `"scenes"` for the
-> bridge to resolve correctly. This is a v0.1 limitation.
-
-Wire `RPTRACKER_SCENE_DISPLAY` to resolve scene IDs to human-readable strings
-in `+activity/detail`:
+`+activity/detail` lists a session's scenes by their public `scene_number`, the
+number players use with `+scene` and `+log`, falling back to the stored key if
+the scenes app has no such field. Set `RPTRACKER_SCENE_DISPLAY` to render them
+your own way:
 
 ```python
 RPTRACKER_SCENE_DISPLAY = "myscenes.display.render_scene_ref"
-# callable: (scene_id: int) -> str
+# callable: (scene_id: int) -> str, where scene_id is the scene's primary key
 ```
 
 ---

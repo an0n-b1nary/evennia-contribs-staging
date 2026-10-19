@@ -502,12 +502,8 @@ RPTRACKER_CHANNEL_ELIGIBLE = None
 RPTRACKER_REGIONS_APP_LABEL = "evennia_regions"
 
 # NOTE: RPTRACKER_SCENES_APP_LABEL is intentionally left unset. Its code
-# default is "evennia_scenes" (contribs/game_systems/evennia_rptracker/apps.py),
-# which already matches this game's evennia_scenes app label — no override
-# needed. (The contrib's own README §"Scene bridge" claims the bridge's FK is
-# "hardcoded to scenes.Scene"; that line is stale — RPSessionSceneLink.scene_id
-# is a plain PositiveBigIntegerField soft-ref resolved dynamically via
-# apps.get_model(label, "Scene"), so the code default is correct as-is.)
+# default is "evennia_scenes", which already matches this game's scenes app
+# label, so no override is needed.
 
 RPTRACKER_SCENE_DISPLAY = (
     "evennia_scenes.display.render_scene_ref" if "evennia_scenes" in INSTALLED_APPS else None
