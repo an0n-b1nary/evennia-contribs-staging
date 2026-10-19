@@ -20,7 +20,7 @@ from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
 from world.sandbox import content
-from world.sandbox.tests import SeededSandboxMixin
+from world.sandbox.seeding import SeededSandboxMixin
 
 
 class TestSeededPlotThreads(SeededSandboxMixin, EvenniaTest):

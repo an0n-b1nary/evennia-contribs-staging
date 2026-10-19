@@ -24,7 +24,7 @@ from evennia_jobs.commands import CmdJobs
 from evennia_npcs.commands import CmdNPCPose, contest_command
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
-from world.sandbox.tests import SeededSandboxMixin
+from world.sandbox.seeding import SeededSandboxMixin
 
 from commands.sandbox import CmdSandbox, _stray_rooms
 from evennia_posing.commands import CmdLastPose, CmdPose, CmdPot

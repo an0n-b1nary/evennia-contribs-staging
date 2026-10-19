@@ -14,14 +14,12 @@ from evennia_rp_resources.models import PlotPayoutRun, ResourceHolding
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from world.sandbox.seeding import SeededSandboxMixin
 
-class M6Seams(EvenniaTest):
+
+class M6Seams(SeededSandboxMixin, EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
-
-    def setUp(self):
-        super().setUp()
-        call_command("seed_sandbox", verbosity=0)
 
     def test_host_cmdset_exposes_shop_management(self):
         from commands.default_cmdsets import CharacterCmdSet

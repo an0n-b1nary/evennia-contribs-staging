@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.apps import apps
 from django.core.management import call_command
 from django.test import override_settings
-from evennia.utils.test_resources import BaseEvenniaCommandTest, EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia_npcs import services as svc
 from evennia_npcs.models import NPCSceneAppearance, PlotNPCLink
 from typeclasses.characters import Character
@@ -143,9 +143,19 @@ class NPCSeams(EvenniaTest):
 
 
 @override_settings(NPCS_REVEALED=True, NPCS_FROZEN=False)
-class NPCCommandSeams(BaseEvenniaCommandTest):
+class NPCCommandSeams(EvenniaCommandTest):
     character_typeclass = Character
     room_typeclass = Room
+
+    @skipUnless(apps.is_installed("evennia_building"), "building absent")
+    def test_seams_run_under_the_reference_game_settings(self):
+        # The seed locks building entrances with building_entry(). Evennia
+        # caches lock functions once per process, so under its default
+        # settings the seed only worked when an earlier test had filled that
+        # cache from the game's LOCK_FUNC_MODULES.
+        from django.conf import settings
+
+        self.assertIn("evennia_building.lockfuncs", settings.LOCK_FUNC_MODULES)
 
     @skipUnless(apps.is_installed("evennia_rp_contest"), "contest absent")
     def test_contest_uses_npc_stats_without_pc_sheet_or_rewards(self):
