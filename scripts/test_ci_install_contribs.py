@@ -157,19 +157,43 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
             code = installer.main(self.game, exclude)
         return code, pip, stderr.getvalue()
 
+    def installed(self, pip):
+        """App labels the final pip call installs editable, in argument order."""
+        args = pip.call_args.args[0]
+        return [pathlib.Path(args[i + 1]).name for i, arg in enumerate(args) if arg == "-e"]
+
     def test_installs_and_registers_in_dependency_order(self):
         self.add("rpg", "evennia_rp_contest", ["evennia-rp-rules"])
         self.add("rpg", "evennia_rp_rules")
         code, pip, _ = self.run_main()
         self.assertEqual(code, 0)
-        installed = [pathlib.Path(call.args[0][-1]).name for call in pip.call_args_list]
-        self.assertEqual(installed, ["evennia_rp_rules", "evennia_rp_contest"])
+        self.assertEqual(self.installed(pip), ["evennia_rp_rules", "evennia_rp_contest"])
         settings = self.settings.read_text(encoding="utf-8")
         self.assertLess(
             settings.index('"evennia_rp_rules"'), settings.index('"evennia_rp_contest"')
         )
         self.assertIn("MD5PasswordHasher", settings)
         self.assertNotIn("TEST_RUNNER", settings)
+
+    def test_one_pip_call_installs_every_contrib_after_their_build_requirements(self):
+        self.add("base_systems", "evennia_links")
+        self.add("game_systems", "evennia_maps", ["evennia-links"])
+        maps = self.root / "game_systems/evennia_maps/pyproject.toml"
+        maps.write_text(
+            maps.read_text(encoding="utf-8")
+            + '\n[build-system]\nrequires = ["setuptools>=61.0", "setuptools-scm>=8"]\n',
+            encoding="utf-8",
+        )
+        code, pip, _ = self.run_main()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(pip.call_args_list), 2)
+        build, install = (call.args[0] for call in pip.call_args_list)
+        # A pyproject without [build-system] builds with setuptools (PEP 518).
+        self.assertEqual(
+            build[-3:], ["setuptools-scm>=8", "setuptools>=40.8.0", "setuptools>=61.0"]
+        )
+        self.assertIn("--no-build-isolation", install)
+        self.assertEqual(self.installed(pip), ["evennia_links", "evennia_maps"])
 
     def test_links_installs_its_task_isolating_test_runner(self):
         self.add("base_systems", "evennia_links")
@@ -185,8 +209,7 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         self.add("game_systems", "evennia_maps", extras={"calendar": ["evennia-calendar"]})
         code, pip, _ = self.run_main(("evennia-calendar",))
         self.assertEqual(code, 0)
-        self.assertEqual(len(pip.call_args_list), 1)
-        self.assertEqual(pathlib.Path(pip.call_args.args[0][-1]).name, "evennia_maps")
+        self.assertEqual(self.installed(pip), ["evennia_maps"])
         self.assertNotIn("evennia_calendar", self.settings.read_text(encoding="utf-8"))
         self.assertIn("evennia_maps", self.settings.read_text(encoding="utf-8"))
 
@@ -195,7 +218,7 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         self.add("game_systems", "evennia_maps")
         code, pip, _ = self.run_main(("evennia_calendar",))
         self.assertEqual(code, 0)
-        self.assertEqual(len(pip.call_args_list), 1)
+        self.assertEqual(self.installed(pip), ["evennia_maps"])
 
     def test_unknown_exclusion_fails_before_pip_or_settings_edits(self):
         self.add("game_systems", "evennia_maps")

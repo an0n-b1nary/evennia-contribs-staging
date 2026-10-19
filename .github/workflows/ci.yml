@@ -11,6 +11,11 @@ on:
     - cron: "23 7 * * *"
   workflow_dispatch:
 
+# Partner jobs don't run `evennia migrate`: creating the test database applies
+# every installed app's migrations, and no partner runner uses the game's own
+# database. A pip download cache was tried and saved nothing measurable (#170):
+# installing, not downloading, is the cost.
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -182,9 +187,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Fresh-process partner seams and host-configured maps suite
         run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
@@ -229,9 +231,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Building suite and partner seams with verified absence
         run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
 
@@ -273,9 +272,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Resources suite and real partner seams
         run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
 
@@ -314,9 +310,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Economy suite and real partner seams
         run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
 
@@ -396,9 +389,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected partners
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: Contest seams with verified partner absence
         run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
 
@@ -518,9 +508,6 @@ jobs:
         run: evennia --init ci_game < /dev/null
       - name: Install selected contribs in dependency order
         run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Migrate
-        working-directory: ci_game
-        run: evennia migrate --noinput < /dev/null
       - name: NPC suite and verified partner seams
         run: python scripts/ci_run_npc_tests.py ci_game ${{ matrix.absent }}
 
