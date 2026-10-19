@@ -190,6 +190,20 @@ The catalogue's optional `basic` flag defaults to false. Economy's system
 seller also checks `in_trickle`, archive status and explicit host prices;
 it never sells payout-only rarity.
 
+## Guide pages
+
+The `guides/` directory holds pages for
+[evennia-guides](../../utils/evennia_guides/README.md): a player page,
+`resources` (also found as `gathering`), on weekly gathering, leans, the cap
+and plot rewards; the glossary term `glossary-lean`; and two design principles,
+`time-pays-quantity` and `nothing-decays`. The player page and the term are
+hidden while `RP_RESOURCES_REVEALED` is off. They describe the system in
+general terms, without exact numbers, and link only to this contrib's own
+pages. Contribs that depend on resources, such as crafting, may link and tag
+the principles. With evennia-guides installed they appear on its web guide;
+without it they're ignored. To restate one for your game, add a page with the
+same key to `GUIDES_DIRS`.
+
 ## Tests
 
 From a game with links and resources installed:

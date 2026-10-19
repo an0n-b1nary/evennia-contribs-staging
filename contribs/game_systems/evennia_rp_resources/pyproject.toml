@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-resources"
-version = "0.2.0"
+version = "0.2.1"
 description = "Passive resource accrual, atomic holdings and gathering choices for Evennia RP games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -39,3 +39,6 @@ packages = [
 [tool.setuptools.package-dir]
 "evennia_rp_resources" = "."
 "evennia_rp_resources.migrations" = "migrations"
+
+[tool.setuptools.package-data]
+evennia_rp_resources = ["guides/*.md"]
