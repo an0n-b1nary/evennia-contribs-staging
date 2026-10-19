@@ -4,8 +4,6 @@
 
 - `TestRunner` stops the reactor's never-started thread pool, so the lock
   warnings each Evennia test logs are dropped instead of queueing forever.
-- `TestRunner` freezes the objects that exist before the first test, so the
-  full collection that ends each Evennia test no longer walks them.
 
 ## 0.8.9 - 2026-10-18
 

@@ -577,8 +577,6 @@ writes:
 TEST_RUNNER = "evennia_links.testing.TestRunner"
 ```
 
-It also freezes the objects that exist before the first test (`gc.freeze()`),
-so the full collection that ends each test walks only what tests created. It
-behaves like Evennia's own runner otherwise, and also supports
+It behaves like Evennia's own runner otherwise, and also supports
 `evennia test --parallel` when Python spawns its workers rather than forking
 them. Tasks that existed before a test started are left alone.

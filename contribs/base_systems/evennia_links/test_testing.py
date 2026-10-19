@@ -1,19 +1,12 @@
 """Evennia tests must not leave scheduled tasks or thread work behind when they finish."""
 
-import gc
 import unittest
 from unittest.mock import patch
 
 from evennia.scripts.taskhandler import TASK_HANDLER
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
-from .testing import (
-    TestRunner,
-    _prepare_worker,
-    discard_thread_work,
-    frozen_heap,
-    isolate_tasks,
-)
+from .testing import TestRunner, _prepare_worker, discard_thread_work, isolate_tasks
 
 
 class TestTaskIsolation(EvenniaTestCase):
@@ -85,34 +78,6 @@ class TestTaskIsolation(EvenniaTestCase):
     def test_discarding_thread_work_is_idempotent(self):
         discard_thread_work()
         discard_thread_work()
-
-    def unfreeze_for_test(self):
-        # This suite may itself run frozen under the links runner.
-        if gc.get_freeze_count():
-            gc.unfreeze()
-            self.addCleanup(gc.freeze)
-
-    def test_the_runner_runs_the_suite_with_the_heap_frozen(self):
-        self.unfreeze_for_test()
-        frozen = []
-
-        def run_suite(runner, suite, **kwargs):
-            frozen.append(gc.get_freeze_count())
-
-        with patch("django.test.runner.DiscoverRunner.run_suite", run_suite):
-            TestRunner().run_suite(unittest.TestSuite())
-
-        self.assertGreater(frozen[0], 0)
-        self.assertEqual(gc.get_freeze_count(), 0)
-
-    def test_a_nested_frozen_heap_leaves_the_outer_freeze_alone(self):
-        self.unfreeze_for_test()
-        with frozen_heap():
-            outer = gc.get_freeze_count()
-            with frozen_heap():
-                pass
-            self.assertEqual(gc.get_freeze_count(), outer)
-        self.assertEqual(gc.get_freeze_count(), 0)
 
     def test_spawned_workers_get_the_settings_module_the_parent_loaded(self):
         from django.conf import settings

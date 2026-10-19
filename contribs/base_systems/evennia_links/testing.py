@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Test runner that stops Evennia tests' leftover work slowing the run down.
+Test runner that stops Evennia tests' leftover work outliving them.
 
 Point a game's test settings at it::
 
@@ -30,13 +30,6 @@ forever, five per test, each holding its ``Deferred`` and closures. The runner
 stops the never-started pool, which makes it drop new work instead of queueing
 it. That work could never run either way.
 
-The full collection at the end of every test still walks every object Django,
-Evennia and the contribs created at import time. The runner freezes those
-objects (``gc.freeze()``) once the test databases exist, so each collection
-only walks what the tests created. Everything a test creates is collected as
-before; an import-time object that becomes cyclic garbage during the run is
-only kept until the run ends.
-
 It also prepares Django's parallel workers when
 they are spawned instead of forked (the Linux default from Python 3.14), which
 Evennia's own runner setup does not reach.
@@ -45,9 +38,7 @@ This works around Evennia 6.0's test harness; drop it once Evennia's
 ``EvenniaTestMixin`` cleans up its own login task.
 """
 
-import contextlib
 import functools
-import gc
 
 from django.test.runner import ParallelTestSuite
 from evennia.server.tests.testrunner import EvenniaTestSuiteRunner
@@ -106,24 +97,6 @@ def discard_thread_work():
     pool.stop()
 
 
-@contextlib.contextmanager
-def frozen_heap():
-    """Freeze every live object for the duration, so collections skip them.
-
-    Garbage is collected first so it isn't frozen. Does nothing when objects
-    are already frozen, for example in a forked worker or a nested run.
-    """
-    if gc.get_freeze_count():
-        yield
-        return
-    gc.collect()
-    gc.freeze()
-    try:
-        yield
-    finally:
-        gc.unfreeze()
-
-
 def _prepare_worker(settings_module):
     """Set up a spawned or forkserver test worker the way the parent was.
 
@@ -151,8 +124,6 @@ def _prepare_worker(settings_module):
     settings.TEST_ENVIRONMENT = True
     isolate_tasks()
     discard_thread_work()
-    gc.collect()
-    gc.freeze()
 
 
 class _ParallelTestSuite(ParallelTestSuite):
@@ -166,7 +137,7 @@ class _ParallelTestSuite(ParallelTestSuite):
 
 
 class TestRunner(EvenniaTestSuiteRunner):
-    """Evennia's test runner, without the leftover work that slows long runs down."""
+    """Evennia's test runner, with each test's leftover tasks and thread work dropped."""
 
     parallel_test_suite = _ParallelTestSuite
 
@@ -174,7 +145,3 @@ class TestRunner(EvenniaTestSuiteRunner):
         super().setup_test_environment(**kwargs)
         isolate_tasks()
         discard_thread_work()
-
-    def run_suite(self, suite, **kwargs):
-        with frozen_heap():
-            return super().run_suite(suite, **kwargs)

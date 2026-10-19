@@ -317,8 +317,7 @@ sandbox gate, crafting, lore/items, and building and calendar
 partner suites run with parallel workers; file-backed race runs stay serial.
 Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
 which stops Evennia's test fixture from keeping each finished test's world and
-its queued log writes in memory, and freezes the startup heap so each test's
-garbage collection only walks what tests created.
+its queued log writes in memory.
 
 The `test`, partner, `sandbox` and `live-playtest` jobs have a 30-minute
 limit, the `*-independent` and `moderation-partners` jobs 20 minutes, and
