@@ -1,5 +1,9 @@
 # Changelog — evennia-scenes
 
+## [0.8.3] - 2026-10-18
+
+- Guide pages: `scenes` notes that room events can be logged without counting as poses, and what a scene's web page links to.
+
 ## [0.8.2] - 2026-10-16
 
 - Add explicit non-activity entry capture with preserved authorship, ordering
