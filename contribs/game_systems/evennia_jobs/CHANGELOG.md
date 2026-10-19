@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.4 — 2026-10-18
+
+- Guide pages: `requests` now covers structured forms (starting, answering, previewing and submitting), revisions after staff ask for changes, withdrawal, and what guests can send.
+- `+request` help lists `/withdraw`.
+
 ## 0.7.3 — 2026-10-18
 
 - Guide pages: a staff page, `jobs-staff`, covering triage, deciding structured requests, staff discussions, automated flags and guide questions.
