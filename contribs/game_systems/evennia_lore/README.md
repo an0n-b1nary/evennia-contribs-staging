@@ -463,6 +463,18 @@ example are in [evennia-accessibility's README](../../utils/evennia_accessibilit
 
 ---
 
+## Guide pages
+
+The `guides/` directory holds player guide pages for
+[evennia-guides](../../utils/evennia_guides/README.md): `lore` and the
+`ic-may-mislead` principle. They explain the system to players in general
+terms, without exact numbers, and link only to pages this contrib or its
+required dependencies ship. With evennia-guides installed they appear on its
+web guide; without it they're ignored. To restate one for your game, add a page
+with the same key to `GUIDES_DIRS`.
+
+---
+
 ## Version history
 
 See [CHANGELOG.md](CHANGELOG.md).
