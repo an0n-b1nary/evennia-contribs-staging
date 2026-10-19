@@ -265,13 +265,15 @@ money/items still work. No tracker, crafting, maps or jobs import is required.
 
 ## Guide pages
 
-The `guides/` directory holds a player page for
-[evennia-guides](../../utils/evennia_guides/README.md), `economy` (also found
-as `trading` and `money`), on purses and weekly income, trading and gifts,
-stalls, shops and the market. It's hidden while `RP_ECONOMY_REVEALED` is off.
-It describes the system in general terms, without exact numbers, and links
-only to its own pages, since links ships none. With evennia-guides installed it
-appears on its web guide; without it it's ignored. To restate it for your game,
+The `guides/` directory holds pages for
+[evennia-guides](../../utils/evennia_guides/README.md): a player page,
+`economy` (also found as `trading` and `money`), on purses and weekly income,
+trading and gifts, stalls, shops and the market, hidden while
+`RP_ECONOMY_REVEALED` is off; and a staff page, `economy-staff`, on the weekly
+run, adjustments, audits, review flags, shops, stalls and the freeze. They
+describe the system in general terms, without exact numbers, and link only to
+their own pages, since links ships none. With evennia-guides installed they
+appear on its web guide; without it they're ignored. To restate one for your game,
 add a page with the same key to `GUIDES_DIRS`.
 
 ## Verification and scope
