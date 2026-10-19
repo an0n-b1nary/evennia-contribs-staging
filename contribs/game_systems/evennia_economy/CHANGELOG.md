@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 - 2026-10-19
+
+- Add a staff guide page for evennia-guides, `economy-staff`: the weekly run and stipends, adjusting purses, audits and review flags, shops, closing stalls, and freezing and revealing.
+
 ## 0.3.2 - 2026-10-18
 
 - Add a player guide page for evennia-guides, `economy`, hidden while `RP_ECONOMY_REVEALED` is off. It ships as package data.

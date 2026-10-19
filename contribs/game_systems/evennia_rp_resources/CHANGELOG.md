@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-10-19
+
+- Add a staff guide page for evennia-guides, `resources-staff`: the weekly run, the catalogue, grants and spending, audits, and approving and retrying plot payouts.
+
 ## 0.2.1 — 2026-10-18
 
 - Add guide pages for evennia-guides: the player page `resources` and the term `glossary-lean`, both hidden while `RP_RESOURCES_REVEALED` is off, and the design principles `time-pays-quantity` and `nothing-decays`. They ship as package data.

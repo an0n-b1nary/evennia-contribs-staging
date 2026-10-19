@@ -482,3 +482,22 @@ class TestGuidesInTheSandbox(EvenniaTest):
             self.assertContains(self.client.get("/guide/companions/"), "Giving it away")
         finally:
             runtime.reset("RP_CRAFTING_WAVE_THREE_REVEALED")
+
+    def test_economy_and_making_staff_pages_are_for_staff(self):
+        """Each staff page: a 404 for players, readable by Builders, linked from the index."""
+        pages = (
+            ("economy-staff", "Review flags"),
+            ("resources-staff", "Resource keys are permanent"),
+            ("crafting-staff", "Approving needs someone who is both jobs staff and crafting staff"),
+        )
+        self._reader(self.account2)
+        for key, _text in pages:
+            with self.subTest(key, reader="player"):
+                self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 404)
+
+        self._reader(self.account, "Builder")
+        index = self.client.get("/guide/staff-start-here/")
+        for key, text in pages:
+            with self.subTest(key, reader="staff"):
+                self.assertContains(self.client.get(f"/guide/{key}/"), text)
+                self.assertContains(index, f'href="/guide/{key}/"')

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-crafting"
-version = "0.10.2"
+version = "0.10.3"
 description = "Invested Workshops, cosmetic item behaviours and verified maker hallmarks for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }

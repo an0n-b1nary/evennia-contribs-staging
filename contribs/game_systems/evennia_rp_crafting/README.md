@@ -366,9 +366,9 @@ Earlier saved drafts continue through the same single-behaviour shorthand.
 The `guides/` directory holds player pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `crafting`,
 `crafting-letters`, `crafting-fixtures`, `companions`, `crafting-modifiers`
-and `patterns`, three glossary terms (`glossary-workshop`,
-`glossary-hallmark`, `glossary-pattern`) and the design principle
-`breadth-not-quality`. Each page requires `RP_CRAFTING_REVEALED`, and pages
+and `patterns`, a staff page, `crafting-staff`, three glossary terms
+(`glossary-workshop`, `glossary-hallmark`, `glossary-pattern`) and the design
+principle `breadth-not-quality`. Each player page requires `RP_CRAFTING_REVEALED`, and pages
 on staged features also require their switch: fixtures
 `RP_CRAFTING_WAVE_TWO_REVEALED`, companions and modifiers
 `RP_CRAFTING_WAVE_THREE_REVEALED`, and Patterns
