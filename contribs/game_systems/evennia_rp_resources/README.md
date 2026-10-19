@@ -195,7 +195,8 @@ it never sells payout-only rarity.
 The `guides/` directory holds pages for
 [evennia-guides](../../utils/evennia_guides/README.md): a player page,
 `resources` (also found as `gathering`), on weekly gathering, leans, the cap
-and plot rewards; the glossary term `glossary-lean`; and two design principles,
+and plot rewards; a staff page, `resources-staff`, on runs, the catalogue,
+grants, audits and payouts; the glossary term `glossary-lean`; and two design principles,
 `time-pays-quantity` and `nothing-decays`. The player page and the term are
 hidden while `RP_RESOURCES_REVEALED` is off. They describe the system in
 general terms, without exact numbers, and link only to this contrib's own
