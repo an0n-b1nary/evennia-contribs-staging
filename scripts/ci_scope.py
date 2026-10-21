@@ -191,6 +191,8 @@ NO_PARTNER_JOB = (
     "scripts/*file_issue.py",
     "scripts/*check_contrib_versions.py",
     "scripts/*check_templates.py",
+    "scripts/*check_command_syntax.py",
+    "scripts/command_syntax_allowlist.txt",
     "scripts/*downstream*.py",
     "scripts/calibrate_*.py",
     "scripts/ui_shots.py",

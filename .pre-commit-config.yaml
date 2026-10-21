@@ -33,6 +33,13 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: check-command-syntax
+        name: command syntax sweep (one switch, no ';', '=' relates)
+        entry: python scripts/check_command_syntax.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: anonymity-push-guard
         name: anonymity guard (push remote <-> identity)
         entry: python scripts/anonymity_push_guard.py

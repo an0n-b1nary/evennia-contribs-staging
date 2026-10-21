@@ -52,6 +52,67 @@ Type hints in signatures are **encouraged but not required** for public function
 - **Mocks:** use `unittest.mock`; prefer narrow patches over wholesale fakes.
 - Tests must pass under `EvenniaTest` with no source-project-local fixtures (per Evennia's standard contrib requirements).
 
+## Command syntax
+
+No command is harder to type than `+command/switch target=value`. Players
+come from MUSH and MUX clients: they read `/` as one switch and `=` as "this,
+to that", and some clients treat `;` as a line break. When an operation needs
+more than that, add a command or a step instead of more syntax.
+
+1. **One switch at most.** Never `+build/resident/add`. A modifier becomes a
+   switch of its own (`+resident/add`), a companion command (`+thread` beside
+   `+plot`), or an armed flag (rule 3).
+2. **A choice among a few values may be the switch:** `+attack/penetrating`.
+   Declare `switch_options` so MuxCommand accepts any unique prefix
+   (`+attack/p`), and reject a second switch with a usage message.
+3. **Other modifiers are their own commands.** `+empower`, then `+attack`.
+   The flag arms the next action, shows in the status display, clears when
+   that action resolves (a cancelled action keeps it), and `+empower/off`
+   disarms it.
+4. **No `;`, `~` or `|` separators, and no `:` sub-fields.** A
+   one-character prefix alias, like `;` for `semipose`, is not a separator
+   and is fine.
+5. **`=` relates one target to one value.** The pattern is `target=value`, and
+   it follows `give`: `thing=recipient`, `record=value`. With no target, the
+   value is bare (`+craft/desc <text>`, not `+craft/desc = <text>`).
+   - **A target is one thing:** a name, `#N`, or one address step. `#N.M` is
+     a record within a record, such as a plot thread or a revision
+     (`+jobs/approve 12.3`). `thing/field` is a member or field
+     (`+bb board/post`, `+npc/stat Guard/strength=3`).
+   - **Never a run of positional arguments** like `<project> <room> <x>=`. Take
+     the context from where the player stands, or add a step.
+   - **The value is one thing,** optionally with one address step
+     (`=<move>/<domain>`).
+6. **Commas list like items only:** several targets, recipients or ranked
+   choices. They never stack options (`=<move>,burst,empower`) or attach a
+   note (`=<amount>,<note>`).
+7. **Amounts read like `give`:** `53 scales`, `2 timber`.
+8. **A reason or comment may trail the line after ` # `:**
+   `+xp/grant Ana=5 # ran the tournament`. The `#` needs whitespace on both
+   sides, so `#12` and `#N.M` still parse as references.
+9. **No JSON on the command line.** Set one field per command
+   (`+tactics/set Careful/appetite=cautious`). If validation spans several
+   fields, use a draft: `/new`, a switch per field, then `/finish` and
+   `/cancel`, as `+craft` and `+tome` do. Staff-only `+runtime` is exempt.
+10. **Guards belong in a confirmation token, not in what the player types.**
+    Expected owners, versions, fingerprints and agreement wording go there.
+    The first call previews and prints a token, and repeating it with
+    `=<token>` commits, as `+build/discard` does.
+11. **Acting as an NPC is puppet state, not syntax.** After `+npc/puppet`,
+    the ordinary commands act as the NPC, and every message says who you are
+    puppeting. There are no `/npc` or `/as` switches.
+
+`scripts/check_command_syntax.py` enforces what can be read from source:
+- stacked switches in help, guides, READMEs and templates
+- forbidden separators, nested `=`, JSON, `[,option]` stacking and positional
+  runs in help usage lines
+- input split on `;`
+
+It runs in pre-commit and CI. Offenders that predate this section are listed in
+`scripts/command_syntax_allowlist.txt`. A PR that fixes a contrib deletes that
+contrib's lines; an entry that matches nothing fails the sweep, so the list only
+shrinks. Do not add lines to land new syntax.
+
 ## Web UI
 
 Contribs that ship templates follow the shared [UI conventions](UI_CONVENTIONS.md)
@@ -151,7 +212,7 @@ Keep `ready()` minimal: import-only, no heavy work; Django calls it at startup.
 ## Tooling
 
 - **Ruff** handles formatting, linting, and import sorting. Config lives at the repo root in `pyproject.toml` under `[tool.ruff]`. Same 100-char limit as Evennia upstream's Black; same rule set as upstream's Flake8 (and a few extras: bugbear, pyupgrade, simplify).
-- **pre-commit** runs the anonymity guard, Ruff format, and Ruff check on every commit. One-time setup per clone:
+- **pre-commit** runs the anonymity guard, the template and command syntax sweeps, Ruff format, and Ruff check on every commit. One-time setup per clone:
   ```bash
   pip install pre-commit ruff==0.16.10
   pre-commit install --hook-type pre-commit --hook-type pre-push
