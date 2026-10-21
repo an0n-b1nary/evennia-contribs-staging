@@ -795,9 +795,11 @@ class TestLoreGuidePages(EvenniaTest):
                 for path in sorted(folder.glob("*.md"))
             )
         }
-        self.assertEqual(set(pages), {"lore", "ic-may-mislead"})
+        self.assertEqual(set(pages), {"lore", "ic-may-mislead", "lore-staff"})
         self.assertEqual(pages["ic-may-mislead"].kind, "principle")
         self.assertIn("ic-may-mislead", pages["lore"].principles)
+        self.assertEqual(pages["lore-staff"].audience, "staff")
+        self.assertEqual(pages["lore-staff"].requires, ())
 
 
 class TestAnonymousDetail(LoreWebRenderTestCase):

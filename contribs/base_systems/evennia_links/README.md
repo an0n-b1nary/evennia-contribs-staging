@@ -580,3 +580,9 @@ TEST_RUNNER = "evennia_links.testing.TestRunner"
 It behaves like Evennia's own runner otherwise, and also supports
 `evennia test --parallel` when Python spawns its workers rather than forking
 them. Tasks that existed before a test started are left alone.
+
+## Guide pages
+
+The staff-only [`links-staff`](guides/links-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+With [evennia-guides](../../utils/evennia_guides/README.md) installed, pages in `guides/` appear in its web guide; otherwise they are ignored. Hosts may replace a page with the same key in `GUIDES_DIRS`.

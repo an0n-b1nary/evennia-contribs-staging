@@ -1,6 +1,6 @@
 # evennia-building
 
-Version 0.3.3 supplies reviewed private homes, public frontier and mixed
+Version 0.3.4 supplies reviewed private homes, public frontier and mixed
 settlements. Shared authors draft together under the lead's quotas; every
 contributor acknowledges the exact candidate and content reuse terms. Each
 proposed home owner accepts their own boundary. Staff approve the entire frozen
@@ -253,7 +253,9 @@ owned room ids in one query, so furnishing credit does not scan the whole grid.
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`building-staff`](guides/building-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `building` and `building-frontier`. They
 explain the system to players in general terms, without exact numbers, and link
 only to pages this contrib or its required dependencies ship. With

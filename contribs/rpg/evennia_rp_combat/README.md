@@ -239,7 +239,9 @@ or add revival, Boss Checks or new Ability mechanics.
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`combat-staff`](guides/combat-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `combat`, `combat-moves` and `combat-storytelling`. They
 explain the system to players in general terms, without exact numbers, and link
 only to pages this contrib or its required dependencies ship. With

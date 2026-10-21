@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.2.5 — 2026-10-20
+
+- Add the staff-only `combat-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.2.4] - 2026-10-18
 
 - Rewrote the player guide in the guide format and split it into three pages,

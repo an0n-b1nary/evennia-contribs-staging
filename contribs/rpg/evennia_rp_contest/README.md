@@ -106,7 +106,9 @@ an Evennia launcher that exits without a positive test count.
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`contest-staff`](guides/contest-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `tests`,
 `defaults-with-override` (a principle). They explain the system to players in
 general terms, without exact numbers, and link only to pages this contrib or

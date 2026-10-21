@@ -1,7 +1,7 @@
 # evennia-rp-party
 
-Optional tactical parties within a combat side. Preview release **0.2.1**;
-Python 3.12+ and Evennia 6.0+. Combat 0.2.3+ is required for atomic resource
+Optional tactical parties within a combat side. Preview release **0.2.4**;
+Python 3.12+ and Evennia 6.0+. Combat 0.2.5+ is required for atomic resource
 reservations and public transition notices. No new models, migrations or typeclass mixins.
 
 ## Install
@@ -279,7 +279,9 @@ combat partners. See `scripts/ci_run_party_tests.py`.
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`party-staff`](guides/party-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `party`, `party-surge` and `party-boss-checks`. They
 explain the system to players in general terms, without exact numbers, and link
 only to pages this contrib or its required dependencies ship. With

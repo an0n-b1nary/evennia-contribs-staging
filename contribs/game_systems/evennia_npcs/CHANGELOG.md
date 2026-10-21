@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 — 2026-10-20
+
+- Add the staff-only `npcs-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.1.3 — 2026-10-18
 
 - Refreshed the `npcs` guide page: templates and unique NPCs, sharing and

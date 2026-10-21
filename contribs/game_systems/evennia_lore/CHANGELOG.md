@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.8.4 — 2026-10-20
+
+- Add the staff-only `lore-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.8.3] - 2026-10-18
 
 - Guide pages: `lore` now lists its main commands and covers how characters learn lore (sessions, `+investigate` leans, sharing, `+forget`), restricted entries and `+hint`, reading books and tomes that cite lore, edit history, and the XP lore earns.

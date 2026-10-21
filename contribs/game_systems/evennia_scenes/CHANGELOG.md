@@ -1,5 +1,9 @@
 # Changelog — evennia-scenes
 
+## 0.8.4 — 2026-10-20
+
+- Add the staff-only `scenes-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.8.3] - 2026-10-18
 
 - Guide pages: `scenes` notes that room events can be logged without counting as poses, and what a scene's web page links to.

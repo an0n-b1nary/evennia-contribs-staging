@@ -12,6 +12,28 @@ from typeclasses.rooms import Room
 
 urlpatterns = [path("", include("web.urls"))]
 
+STORY_STAFF_PAGES = (
+    ("plots-staff", "Concluding or archiving"),
+    ("lore-staff", "Affirmation is separate from publication"),
+    ("scenes-staff", "Restoring a log entry"),
+    ("calendar-staff", "Locking a cluster"),
+    ("boards-staff", "Creating a board"),
+    ("xp-staff", "Reading the weekly run"),
+)
+WORLD_STAFF_PAGES = (
+    ("building-staff", "Review the frozen revision"),
+    ("maps-staff", "Preview before reflow"),
+    ("regions-staff", "Choosing the primary region"),
+    ("npcs-staff", "Permission to play, not ownership"),
+    ("links-staff", "What a reveal publishes"),
+)
+CHARACTER_STAFF_PAGES = (
+    ("chargen-staff", "Reviewing a sheet"),
+    ("contest-staff", "The room, not every test in the game"),
+    ("combat-staff", "Restore the whole fight"),
+    ("party-staff", "Preview, then commit"),
+)
+
 
 @override_settings(ROOT_URLCONF=__name__)
 class TestGuidesInTheSandbox(EvenniaTest):
@@ -501,3 +523,52 @@ class TestGuidesInTheSandbox(EvenniaTest):
             with self.subTest(key, reader="staff"):
                 self.assertContains(self.client.get(f"/guide/{key}/"), text)
                 self.assertContains(index, f'href="/guide/{key}/"')
+
+    def _assert_staff_pages(self, expected):
+        from evennia_guides.pages import get_page
+
+        for reader in ("anonymous", "player"):
+            if reader == "player":
+                self._reader(self.account2)
+            index = self.client.get("/guide/")
+            for key, _text in expected:
+                with self.subTest(key, reader=reader):
+                    self.assertEqual(self.client.get(f"/guide/{key}/").status_code, 404)
+                    self.assertNotContains(index, f'href="/guide/{key}/"')
+
+        self._reader(self.account, "Builder")
+        index = self.client.get("/guide/staff-start-here/")
+        for key, text in expected:
+            with self.subTest(key, reader="staff"):
+                page = get_page(key)
+                self.assertIsNotNone(page)
+                self.assertEqual(page.audience, "staff")
+                self.assertEqual(page.category, "Staff")
+                self.assertEqual(page.requires, ())
+                self.assertNotEqual(page.origin, "host")
+                self.assertContains(self.client.get(f"/guide/{key}/"), text)
+                self.assertContains(index, f'href="/guide/{key}/"')
+
+    def test_story_staff_pages_render_and_stay_private(self):
+        self._assert_staff_pages(STORY_STAFF_PAGES)
+
+    def test_world_staff_pages_render_and_stay_private(self):
+        self._assert_staff_pages(WORLD_STAFF_PAGES)
+
+    def test_character_staff_pages_render_and_stay_private(self):
+        self._assert_staff_pages(CHARACTER_STAFF_PAGES)
+
+    def test_staff_pages_remain_readable_before_reveal(self):
+        from evennia_links import runtime
+
+        self._reader(self.account, "Builder")
+        settings = [name for name in runtime.registered() if name.endswith("_REVEALED")]
+        try:
+            for name in settings:
+                runtime.set(name, False)
+            for key, text in STORY_STAFF_PAGES + WORLD_STAFF_PAGES + CHARACTER_STAFF_PAGES:
+                with self.subTest(key):
+                    self.assertContains(self.client.get(f"/guide/{key}/"), text)
+        finally:
+            for name in settings:
+                runtime.reset(name)
