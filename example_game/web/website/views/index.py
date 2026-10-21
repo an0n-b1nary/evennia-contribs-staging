@@ -145,7 +145,7 @@ def _upcoming_events():
 
 
 def _map_summary(request=None):
-    """Plane and tile counts, and the deepest map link that resolves."""
+    """Visible plane/tile counts and a usable map link for this account."""
     if not apps.is_installed("evennia_maps"):
         return None
     from django.db.models import Prefetch
@@ -154,7 +154,7 @@ def _map_summary(request=None):
     from evennia_links.visibility import request_viewer
     from evennia_maps.models import MapPlane
     from evennia_maps.permissions import visible_planes
-    from evennia_maps.views import plane_tiles_queryset, visible_tiles_for_plane
+    from evennia_maps.views import plane_tiles_queryset, tiles_url_template, visible_tiles_for_plane
 
     staff = is_staff_user(request)
     viewer = request_viewer(request, staff=staff)
@@ -168,6 +168,9 @@ def _map_summary(request=None):
     first = planes.first()
     if first is None:
         return None
+    live_url = None
+    if getattr(getattr(request, "user", None), "is_authenticated", False) and tiles_url_template():
+        live_url = _url("evennia_maps:plane-live-map", first.pk)
     return {
         "plane_count": planes.count(),
         "tile_count": sum(
@@ -175,7 +178,7 @@ def _map_summary(request=None):
         ),
         "plane_name": first.name,
         "url": (
-            _url("evennia_maps:plane-live-map", first.pk)
+            live_url
             or _url("evennia_maps:plane-detail", first.pk)
             or _url("evennia_maps:plane-list")
         ),

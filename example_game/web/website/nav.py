@@ -53,7 +53,7 @@ NAV_GROUPS = (
     (
         "Setting",
         (
-            ("Map", "evennia_maps:plane-list", PUBLIC),
+            ("All Maps", "evennia_maps:plane-list", PUBLIC),
             ("Regions", "evennia_regions:region-list", PUBLIC),
             # lore-list, not lore-compendium: LoreListView is the public index of
             # PUBLISHED entries (LoreDetailView then serves body-or-stub per the
@@ -65,8 +65,8 @@ NAV_GROUPS = (
     (
         "Events",
         (
-            ("Scenes", "evennia_scenes:scene-list", PUBLIC),
             ("Happening Now", "evennia_scenes:scene-live-list", PUBLIC),
+            ("All Scenes", "evennia_scenes:scene-list", PUBLIC),
             ("Plots", "evennia_plots:plot-list", PUBLIC),
             ("Calendar", "evennia_calendar:calendar-list", PUBLIC),
         ),
