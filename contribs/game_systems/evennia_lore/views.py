@@ -7,7 +7,7 @@ Views:
     LoreListView           — /lore/       paginated PUBLISHED entries + filters
     LoreDetailView         — /lore/<pk>/  full body or stub based on access
     LoreCompendiumView     — /lore/mine/  character's acquired entries
-    LoreApprovalQueueView  — /lore/queue/ SUBMITTED entries (staff only)
+    LoreApprovalQueueView  — /lore/queue/ publication and affirmation review (staff only)
     LoreCreateView         — /lore/new/   submit new entry
     LoreEditView           — /lore/<pk>/edit/   edit body/title/summary/privacy
     LoreVersionHistoryView — /lore/<pk>/history/  list LoreVersion snapshots
@@ -26,6 +26,7 @@ Wire into your URL config::
 
 import difflib
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
@@ -272,7 +273,7 @@ class LoreCompendiumView(LoginRequiredMixin, ListView):
 
 
 class LoreApprovalQueueView(LoginRequiredMixin, ListView):
-    """SUBMITTED entries awaiting staff review. Builder+ only."""
+    """Affirmation requests and, when required, publication approvals. Staff only."""
 
     template_name = "evennia_lore/lore_queue.html"
     context_object_name = "entries"
@@ -281,11 +282,14 @@ class LoreApprovalQueueView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         if not is_staff_user(self.request):
             raise PermissionDenied
+        if not getattr(settings, "LORE_REQUIRE_APPROVAL", False):
+            return LoreEntry.objects.none()
         return LoreEntry.objects.filter(status=LoreEntry.Status.SUBMITTED).order_by("created_at")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["page_title"] = "Lore Approval Queue"
+        context["page_title"] = "Lore Review"
+        context["approval_required"] = getattr(settings, "LORE_REQUIRE_APPROVAL", False)
         context["is_staff"] = True
         context["affirmation_requests"] = LoreEntry.objects.filter(
             status=LoreEntry.Status.PUBLISHED, affirmation=LoreEntry.Affirmation.REQUESTED

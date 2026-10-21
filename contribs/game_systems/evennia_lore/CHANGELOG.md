@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.5] - 2026-10-21
+
+- Rename the staff web queue to Lore Review and show its publication-approval
+  section only when `LORE_REQUIRE_APPROVAL` is enabled. Affirmation requests
+  remain available in both modes; older submissions are preserved.
+
 ## 0.8.4 — 2026-10-20
 
 - Add the staff-only `lore-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

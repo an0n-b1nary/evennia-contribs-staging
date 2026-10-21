@@ -992,11 +992,63 @@ class TestLoreQueueRenders(LoreWebRenderTestCase):
         self.assertIn("Pending Lore", html)
         self.assertIn(f'action="/lore/{entry.pk}/approve/"', html)
 
+    @override_settings(LORE_REQUIRE_APPROVAL=True)
     def test_empty_queue_renders_its_empty_state(self):
         html = self._render(
             LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
         )
         self.assertIn("No entries awaiting approval.", html)
+
+    @override_settings(LORE_REQUIRE_APPROVAL=False)
+    def test_approval_disabled_shows_only_affirmation_requests(self):
+        with override_settings(LORE_REQUIRE_APPROVAL=True):
+            submitted = _make_entry(title="Older submission", author=self.char2)
+        entry = _make_entry(title="Please affirm this", author=self.char2)
+        entry.request_affirmation(requested_by=self.char2)
+        html = self._render(
+            LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
+        )
+        self.assertIn("Lore Review", html)
+        self.assertIn("Affirmation requests", html)
+        self.assertIn(entry.title, html)
+        self.assertNotIn(submitted.title, html)
+        self.assertNotIn("No entries awaiting approval.", html)
+        self.assertNotIn("Publication approval", html)
+        self.assertNotIn("LORE_REQUIRE_APPROVAL", html)
+        submitted.refresh_from_db()
+        self.assertEqual(submitted.status, LoreEntry.Status.SUBMITTED)
+
+    @override_settings(LORE_REQUIRE_APPROVAL=False)
+    def test_approval_disabled_has_an_affirmation_empty_state(self):
+        html = self._render(
+            LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
+        )
+        self.assertIn("No affirmation requests.", html)
+        self.assertNotIn("No entries awaiting approval.", html)
+
+    @override_settings(LORE_REQUIRE_APPROVAL=True)
+    def test_approval_enabled_shows_both_review_sections(self):
+        submitted = _make_entry(title="Pending publication", author=self.char2)
+        with override_settings(LORE_REQUIRE_APPROVAL=False):
+            entry = _make_entry(title="Pending affirmation", author=self.char2)
+        entry.request_affirmation(requested_by=self.char2)
+        html = self._render(
+            LoreApprovalQueueView, path_="/lore/queue/", user=self.account, puppet=self.char1
+        )
+        self.assertIn("Publication approval", html)
+        self.assertIn("Affirmation requests", html)
+        self.assertIn(submitted.title, html)
+        self.assertIn(entry.title, html)
+
+    def test_review_queue_remains_staff_only(self):
+        from django.core.exceptions import PermissionDenied
+
+        for approval in (True, False):
+            with override_settings(LORE_REQUIRE_APPROVAL=approval):
+                with self.assertRaises(PermissionDenied):
+                    LoreApprovalQueueView.as_view()(self._request("/lore/queue/", self.account2))
+                response = LoreApprovalQueueView.as_view()(self._request("/lore/queue/"))
+                self.assertEqual(response.status_code, 302)
 
 
 class TestLoreFormsRender(LoreWebRenderTestCase):

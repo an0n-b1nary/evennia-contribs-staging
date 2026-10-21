@@ -93,6 +93,11 @@ class CharacterCmdSet(CmdSet):
 | `LORE_PLOTS_APP_LABEL` | `"evennia_plots"` | App label for plots (used for plot-lore links and lean) |
 | `LORE_REGIONS_APP_LABEL` | `"evennia_regions"` | App label for regions (used for region weighting and hint) |
 | `LORE_MAP_LOCKED_NOTE` | `"not yet known: learned through roleplay"` | The note beside a public entry the viewer's character hasn't learned, in the map's room panel |
+
+The staff website's **Lore Review** page always lists affirmation requests. Its
+publication-approval section appears only when `LORE_REQUIRE_APPROVAL` is true.
+Turning approval off hides older submissions from this page without publishing,
+rejecting or deleting them; turning it back on restores their review queue.
 | `LORE_MAP_ENTRY_URL_NAME` | `"lore-detail"` | Route the room panel links known entries to; `""` for no links |
 
 ---
