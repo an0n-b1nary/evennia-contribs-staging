@@ -45,6 +45,7 @@ that self-heals.
 
 from django.conf import settings
 from django.db.models import Count
+from django.http import HttpResponseRedirect
 from django.urls import NoReverseMatch, reverse
 from django.views.generic import DetailView, ListView
 
@@ -300,6 +301,15 @@ class PlaneLiveMapView(DetailView):
     model = MapPlane
     template_name = "evennia_maps/plane_live_map.html"
     context_object_name = "plane"
+
+    def get(self, request, *args, **kwargs):
+        # Resolve visibility first: a redirect must not disclose a hidden plane.
+        self.object = self.get_object()
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(
+                reverse("evennia_maps:plane-detail", kwargs={"pk": self.object.pk})
+            )
+        return self.render_to_response(self.get_context_data(object=self.object))
 
     def get_queryset(self):
         return visible_planes(
