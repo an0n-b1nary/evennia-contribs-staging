@@ -1,5 +1,9 @@
 # Changelog — evennia-rp-contest
 
+## 0.1.5 — 2026-10-20
+
+- Add the staff-only `contest-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.1.4] - 2026-10-12
 
 - Add a host-bound API to freeze rating/modifier sources, validate allowed

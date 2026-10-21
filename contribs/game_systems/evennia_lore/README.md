@@ -465,7 +465,9 @@ example are in [evennia-accessibility's README](../../utils/evennia_accessibilit
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`lore-staff`](guides/lore-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `lore` and the
 `ic-may-mislead` principle. They explain the system to players in general
 terms, without exact numbers, and link only to pages this contrib or its

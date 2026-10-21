@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.7.3 — 2026-10-20
+
+- Add the staff-only `plots-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.7.2 — 2026-10-18
 
 - Guide pages: `plots` now covers OOC notes, requesting and withdrawing threads, sequels and related plots, who can conclude, and `+plot/request-conclude`. It no longer says `+plot/follow` keeps you posted: following records the plot but sends no notices.

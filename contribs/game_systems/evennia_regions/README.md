@@ -247,7 +247,9 @@ example are in [evennia-accessibility's README](../../utils/evennia_accessibilit
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`regions-staff`](guides/regions-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `regions`,
 `glossary-region`. They explain the system to players in general terms, without
 exact numbers, and link only to pages this contrib or its required dependencies

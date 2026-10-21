@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.4.3 — 2026-10-20
+
+- Add the staff-only `chargen-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.4.2] - 2026-10-18
 
 ### Documentation

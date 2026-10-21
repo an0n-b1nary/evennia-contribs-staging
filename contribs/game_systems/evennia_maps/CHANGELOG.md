@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.3 — 2026-10-20
+
+- Add the staff-only `maps-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.10.2 — 2026-10-18
 
 - Guide pages: `map` explains that private places, such as homes and drafts, show only to characters allowed to see them, and planes or floors with nothing visible are left out entirely.

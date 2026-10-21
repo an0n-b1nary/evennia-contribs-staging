@@ -2,6 +2,10 @@
 
 All notable changes to `evennia-regions` will be documented here.
 
+## 0.5.3 — 2026-10-20
+
+- Add the staff-only `regions-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.5.2 — 2026-10-18
 
 - Guide pages: `regions` covers extra room details other systems add, and private rooms and map links hidden from viewers who can't see them.

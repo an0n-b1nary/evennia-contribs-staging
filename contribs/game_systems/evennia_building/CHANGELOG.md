@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 — 2026-10-20
+
+- Add the staff-only `building-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.3.3 - 2026-10-18
 
 - Rewrote the player guide in the guide format as two pages, both hidden while

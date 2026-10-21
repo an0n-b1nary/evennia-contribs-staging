@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## 0.2.4 — 2026-10-20
+
+- Require combat 0.2.5 so the linked combat staff guide is available.
+- Add the staff-only `party-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.2.3] - 2026-10-18
 
 - Rewrote the player guide in the guide format and split it into three pages,

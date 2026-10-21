@@ -377,9 +377,12 @@ the installed contribs ship: player pages for each system (`checks`,
 `crafting-letters`, `crafting-fixtures`, `companions`, `crafting-modifiers`,
 `patterns`), a few principles and glossary
 terms, and staff pages: guides' own `writing-guides` and the contribs'
-`<contrib>-staff` pages (so far `equipment-staff`, `moderation-staff`,
-`jobs-staff`, `social-staff`, `rptracker-staff`, `economy-staff`,
-`resources-staff` and `crafting-staff`). A page here with the same
+`<contrib>-staff` pages: `equipment-staff`, `moderation-staff`, `jobs-staff`,
+`social-staff`, `rptracker-staff`, `plots-staff`, `lore-staff`, `scenes-staff`,
+`calendar-staff`, `boards-staff`, `xp-staff`, `building-staff`, `maps-staff`,
+`regions-staff`, `npcs-staff`, `links-staff`, `chargen-staff`, `contest-staff`,
+`combat-staff`, `party-staff`, `economy-staff`, `resources-staff` and
+`crafting-staff`. A page here with the same
 key as a contrib's page replaces it.
 
 The navbar's **Guide** dropdown links Start here, the full index, the design

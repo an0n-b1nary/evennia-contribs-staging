@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.5.3 — 2026-10-20
+
+- Add the staff-only `calendar-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## [0.5.2] - 2026-10-19
 
 - **Fixed:** players are now told about their RSVPs. Being drawn in a lottery

@@ -1,5 +1,9 @@
 # Changelog — evennia-links
 
+## 0.8.11 — 2026-10-20
+
+- Add the staff-only `links-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.8.10 - 2026-10-19
 
 - `TestRunner` stops the reactor's never-started thread pool, so the lock

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-links"
-version = "0.8.10"
+version = "0.8.11"
 description = "Abstract base models, helpers, and a shared version-tracked text-editing mixin for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -39,3 +39,6 @@ packages = ["evennia_links"]
 
 [tool.setuptools.package-dir]
 "evennia_links" = "."
+
+[tool.setuptools.package-data]
+evennia_links = ["guides/*.md"]

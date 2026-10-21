@@ -371,7 +371,9 @@ new effect kinds, rather than defining an ability model of its own.
 
 ## Guide pages
 
-The `guides/` directory holds player guide pages for
+The staff-only [`chargen-staff`](guides/chargen-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
+
+The `guides/` directory holds player and staff guide pages for
 [evennia-guides](../../utils/evennia_guides/README.md): `character-sheet` and
 `signature-moves`. They explain the system to players in general terms, without
 exact numbers, and link only to pages this contrib or its required dependencies

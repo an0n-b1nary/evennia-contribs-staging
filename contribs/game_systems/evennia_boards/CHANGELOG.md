@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.5.5 — 2026-10-20
+
+- Add the staff-only `boards-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
+
 ## 0.5.4 — 2026-10-18
 
 - Guide pages: `boards` now covers read-only boards, unsubscribing, reply numbering, and who can't post (guests, and anyone under a communication restriction).

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-party"
-version = "0.2.3"
+version = "0.2.4"
 description = "Fight-local tactical parties, Formation, Cover and shared support over RP combat."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]
 requires-python = ">=3.12"
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.5", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-combat>=0.2.3,<0.3"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.5", "evennia-rp-rules>=0.1,<0.2", "evennia-rp-combat>=0.2.5,<0.3"]
 
 [project.optional-dependencies]
 guides = ["evennia-guides>=0.1"]

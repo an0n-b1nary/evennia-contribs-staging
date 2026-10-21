@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-contest"
-version = "0.1.4"
+version = "0.1.5"
 description = "Player-led RP tests, room challenges and private resolution audits for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
