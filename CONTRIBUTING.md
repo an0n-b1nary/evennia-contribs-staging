@@ -210,6 +210,20 @@ Note what it does *not* cover: compiling a template does not resolve `{% extends
 `{% include %}` targets, run a single filter, or reverse a single URL. The sweep is a
 floor, not a substitute for rendering.
 
+## Command syntax sweep
+
+`scripts/check_command_syntax.py` holds commands to the ceiling in
+CODING_STYLE.md's "Command syntax" section, `+command/switch target=value`.
+It reads source without importing it, so it needs no Django and no game.
+Pre-commit runs it, and therefore so does CI's lint job.
+
+`scripts/command_syntax_allowlist.txt` lists the offenders that predate the
+rule. After reshaping a contrib's commands, run
+`python scripts/check_command_syntax.py --print-keys` and delete the
+allowlist lines that no longer appear. The sweep fails on a stale line, so
+forgetting is caught. Tests and changelogs are not scanned, so a test that
+asserts an old form is refused, or a "Breaking" entry naming one, is fine.
+
 ## Render tests
 
 **If your contrib ships web pages, every page needs at least one test that calls
@@ -289,7 +303,7 @@ runner, so a long run doesn't slow down as it goes.
 Pushes to `main`, a nightly schedule and manual runs (**Run workflow** on the
 Actions tab, for any branch) run every job. A PR runs less:
 
-- **lint** (~1 min): pre-commit (anonymity guard + Ruff format + Ruff check) + Python syntax check. Always runs.
+- **lint** (~1 min): pre-commit (anonymity guard + template and command syntax sweeps + Ruff format + Ruff check) + the command sweep's tests + Python syntax check. Always runs.
 - **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test --parallel=auto`. On a PR only 3.12 runs the full suite; 3.13 and 3.14 run a smoke cell (install, migrate, syntax check, template sweep and the `evennia_links` suite with parallel workers), and run in full on `main` and nightly.
 - **Partner jobs**, selected by `scripts/ci_scope.py` from the PR's changed
   files. A job runs when a changed contrib, or a contrib depending on it through
