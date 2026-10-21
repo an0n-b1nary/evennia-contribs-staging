@@ -1104,9 +1104,9 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
         super().setUp()
         self.factory = RequestFactory()
 
-    def _render(self, view, path_, **kwargs):
+    def _render(self, view, path_, *, user=None, **kwargs):
         request = self.factory.get(path_)
-        request.user = AnonymousUser()
+        request.user = user or AnonymousUser()
         # Evennia's general_context processor reaches into request.session;
         # RequestFactory attaches none.
         request.session = import_module(settings.SESSION_ENGINE).SessionStore()
@@ -1193,12 +1193,27 @@ class TestMapWebSurface(SeededSandboxMixin, EvenniaTest):
         from world.sandbox.management.commands.seed_sandbox import PLANE_NAME
 
         plane = MapPlane.objects.get(name=PLANE_NAME)
-        html = self._render(PlaneLiveMapView.as_view(), f"/map/{plane.pk}/live/", pk=plane.pk)
+        html = self._render(
+            PlaneLiveMapView.as_view(),
+            f"/map/{plane.pk}/live/",
+            user=self.account2,
+            pk=plane.pk,
+        )
         self.assertIn("/api/v1/planes/", html)
         self.assertIn("/regions/rooms/", html)
         self.assertIn("/regions/", html)
         self.assertIn("/scenes/", html)
         self.assertIn("/calendar/", html)
+
+    def test_anonymous_live_map_link_redirects_to_a_rendered_static_map(self):
+        from django.urls import reverse
+
+        from evennia_maps.models import MapPlane
+        from world.sandbox.management.commands.seed_sandbox import PLANE_NAME
+
+        plane = MapPlane.objects.get(name=PLANE_NAME)
+        response = self.client.get(reverse("evennia_maps:plane-live-map", args=[plane.pk]))
+        self.assertRedirects(response, reverse("evennia_maps:plane-detail", args=[plane.pk]))
 
     def test_region_page_renders_its_member_rooms(self):
         from evennia_regions.models import Region
@@ -1329,6 +1344,35 @@ class TestEveryWebSurfaceIsMounted(SeededSandboxMixin, EvenniaTest):
                 self.assertIn(response.status_code, (200, 302))
 
 
+class TestLoreReviewSurface(EvenniaTest):
+    """The shared review page renders under the reference game's real web shell."""
+
+    def test_both_approval_modes_render_with_affirmation_requests(self):
+        from evennia_lore.models import LoreEntry
+        from evennia_lore.views import LoreApprovalQueueView
+
+        with override_settings(LORE_REQUIRE_APPROVAL=True):
+            submitted = LoreEntry.create_entry(title="Awaiting publication", author=self.char2)
+        with override_settings(LORE_REQUIRE_APPROVAL=False):
+            published = LoreEntry.create_entry(title="Awaiting affirmation", author=self.char2)
+        published.request_affirmation(requested_by=self.char2)
+        request = RequestFactory().get("/lore/queue/")
+        request.user = self.account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+
+        for approval in (True, False):
+            with self.subTest(approval=approval):
+                with override_settings(LORE_REQUIRE_APPROVAL=approval):
+                    response = LoreApprovalQueueView.as_view()(request)
+                    response.render()
+                html = response.content.decode()
+                self.assertIn("Lore Review", html)
+                self.assertIn(published.title, html)
+                self.assertIn('aria-label="Primary"', html)
+                self.assertEqual(submitted.title in html, approval)
+                self.assertEqual("Publication approval" in html, approval)
+
+
 class TestNavCoversEveryWebSurface(EvenniaTest):
     """The navbar reaches every surface this game mounts, and cannot 500 the site.
 
@@ -1385,7 +1429,7 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
         menu = build_menu(self._request())
         labels = [item["label"] for group in menu["groups"] for item in group["items"]]
 
-        self.assertIn("Map", labels)
+        self.assertIn("All Maps", labels)
         self.assertIn("Lore", labels)
         self.assertEqual(menu["account"]["personal"], [])
         self.assertEqual(menu["account"]["staff"], [])
@@ -1434,7 +1478,17 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
             item["label"] for group in menu["groups"] for item in group["items"] if item["active"]
         ]
 
-        self.assertEqual(active, ["Scenes"])
+        self.assertEqual(active, ["All Scenes"])
+
+    def test_events_put_happening_now_before_all_scenes(self):
+        from web.website.nav import build_menu
+
+        menu = build_menu(self._request())
+        events = next(group for group in menu["groups"] if group["label"] == "Events")
+        self.assertEqual(
+            [item["label"] for item in events["items"]],
+            ["Happening Now", "All Scenes", "Plots", "Calendar"],
+        )
 
     def test_longest_prefix_wins_across_menus(self):
         """/lore/mine/ activates "My Lore" only - not "Lore" as well.
@@ -1505,6 +1559,38 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
 
     character_typeclass = Character
     room_typeclass = Room
+
+    def test_map_widget_chooses_a_working_destination_for_each_viewer(self):
+        from django.urls import reverse
+        from web.website.views.index import _map_summary
+
+        from evennia_maps.models import MapPlane
+
+        for user, route in (
+            (AnonymousUser(), "evennia_maps:plane-detail"),
+            (self.account2, "evennia_maps:plane-live-map"),
+        ):
+            with self.subTest(authenticated=user.is_authenticated):
+                request = RequestFactory().get("/")
+                request.user = user
+                request.session = {}
+                summary = _map_summary(request)
+                plane = MapPlane.objects.get(name=summary["plane_name"])
+                self.assertEqual(summary["url"], reverse(route, args=[plane.pk]))
+
+    def test_map_widget_falls_back_when_the_live_api_is_unmounted(self):
+        from django.urls import reverse
+        from web.website.views.index import _map_summary
+
+        from evennia_maps.models import MapPlane
+
+        request = RequestFactory().get("/")
+        request.user = self.account2
+        request.session = {}
+        with override_settings(MAPS_TILES_URL_NAME=""):
+            summary = _map_summary(request)
+        plane = MapPlane.objects.get(name=summary["plane_name"])
+        self.assertEqual(summary["url"], reverse("evennia_maps:plane-detail", args=[plane.pk]))
 
     def _index(self):
         from django.urls import reverse

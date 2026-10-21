@@ -28,6 +28,13 @@ Keep the owning views' visibility rules, documenting each queryset's origin.
 An empty widget explains what will fill it. A missing optional app or route
 degrades gracefully. Place game activity before engine information.
 
+The map widget chooses a static map for anonymous visitors and a live map for
+authenticated accounts when the tile API is mounted. Preserve this choice in
+custom landing-page links: a live map needs an authenticated account, though it
+does not require a selected character. Game-specific named-plane shortcuts belong
+in the host's menu composition. The reference menu labels the plane list **All
+Maps** and puts **Happening Now** before **All Scenes** under Events.
+
 ## Viewer policy and template conventions
 
 The reference web staff policy is mirrored in the sandbox and contrib permission

@@ -1422,7 +1422,11 @@ Three mechanisms, for three different needs:
 ### Present activity on the web
 
 The home page and both map views link running scenes to readable logs. The
-**Happening Now** menu opens `/scenes/live/`; `/scenes/` remains the archive.
+**Events** lists **Happening Now** before **All Scenes**: the former opens
+`/scenes/live/`, and the latter opens the archive at `/scenes/`. **Setting → All
+Maps** opens the plane list. The homepage map widget links anonymous visitors to
+the static map and authenticated accounts to the live map when its API is mounted.
+Direct live-map links also redirect anonymous visitors to the static map.
 Live logs begin on the newest page, show participants, and poll every ten seconds.
 Numbered earlier pages stay put, OOC filtering survives pagination, and manual
 refresh works without JavaScript. The poll uses the same privacy checks as the

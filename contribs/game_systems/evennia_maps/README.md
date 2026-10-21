@@ -169,7 +169,10 @@ rather than an empty canvas when it does not resolve.
 
 The API viewsets carry their own authentication, permission, pagination and filter
 classes, so they do not depend on your project's global `REST_FRAMEWORK` settings.
-Tiles require an authenticated account; the SVG page does not.
+Tiles require an authenticated account; the SVG page does not. Anonymous visitors
+to a live-map URL are redirected to that plane's static SVG map, after the same
+plane visibility checks. Any authenticated account can open the live map without
+selecting a character; room visibility still follows the existing viewer rules.
 
 **Leaflet is loaded from a CDN** (unpkg, 1.9.4, with an SRI hash) by
 `plane_live_map.html`. Nothing is vendored into this package. If your site runs

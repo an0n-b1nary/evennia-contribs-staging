@@ -1861,6 +1861,7 @@ class TestReadRoomAttr(MapsTestCase):
 
 def _attach(request, user):
     request.user = user
+    request.session = {}
     return request
 
 
@@ -2161,6 +2162,30 @@ class TestSvgContextQueryCost(MapsWebTestCase):
 
 @override_settings(ROOT_URLCONF=__name__)
 class TestPlaneLiveMapView(MapsWebTestCase):
+    def test_anonymous_visitors_redirect_to_the_static_map(self):
+        plane = _make_plane("Public map")
+        request = _attach(self.factory.get(f"/map/{plane.pk}/live/"), AnonymousUser())
+        response = PlaneLiveMapView.as_view()(request, pk=plane.pk)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"/map/{plane.pk}/")
+
+    def test_authenticated_accounts_need_no_selected_character(self):
+        plane = _make_plane("Public map")
+        request = _attach(self.factory.get(f"/map/{plane.pk}/live/"), self.account2)
+        with mock.patch.object(self.account2, "get_all_puppets", return_value=[]):
+            response = PlaneLiveMapView.as_view()(request, pk=plane.pk)
+            response.render()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="evennia-maps-live"', response.content.decode())
+
+    def test_missing_and_archived_planes_are_not_redirected(self):
+        plane = _make_plane("Archived map")
+        plane.archive()
+        request = _attach(self.factory.get("/map/"), AnonymousUser())
+        for pk in (plane.pk, plane.pk + 1):
+            with self.subTest(pk=pk), self.assertRaises(Http404):
+                PlaneLiveMapView.as_view()(request, pk=pk)
+
     def _context(self, plane, user=None):
         view = PlaneLiveMapView()
         view.request = _attach(self.factory.get("/map/"), user or AnonymousUser())
@@ -2217,8 +2242,8 @@ class TestWebPagesRender(MapsWebTestCase):
         self.plane = _make_plane("Rendered")
         placement.place_tile(self.room1, self.plane, 0, 0)
 
-    def _render(self, view, **kwargs):
-        request = _attach(self.factory.get("/map/"), AnonymousUser())
+    def _render(self, view, *, user=None, **kwargs):
+        request = _attach(self.factory.get("/map/"), user or AnonymousUser())
         response = view.as_view()(request, **kwargs)
         response.render()
         html = response.content.decode()
@@ -2239,7 +2264,7 @@ class TestWebPagesRender(MapsWebTestCase):
         self.assertNotIn(f"/map/{self.plane.pk}/live/", html)
 
     def test_live_map_renders_its_container_and_script(self):
-        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        html = self._render(PlaneLiveMapView, user=self.account2, pk=self.plane.pk)
         self.assertIn('id="evennia-maps-live"', html)
         self.assertIn("/api/v1/planes/0/tiles/", html)
         self.assertIn("evennia_maps/js/evennia_maps.js", html)
@@ -2248,14 +2273,14 @@ class TestWebPagesRender(MapsWebTestCase):
         self.assertLess(html.index("leaflet.css"), html.index("evennia_maps/css/evennia_maps.css"))
 
     def test_live_map_renders_the_room_panel(self):
-        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        html = self._render(PlaneLiveMapView, user=self.account2, pk=self.plane.pk)
         self.assertIn('id="evennia-maps-panel"', html)
         self.assertIn('aria-labelledby="evennia-maps-panel-title"', html)
         self.assertIn('data-tile-detail-url-template="/api/v1/planes/0/tiles/0/detail/"', html)
 
     @override_settings(MAPS_TILES_URL_NAME="")
     def test_live_map_explains_itself_when_the_api_is_off(self):
-        html = self._render(PlaneLiveMapView, pk=self.plane.pk)
+        html = self._render(PlaneLiveMapView, user=self.account2, pk=self.plane.pk)
         self.assertNotIn('id="evennia-maps-live"', html)
         self.assertIn("map API is not mounted", html)
 

@@ -5,22 +5,23 @@
   {% include "evennia_lore/_styles.html" %}
 {% endblock %}
 
-{% block titleblock %}Lore Approval Queue{% endblock %}
+{% block titleblock %}{{ page_title }}{% endblock %}
 
 {% block breadcrumbs %}
 <nav aria-label="Breadcrumb" class="container mt-2">
   <ol class="breadcrumb bg-transparent px-0">
     <li class="breadcrumb-item"><a href="{% url 'lore-list' %}">Lore</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Approval Queue</li>
+    <li class="breadcrumb-item active" aria-current="page">Review</li>
   </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<h1 class="mb-3">Lore Approval Queue</h1>
+<h1 class="mb-3">{{ page_title }}</h1>
+{% if approval_required %}
+<h2 class="h4 mb-3">Publication approval</h2>
 <p class="text-muted small mb-3">
-  Entries awaiting staff review (only populated when
-  <code>LORE_REQUIRE_APPROVAL = True</code>).
+  Entries awaiting staff approval before publication.
 </p>
 
 {% if entries %}
@@ -57,6 +58,7 @@
 </div>
 {% else %}
 {% include "evennia_lore/_empty_state.html" with message="No entries awaiting approval." %}
+{% endif %}
 {% endif %}
 
 <h2 class="h4 mt-4 mb-3">Affirmation requests</h2>

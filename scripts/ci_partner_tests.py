@@ -16,6 +16,7 @@ from importlib.util import find_spec
 
 from django.apps import apps
 from django.conf import settings
+from django.test import RequestFactory
 from django.urls import NoReverseMatch, include, path, reverse
 from django.utils import timezone
 from evennia.objects.objects import DefaultRoom
@@ -27,6 +28,7 @@ from evennia_links.runtime import get as _runtime
 from evennia_maps.models import MapPlane, RoomTile
 from evennia_maps.overlays import collect_overlays, overlay_url_templates
 from evennia_maps.typeclasses import MapsRoomMixin
+from evennia_maps.views import PlaneLiveMapView
 from evennia_regions.models import Region, RegionMembership
 
 urlpatterns = [
@@ -173,12 +175,20 @@ class TestPartnerIntegration(EvenniaTest):
 
     def test_live_map_retains_the_feed_and_only_available_links(self):
         """Render the live map shell with the feed and available partner links."""
-        response = self.client.get(reverse("evennia_maps:plane-live-map", args=[self.plane.pk]))
+        request = RequestFactory().get(reverse("evennia_maps:plane-live-map", args=[self.plane.pk]))
+        request.user = self.account2
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        response = PlaneLiveMapView.as_view()(request, pk=self.plane.pk)
+        response.render()
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-tiles-url-template="/api/v1/planes/0/tiles/"')
         event_url = "/calendar/0/" if settings.PARTNER_TEST_CALENDAR else ""
         self.assertContains(response, f'data-event-url-template="{event_url}"')
         self.assertContains(response, 'data-region-url-template="/regions/0/"')
+
+    def test_anonymous_live_map_redirects_to_the_static_partner_map(self):
+        response = self.client.get(reverse("evennia_maps:plane-live-map", args=[self.plane.pk]))
+        self.assertRedirects(response, reverse("evennia_maps:plane-detail", args=[self.plane.pk]))
 
     def test_authenticated_tile_feed_keeps_remaining_provider_data(self):
         """Serve real overlay data with no calendar events when its partner is absent."""

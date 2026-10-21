@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.10.4] - 2026-10-21
+
+- Redirect anonymous live-map requests to the same plane's static SVG map after
+  checking visibility. Authenticated accounts can use the live map without a
+  selected character.
+
 ## 0.10.3 — 2026-10-20
 
 - Add the staff-only `maps-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.
