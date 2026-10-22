@@ -118,7 +118,7 @@ class SnapshotFixtureTests(unittest.TestCase):
             def send(self, actor, command):
                 outputs = {
                     "+sheet": "Presence B ++",
-                    "+abilities": "Proficiency: Performance",
+                    "+abilities": "Proficiency/Performance",
                     "+xp": "XP 10",
                     "+xp/grant pt-alice=10 # Forbidden": "Not permitted",
                 }

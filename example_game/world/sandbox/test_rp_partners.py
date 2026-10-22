@@ -211,7 +211,7 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
 
         with self.assertRaisesMessage(ChargenError, "Agility ++ is held by your duelist's gloves."):
             chargen.set_edge(wearer, "agility", 1)
-        with self.assertRaisesMessage(ChargenError, "Combat Focus: Blades is held by"):
+        with self.assertRaisesMessage(ChargenError, "Combat Focus/Blades is held by"):
             abilities.unequip(self.samples[1], "combat focus", "blades")
         gear.remove(wearer, gloves)
         chargen.set_edge(wearer, "agility", 1)

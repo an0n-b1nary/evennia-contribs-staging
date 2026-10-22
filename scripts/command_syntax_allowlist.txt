@@ -14,17 +14,10 @@ evennia_calendar stacked-switch +calendar
 evennia_calendar stacked-switch +rsvp
 evennia_lore pipe +lorecraft
 evennia_lore stacked-switch +lore
-evennia_npcs colon +npc
-evennia_npcs json +npc
 evennia_plots colon +arc
 evennia_plots stacked-switch +arc
 evennia_plots stacked-switch +plot
-evennia_rp_chargen colon +abilities
-evennia_rp_chargen colon +chargen
-evennia_rp_chargen colon +spend
-evennia_rp_chargen colon +upgrade
 evennia_rp_chargen json +moves
-evennia_rp_chargen stacked-switch +chargen
 evennia_rp_combat json +combat
 evennia_rp_combat json +tactics
 evennia_rp_combat nested-equals +combat

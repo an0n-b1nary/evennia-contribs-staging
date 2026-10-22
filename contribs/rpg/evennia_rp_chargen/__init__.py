@@ -23,4 +23,4 @@ Modules:
 Importing the package imports no models; import the modules you need.
 """
 
-__version__ = "0.4.4"
+__version__ = "0.5.0"

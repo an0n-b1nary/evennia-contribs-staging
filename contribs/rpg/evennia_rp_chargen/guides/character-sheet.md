@@ -32,6 +32,7 @@ A `-` pip doesn't buy you anything: it never earns extra `+` pips. So nobody tak
 Abilities help with checks. Some are chosen per subject, so the same ability for performance and for stealth is two separate copies, each with its own level.
 
 - **Equipped abilities** count against your **loadout**, which has room for only so many, and only equipped abilities apply to checks. `+abilities/equip` and `+abilities/unequip` change what's equipped.
+- For a tagged ability, use `<ability>/<tag>`, for example `+spend/ability Proficiency/Performance`. The same address works for info, equip, unequip, flaws and upgrades.
 - **Buying and upgrading** use your starting allowance first. A new ability is equipped straight away if your loadout has room. Once that's gone, they use XP if your game has it. Each level costs more than the last, and `+abilities/info <ability>` shows the costs.
 - **Flaws** are free and always in effect, and they give nothing back. Take one with `+abilities/flaw` and drop it with `+abilities/unflaw`. Some flaws are set by staff, and only staff can remove those.
 

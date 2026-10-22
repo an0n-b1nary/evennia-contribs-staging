@@ -87,7 +87,7 @@ def _tag(ability: AbilityDefinition, tag_text: str | None):
         return None
     if not tag_text:
         raise ChargenError(
-            f"Which {ability.tag_kind}? For example: {ability.name}: <{ability.tag_kind}>"
+            f"Which {ability.tag_kind}? For example: {ability.name}/<{ability.tag_kind}>"
         )
     try:
         tag = DBVocabulary().find(tag_text, kind=ability.tag_kind)
@@ -123,7 +123,7 @@ def find_owned(character, ability_text: str, tag_text: str | None = None) -> Cha
         if copies:
             return copies[0]
     raise ChargenError(
-        f"You don't have {ability.display_name(None)}{f': {tag_text}' if tag_text else ''}."
+        f"You don't have {ability.display_name(None)}{f'/{tag_text}' if tag_text else ''}."
     )
 
 

@@ -111,7 +111,7 @@ class AbilityGuardTests(GuardMixin, ChargenTest):
         abilities.acquire(self.char1, "domain expertise", "riddles")
         self.asked.clear()
 
-    def copy(self, name="Domain Expertise: Riddles"):
+    def copy(self, name="Domain Expertise/Riddles"):
         return {c.display_name: c for c in abilities.owned(self.char1)}.get(name)
 
     def test_a_refused_unequip_keeps_it_equipped(self):
@@ -134,7 +134,7 @@ class AbilityGuardTests(GuardMixin, ChargenTest):
         self.refuse[guards.ACQUIRE] = AXE
         with self.assertRaisesMessage(ChargenError, AXE):
             abilities.acquire(self.char1, "domain expertise", "climbing", by=self.char1)
-        self.assertIsNone(self.copy("Domain Expertise: Climbing"))
+        self.assertIsNone(self.copy("Domain Expertise/Climbing"))
         self.assertEqual(services.get_build(self.char1).allowance_left, Decimal(17))
         self.assertEqual(AbilityTransaction.objects.filter(kind="acquire").count(), 1)
         self.assertEqual((self.asked[-1].copy, self.asked[-1].level), (None, 1))
@@ -161,7 +161,7 @@ class AbilityGuardTests(GuardMixin, ChargenTest):
         self.refuse[guards.REMOVE_FLAW] = AXE
         with self.assertRaisesMessage(ChargenError, AXE):
             abilities.remove_flaw(self.char1, "domain ineptitude")
-        self.assertIsNotNone(self.copy("Domain Ineptitude: Climbing"))
+        self.assertIsNotNone(self.copy("Domain Ineptitude/Climbing"))
         self.assertEqual(self.asked[-1].level, 0)
 
     def test_staff_grants_and_revokes_are_refused_too(self):

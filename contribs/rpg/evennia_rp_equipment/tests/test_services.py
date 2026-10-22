@@ -146,16 +146,16 @@ class WearingTests(GearTest):
 
     def test_unmet_requirements_refuse(self):
         self.make_sheet(self.char1, brawn="Mid+")
-        item = self.make_item(self.char1, "axe", "Brawn +2", "flaw Domain Ineptitude: Riddles")
+        item = self.make_item(self.char1, "axe", "Brawn +2", "flaw Domain Ineptitude/Riddles")
         with self.assertRaisesMessage(
-            GearError, "Wearing axe needs Brawn ++, the flaw Domain Ineptitude: Riddles."
+            GearError, "Wearing axe needs Brawn ++, the flaw Domain Ineptitude/Riddles."
         ):
             services.wear(self.char1, item)
         self.assertFalse(item.is_worn)
 
     def test_an_unowned_ability_only_means_not_attuned(self):
         self.make_sheet(self.char1)
-        item = self.make_item(self.char1, "staff", "ability Domain Expertise: Riddles")
+        item = self.make_item(self.char1, "staff", "ability Domain Expertise/Riddles")
         notices = services.wear(self.char1, item)
         self.assertTrue(item.is_worn)
         self.assertIn("aren't fully attuned", notices[0])
@@ -164,9 +164,9 @@ class WearingTests(GearTest):
         self.make_sheet(self.char1)
         abilities.acquire(self.char1, "domain expertise", "riddles")
         abilities.unequip(self.char1, "domain expertise", "riddles")
-        item = self.make_item(self.char1, "staff", "ability Domain Expertise: Riddles")
+        item = self.make_item(self.char1, "staff", "ability Domain Expertise/Riddles")
         with self.assertRaisesMessage(
-            GearError, "Wearing staff needs Domain Expertise: Riddles equipped."
+            GearError, "Wearing staff needs Domain Expertise/Riddles equipped."
         ):
             services.wear(self.char1, item)
 

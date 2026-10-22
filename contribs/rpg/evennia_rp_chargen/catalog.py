@@ -118,12 +118,18 @@ def find_ability(text: str, *, include_archived: bool = False) -> AbilityDefinit
     return match_spelling(list(manager.all()), text, "ability")
 
 
-def split_ability_text(text: str, rhs: str | None = None) -> tuple[str, str | None]:
-    """`"Domain Expertise: Performance"` (or lhs/rhs of `=`) into ability and tag text."""
-    if rhs is not None and rhs.strip():
-        return text.strip(), rhs.strip()
-    name, sep, tag = text.partition(":")
-    return name.strip(), (tag.strip() or None) if sep else None
+def split_ability_text(text: str) -> tuple[str, str | None]:
+    """Split one ability/tag address; refuse colon, equals and nested addresses."""
+    from evennia_rp_chargen.services import ChargenError
+
+    name, sep, tag = text.partition("/")
+    if (
+        not name.strip()
+        or any(c in text for c in (":", "=", ";", "~", "|"))
+        or (sep and (not tag.strip() or "/" in tag))
+    ):
+        raise ChargenError("Use <ability>[/<tag>].")
+    return name.strip(), tag.strip() if sep else None
 
 
 def modifiers_for(character) -> list:

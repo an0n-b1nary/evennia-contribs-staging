@@ -337,6 +337,89 @@ class NPCTests(EvenniaTest):
     DEFAULT_HOME="#1",
 )
 class NPCCommandTests(BaseEvenniaCommandTest):
+    def expect(self, command, args, text=None, **kwargs):
+        output = self.call(command, args, **kwargs)
+        if text is not None:
+            self.assertIn(text, output)
+        return output
+
+    def test_single_stat_updates_preserve_other_stats_and_require_management(self):
+        blueprint = svc.create_blueprint(self.char1, "Field Guard")
+        first, second = list(get_ruleset().stats.values())[:2]
+        rating = first.scale.rungs[-1].key
+        other = second.scale.rungs[0].key
+        self.expect(CmdNPC(), f"/StA Field Guard/{first.key}={rating}", "updated")
+        self.expect(CmdNPC(), f"/stat #{blueprint.pk}/{second.key}={other}", "updated")
+        blueprint.refresh_from_db()
+        expected = {first.key: rating, second.key: other}
+        self.assertEqual(blueprint.stat_block, expected)
+        self.expect(CmdNPC(), f"/stat Field Guard/{first.key}={other}", caller=self.char2)
+        blueprint.refresh_from_db()
+        self.assertEqual(blueprint.stat_block, expected)
+
+    def test_old_bulk_stats_and_raw_switch_stacks_are_refused(self):
+        blueprint = svc.create_blueprint(self.char1, "Field Guard")
+        stat = next(iter(get_ruleset().stats.values()))
+        rating = stat.scale.rungs[0].key
+        for args in (
+            f"/stats Field Guard={stat.key}:{rating}",
+            f"/stat/unknown Field Guard/{stat.key}={rating}",
+            f"/unknown/stat Field Guard/{stat.key}={rating}",
+            "/de Field Guard=Replaced",
+        ):
+            with self.subTest(args=args):
+                self.expect(CmdNPC(), args)
+                blueprint.refresh_from_db()
+                self.assertEqual((blueprint.stat_block, blueprint.description), ({}, ""))
+
+    @override_settings(NPCS_COMBAT_PROFILES_REVEALED=True)
+    def test_profile_fields_mapping_entries_and_lists_without_json(self):
+        blueprint = svc.create_blueprint(self.char1, "Field Guard")
+        for field, value in (
+            ("target_policy", "lowest_vitality"),
+            ("action_weights.standard", "3"),
+            ("action_weights.special", "1"),
+            ("reaction_policy.appetite", "cautious"),
+            ("reaction_policy.preferred_reaction", "evade"),
+            ("special_moves", "shield,shout"),
+            ("boss_check_schedule", "4,2,2"),
+        ):
+            self.expect(CmdNPC(), f"/ProF #{blueprint.pk}/{field}={value}", "saved")
+        profile = NPCCombatProfile.objects.get(blueprint=blueprint)
+        self.assertEqual(profile.target_policy, "lowest_vitality")
+        self.assertEqual(profile.action_weights, {"standard": 3, "special": 1})
+        self.assertEqual(
+            profile.reaction_policy, {"appetite": "cautious", "preferred_reaction": "evade"}
+        )
+        self.assertEqual(profile.special_moves, ["shield", "shout"])
+        self.assertEqual(profile.boss_check_schedule, [2, 4])
+        for args in (
+            '/profile Field Guard={"target_policy":"random"}',
+            '/profile Field Guard/target_policy={"x":1}',
+            "/profile Field Guard/action_weights.standard=-1",
+            "/profile Field Guard/boss_check_schedule=0,2",
+            "/profile Field Guard/reaction_policy.appetite=reckless",
+            "/profile/unknown Field Guard/target_policy=random",
+        ):
+            with self.subTest(args=args):
+                self.expect(CmdNPC(), args)
+                profile.refresh_from_db()
+                self.assertEqual(profile.target_policy, "lowest_vitality")
+                self.assertEqual(profile.action_weights, {"standard": 3, "special": 1})
+                self.assertEqual(profile.boss_check_schedule, [2, 4])
+                self.assertEqual(profile.reaction_policy["appetite"], "cautious")
+        self.expect(CmdNPC(), "/profile Field Guard/target_policy=random", caller=self.char2)
+        profile.refresh_from_db()
+        self.assertEqual(profile.target_policy, "lowest_vitality")
+        self.expect(CmdNPC(), "/profile Field Guard/special_moves=", "saved")
+        profile.refresh_from_db()
+        self.assertEqual(profile.special_moves, [])
+
+    def test_profile_fields_still_require_reveal(self):
+        blueprint = svc.create_blueprint(self.char1, "Field Guard")
+        self.expect(CmdNPC(), "/profile Field Guard/target_policy=lowest_vitality", "not available")
+        self.assertEqual(NPCCombatProfile.objects.get(blueprint=blueprint).target_policy, "random")
+
     def test_create_spawn_control_and_release(self):
         self.call(CmdNPC(), "/create Cameo=template", "Created NPC blueprint")
         blueprint = svc.find_blueprint("Cameo")
@@ -357,8 +440,8 @@ class NPCCommandTests(BaseEvenniaCommandTest):
 
     def test_invalid_switch_and_json_report_refusal(self):
         svc.create_blueprint(self.char1, "Porter")
-        self.call(CmdNPC(), "/unknown Porter", "Unknown NPC switch")
-        self.call(CmdNPC(), "/profile Porter={", "Expecting property name")
+        self.call(CmdNPC(), "/unknown Porter", "Unknown or ambiguous switch")
+        self.call(CmdNPC(), "/profile Porter={", "Usage: +npc/profile")
 
     def test_plain_pc_pose_and_say_still_work(self):
         self.call(CmdNPCPose(), "waves.", f"{self.char1.key} waves.")

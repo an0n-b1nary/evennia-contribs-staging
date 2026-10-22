@@ -55,7 +55,7 @@ def on_build_change(sender, change, **kwargs):
             if _breaks(change, req):
                 name = item.get_display_name(change.by or character)
                 whose = f"your {name}" if own else f"{character.key}'s {name}"
-                # "Proficiency: Blades is held by...", not "...Blades equipped is held by".
+                # "Proficiency/Blades is held by...", not "...Blades equipped is held by".
                 held = describe(req).removesuffix(" equipped")
                 refusals.append(f"{held} is held by {whose}. Take that off first.")
     return refusals or None

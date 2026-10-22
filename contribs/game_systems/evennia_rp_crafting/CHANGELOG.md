@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.6] - 2026-10-22
+
+### Changed
+
+- Accept Equipment 0.3 in the optional wearable dependency range.
+
 ## [0.10.5] - 2026-10-22
 
 - Allow Resources 0.3 and Economy 0.4 in dependency constraints. Their service integrations remain compatible with the revised command syntax.

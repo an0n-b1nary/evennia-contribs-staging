@@ -18,6 +18,12 @@ class CommandSyntaxSeams(EvenniaCommandTest):
     character_typeclass = Character
     room_typeclass = Room
 
+    def expect(self, command, args, text=None, **kwargs):
+        output = self.call(command, args, **kwargs)
+        if text is not None:
+            self.assertIn(text, output)
+        return output
+
     def command(self, key):
         return next(command for command in CharacterCmdSet().commands if command.key == key)
 
@@ -158,3 +164,56 @@ class CommandSyntaxSeams(EvenniaCommandTest):
             ResourceGrant.objects.order_by("pk").first(),
         ):
             self.assertEqual((row.note, row.by_id), (note, self.char1.pk))
+
+    def test_ability_addresses_reach_the_host_equipment_guard_and_refund(self):
+        from evennia_rp_chargen.catalog import seed_catalog
+        from evennia_rp_chargen.models import CharacterAbility
+        from evennia_rp_equipment import services as gear
+
+        seed_catalog()
+        command = self.command("+chargen")
+        self.expect(command, "/grant Char2/Proficiency:Performance=2")
+        self.assertFalse(CharacterAbility.objects.exists())
+        self.expect(command, "/grant Char2=Proficiency/Performance", "now has")
+        self.expect(command, "/level Char2=2", "Proficiency/Performance at level 2")
+        copy = CharacterAbility.objects.get(character_id=self.char2.pk)
+        item = gear.make(self.char2, "Syntax gloves")
+        gear.add_requirement(self.char2, item, "ability Proficiency/Performance")
+        gear.wear(self.char2, item)
+        self.expect(
+            self.command("+abilities"),
+            "/unequip Proficiency/Performance",
+            "held by",
+            caller=self.char2,
+        )
+        copy.refresh_from_db()
+        self.assertTrue(copy.equipped)
+        gear.remove(self.char2, item)
+        self.expect(command, "/refund Char2=Proficiency/Performance", "Revoked")
+        self.assertFalse(CharacterAbility.objects.exists())
+        self.expect(command, "/grant Char2=Proficiency/Performance", caller=self.char2)
+        self.assertFalse(CharacterAbility.objects.exists())
+
+    def test_npc_fields_reach_host_spawn_ratings_and_combat_profile(self):
+        from django.test import override_settings
+        from evennia_npcs import services
+        from evennia_npcs.models import NPCCombatProfile
+
+        with override_settings(NPCS_COMBAT_PROFILES_REVEALED=True):
+            command = self.command("+npc")
+            self.expect(command, "/create Syntax Guard=template", "Created")
+            blueprint = services.find_blueprint("Syntax Guard")
+            self.expect(command, "/stats Syntax Guard=presence:A")
+            blueprint.refresh_from_db()
+            self.assertEqual(blueprint.stat_block, {})
+            self.expect(command, "/stat Syntax Guard/presence=A", "updated")
+            self.expect(command, "/stat Syntax Guard/resolve=B", "updated")
+            spawned = services.spawn(self.char1, blueprint).spawned_object
+            self.assertEqual(spawned.get_rating("presence").rung.key, "a")
+            self.expect(command, "/profile Syntax Guard/action_weights.standard=3", "saved")
+            self.expect(command, "/profile Syntax Guard/reaction_policy.appetite=cautious", "saved")
+            self.expect(command, '/profile Syntax Guard={"target_policy":"lowest_vitality"}')
+            profile = NPCCombatProfile.objects.get(blueprint=blueprint)
+            self.assertEqual(profile.action_weights, {"standard": 3})
+            self.assertEqual(profile.reaction_policy, {"appetite": "cautious"})
+            self.assertEqual(profile.target_policy, "random")

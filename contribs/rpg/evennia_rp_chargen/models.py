@@ -257,7 +257,7 @@ class AbilityDefinition(AbstractArchived):
         return (self.key, self.name)
 
     def display_name(self, tag=None) -> str:
-        return f"{self.name}: {tag.name}" if tag is not None else self.name
+        return f"{self.name}/{tag.name}" if tag is not None else self.name
 
     def budget_cost_for(self, tag=None) -> int:
         """Resolve the current catalog cost; flaws always use zero budget."""

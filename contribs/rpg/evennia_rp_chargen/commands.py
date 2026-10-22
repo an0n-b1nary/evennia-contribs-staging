@@ -28,7 +28,13 @@ from evennia.utils.utils import inherits_from
 
 from evennia_rp_chargen import abilities, conf, locks, services
 from evennia_rp_chargen.catalog import split_ability_text
-from evennia_rp_chargen.models import AbilityDefinition, CharacterBuild, TagDefinition
+from evennia_rp_chargen.command_syntax import SingleSwitchMixin
+from evennia_rp_chargen.models import (
+    AbilityDefinition,
+    CharacterAbility,
+    CharacterBuild,
+    TagDefinition,
+)
 from evennia_rp_chargen.move_commands import CmdMoves
 from evennia_rp_chargen.services import ChargenError
 from evennia_rp_chargen.sheet import ability_lines, render_sheet, stat_lines
@@ -48,7 +54,7 @@ def _count(text: str, glyph: str) -> int | None:
     return None
 
 
-class _ChargenCommand(MuxCommand):
+class _ChargenCommand(SingleSwitchMixin, MuxCommand):
     help_category = "Character"
     locks = "cmd:all()"
 
@@ -257,8 +263,10 @@ class CmdChargen(_ChargenCommand):
       +chargen/approve <character>[=<note>]
       +chargen/reopen <character>[=<note>]
       +chargen/setstat <character>/<stat>=<rating>
-      +chargen/grant <character>/<ability>[: <tag>][=<level>]
-      +chargen/revoke[/refund] <character>/<ability>[: <tag>]
+      +chargen/grant <character>=<ability>[/<tag>]
+      +chargen/level <character>=<level>
+      +chargen/revoke <character>=<ability>[/<tag>]
+      +chargen/refund <character>=<ability>[/<tag>]
       +chargen/allowance <character>=<amount or default>
       +chargen/tag <name>[=<kind>]
 
@@ -266,7 +274,9 @@ class CmdChargen(_ChargenCommand):
     /reopen sends a sheet back to draft so its player can change rungs.
     /setstat sets a full rating such as B++- directly, bypassing allocation
     and pip limits; anything it breaks is reported.
-    /grant gives an ability or flaw free (or sets its level); /revoke takes
+    /grant gives an ability or flaw free at level 1. /level changes the last
+    ability you granted, for that character, until a server reload. It names
+    the ability in its reply. /revoke takes
     one away, and /refund returns what was paid for it.
     /tag adds a tag (a new domain, say) to the vocabulary.
     """
@@ -278,6 +288,7 @@ class CmdChargen(_ChargenCommand):
         "reopen",
         "setstat",
         "grant",
+        "level",
         "revoke",
         "refund",
         "allowance",
@@ -291,8 +302,10 @@ class CmdChargen(_ChargenCommand):
             return
         if "setstat" in self.switches:
             self.setstat()
-        elif "grant" in self.switches or "revoke" in self.switches:
+        elif any(s in self.switches for s in ("grant", "revoke", "refund")):
             self.grant_or_revoke()
+        elif "level" in self.switches:
+            self.level()
         elif "allowance" in self.switches:
             self.allowance()
         elif "tag" in self.switches:
@@ -351,43 +364,32 @@ class CmdChargen(_ChargenCommand):
         for warning in warnings:
             self.msg(f"|yNote:|n {warning}")
 
-    def _target_and_ability(self, usage: str):
-        """`<character>/<ability>[: <tag>]` from the left side, or None (usage shown)."""
-        name, sep, ability_text = self.lhs.partition("/")
-        if not sep or not ability_text.strip():
-            self.msg(usage)
-            return None
-        target = self.find_character(name)
-        if target is None:
-            return None
-        ability, tag = split_ability_text(ability_text)
-        return target, ability, tag
-
     def grant_or_revoke(self):
-        if "grant" in self.switches:
-            found = self._target_and_ability(
-                "Usage: +chargen/grant <character>/<ability>[: <tag>][=<level>]"
-            )
-            if found is None:
-                return
-            target, ability, tag = found
-            level = (self.rhs or "1").strip()
-            if not level.isdigit():
-                self.msg("The level must be a whole number.")
-                return
-            copy = self.run(abilities.grant, target, ability, tag, level=int(level), by=self.caller)
+        operation = self.switches[0]
+        if operation == "grant":
+            self.caller.ndb.chargen_level_target = None
+        usage = f"Usage: +chargen/{operation} <character>=<ability>[/<tag>]"
+        if not self.lhs or not self.rhs or "/" in self.lhs:
+            self.msg(usage)
+            return
+        address = self.run(split_ability_text, self.rhs)
+        if address is None:
+            return
+        target = self.find_character(self.lhs)
+        if target is None:
+            return
+        ability, tag = address
+        if operation == "grant":
+            copy = self.run(abilities.grant, target, ability, tag, by=self.caller)
             if copy is not None:
+                self.caller.ndb.chargen_level_target = (target.pk, copy.pk)
                 state = "equipped" if copy.equipped else "not equipped"
                 self.msg(
-                    f"{target.key} now has {copy.display_name} at level {copy.level} ({state})."
+                    f"{target.key} now has {copy.display_name} at level {copy.level} ({state}). Use +chargen/level {target.dbref}=<level> to change this ability."
                 )
             return
-        found = self._target_and_ability("Usage: +chargen/revoke[/refund] <character>/<ability>")
-        if found is None:
-            return
-        target, ability, tag = found
         result = self.run(
-            abilities.revoke, target, ability, tag, refund="refund" in self.switches, by=self.caller
+            abilities.revoke, target, ability, tag, refund=operation == "refund", by=self.caller
         )
         if result is None:
             return
@@ -398,6 +400,38 @@ class CmdChargen(_ChargenCommand):
         if kept:
             text += f" |y{abilities.format_amount(kept)} XP couldn't be refunded (no XP ledger).|n"
         self.msg(text)
+
+    def level(self):
+        """Change the last copy this staff character successfully granted."""
+        if not self.lhs or not self.rhs or not self.rhs.isascii() or not self.rhs.isdigit():
+            self.msg("Usage: +chargen/level <character>=<level> (a whole number)")
+            return
+        target = self.find_character(self.lhs)
+        if target is None:
+            return
+        selected = self.caller.ndb.chargen_level_target
+        copy = (
+            CharacterAbility.objects.select_related("ability", "tag")
+            .filter(pk=selected[1], character_id=target.pk)
+            .first()
+            if selected and selected[0] == target.pk
+            else None
+        )
+        if copy is None:
+            self.msg(
+                "First grant the ability to this character with +chargen/grant. No matching grant is selected."
+            )
+            return
+        copy = self.run(
+            abilities.grant,
+            target,
+            copy.ability.key,
+            copy.tag.key if copy.tag else None,
+            level=int(self.rhs),
+            by=self.caller,
+        )
+        if copy is not None:
+            self.msg(f"{target.key} now has {copy.display_name} at level {copy.level}.")
 
     def allowance(self):
         if not self.lhs or not self.rhs:
@@ -445,13 +479,13 @@ class CmdAbilities(_ChargenCommand):
       +abilities
       +abilities/list [<category>]
       +abilities/info <ability>
-      +abilities/equip <ability>[: <tag>]
-      +abilities/unequip <ability>[: <tag>]
-      +abilities/flaw <flaw>[: <tag>]
-      +abilities/unflaw <flaw>[: <tag>]
+      +abilities/equip <ability>[/<tag>]
+      +abilities/unequip <ability>[/<tag>]
+      +abilities/flaw <flaw>[/<tag>]
+      +abilities/unflaw <flaw>[/<tag>]
 
-    Some abilities are chosen per tag: Domain Expertise: Performance and
-    Domain Expertise: Stealth are separate copies, each with its own level.
+    Some abilities are chosen per tag: Domain Expertise/Performance and
+    Domain Expertise/Stealth are separate copies, each with its own level.
     Equipped abilities count against your loadout and apply to checks.
     Flaws are free, always in effect, and give nothing back. Equipping and
     flaws are frozen while you're in a scene; +unlock first.
@@ -480,9 +514,12 @@ class CmdAbilities(_ChargenCommand):
         for switch, (action, done) in actions.items():
             if switch in switches:
                 if not self.args.strip():
-                    self.msg(f"Usage: +abilities/{switch} <ability>[: <tag>]")
+                    self.msg(f"Usage: +abilities/{switch} <ability>[/<tag>]")
                     return
-                ability, tag = split_ability_text(self.lhs, self.rhs)
+                address = self.run(split_ability_text, self.args)
+                if address is None:
+                    return
+                ability, tag = address
                 result = self.run(action, caller, ability, tag)
                 if result is not None:
                     self.msg(done.format(getattr(result, "display_name", result)))
@@ -508,7 +545,7 @@ class CmdAbilities(_ChargenCommand):
             lines.append("|wFlaws|n" if flaws else "|wAbilities|n")
             for ability in group:
                 name = (
-                    f"{ability.name}: <{ability.tag_kind}>" if ability.is_template else ability.name
+                    f"{ability.name}/<{ability.tag_kind}>" if ability.is_template else ability.name
                 )
                 if flaws:
                     detail = "free" if ability.acquisition == "free" else "staff only"
@@ -527,7 +564,10 @@ class CmdAbilities(_ChargenCommand):
         if not text:
             self.msg("Usage: +abilities/info <ability>")
             return
-        ability_text, tag_text = split_ability_text(text)
+        address = self.run(split_ability_text, text)
+        if address is None:
+            return
+        ability_text, tag_text = address
         ability = self.run(abilities._ability, ability_text)
         if ability is None:
             return
@@ -541,7 +581,7 @@ class CmdAbilities(_ChargenCommand):
         if ability.description:
             lines.append(ability.description)
         if ability.is_template:
-            lines.append(f"Chosen per {ability.tag_kind}: {ability.name}: <{ability.tag_kind}>.")
+            lines.append(f"Chosen per {ability.tag_kind}: {ability.name}/<{ability.tag_kind}>.")
         if not ability.is_flaw:
             cost = (
                 f"{abilities.format_amount(ability.xp_cost)} XP"
@@ -550,7 +590,7 @@ class CmdAbilities(_ChargenCommand):
             )
             lines.append(f"Cost: {cost}. Loadout: {ability.budget_cost_for(tag)} {unit}.")
             if ability.budget_cost_overrides and tag is None:
-                lines.append("Loadout cost varies by tag; use +abilities/info <ability>: <tag>.")
+                lines.append("Loadout cost varies by tag; use +abilities/info <ability>/<tag>.")
             if ability.max_level > 1 and ability.acquisition == "xp":
                 steps = ", ".join(
                     f"{level + 1}: {abilities.format_amount(conf.upgrade_cost(level))} XP"
@@ -566,7 +606,7 @@ class CmdSpend(_ChargenCommand):
 
     Usage:
       +spend
-      +spend/ability <ability>[: <tag>]
+      +spend/ability <ability>[/<tag>]
 
     Abilities are paid for from your starting allowance first, then from XP.
     A new ability is equipped straight away if your loadout has room.
@@ -579,7 +619,7 @@ class CmdSpend(_ChargenCommand):
         caller = self.caller
         if "ability" not in self.switches:
             if self.args.strip():
-                self.msg("Usage: +spend/ability <ability>[: <tag>]")
+                self.msg("Usage: +spend/ability <ability>[/<tag>]")
                 return
             allowance, xp = abilities.balance(caller)
             noun = conf.get("RP_CHARGEN_ALLOWANCE_NOUN")
@@ -588,9 +628,12 @@ class CmdSpend(_ChargenCommand):
             self.msg(text)
             return
         if not self.args.strip():
-            self.msg("Usage: +spend/ability <ability>[: <tag>]")
+            self.msg("Usage: +spend/ability <ability>[/<tag>]")
             return
-        ability, tag = split_ability_text(self.lhs, self.rhs)
+        address = self.run(split_ability_text, self.args)
+        if address is None:
+            return
+        ability, tag = address
         result = self.run(abilities.acquire, caller, ability, tag, by=caller)
         if result is None:
             return
@@ -604,7 +647,7 @@ class CmdUpgrade(_ChargenCommand):
     Raise an ability one level.
 
     Usage:
-      +upgrade <ability>[: <tag>]
+      +upgrade <ability>[/<tag>]
 
     Each level costs more than the last; +abilities/info shows the costs.
     Paid from your starting allowance first, then XP.
@@ -614,9 +657,12 @@ class CmdUpgrade(_ChargenCommand):
 
     def func(self):
         if not self.args.strip():
-            self.msg("Usage: +upgrade <ability>[: <tag>]")
+            self.msg("Usage: +upgrade <ability>[/<tag>]")
             return
-        ability, tag = split_ability_text(self.lhs, self.rhs)
+        address = self.run(split_ability_text, self.args)
+        if address is None:
+            return
+        ability, tag = address
         result = self.run(abilities.upgrade, self.caller, ability, tag, by=self.caller)
         if result is not None:
             copy, payment = result

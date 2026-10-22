@@ -71,21 +71,19 @@ class CombatSuite(Suite):
         self.command("bob", "+combat/accept", "accepted request")
 
     def revival_and_recovery(self):
-        stats = ",".join(
-            f"{stat}:B"
-            for stat in (
-                "strength",
-                "endurance",
-                "intellect",
-                "intuition",
-                "presence",
-                "resolve",
-                "agility",
-            )
+        stats = (
+            "strength",
+            "endurance",
+            "intellect",
+            "intuition",
+            "presence",
+            "resolve",
+            "agility",
         )
         mend = '{"key":"mend","name":"Mend","action":"assist","effects":["heal"]}'
         self.command("alice", "+npc/create Sparring Post =template", "Created NPC blueprint")
-        self.command("alice", f"+npc/stats Sparring Post ={stats}", "updated")
+        for stat in stats:
+            self.command("alice", f"+npc/stat Sparring Post/{stat}=B", "updated")
         self.command("alice", "+combat/setup Revival rehearsal", "set up combat")
         self.command("alice", "+combat/join one", "joined")
         self.command("bob", "+combat/join one", "joined")
@@ -146,19 +144,17 @@ class CombatSuite(Suite):
         self.command("alice", "+combat/join one=3,4", "joined")
         self.command("bob", "+combat/join one", "joined")
         self.command("alice", "+npc/create Synergy Post=template", "Created NPC blueprint")
-        stats = ",".join(
-            f"{stat}:B"
-            for stat in (
-                "strength",
-                "endurance",
-                "intellect",
-                "intuition",
-                "presence",
-                "resolve",
-                "agility",
-            )
+        stats = (
+            "strength",
+            "endurance",
+            "intellect",
+            "intuition",
+            "presence",
+            "resolve",
+            "agility",
         )
-        self.command("alice", f"+npc/stats Synergy Post={stats}", "updated")
+        for stat in stats:
+            self.command("alice", f"+npc/stat Synergy Post/{stat}=B", "updated")
         spawned = self.command("alice", "+combatstory/template Synergy Post=two", "Synergy Post")
         npc_id = re.search(r"Spawned Synergy Post \(NPC\) #(\d+)", spawned["output"]).group(1)
         self.command("alice", "+party/create Synergy Team", "Party create")

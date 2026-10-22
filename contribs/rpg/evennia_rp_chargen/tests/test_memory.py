@@ -74,7 +74,7 @@ class MemoryTests(CatalogTest, EvenniaCommandTest):
         AbilityDefinition.objects.filter(key="domain-expertise").update(
             budget_cost_overrides={"climbing": 17}
         )
-        self.assertIn("Loadout: 17", self.call(CmdAbilities(), "/info domain expertise: climbing"))
-        self.assertIn("Loadout: 10", self.call(CmdAbilities(), "/info domain expertise: riddles"))
+        self.assertIn("Loadout: 17", self.call(CmdAbilities(), "/info domain expertise/climbing"))
+        self.assertIn("Loadout: 10", self.call(CmdAbilities(), "/info domain expertise/riddles"))
         self.assertIn("varies by tag", self.call(CmdAbilities(), "/info domain expertise"))
-        self.assertIn("Unknown", self.call(CmdAbilities(), "/info domain expertise: fire"))
+        self.assertIn("Unknown", self.call(CmdAbilities(), "/info domain expertise/fire"))

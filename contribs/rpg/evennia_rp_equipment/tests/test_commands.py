@@ -169,7 +169,7 @@ class GearCommandTests(GearCommandTest):
         self.make_sheet(self.char2)
         self.make_item(self.char2, "axe", "Brawn +1")
         self.call(CmdWear(), "axe", "Wearing axe needs Brawn +.", caller=self.char2)
-        self.make_item(self.char2, "staff", "ability Domain Expertise: Riddles")
+        self.make_item(self.char2, "staff", "ability Domain Expertise/Riddles")
         self.call(
             CmdWear(),
             "staff",

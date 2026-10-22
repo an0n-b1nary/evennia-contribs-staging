@@ -94,7 +94,7 @@ are evennia-rp-rules effect specs stored as data:
 
 - **Templates.** An entry with `tag_kind` is a template, acquired once per
   tag of that kind. `@tag` in its effects stands for the chosen tag, so one
-  entry covers every domain ("Proficiency: Performance"), including
+  entry covers every domain ("Proficiency/Performance"), including
   domains staff add later.
 - **Equipping.** Equipped copies count against `RP_CHARGEN_LOADOUT_BUDGET`
   and reach checks as modifiers. The loadout is frozen while the build is
@@ -128,7 +128,7 @@ transaction; a failed purchase rolls them all back.
 **Per-tag loadout costs.** A template can set `budget_cost_overrides`, such as
 `{"ritual": 15, "performance": 12}`, falling back to `budget_cost` for other
 tags. Use tag keys of the template's kind and nonnegative integer costs.
-`+abilities/info Proficiency: Ritual` shows the resolved cost. Costs
+`+abilities/info Proficiency/Ritual` shows the resolved cost. Costs
 are read from the catalog each time, so rebalancing reaches existing copies.
 An over-budget loadout stays equipped and is flagged on the sheet; new equips
 are blocked until enough abilities are unequipped. Flaws always cost zero.
@@ -262,10 +262,10 @@ The other triggers need no wiring:
 | `+pips <stat>=<n>`, `/set`, `/clear`, `/weakness` | owner | `+` and weakness pips; counts may be numbers or `+++` / `--` |
 | `+lock`, `+unlock` | owner | Lock or unlock pips and loadout, announced |
 | `+abilities`, `/list`, `/info`, `/equip`, `/unequip`, `/flaw`, `/unflaw` | owner | Your abilities and flaws, the catalog, and the loadout |
-| `+spend`, `+spend/ability <ability>[: <tag>]` | owner | Your allowance and XP; buy an ability |
-| `+upgrade <ability>[: <tag>]` | owner | Raise an ability a level |
+| `+spend`, `+spend/ability <ability>[/<tag>]` | owner | Your allowance and XP; buy an ability |
+| `+upgrade <ability>[/<tag>]` | owner | Raise an ability a level |
 | `+chargen`, `/list`, `/approve`, `/reopen`, `/setstat` | staff | List, view, approve and reopen sheets, and set any rating directly |
-| `+chargen/grant`, `/revoke[/refund]`, `/allowance`, `/tag` | staff | Give, set the level of, or take away abilities; set allowances; add tags |
+| `+chargen/grant`, `/level`, `/revoke`, `/refund`, `/allowance`, `/tag` | staff | Give, set the level of, or take away abilities; set allowances; add tags |
 
 `/setstat` bypasses allocation and pip limits, and reports anything it breaks.
 Nobody but the owner and staff can see a sheet, and it never shows scores.
@@ -408,3 +408,13 @@ the check adapter accepts that finalized trial only while in the wing. A draft
 never rolls, and `CharacterBuild.is_playable` never receives a guest exception.
 `+stats/reset` deletes only the caller's guest build and starts a fresh draft.
 Trial builds and their abilities cascade away when the character is deleted.
+
+Staff grant at base level with `+chargen/grant <character>=<ability>[/<tag>]`.
+Then `+chargen/level <character>=<level>` changes that staff character's most
+recently granted copy; granting another ability replaces the selection, and a
+server reload clears it. The reply names the ability being changed.
+`+chargen/revoke <character>=<ability>[/<tag>]` removes without a refund;
+`+chargen/refund <character>=<ability>[/<tag>]` removes and refunds recorded payments.
+Ability commands accept one switch (including unique prefixes) and use `/`
+between ability and tag. Colon and equals-tag forms are refused. Signature Move
+authoring will receive its draft flow with the combat command changes.

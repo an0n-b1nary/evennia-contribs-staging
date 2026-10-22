@@ -62,7 +62,8 @@ of sending the player's PC through reward or chargen-lock hooks.
 ```
 +npc/create Market porter=template
 +npc/desc Market porter=A porter with a weathered satchel.
-+npc/stats Market porter=might:adept,presence:novice
++npc/stat Market porter/might=adept
++npc/stat Market porter/presence=novice
 +npc/spawn Market porter
 +npc/puppet #123
 pose offers to carry the parcel.
@@ -129,7 +130,11 @@ Every blueprint gets an `NPCCombatProfile`, initially empty and dark. Reveal
 profile editing separately with `NPCS_COMBAT_PROFILES_REVEALED`:
 
 ```
-+npc/profile Market porter={"target_policy":"random","action_weights":{"standard":3,"special":1},"special_moves":[],"reaction_policy":{},"boss_check_schedule":[2,4]}
++npc/profile Market porter/target_policy=random
++npc/profile Market porter/action_weights.standard=3
++npc/profile Market porter/action_weights.special=1
++npc/profile Market porter/reaction_policy.appetite=cautious
++npc/profile Market porter/boss_check_schedule=2,4
 ```
 
 These are durable provider identifiers and weights, not a combat engine. Combat
@@ -158,3 +163,16 @@ only to pages this contrib or its required dependencies ship. With
 evennia-guides installed they appear on its web guide; without it they're
 ignored. To restate one for your game, add a page with the same key to
 `GUIDES_DIRS`.
+
+Profile edits set one field at a time. `target_policy` takes text;
+`special_moves` takes comma-separated stable identifiers; `boss_check_schedule`
+takes comma-separated positive turn numbers. Mapping entries use a qualified
+field: `action_weights.<action>` takes a nonnegative integer, and
+`reaction_policy.<field>` accepts `appetite` or `rps_appetite` (cautious,
+balanced, bold), `preferred_reaction` (evade, resist, overpower), or
+`preferred_moves` (comma-separated stable identifiers). An empty value clears
+a list or mapping, or removes the named mapping entry. Weights must retain a
+positive total unless the mapping is empty. Editing one stat or mapping entry
+preserves the others. Profile reveal and ownership checks still apply; these
+commands work without a combat provider installed. Bulk stat and JSON profile
+forms are refused. NPC commands accept one switch and its unique prefixes.

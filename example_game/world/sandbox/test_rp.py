@@ -226,7 +226,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_chargen.services import ChargenError
 
         self.build_player()
-        for name in ("Proficiency:Performance", "Combat Focus:Blades"):
+        for name in ("Proficiency/Performance", "Combat Focus/Blades"):
             self.assertIn("You learn", self.call(CmdSpend(), f"/ability {name}", caller=self.char2))
             self.assertIn("level 2", self.call(CmdUpgrade(), name, caller=self.char2))
         build = CharacterBuild.objects.get(character=self.char2)

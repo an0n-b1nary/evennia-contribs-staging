@@ -83,7 +83,7 @@ class CmdGear(_GearCommand):
     A requirement ties wearing the item to your build:
       <stat> +2          at least two + pips on that stat
       <stat> -1          at least one weakness on that stat
-      ability <name>     that ability equipped (ability <name>: <tag> for one per tag)
+      ability <name>     that ability equipped (ability <name>/<tag> for one per tag)
       flaw <name>        that flaw held
     Equipment never makes you stronger; it only asks you to commit. While you
     wear it, the build it needs can't change; take it off first.

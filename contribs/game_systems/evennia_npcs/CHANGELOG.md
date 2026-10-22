@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0] - 2026-10-22
+
+### Breaking
+
+- Replace bulk stats with `+npc/stat name/stat=rating` and JSON combat profiles with `+npc/profile name/field=value`. Mapping entries use qualified fields such as `action_weights.standard`; lists use comma-separated like items. Empty values clear lists or mappings and remove mapping entries. Single-field edits preserve other fields under the blueprint lock. Unknown, ambiguous and stacked switches are refused; unique switch prefixes work. Combat actor resolution and puppet feedback prefixes will ship with the combat command changes.
+
 ## 0.1.4 — 2026-10-20
 
 - Add the staff-only `npcs-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

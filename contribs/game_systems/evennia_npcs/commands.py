@@ -13,10 +13,11 @@ from evennia.commands.default.general import CmdSay as DefaultSay
 from evennia.commands.default.muxcommand import MuxCommand
 
 from . import services as svc
+from .command_syntax import SingleSwitchMixin
 from .models import NPCBlueprint, NPCPermissionRequest
 
 
-class CmdNPC(MuxCommand):
+class CmdNPC(SingleSwitchMixin, MuxCommand):
     """Create, share and play NPCs. Names refer to blueprints, object #ids to spawns.
 
     Usage:
@@ -25,7 +26,7 @@ class CmdNPC(MuxCommand):
       +npc/create <name>=template|unique
       +npc/desc <name>=<description>
       +npc/short <name>=<short description>
-      +npc/stats <name>=<stat>:<rating>,...
+      +npc/stat <name>/<stat>=<rating>
       +npc/abilities <name>=<stable identifier>,...
       +npc/archive <name>              +npc/restore <name>
       +npc/spawn <name>                +npc/despawn <object #id>
@@ -37,7 +38,7 @@ class CmdNPC(MuxCommand):
       +npc/approve <request #id>       +npc/deny <request #id>
       +npc/history <name>
       +npc/plot <name>=<plot #id>       +npc/unplot <name>=<plot #id>
-      +npc/profile <name>=<JSON mapping> (separately revealed)
+      +npc/profile <name>/<field>=<value> (separately revealed)
 
     Templates are open to play; unique NPCs need owner permission and can
     only appear once. Virtual portrayal redirects pose, say, emit, semipose
@@ -51,10 +52,38 @@ class CmdNPC(MuxCommand):
     help_category = "NPCs"
     locks = "cmd:all()"
 
+    switch_options = (
+        "search",
+        "create",
+        "desc",
+        "short",
+        "stat",
+        "abilities",
+        "archive",
+        "restore",
+        "spawn",
+        "despawn",
+        "puppet",
+        "unpuppet",
+        "fullpuppet",
+        "unfullpuppet",
+        "permit",
+        "revoke",
+        "transfer",
+        "request",
+        "requests",
+        "approve",
+        "deny",
+        "history",
+        "plot",
+        "unplot",
+        "profile",
+    )
+
     def func(self):
         try:
             self.execute()
-        except (svc.NPCError, json.JSONDecodeError) as exc:
+        except svc.NPCError as exc:
             self.msg(str(exc))
 
     def execute(self):
@@ -115,6 +144,20 @@ class CmdNPC(MuxCommand):
                 or "No NPC blueprints found."
             )
             return
+        if switch in {"stat", "profile"}:
+            name, sep, field = self.lhs.partition("/")
+            if not sep or not name.strip() or not field.strip() or "/" in field or self.rhs is None:
+                raise svc.NPCError(
+                    f"Usage: +npc/{switch} <name>/<{'stat' if switch == 'stat' else 'field'}>=<value>"
+                )
+            blueprint = svc.find_blueprint(name.strip())
+            if switch == "stat":
+                svc.edit_stat(actor, blueprint, field.strip(), self.rhs.strip())
+                self.msg("NPC blueprint updated.")
+            else:
+                svc.edit_profile_field(actor, blueprint, field.strip(), self.rhs.strip())
+                self.msg("NPC combat profile saved. Combat actions require a combat provider.")
+            return
         blueprint = svc.find_blueprint(self.lhs)
         if not switch:
             self.msg(
@@ -125,19 +168,13 @@ class CmdNPC(MuxCommand):
             self.msg(
                 f"Spawned {blueprint.name}: object #{record.spawned_object_id}. Use +npc/puppet #{record.spawned_object_id}."
             )
-        elif switch in {"desc", "short", "stats", "abilities"}:
+        elif switch in {"desc", "short", "abilities"}:
             value = self.rhs or ""
-            if switch == "stats":
-                pairs = [pair.strip().partition(":") for pair in value.split(",") if pair.strip()]
-                if any(not sep or not rating for _, sep, rating in pairs):
-                    raise svc.NPCError("Use stat:rating pairs separated by commas.")
-                value = {key.strip(): rating.strip() for key, _, rating in pairs}
-            elif switch == "abilities":
+            if switch == "abilities":
                 value = [part.strip() for part in value.split(",") if part.strip()]
             field = {
                 "desc": "description",
                 "short": "short_desc",
-                "stats": "stat_block",
                 "abilities": "abilities",
             }[switch]
             svc.edit_blueprint(actor, blueprint, **{field: value})
@@ -165,9 +202,6 @@ class CmdNPC(MuxCommand):
             self.msg(
                 f"NPC {'unlinked from' if switch == 'unplot' else 'linked to'} plot #{thread.plot_number}."
             )
-        elif switch == "profile":
-            svc.edit_profile(actor, blueprint, json.loads(self.rhs or "{}"))
-            self.msg("NPC combat profile saved. Combat actions require a combat provider.")
         else:
             raise svc.NPCError("Unknown NPC switch. See help +npc.")
 

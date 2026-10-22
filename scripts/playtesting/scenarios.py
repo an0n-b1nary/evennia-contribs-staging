@@ -111,7 +111,25 @@ class Suite:
         bob_name = self.session.host.credentials["bob"]["name"]
         alice_name = self.session.host.credentials["alice"]["name"]
         self.command("alice", "+npc/create Driver Guest =unique", "Created NPC blueprint")
-        self.command("alice", "+npc/stats Driver Guest =presence:A", "updated")
+        self.command("alice", "+npc/stats Driver Guest=presence:A", "Unknown or ambiguous")
+        self.command("alice", "+npc/stat Driver Guest/presence=A", "updated")
+        self.command("alice", "+npc/stat Driver Guest/resolve=B", "updated")
+        self.command("staff", "+runtime NPCS_COMBAT_PROFILES_REVEALED=true", "True")
+        try:
+            self.command("alice", '+npc/profile Driver Guest={"target_policy":"random"}', "Usage:")
+            self.command("alice", "+npc/profile Driver Guest/target_policy=random", "saved")
+            self.command("alice", "+npc/profile Driver Guest/action_weights.standard=3", "saved")
+            self.command("alice", "+npc/profile Driver Guest/action_weights.special=1", "saved")
+            self.command(
+                "alice", "+npc/profile Driver Guest/reaction_policy.appetite=cautious", "saved"
+            )
+            self.command("alice", "+npc/profile Driver Guest/boss_check_schedule=2,4", "saved")
+            self.command("alice", "+npc/profile Driver Guest/boss_check_schedule=", "saved")
+            self.command(
+                "bob", "+npc/profile Driver Guest/target_policy=lowest_vitality", "permission"
+            )
+        finally:
+            self.command("staff", "+runtime/reset NPCS_COMBAT_PROFILES_REVEALED", "False")
         self.command("bob", "+npc/spawn Driver Guest", "permission")
         result = self.command("alice", "+npc/spawn Driver Guest", "Spawned Driver Guest")
         object_id = int(re.search(r"object #(\d+)", result["output"]).group(1))
@@ -564,10 +582,15 @@ class Suite:
         assert self.state()["actors"]["alice"]["stats"]["intellect"] == "B"
 
     def purchases(self):
-        self.command("alice", "+spend/ability proficiency: performance", "You learn")
-        self.command("alice", "+abilities/unequip proficiency: performance", "no longer equipped")
-        self.command("alice", "+abilities/equip proficiency: performance", "now equipped")
-        self.command("alice", "+spend/ability combat focus: blades", "You learn")
+        before = self.state()["actors"]["alice"]
+        self.command("alice", "+spend/ability proficiency: performance", "Use <ability>")
+        self.command("alice", "+spend/ability proficiency=performance", "Use <ability>")
+        self.command("alice", "+spend/ability/bogus proficiency/performance", "Use one switch")
+        assert self.state()["actors"]["alice"] == before
+        self.command("alice", "+spend/ability proficiency/performance", "You learn")
+        self.command("alice", "+abilities/unequip proficiency/performance", "no longer equipped")
+        self.command("alice", "+abilities/equip proficiency/performance", "now equipped")
+        self.command("alice", "+spend/ability combat focus/blades", "You learn")
         state = self.state()
         assert float(state["actors"]["alice"]["allowance"]) == 4
         owned = state["actors"]["alice"]["abilities"]
@@ -582,7 +605,7 @@ class Suite:
         self.command("staff", "+xp/grant pt-bob=10:Old syntax", "reason is required")
         assert self.state()["xp"] == before
         self.command("staff", "+xp/grant pt-bob=10 # Live playtest", "10")
-        self.command("bob", "+spend/ability proficiency: performance", "You learn")
+        self.command("bob", "+spend/ability proficiency/performance", "You learn")
         state = self.state()
         bob = state["actors"]["bob"]["id"]
         purchase = [
@@ -593,9 +616,9 @@ class Suite:
         assert len(purchase) == 1, purchase
         assert float(purchase[0]["allowance_amount"]) == 1 and float(purchase[0]["xp_amount"]) == 2
         for level in (2, 3):
-            self.command("bob", "+upgrade proficiency: performance", f"level {level}")
+            self.command("bob", "+upgrade proficiency/performance", f"level {level}")
         before = self.state()
-        self.command("bob", "+upgrade proficiency: performance", "need|enough|insufficient")
+        self.command("bob", "+upgrade proficiency/performance", "need|enough|insufficient")
         after = self.state()
         for key in ("transactions", "spends", "xp"):
             assert before[key] == after[key], f"Failed purchase changed {key}"
@@ -603,8 +626,10 @@ class Suite:
             "Failed purchase changed Bob's build"
         )
         self.command(
-            "staff", "+chargen/revoke/refund pt-bob/proficiency: performance", "refund|revok"
+            "staff", "+chargen/revoke/refund pt-bob/proficiency: performance", "Use one switch"
         )
+        assert self.state()["transactions"] == after["transactions"]
+        self.command("staff", "+chargen/refund pt-bob=proficiency/performance", "refund|revok")
         state = self.state()
         assert not state["actors"]["bob"]["abilities"]
         assert float(state["actors"]["bob"]["allowance"]) == 1
@@ -613,6 +638,12 @@ class Suite:
             == 10
         )
         assert all(row["refunded_at"] for row in state["spends"] if row["character_id"] == bob)
+        self.command("staff", "+chargen/grant pt-bob/proficiency:performance=2", "Usage:")
+        assert not self.state()["actors"]["bob"]["abilities"]
+        self.command("staff", "+chargen/grant pt-bob=proficiency/performance", "at level 1")
+        self.command("staff", "+chargen/level pt-bob=2", "Proficiency/Performance at level 2")
+        self.command("staff", "+chargen/revoke pt-bob=proficiency/performance", "Revoked")
+        assert not self.state()["actors"]["bob"]["abilities"]
 
     def locks(self):
         self.command("alice", "ooc Choosing an approach.", "Choosing an approach")
@@ -737,8 +768,8 @@ class Suite:
     def normal_rng(self):
         for command in (
             "+pips/set presence=2",
-            "+spend/ability proficiency: performance",
-            "+spend/ability combat focus: blades",
+            "+spend/ability proficiency/performance",
+            "+spend/ability combat focus/blades",
         ):
             self.command("alice", command)
         for approach in ("Presence/Performance", "Agility/Blades"):

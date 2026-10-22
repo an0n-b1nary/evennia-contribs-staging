@@ -103,10 +103,10 @@ class SeedTests(CatalogTest):
         with self.assertRaises(LookupError):
             find_ability("domain")
         self.assertEqual(
-            split_ability_text("Domain Expertise: Riddles"), ("Domain Expertise", "Riddles")
+            split_ability_text("Domain Expertise/Riddles"), ("Domain Expertise", "Riddles")
         )
         self.assertEqual(split_ability_text("lucky"), ("lucky", None))
-        self.assertEqual(split_ability_text("expertise", "riddles"), ("expertise", "riddles"))
+        self.assertEqual(split_ability_text("expertise/riddles"), ("expertise", "riddles"))
 
 
 class VocabularyTests(CatalogTest):
@@ -138,7 +138,7 @@ class VocabularyTests(CatalogTest):
 class BuyingTests(CatalogTest):
     def test_acquire_pays_from_the_allowance_and_equips(self):
         copy, payment = abilities.acquire(self.char1, "domain expertise", "rid")
-        self.assertEqual(copy.display_name, "Domain Expertise: Riddles")
+        self.assertEqual(copy.display_name, "Domain Expertise/Riddles")
         self.assertTrue(copy.equipped)
         self.assertEqual((payment.allowance, payment.xp), (Decimal(3), Decimal(0)))
         build = services.get_build(self.char1)
@@ -256,7 +256,7 @@ class FlawTests(CatalogTest):
         with self.assertRaisesMessage(ChargenError, "stay in effect"):
             abilities.unequip(self.char1, "domain ineptitude")
         self.assertEqual(
-            abilities.remove_flaw(self.char1, "domain ineptitude"), "Domain Ineptitude: Climbing"
+            abilities.remove_flaw(self.char1, "domain ineptitude"), "Domain Ineptitude/Climbing"
         )
         kinds = list(AbilityTransaction.objects.values_list("kind", flat=True))
         self.assertEqual(sorted(kinds), ["flaw_add", "flaw_remove"])
@@ -295,7 +295,7 @@ class StaffTests(CatalogTest):
         abilities.acquire(self.char1, "domain expertise", "riddles")
         abilities.upgrade(self.char1, "domain expertise", "riddles")
         name, refunded, kept = abilities.revoke(self.char1, "domain expertise", refund=True)
-        self.assertEqual(name, "Domain Expertise: Riddles")
+        self.assertEqual(name, "Domain Expertise/Riddles")
         self.assertEqual(refunded.allowance, Decimal(5))  # 3 + 2, not the first copy's 3
         self.assertEqual(services.get_build(self.char1).allowance_left, Decimal(17))
         self.assertEqual(kept, Decimal(0))
@@ -341,7 +341,7 @@ class ChecksTests(CatalogTest):
         abilities.acquire(self.char1, "domain expertise", "riddles")
         result = self.check(self.char1, tags={"riddles"})
         self.assertEqual(
-            [e.describe() for e in result.entries_for("actor")], ["Domain Expertise: Riddles +2"]
+            [e.describe() for e in result.entries_for("actor")], ["Domain Expertise/Riddles +2"]
         )
         abilities.upgrade(self.char1, "domain expertise")
         self.assertEqual(self.check(self.char1, tags={"riddles"}).bonuses["actor"], 3)

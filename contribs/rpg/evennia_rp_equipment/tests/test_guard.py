@@ -72,20 +72,20 @@ class AbilityGuardTests(GearTest):
         self.staff = self.make_item(
             self.char1,
             "staff",
-            "ability Domain Expertise: Riddles",
-            "flaw Domain Ineptitude: Climbing",
+            "ability Domain Expertise/Riddles",
+            "flaw Domain Ineptitude/Climbing",
         )
         services.wear(self.char1, self.staff)
 
     def test_unequipping_a_required_ability_is_refused(self):
         with self.assertRaisesMessage(
-            ChargenError, "Domain Expertise: Riddles is held by your staff. Take that off first."
+            ChargenError, "Domain Expertise/Riddles is held by your staff. Take that off first."
         ):
             abilities.unequip(self.char1, "domain expertise", "riddles")
 
     def test_shedding_a_required_flaw_is_refused(self):
         with self.assertRaisesMessage(
-            ChargenError, "the flaw Domain Ineptitude: Climbing is held by your staff"
+            ChargenError, "the flaw Domain Ineptitude/Climbing is held by your staff"
         ):
             abilities.remove_flaw(self.char1, "domain ineptitude", "climbing")
 
@@ -105,7 +105,7 @@ class AbilityGuardTests(GearTest):
 class AttunementTests(GearTest):
     def test_gaining_an_ability_while_unattuned_is_never_refused(self):
         self.make_sheet(self.char1)
-        staff = self.make_item(self.char1, "staff", "ability Domain Expertise: Riddles")
+        staff = self.make_item(self.char1, "staff", "ability Domain Expertise/Riddles")
         services.wear(self.char1, staff)
         copy, _ = abilities.acquire(self.char1, "domain expertise", "riddles")
         self.assertTrue(copy.equipped)

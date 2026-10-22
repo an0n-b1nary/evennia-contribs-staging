@@ -100,7 +100,7 @@ Decisions log
 - Fighting styles replace elements as the second tag kind (`style`): Blades,
   Blunt, Polearms, Archery, Unarmed and Spellcraft. A move has a style the
   way it would have an element, and a style is also a `+test` tag.
-- Domain Expertise is Proficiency: a general benefit in combat (once combat
+- Domain Expertise is Proficiency/a general benefit in combat (once combat
   exists) and a specific one on tests in its domain. Elemental Focus is
   Combat Focus, on a style: a specific benefit in combat and a general one
   on tests carrying the style. Resistance and Vulnerability exist for both
