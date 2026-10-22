@@ -7,6 +7,7 @@ from uuid import uuid4
 from django.core.exceptions import PermissionDenied, ValidationError
 from evennia.utils.eveditor import EvEditor
 
+from evennia_jobs.command_syntax import revision_address, split_comment
 from evennia_jobs.models import Job, RequestOutcome
 from evennia_jobs.requests import clean_answer, get_request_form, request_forms
 from evennia_jobs.review import review_request, submit_request, withdraw_request
@@ -93,15 +94,17 @@ def handle_request(command):
     caller = command.caller
     try:
         if "withdraw" in switches:
-            parts = command.lhs.split()
-            if len(parts) != 2 or not all(part.isdigit() for part in parts):
-                raise ValidationError("Usage: +request/withdraw <ticket> <revision>=<reason>")
-            job = Job.objects.filter(job_number=int(parts[0])).first()
+            address, reason = split_comment(command.args)
+            try:
+                number, revision = revision_address(address)
+            except ValidationError as exc:
+                raise ValidationError(
+                    "Usage: +request/withdraw <ticket>.<revision> [# reason]"
+                ) from exc
+            job = Job.objects.filter(job_number=number).first()
             if not job:
                 raise ValidationError("No such ticket.")
-            withdraw_request(
-                job=job, author=caller, expected_revision=int(parts[1]), reason=command.rhs or ""
-            )
+            withdraw_request(job=job, author=caller, expected_revision=revision, reason=reason)
             caller.msg("Request withdrawn. Its history is preserved; you may revise it.")
             return True
         if "forms" in switches:
@@ -231,22 +234,28 @@ def handle_review(command):
     if action is None:
         return False
     try:
-        parts = command.lhs.split()
-        if len(parts) != 2 or not all(part.isdigit() for part in parts) or not command.rhs:
-            raise ValidationError(f"Usage: +jobs/{action} <ticket> <revision>=<explanation>")
-        job = Job.objects.filter(job_number=int(parts[0])).first()
+        address, reason = split_comment(command.args)
+        try:
+            number, revision = revision_address(address)
+        except ValidationError as exc:
+            raise ValidationError(
+                f"Usage: +jobs/{action} <ticket>.<revision> # <explanation>"
+            ) from exc
+        if not reason:
+            raise ValidationError(f"Usage: +jobs/{action} <ticket>.<revision> # <explanation>")
+        job = Job.objects.filter(job_number=number).first()
         if not job:
             raise ValidationError("No such ticket.")
         decision = review_request(
             job=job,
             reviewer=command.caller,
             outcome=actions[action],
-            reason=command.rhs,
-            expected_revision=int(parts[1]),
-            review_options={"share_decline_reason": "share" in command.switches},
+            reason=reason,
+            expected_revision=revision,
+            review_options={"share_decline_reason": False},
         )
         command.caller.msg(
-            f"Ticket #{job.job_number}: {decision.get_outcome_display()} (revision {parts[1]})."
+            f"Ticket #{job.job_number}: {decision.get_outcome_display()} (revision {revision})."
         )
     except (ValidationError, PermissionDenied) as exc:
         command.caller.msg(

@@ -12,7 +12,7 @@ Jobs is where players reach staff, and where other systems send things that need
 - **The queue:** `+jobs` lists every ticket that isn't closed, and `+jobs <id>` shows one with all its comments. `+jobs/list <type>` filters by request, bug, issue or discuss, and `+jobs/form <key>` by structured form. The website's staff queue shows the same.
 - **Triage:** `+jobs/assign <id>=<character>` hands a ticket to someone. `+jobs/status <id>=<status>` moves it between open, in review, answered and closed, and `+jobs/priority <id>=<priority>` marks it normal, high or urgent. `+jobs/close` and `+jobs/reopen` close and reopen it.
 - **Replying:** `+jobs/comment <id>=<text>` writes to the player. `+jobs/staffonly <id>=<text>` adds a note only staff can read. Leave out `=<text>` to write in an editor.
-- **Structured requests:** a form ticket shows its answers by revision. Decide the revision you read: `+jobs/approve <id> <revision>=<reason>`, `+jobs/decline <id> <revision>=<reason>`, or `+jobs/revise <id> <revision>=<reason>` to ask for changes. The web review page offers the same choices. A form may allow only some of these outcomes.
+- **Structured requests:** a form ticket shows its answers by revision. Decide the revision you read: `+jobs/approve <id>.<revision> # <reason>`, `+jobs/decline <id>.<revision> # <reason>`, or `+jobs/revise <id>.<revision> # <reason>` to ask for changes. The web review page offers the same choices. A form may allow only some of these outcomes.
 - **Staff discussions:** `+discuss <title>=<text>` opens a staff-only ticket, and `+discuss` lists them. Players never see these.
 
 ## How decisions work

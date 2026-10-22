@@ -165,6 +165,9 @@ def usage_form(line: str, names: list[str]) -> str | None:
 
 def positional_chain(form: str) -> bool:
     """Whether two placeholders sit next to each other before the '='."""
+    # A trailing comment is prose, not another positional argument. Dbrefs
+    # such as #12 and #12.3 have no whitespace after the hash and stay intact.
+    form = re.split(r"(?<=\s)#(?=\s)", form, maxsplit=1)[0]
     words = OPTIONAL.sub("[]", PLACEHOLDER.sub("<>", AMOUNT.sub("", form))).split()[1:]
     run = longest = 0
     for word in words:

@@ -85,8 +85,7 @@ Game-specific starting rewards belong in the host's integration.
 Decline/expiry erase the hash, release the name and allowance, and invalidate
 the code. Referrers are notified online or at their next login. Reasons stay
 private unless staff select the web checkbox or use
-`+admissions/decline/share <job>=<reason>` (also
-`+jobs/decline/share <job> <revision>=<reason>`).
+`+admissions/declineshare <job>=<reason>`.
 
 Hosts requiring reviewed admission must disable ordinary signup on both
 telnet and the direct website registration endpoint. The public reference
@@ -136,7 +135,7 @@ There is no waitlist.
 +softban/ip <address or CIDR>=<reason>
 +softban/duration <account>=<hours>
 +softban/lift <account>
-+softban/lift/ip <address or CIDR>
++softban/liftip <address or CIDR>
 +mute <account>=<reason>
 +mute/duration <account>=<hours>
 +mute/lift <account>

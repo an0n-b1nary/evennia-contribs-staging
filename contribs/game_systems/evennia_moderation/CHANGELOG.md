@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0] - 2026-10-21
+
+### Breaking
+
+- Replace `+softban/lift/ip` with `+softban/liftip <address or CIDR>`.
+- Replace `+admissions/decline/share` with
+  `+admissions/declineshare <job>=<reason>`. Plain `/decline` keeps reasons private.
+- Timed restrictions, notes and admissions reject stacked, unknown and
+  ambiguous switches before changing state. Unique prefixes and
+  case-insensitive switch matching remain available.
+
 ## 0.1.2 — 2026-10-18
 
 - Guide pages for `evennia-guides`: a player page, `joining` (applying, referrals, restrictions and what staff can see), and a staff page, `moderation-staff`.

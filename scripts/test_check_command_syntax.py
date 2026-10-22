@@ -90,6 +90,16 @@ class SyntaxSweep(unittest.TestCase):
         self.command("+probe/a <x>=<y>[, <niche>...]", "+pr [stall/]item or lot = <price>")
         self.assertEqual(self.rules(), [])
 
+    def test_dotted_addresses_with_trailing_comments_are_not_chains(self):
+        self.command(
+            "+probe/approve <id>.<revision> # <reason>",
+            "+probe/approve #12.3 # <reason>",
+            "+probe/withdraw <id>.<revision> [# reason]",
+        )
+        self.assertEqual(self.rules(), [])
+        self.command("+probe/approve <id> <revision> # <reason>")
+        self.assertIn("positional-chain", self.rules())
+
     def test_prose_help_lines(self):
         self.command(
             "/save stores everything worn; saving twice is fine.",

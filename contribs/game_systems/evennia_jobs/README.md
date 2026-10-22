@@ -138,9 +138,9 @@ wording cannot change unnoticed.
 Staff review the displayed revision explicitly:
 
 ```text
-+jobs/approve 12 1=This fits the setting.
-+jobs/decline 12 1=Please use the existing location instead.
-+jobs/revise 12 1=Please describe the entrance.
++jobs/approve 12.1 # This fits the setting.
++jobs/decline 12.1 # Please use the existing location instead.
++jobs/revise 12.1 # Please describe the entrance.
 ```
 
 The website offers the same outcomes at `/jobs/<pk>/review/`
@@ -195,7 +195,7 @@ the new tables begin empty. Do not regenerate earlier migrations.
 ### Author withdrawal and domain-owned forms (0.7)
 
 The author may withdraw a pending revision with
-`+request/withdraw <ticket> <revision>=<optional reason>` or its web withdrawal action.
+`+request/withdraw <ticket>.<revision> [# reason]` or its web withdrawal action.
 `withdraw_request(job=..., author=..., expected_revision=..., reason="")`
 records an append-only `RequestWithdrawal`, marks the ticket answered and
 removes it from the active queue. A withdrawal is distinct from a staff decision.

@@ -27,7 +27,7 @@ Web/API surface (requires [web] extra):
     # wire URLs with: include("evennia_jobs.urls") / include("evennia_jobs.api.urls")
 """
 
-__version__ = "0.7.4"
+__version__ = "0.8.0"
 
 _LAZY = {
     "Job": "models",

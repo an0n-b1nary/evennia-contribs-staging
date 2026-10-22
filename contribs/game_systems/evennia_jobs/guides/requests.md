@@ -27,7 +27,7 @@ Some proposals need the same answers every time, so your game may set up a **for
 
 Some questions are acknowledgements, such as agreeing that your work may be reused. They need a yes before you can submit.
 
-Staff approve the form, decline it, or ask for changes, and each decision comes with their reason. If they ask for changes, `+request/revise <id>` starts a new revision with your earlier answers filled in. You'll need to give any acknowledgements again. While a revision is waiting, you can take it back with `+request/withdraw <id> <revision>=<reason>`, and revise it later if you like.
+Staff approve the form, decline it, or ask for changes, and each decision comes with their reason. If they ask for changes, `+request/revise <id>` starts a new revision with your earlier answers filled in. You'll need to give any acknowledgements again. While a revision is waiting, you can take it back with `+request/withdraw <id>.<revision> # <reason>`, and revise it later if you like.
 
 :::insight[Every revision stays on the record]
 A new revision never overwrites an old one. The ticket keeps every version you sent, each decision and its reason, and any withdrawal, so you and staff can always see what was agreed and when.

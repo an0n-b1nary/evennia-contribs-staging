@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.4] - 2026-10-21
+
+- Allow Jobs 0.8 in the optional `jobs` extra; its service integration remains
+  compatible with the revised command syntax.
+
 ## 0.10.3 - 2026-10-19
 
 - Add a staff guide page for evennia-guides, `crafting-staff`: the craft
