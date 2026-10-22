@@ -30,7 +30,8 @@ class PageSeams(EvenniaCommandTest):
             f"/contents {book.key}",
             f"{book.key}\nContents (2 pages):\n1. Market Row\n2. The Common Road",
         )
-        self.call(CmdRead(), f"{book.key} 2", f"{book.key}\nPage 2 of 2: The Common Road")
+        self.call(CmdRead(), f"{book.key} 2", "Could not find")
+        self.call(CmdRead(), f"{book.key}=2", f"{book.key}\nPage 2 of 2: The Common Road")
         self.call(CmdRead(), book.key, f"{book.key}\nPage 2 of 2: The Common Road")
         self.char1.move_to(self.room1, quiet=True)
         call_command("seed_sandbox", verbosity=0)

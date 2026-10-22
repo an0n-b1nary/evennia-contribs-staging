@@ -256,21 +256,22 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
     def test_journal_commands_and_draft_replacement(self):
         for args in (
             "/new writing-0/readable = Notebook",
-            "/desc = A journal.",
-            "/journal = 2",
-            "/resources = wood:2",
+            "/desc A journal.",
+            "/journal 2",
+            "/resources 2 wood",
         ):
             self.call(CmdCraft(), args, "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: Notebook")
         output = self.call(CmdCraft(), "/finish", "You craft Notebook")
         self.assertIn("Hallmark (OOC):", output)
-        self.call(CmdJournal(), "/write Notebook = Start | We arrived.", "Journal page 1 saved")
+        self.call(CmdJournal(), "/write Notebook = We arrived.", "Journal page 1 saved")
+        self.call(CmdJournal(), "/title Notebook/1 = Start", "Journal page 1 saved (revision 2)")
         self.call(
             CmdJournal(),
-            "/revise Notebook = 1 | Start | We arrived at dawn.",
-            "Journal page 1 saved (revision 2)",
+            "/revise Notebook/1 = We arrived at dawn.",
+            "Journal page 1 saved (revision 3)",
         )
-        output = self.call(CmdJournal(), "/history Notebook = 1", "Revision 1")
+        output = self.call(CmdJournal(), "/history Notebook/1", "Revision 1")
         self.assertIn("We arrived.", output)
         self.assertIn("We arrived at dawn.", output)
         self.call(CmdRead(), "Notebook", "Notebook\nPage 1 of 1: Start\nWe arrived at dawn.")
@@ -282,12 +283,12 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
         output = self.call(CmdCraft(), "", "Copy draft: First edition")
         self.assertIn("First text.", output)
         self.assertIn("1 materials", output)
-        self.call(CmdCraft(), "/text = Forged text", "Copy drafts allow")
-        self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
+        self.call(CmdCraft(), "/text Forged text", "Copy drafts allow")
+        self.call(CmdCraft(), "/resources 1 wood", "Copy draft saved")
         write(self.char1, journal, "One", "Revised text.", page=1)
         self.call(CmdCraft(), "/finish", "The source has changed")
         self.call(CmdCraft(), f"/copy {journal.key} = writing-0/First edition", "Copy draft saved")
-        self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Copy draft saved")
         output = self.call(CmdCraft(), "/finish", "You copy First edition")
         self.assertIn("Hallmark (OOC):", output)
         self.assertFalse(self.char1.attributes.has(DRAFT_KEY))
@@ -298,9 +299,9 @@ class ReadableTests(CraftingFixture, EvenniaCommandTest):
         write(self.char1, journal, "One", "First text.")
         self.call(CmdCraft(), f"/copy {journal.key} = writing-0/Fair copy", "Copy draft saved")
         self.assertIn("A bound notebook.", self.call(CmdCraft(), "", "Copy draft: Fair copy"))
-        self.call(CmdCraft(), "/desc = A slim printed copy.", "Copy draft saved")
+        self.call(CmdCraft(), "/desc A slim printed copy.", "Copy draft saved")
         self.assertIn("A slim printed copy.", self.call(CmdCraft(), "", "Copy draft: Fair copy"))
-        self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Copy draft saved")
         self.call(CmdCraft(), "/finish", "You copy Fair copy")
         copy = ObjectDB.objects.get(db_key="Fair copy")
         self.assertEqual(copy.craft_record.prose["description"], "A slim printed copy.")

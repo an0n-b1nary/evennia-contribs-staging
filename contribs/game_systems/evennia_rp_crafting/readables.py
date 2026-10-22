@@ -107,7 +107,11 @@ def snapshot(actor, item):
 
 @atomic_objects
 def write(actor, item, title, body, *, page=None):
-    """Append or revise one's own entry while holding the journal; writing is free."""
+    """Append or revise one's own entry while holding the journal; writing is free.
+
+    On revisions, None preserves that field under the journal lock. Existing
+    callers supplying both fields still replace both in one appended revision.
+    """
     from .services import _require
 
     # Same actor-before-item order as crafting/economy handoff services.
@@ -133,7 +137,6 @@ def write(actor, item, title, body, *, page=None):
         raise CraftingError("Only blank journals accept new writing.")
     if not item.access(actor, "write", default=True):
         raise CraftingError("You cannot write in that journal.")
-    normalized = validate({"pages": [{"title": title, "text": body}]})["pages"][0]
     entries = latest_entries(record)
     if page is None:
         page = len(entries) + 1
@@ -146,7 +149,11 @@ def write(actor, item, title, body, *, page=None):
         previous = entries[page - 1]
         if previous.author_id != actor.pk:
             raise CraftingError("You may revise only your own journal entries.")
+        # Partial command edits preserve the other field under the same lock.
+        title = previous.title if title is None else title
+        body = previous.text if body is None else body
         revision = previous.revision + 1
+    normalized = validate({"pages": [{"title": title, "text": body}]})["pages"][0]
     total = sum(len(entry.text) + len(entry.title) for entry in entries if entry.page != page)
     if total + len(normalized["title"]) + len(normalized["text"]) > MAX_TEXT:
         raise CraftingError(

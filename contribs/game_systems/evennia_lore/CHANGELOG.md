@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.0 — 2026-10-22
+
+- **Breaking:** `+tome/desc <description>` takes a bare value; the former leading
+  `=` form is rejected without changing the draft.
+- Update Crafting examples and optional dependency support for Crafting 0.11.
+
 ## [0.9.0] - 2026-10-22
 
 ### Breaking

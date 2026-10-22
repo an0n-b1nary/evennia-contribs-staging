@@ -131,8 +131,8 @@ class PatternCraftTests(PatternFixture):
         with self.assertRaises(CraftingError):
             patterns.edit(self.staff, self.pattern, niches=["no-such-niche"])
         self.assertEqual(
-            patterns.parse_combination("carried: readable + activatable"),
-            ("carried", ["activatable", "readable"]),
+            patterns.validate_combinations({"carried": [["readable", "activatable"]]}),
+            {"carried": [["activatable", "readable"]]},
         )
 
     def test_copies_never_inherit_the_source_pattern(self):
@@ -158,8 +158,8 @@ class PatternCraftTests(PatternFixture):
             self.staff, self.pattern, combinations={"carried": [["activatable", "readable"]]}
         )
         self.call(CmdCraft(), "/new writing-0/readable = Song book", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = Songs.", "Craft draft saved")
-        self.call(CmdCraft(), "/text = Verses.", "Craft draft saved")
+        self.call(CmdCraft(), "/desc Songs.", "Craft draft saved")
+        self.call(CmdCraft(), "/text Verses.", "Craft draft saved")
         self.call(CmdCraft(), "/pattern market-lettering", "You don't know that Pattern.")
         self.call(CmdCraft(), "/verb music/activatable", "That lifecycle and verb combination")
         self.learn()
@@ -171,7 +171,7 @@ class PatternCraftTests(PatternFixture):
         self.call(CmdCraft(), "", "That lifecycle and verb combination")
         self.call(CmdCraft(), "/unpattern", "The draft names no Pattern.")
         self.call(CmdCraft(), "/pattern market-lettering", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:2", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 2 wood", "Craft draft saved")
         self.call(CmdCraft(), "/finish", "You craft Song book. Hallmark (OOC): Worked in")
         self.assertFalse(self.char1.attributes.has(DRAFT_KEY))
 
@@ -288,7 +288,10 @@ class PatternTeachingTests(PatternFixture):
     def test_commands_teach_accept_and_show_own_lineage_only(self):
         self.spreading()
         self.scene(self.char1, self.char2)
-        self.call(CmdPattern(), "/teach Char2 = market-lettering", "You offer to teach Char2")
+        count = PatternOffer.objects.count()
+        self.call(CmdPattern(), "/teach Char2=market-lettering")
+        self.assertEqual(PatternOffer.objects.count(), count)
+        self.call(CmdPattern(), "/teach market-lettering = Char2", "You offer to teach Char2")
         self.assertIn(
             "Char offers to teach you Market Lettering",
             self.call(CmdPattern(), "", caller=self.char2),
@@ -385,6 +388,34 @@ class PatternVisibilityTests(PatternFixture):
                 self.book(pattern="market-lettering")
             self.assertTrue(CmdPattern().access(self.staff))
 
+    def test_one_verb_edits_reject_old_syntax_and_preserve_stored_alternatives(self):
+        original = dict(self.pattern.combinations)
+        for args in (
+            "/combo market-lettering=carried:readable+activatable",
+            "/combo/nope market-lettering/carried=readable",
+            "/combo market-lettering/carried=readable+activatable",
+        ):
+            self.call(CmdPattern(), args, caller=self.staff)
+            self.pattern.refresh_from_db()
+            self.assertEqual(self.pattern.combinations, original)
+        self.call(CmdPattern(), "/CoMb market-lettering/carried=readable", caller=self.staff)
+        self.call(CmdPattern(), "/combo market-lettering/carried=activatable", caller=self.staff)
+        self.pattern.refresh_from_db()
+        self.assertEqual(self.pattern.combinations, {"carried": [["activatable", "readable"]]})
+        self.call(CmdPattern(), "/uncombo market-lettering/carried=readable", caller=self.staff)
+        self.pattern.refresh_from_db()
+        self.assertEqual(self.pattern.combinations, {"carried": [["activatable"]]})
+        alternatives = {"carried": [["readable"], ["activatable"]]}
+        patterns.edit(self.staff, self.pattern, combinations=alternatives)
+        self.call(
+            CmdPattern(),
+            "/combo market-lettering/carried=readable",
+            "This lifecycle has multiple",
+            caller=self.staff,
+        )
+        self.pattern.refresh_from_db()
+        self.assertEqual(self.pattern.combinations, alternatives)
+
     def test_staff_commands_curate_patterns(self):
         staff = {"caller": self.staff}
         self.call(CmdPattern(), "/create Deep-Tuning = Deep Tuning", "Pattern Deep Tuning", **staff)
@@ -395,17 +426,19 @@ class PatternVisibilityTests(PatternFixture):
         )
         self.call(
             CmdPattern(),
-            "/combo deep-tuning = carried:readable+activatable",
+            "/combo deep-tuning/carried = readable",
             "Deep Tuning",
             **staff,
         )
+        self.call(CmdPattern(), "/combo deep-tuning/carried = activatable", "Deep Tuning", **staff)
         self.assertIn(
             "carried + activatable + readable",
             self.call(CmdPattern(), "/info deep-tuning", **staff),
         )
+        self.call(CmdPattern(), "/uncombo deep-tuning/carried = readable", "Deep Tuning", **staff)
         self.assertIn(
             "hallmark only",
-            self.call(CmdPattern(), "/uncombo deep-tuning = carried:readable+activatable", **staff),
+            self.call(CmdPattern(), "/uncombo deep-tuning/carried = activatable", **staff),
         )
         self.call(CmdPattern(), "/grant deep-tuning = Char", "Char learns Deep Tuning.", **staff)
         self.call(CmdPattern(), "/grant deep-tuning = Char", "Char already knows", **staff)

@@ -131,9 +131,9 @@ class CompositionTests(CraftingFixture, EvenniaCommandTest):
 
     def test_book_draft_still_finishes_after_persistent_reload(self):
         self.call(CmdCraft(), "/new writing-0/readable = notes", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = Bound notes.", "Craft draft saved")
-        self.call(CmdCraft(), "/text = Keep these.", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:1", "Craft draft saved")
+        self.call(CmdCraft(), "/desc Bound notes.", "Craft draft saved")
+        self.call(CmdCraft(), "/text Keep these.", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Craft draft saved")
         # Fetch from the database-backed Attribute handler, rather than retaining
         # a command instance or an in-memory draft object between invocations.
         self.assertTrue(self.char1.attributes.has(DRAFT_KEY))
@@ -216,9 +216,9 @@ class CompositionTests(CraftingFixture, EvenniaCommandTest):
         with override_settings(RP_CRAFTING_COMBINATIONS={"wearable": [["readable"]]}):
             for args in (
                 "/verb writing-0/readable",
-                "/desc = Small.",
-                "/text = A secret.",
-                "/resources = wood:2",
+                "/desc Small.",
+                "/text A secret.",
+                "/resources 2 wood",
             ):
                 self.call(CmdCraft(), args, "Craft draft saved")
             output = self.call(CmdCraft(), "", "Draft: locket")

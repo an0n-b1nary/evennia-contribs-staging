@@ -11,7 +11,7 @@ A crafter who makes books can make them with fixed pages, blank journals for any
 
 - `read <item>` reads the page you were on, and `read <item>=<page>` a chosen page.
 - `read/contents <item>` lists the page titles.
-- `+journal/write <journal>=<title> | <text>` writes a new page in a journal you carry.
+- `+journal/write <journal>=<text>` writes a new page in a journal you carry.
 - `+letter/address <letter>=<name>` addresses a letter, and `+letter/seal <letter>=<signet>` seals it.
 
 ## Reading
@@ -24,12 +24,12 @@ Start a readable draft, then add pages with `+craft/page [title]=<text>`, or set
 
 ## Journals
 
-A journal is a blank book with a number of pages, chosen when it's made: `+craft/journal=<pages>`. Whoever carries it can write in it for free, with `+journal/write`, and `+journal/revise <journal>=<page> | <title> | <text>` changes a page you wrote.
+A journal is a blank book with a number of pages, chosen when it's made: `+craft/journal <pages>`. Set a page title with `+journal/title <journal>/<page>=<title>`. Title and text changes preserve the other field and append a revision. Whoever carries it can write in it for free, with `+journal/write`, and `+journal/revise <journal>/<page>=<text>` changes a page you wrote.
 
 If you give a journal away, its new owner can add pages but can't change yours. If it comes back to you, you can revise your own pages again. Every page shows who wrote it, under an OOC label.
 
 :::insight[Revisions are history, not erasure]
-`+journal/history <journal>=<page>` shows every earlier version of a page. Revising a page changes what it says now, never what it said before, so nobody can quietly rewrite what was written in a journal.
+`+journal/history <journal>/<page>` shows every earlier version of a page. Revising a page changes what it says now, never what it said before, so nobody can quietly rewrite what was written in a journal.
 :::
 
 ## Copies

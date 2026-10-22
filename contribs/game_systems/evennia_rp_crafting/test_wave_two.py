@@ -489,9 +489,9 @@ class ActivationTests(WaveTwoFixture, EvenniaCommandTest):
 
     def test_draft_commands_and_use_mode(self):
         self.call(CmdCraft(), "/new music/activatable = a flute", "Craft draft saved: a flute.")
-        self.call(CmdCraft(), "/desc = A carved flute.")
+        self.call(CmdCraft(), "/desc A carved flute.")
         self.call(CmdCraft(), "/mode play = A high note carries.")
-        self.call(CmdCraft(), "/resources = wood:1")
+        self.call(CmdCraft(), "/resources 1 wood")
         self.call(CmdCraft(), "/finish", "You craft a flute.", receiver=self.char1)
         self.call(CmdUse(), "a flute = play", "You use a flute.")
         self.assertEqual(ActivationUse.objects.get().mode, "play")

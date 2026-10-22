@@ -20,7 +20,7 @@ class CmdPattern(CraftCommand):
       +pattern                          Patterns you know and teaching offers
       +pattern/all                      Patterns known in the game
       +pattern/info <Pattern>
-      +pattern/teach <character> = <Pattern>
+      +pattern/teach <Pattern> = <character>
       +pattern/accept <Pattern> [= <teacher>]
       +pattern/decline <Pattern>
 
@@ -29,8 +29,8 @@ class CmdPattern(CraftCommand):
       +pattern/describe <Pattern> = <text>
       +pattern/rename <Pattern> = <name>
       +pattern/niches <Pattern> = <niche key>[, <niche key>...]
-      +pattern/combo <Pattern> = <lifecycle>:<verb>[+<verb>...]
-      +pattern/uncombo <Pattern> = <lifecycle>:<verb>[+<verb>...]
+      +pattern/combo <Pattern>/<lifecycle> = <verb>  (repeat to add a verb)
+      +pattern/uncombo <Pattern>/<lifecycle> = <verb>
       +pattern/grant <Pattern> = <character>
       +pattern/thread <Pattern> = <plot thread id>
       +pattern/advance <Pattern> [= <reason>]
@@ -45,6 +45,26 @@ class CmdPattern(CraftCommand):
     """
 
     key = "+pattern"
+    switch_options = (
+        "mine",
+        "all",
+        "info",
+        "teach",
+        "accept",
+        "decline",
+        "create",
+        "describe",
+        "rename",
+        "niches",
+        "combo",
+        "uncombo",
+        "grant",
+        "thread",
+        "advance",
+        "archive",
+        "unarchive",
+        "roster",
+    )
     aliases = ["+patterns"]  # noqa: RUF012
 
     def visible(self, actor):
@@ -109,9 +129,9 @@ class CmdPattern(CraftCommand):
 
     def do_teach(self):
         if self.rhs is None:
-            raise CraftingError("Usage: +pattern/teach <character> = <Pattern>")
-        student = self.target(self.lhs)
-        pattern = self.lookup(self.rhs)
+            raise CraftingError("Usage: +pattern/teach <Pattern> = <character>")
+        pattern = self.lookup(self.lhs)
+        student = self.target(self.rhs)
         patterns.offer(self.caller, student, pattern)
         self.msg(f"You offer to teach {student.key} {pattern.name}.")
         student.msg(
@@ -153,21 +173,16 @@ class CmdPattern(CraftCommand):
         self.edit(niches=[key.strip() for key in (self.rhs or "").split(",") if key.strip()])
 
     def combo(self, add):
-        pattern = self.lookup(self.lhs)
-        lifecycle, verbs = patterns.parse_combination(self.rhs)
-        combinations = {
-            key: [list(choice) for choice in value] for key, value in pattern.combinations.items()
-        }
-        choices = combinations.setdefault(lifecycle, [])
-        if add:
-            if verbs in choices:
-                raise CraftingError("That Pattern already unlocks this combination.")
-            choices.append(verbs)
-        elif verbs in choices:
-            choices.remove(verbs)
-        else:
-            raise CraftingError("That Pattern doesn't unlock this combination.")
-        self.edit(combinations=combinations)
+        address = self.lhs.split("/")
+        if len(address) != 2 or self.rhs is None:
+            raise CraftingError(
+                "Usage: +pattern/combo <Pattern>/<lifecycle> = <verb>. Use /uncombo to remove one."
+            )
+        pattern = self.lookup(address[0].strip())
+        pattern = patterns.edit_verb(
+            self.caller, pattern, address[1].strip(), self.rhs.strip(), add=add
+        )
+        self.msg(patterns.info(self.caller, pattern))
 
     def do_combo(self):
         self.combo(True)

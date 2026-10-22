@@ -155,8 +155,8 @@ class ItemDetailsTests(CraftingFixture, EvenniaCommandTest):
     def test_draft_edits_are_repairable_and_paid_only_at_completion(self):
         before = self.held()
         self.call(CmdCraft(), "/new writing-0/readable = Detail book", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = A notebook.", "Craft draft saved")
-        self.call(CmdCraft(), "/text = Written text.", "Craft draft saved")
+        self.call(CmdCraft(), "/desc A notebook.", "Craft draft saved")
+        self.call(CmdCraft(), "/text Written text.", "Craft draft saved")
         self.call(CmdCraft(), "/detail Cover = A cloth cover.", "Craft draft saved")
         self.call(CmdCraft(), "/detail Cover = An embroidered cover.", "Craft draft saved")
         self.call(CmdCraft(), "/sense smell = Cedar.", "Craft draft saved")
@@ -170,10 +170,10 @@ class ItemDetailsTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdCraft(), "/unsense smell", "Craft draft saved")
         self.assertEqual(dict(self.char1.attributes.get(DRAFT_KEY)["facets"]), {})
         self.call(CmdCraft(), "/detail cover = Restored detail.", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:1", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Craft draft saved")
         self.call(CmdCraft(), "/finish", "Choose exactly")
         self.assertTrue(self.char1.attributes.has(DRAFT_KEY))
-        self.call(CmdCraft(), "/resources = wood:2", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 2 wood", "Craft draft saved")
         self.call(CmdCraft(), "/finish", "You craft Detail book")
         self.assertEqual(self.held(), before - 2)
 

@@ -6,6 +6,7 @@ from evennia.objects.models import ObjectDB
 
 from . import services
 from .command_base import CraftCommand
+from .command_syntax import bare_value, select_resource
 from .errors import CraftingError
 from .readables import copy_book, history, snapshot, write
 
@@ -50,17 +51,17 @@ def copy_draft(command):
 
 
 def continue_copy(command, switch, draft):
-    from .commands import DRAFT_KEY, costs_text, resource_spec
+    from .commands import DRAFT_KEY, costs_text
 
-    if switch not in ("", "desc", "resources", "finish", "addressee"):
+    if switch not in ("", "desc", "resources", "unresource", "finish", "addressee"):
         raise CraftingError(
-            "Copy drafts allow /desc, /addressee, /resources, /finish or /cancel. Start a new craft for rewritten text."
+            "Copy drafts allow /desc, /addressee, /resources, /unresource, /finish or /cancel. Start a new craft for rewritten text."
         )
     if switch == "desc":
         from .behaviours import text
 
         # The binding is the copier's own work; only the pages are copied.
-        value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
+        value = bare_value(command)
         draft["description"] = text(value, "Description", 4000, required=True)
         command.caller.attributes.add(DRAFT_KEY, draft)
         command.msg(f"Copy draft saved: {draft['name']}.")
@@ -90,14 +91,14 @@ def continue_copy(command, switch, draft):
     if switch == "addressee":
         from .letters import line
 
-        value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
+        value = bare_value(command)
         draft["addressee"] = line(value, "Addressee")
         command.caller.attributes.add(DRAFT_KEY, draft)
         command.msg(f"Copy draft saved: {draft['name']}.")
         return
-    if switch == "resources":
-        value = command.rhs if command.rhs is not None else command.args.lstrip("= ")
-        draft["selected"] = resource_spec(value)
+    if switch in ("resources", "unresource"):
+        value = bare_value(command)
+        select_resource(draft, value, remove=switch == "unresource")
         command.caller.attributes.add(DRAFT_KEY, draft)
         command.msg(f"Copy draft saved: {draft['name']}.")
         return
@@ -122,32 +123,56 @@ class CmdJournal(CraftCommand):
     """Write in a carried journal; only your own entries may be revised.
 
     Usage:
-      +journal/write <journal> = <title> | <text>
-      +journal/revise <journal> = <page number> | <title> | <text>
-      +journal/history <journal> = <page number>
+      +journal/write <journal> = <text>
+      +journal/title <journal>/<page number> = <title>
+      +journal/revise <journal>/<page number> = <text>
+      +journal/history <journal>/<page number>
 
     Writing is free. Earlier revisions remain readable in the journal history.
     Gifting transfers writing rights, while earlier writers retain attribution.
     """
 
     key = "+journal"
+    switch_options = ("write", "title", "revise", "history")
 
     def run(self, switch):
-        if switch not in ("write", "revise", "history") or self.rhs is None:
-            raise CraftingError("Use +journal/write, /revise or /history. See help +journal.")
-        item = find_item(self.caller, self.lhs.strip())
+        number = None
+        name = self.lhs.strip()
+        if switch not in self.switch_options:
+            raise CraftingError(
+                "Use +journal/write, /title, /revise or /history. See help +journal."
+            )
+        if switch == "history":
+            if self.rhs is not None:
+                raise CraftingError("Usage: +journal/history <journal>/<page>")
+        elif self.rhs is None or "|" in self.rhs:
+            raise CraftingError(
+                f"Usage: +journal/{switch} <journal>"
+                + ("/<page>" if switch != "write" else "")
+                + " = <text>"
+            )
+        if switch != "write":
+            parts = name.split("/")
+            if (
+                len(parts) != 2
+                or not parts[1].isascii()
+                or not parts[1].isdecimal()
+                or int(parts[1]) < 1
+            ):
+                raise CraftingError(
+                    f"Usage: +journal/{switch} <journal>/<page>"
+                    + (" = <text>" if switch != "history" else "")
+                )
+            name, number = parts[0].strip(), int(parts[1])
+        item = find_item(self.caller, name)
         if item is None:
             return
         if switch == "history":
-            self.msg(history(self.caller, item, int(self.rhs.strip())))
+            self.msg(history(self.caller, item, number))
             return
-        parts = self.rhs.split("|", 2 if switch == "revise" else 1)
-        if len(parts) != (3 if switch == "revise" else 2):
-            raise CraftingError(
-                "Separate the title and text with |. Revisions also start with page number |."
-            )
-        number = int(parts.pop(0).strip()) if switch == "revise" else None
-        revision = write(self.caller, item, parts[0].strip(), parts[1].strip(), page=number)
+        title = self.rhs.strip() if switch == "title" else "" if switch == "write" else None
+        body = None if switch == "title" else self.rhs.strip()
+        revision = write(self.caller, item, title, body, page=number)
         self.msg(
             f"Journal page {revision.page} saved (revision {revision.revision}); text by (OOC): {revision.author_name}."
         )

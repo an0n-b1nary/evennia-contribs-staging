@@ -283,10 +283,10 @@ class LetterTests(LetterFixture, EvenniaCommandTest):
         self.assertIn("+letter", {row.key for row in CraftingCmdSet().commands})
         for arg in (
             "/new writing-0/readable = Message",
-            "/desc = A folded letter.",
-            "/text = Come at dawn.",
-            "/addressee = The Keeper",
-            "/resources = wood:1",
+            "/desc A folded letter.",
+            "/text Come at dawn.",
+            "/addressee The Keeper",
+            "/resources 1 wood",
         ):
             self.call(CmdCraft(), arg, "Craft draft saved")
         self.call(CmdCraft(), "/finish", "You craft Message")
@@ -294,10 +294,10 @@ class LetterTests(LetterFixture, EvenniaCommandTest):
         self.call(CmdRead(), "/contents Message", "Message\nThe letter is sealed")
         self.call(CmdRead(), "Message", "Message\nYou break the seal")
         self.call(CmdCraft(), "/copy Message = writing-0/New letter", "Copy draft saved")
-        self.call(CmdCraft(), "/addressee = A Friend", "Copy draft saved")
+        self.call(CmdCraft(), "/addressee A Friend", "Copy draft saved")
         output = self.call(CmdCraft(), "", "Copy draft: New letter")
         self.assertIn("A Friend", output)
-        self.call(CmdCraft(), "/resources = wood:1", "Copy draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Copy draft saved")
         self.call(CmdCraft(), "/finish", "You copy New letter")
         copy = ObjectDB.objects.get(db_key="New letter")
         self.assertEqual(self.state(copy).addressee, "A Friend")
@@ -324,9 +324,9 @@ class LetterTests(LetterFixture, EvenniaCommandTest):
 
     def test_blank_draft_addressee_clears_the_letter_facet(self):
         self.call(CmdCraft(), "/new writing-0/readable = Message", "Craft draft saved")
-        self.call(CmdCraft(), "/addressee = The Keeper", "Craft draft saved")
+        self.call(CmdCraft(), "/addressee The Keeper", "Craft draft saved")
         self.assertIn("letter", self.char1.attributes.get(DRAFT_KEY)["facets"])
-        self.call(CmdCraft(), "/addressee =", "Craft draft saved")
+        self.call(CmdCraft(), "/addressee", "Craft draft saved")
         self.assertNotIn("letter", self.char1.attributes.get(DRAFT_KEY)["facets"])
 
 
@@ -395,14 +395,14 @@ class SignetCraftTests(CraftingFixture, EvenniaCommandTest):
     def test_signet_command_draft_can_be_corrected_before_spending(self):
         for arg in (
             "/new weaving/wearable = New ring",
-            "/desc = A ring.",
-            "/line = a ring",
-            "/signet = A Rose",
+            "/desc A ring.",
+            "/line a ring",
+            "/signet A Rose",
         ):
             self.call(CmdCraft(), arg, "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: New ring")
         self.call(CmdCraft(), "/unsignet", "Craft draft saved")
         self.assertNotIn("signet", self.char1.attributes.get(DRAFT_KEY)["facets"])
-        self.call(CmdCraft(), "/signet = Another Rose", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:2", "Craft draft saved")
+        self.call(CmdCraft(), "/signet Another Rose", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 2 wood", "Craft draft saved")
         self.call(CmdCraft(), "/finish", "You craft New ring")

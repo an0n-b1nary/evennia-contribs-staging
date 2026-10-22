@@ -352,7 +352,7 @@ Complete an ordinary `+craft` draft, then attach lore before paying:
 +lorecraft/cite = #20
 +lorecraft/recognise #14=A familiar sign is woven into the hem.
 +craft
-+craft/resources = timber:3
++craft/resources 3 timber
 +craft/finish
 ```
 
@@ -418,7 +418,7 @@ Item names ending in numbers remain whole names. Positional page suffixes are re
 
 ```
 +tome/new an old chronicle
-+tome/desc = A dusty book bound in dark leather.
++tome/desc A dusty book bound in dark leather.
 +tome/page Preface = A traveller's introduction.
 +tome/page The Exile = An old account, possibly unreliable.
 +tome/cite 2 = #14

@@ -159,14 +159,14 @@ class WearableStateTests(CraftingFixture, EvenniaCommandTest):
     def test_commands_edit_preview_clear_and_select_without_activity(self):
         for args in (
             "/new weaving/wearable = drafted cloak",
-            "/desc = A cloak.",
+            "/desc A cloak.",
             "/detail hem = Blue stitches line the hem.",
             "/sense touch = Soft woven cloth.",
             "/state down = a hooded cloak",
             "/state up = a raised hood",
             "/statedesc up = A raised hood.",
             "/defaultstate up",
-            "/resources = wood:5",
+            "/resources 5 wood",
         ):
             self.call(CmdCraft(), args, "Craft draft saved")
         preview = self.call(CmdCraft(), "", "Draft:")

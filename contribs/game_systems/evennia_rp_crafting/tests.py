@@ -359,11 +359,11 @@ class CraftTests(CraftingFixture, EvenniaTest):
 
 class CommandTests(CraftingFixture, EvenniaCommandTest):
     def test_persistent_draft_finish_and_second_finish_do_not_duplicate(self):
-        self.call(CmdWorkshop(), "/unlock writing-0 = wood:3", "Unlocked Scribe 0")
+        self.unlock()
         self.call(CmdCraft(), "/new writing-0/readable = travel journal", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = A travel journal.", "Craft draft saved")
-        self.call(CmdCraft(), "/text = The road goes north.", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:1", "Craft draft saved")
+        self.call(CmdCraft(), "/desc A travel journal.", "Craft draft saved")
+        self.call(CmdCraft(), "/text The road goes north.", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 1 wood", "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: travel journal")
         self.assertEqual(self.held(), 197)
         self.call(CmdCraft(), "/finish", "You craft travel journal")
@@ -388,7 +388,7 @@ class CommandTests(CraftingFixture, EvenniaCommandTest):
         ):
             output = self.call(CmdWorkshop(), "/catalog", "Niches — next unlock position 1")
             self.assertIn("writing-0: Scribe 0 [unavailable] — unavailable", output)
-            self.call(CmdCraft(), "/text = Lost words.", "That crafting behaviour is unavailable")
+            self.call(CmdCraft(), "/text Lost words.", "That crafting behaviour is unavailable")
 
     def test_staff_review_contains_full_snapshot_and_refuses_players(self):
         self.unlock()
@@ -411,8 +411,8 @@ class CommandTests(CraftingFixture, EvenniaCommandTest):
     def test_bad_resource_syntax_and_wrong_behaviour_field_leave_draft_untouched(self):
         self.call(CmdCraft(), "/new writing-0/readable = book", "Craft draft saved")
         original = deepcopy(dict(self.char1.attributes.get(DRAFT_KEY)))
-        self.call(CmdCraft(), "/resources = wood:1,wood:1", "Select resources as")
-        self.call(CmdCraft(), "/aura = shining", "That field isn't available")
+        self.call(CmdCraft(), "/resources wood:1,wood:1", "Select one resource as")
+        self.call(CmdCraft(), "/aura shining", "That field isn't available")
         self.assertEqual(dict(self.char1.attributes.get(DRAFT_KEY)), original)
 
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.0 — 2026-10-22
+
+- **Breaking:** no-target draft fields take bare values. Select one resource per
+  call with `/resources <quantity> <key>`; `/unresource <key>` removes it.
+- **Breaking:** Workshop unlocks collect material selections, then require a
+  preview and an actor-bound, single-use confirmation token. Catalogue, slot or
+  selection changes require another preview; tokens expire after 15 minutes.
+- **Breaking:** Pattern teaching uses `Pattern=character`; combination edits use
+  `Pattern/lifecycle=verb`, repeated to add verbs, with `/uncombo` to remove one.
+- **Breaking:** journal writing takes only text; `/title journal/page=title` and
+  `/revise journal/page=text` preserve the other field and append history.
+  `/history journal/page` addresses history. Reading pages requires `item=page`.
+- Reject unknown, ambiguous and stacked switches before dispatch; unique switch
+  prefixes are case-insensitive. Update guides, host seams and live scenarios.
+- Keep stored item, Pattern and Workshop history formats, and the deferred
+  `+modify` service syntax. Require Links 0.8.12 for strict page addressing.
+
 ## [0.10.6] - 2026-10-22
 
 ### Changed

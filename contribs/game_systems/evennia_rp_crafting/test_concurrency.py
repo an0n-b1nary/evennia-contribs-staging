@@ -28,6 +28,20 @@ class JournalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.unlock()
         self.journal = self.book(configuration={"journal": 2}, selected={"wood": 2})
 
+    def test_title_and_text_edits_preserve_each_other_after_commit(self):
+        from .models import JournalRevision
+        from .readables import write
+
+        write(self.char1, self.journal, "Original title", "Original text")
+        committed_race(
+            lambda: write(self.char1, self.journal, "Changed title", None, page=1),
+            lambda: write(self.char1, self.journal, None, "Changed text", page=1),
+        )
+        last = JournalRevision.objects.filter(craft=self.journal.craft_record).latest("revision")
+        self.assertEqual(
+            (last.title, last.text, last.revision), ("Changed title", "Changed text", 3)
+        )
+
     def test_last_page_capacity_serializes_committed_writers(self):
         from .models import JournalRevision
         from .readables import write
@@ -514,3 +528,38 @@ class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.assertEqual(pattern.proposal_submission_id, first.pk)
         self.assertEqual(PatternKnowledge.objects.get(pattern=pattern).character, self.char1)
         self.assertFalse(RequestDecision.objects.filter(submission=second).exists())
+
+
+class WorkshopConfirmationRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
+            self.skipTest("Race gate requires a file-backed test database")
+        from . import unlocks
+
+        unlocks.select(self.char1, "writing-0", "3 wood")
+        self.token = unlocks.preview(self.char1, "writing-0")[3]
+
+    def test_duplicate_confirmation_spends_once(self):
+        from . import unlocks
+        from .models import NicheUnlock
+
+        with self.assertRaisesMessage(CraftingError, "new unlock preview"):
+            committed_race(
+                lambda: unlocks.confirm(self.char1, "writing-0", self.token),
+                lambda: unlocks.confirm(self.char1, "writing-0", self.token),
+            )
+        self.assertEqual(NicheUnlock.objects.count(), 1)
+        self.assertEqual(self.held(), 197)
+
+    def test_committed_selection_change_blocks_old_confirmation(self):
+        from . import unlocks
+        from .models import NicheUnlock
+
+        with self.assertRaisesMessage(CraftingError, "new unlock preview"):
+            committed_race(
+                lambda: unlocks.select(self.char1, "writing-0", "2 wood"),
+                lambda: unlocks.confirm(self.char1, "writing-0", self.token),
+            )
+        self.assertFalse(NicheUnlock.objects.exists())
+        self.assertEqual(self.held(), 200)

@@ -16,6 +16,7 @@ class CmdFixture(_CraftCommand):
     """
 
     key = "+fixture"
+    switch_options = ("install", "uninstall", "decorate", "clear")
     wave_two = True
 
     def run(self, switch):
