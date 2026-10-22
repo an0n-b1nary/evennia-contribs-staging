@@ -18,7 +18,7 @@ signal-based decoupling).
 | `commands/social/navigation.py` | `CmdOocTeleport`, `CmdHome` |
 | `commands/social/ooc.py` | `CmdOoc` (with the scene-log coupling severed — see below) |
 | `commands/social/roulette.py` | `CmdRoulette` (already a stub in source) |
-| `commands/building.py` | `CmdRoomConfig` only (the hangout slice — `+roomconfig`, `/hangout`, `/hangout/clear`, and the config display). `CmdBuild`, its room-creation sibling in the same file, is a building-tools concern and stays behind. |
+| `commands/building.py` | `CmdRoomConfig` only (the hangout slice — `+roomconfig`, `/hangout`, `/unhangout`, and the config display). `CmdBuild`, its room-creation sibling in the same file, is a building-tools concern and stays behind. |
 | `commands/staff.py` | `CmdTel` only — `CmdSoftBan` in the same file is a moderation command, not a teleportation feature, and stays behind (see report §10) |
 | `world/utils/search.py` | `find_room()`, `find_room_for_player()` — generalized (see below) |
 | `world/utils/social.py` | `is_staff()`, `get_connected_characters()` — verbatim |

@@ -978,7 +978,7 @@ The seeded `IC RP` channel uses `evennia_rptracker.typeclasses.ICChannel`.
 Puppet a character, subscribe with `channel/sub IC RP`, and send with
 `channel IC RP = <message>`. Channel activity has separate session and XP sources;
 it does not alter room pose timers or create scene links. Staff can inspect
-rolling region and channel totals with `+report activity [days]`.
+rolling region and channel totals with `+report/activity [days]`.
 
 ### 6. Snapshot the golden DB
 

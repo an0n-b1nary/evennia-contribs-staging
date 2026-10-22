@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.11.0] - 2026-10-21
+
+### Breaking
+
+- Replace `+map/reflow/apply <#room>` with `+map/reflow <#room>=<token>`,
+  using the token printed by `+map/reflow <#room>`. Tokens expire after 15 minutes
+  and bind the staff character, origin, preview and relevant current tile state.
+  Changed layouts require a fresh preview; confirmation remains atomic.
+- Refuse stacked and unknown switches rather than ignoring extra switches.
+
 ## [0.10.4] - 2026-10-21
 
 - Redirect anonymous live-map requests to the same plane's static SVG map after

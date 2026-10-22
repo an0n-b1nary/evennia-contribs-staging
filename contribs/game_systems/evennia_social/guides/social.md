@@ -47,7 +47,7 @@ A page can go to several people at once: `page <name>,<name>=<message>`. `page/l
 
 `+mood` shows a short line under a room's description about how it feels right now: "Crowded and loud", say. The room's owner and staff can set it, and so can participants in a public scene running there. In a private scene, only the person who started it can.
 
-A room's owner can also add a lasting smell or sound with `+roomconfig/smell` and `+roomconfig/sound`, and mark the room as a hangout with `+roomconfig/hangout <type>`.
+A room's owner can also add a lasting smell or sound with `+roomconfig/smell` and `+roomconfig/sound`, and mark the room as a hangout with `+roomconfig/hangout <type>`. `+roomconfig/unhangout` removes that designation.
 
 ## Visiting as a guest
 

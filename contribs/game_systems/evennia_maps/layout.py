@@ -10,7 +10,7 @@ and flagging genuine conflicts. It never writes a RoomTile; +map/reflow
 
 plan() runs the same BFS and then decides which of those assignments can
 actually be written — see "Why a single pass under-reports" below. Both
-+map/reflow (dry-run) and +map/reflow/apply render a plan() result, so
++map/reflow (dry-run) and +map/reflow <#room>=<token> render a plan() result, so
 they cannot disagree; only /apply calls placement.apply_plan() on it.
 
 Neither walk() nor plan() writes a RoomTile, or scaffolds a MapPlane row

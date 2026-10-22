@@ -421,5 +421,36 @@ class ActivityReportTests(EvenniaCommandTest):
         from evennia_rptracker.commands import CmdRPActivityReport
 
         self.assertEqual(CmdRPActivityReport.locks, "cmd:perm(Builder)")
-        self.call(CmdRPActivityReport(), "activity", "RP activity:", caller=self.char1)
-        self.call(CmdRPActivityReport(), "activity 0", "Choose 1 to 90 days.")
+        self.call(CmdRPActivityReport(), "/activity", "RP activity:", caller=self.char1)
+        self.call(CmdRPActivityReport(), "/activity 0", "Choose 1 to 90 days.")
+
+    def test_report_window_and_prefix(self):
+        from evennia_rptracker.commands import CmdRPActivityReport
+
+        self.make_session(
+            activated_at=timezone.now() - timedelta(days=2),
+            ended_at=timezone.now() - timedelta(days=2) + timedelta(hours=1),
+        )
+        result = self.call(CmdRPActivityReport(), "/act 1")
+        self.assertIn("No activated RP sessions", result)
+        self.call(CmdRPActivityReport(), "/activity 90", "RP activity:")
+        self.call(CmdRPActivityReport(), "/activity 91", "Choose 1 to 90 days.")
+
+    def test_old_and_malformed_forms_do_not_run_report(self):
+        from evennia_rptracker.commands import CmdRPActivityReport
+
+        with patch("evennia_rptracker.reports.activity_report") as report:
+            for args in (
+                "activity",
+                "activity 7",
+                "",
+                "/activity/unknown 7",
+                "/activity/activity 7",
+                "/unknown",
+                "/activity 1 2",
+                "/activity =7",
+                "/activity seven",
+            ):
+                with self.subTest(args=args):
+                    self.call(CmdRPActivityReport(), args)
+            report.assert_not_called()

@@ -434,21 +434,37 @@ class CmdRPTrackerStaff(MuxCommand):
 
 
 class CmdRPActivityReport(MuxCommand):
-    """Staff aggregate activity. Usage: +report activity [days], default 7, range 1-90."""
+    """Staff aggregate activity.
+
+    Usage:
+        +report/activity [days]
+
+    Defaults to 7 days; choose 1 to 90 days.
+    """
 
     key = "+report"
     locks = getattr(settings, "RPTRACKER_STAFF_LOCK", "cmd:perm(Builder)")
     help_category = "Staff"
+    switch_options = ("activity",)
 
     def func(self):
         from evennia_rptracker.reports import activity_report
 
+        raw_switch = self.raw.split(None, 1)[0] if self.raw.startswith("/") else ""
+        if raw_switch.count("/") > 1:
+            self.caller.msg("Use one switch at a time. Usage: +report/activity [days]")
+            return
         args = self.args.split()
-        if not 1 <= len(args) <= 2 or args[0].lower() != "activity":
-            self.caller.msg("Usage: +report activity [days]")
+        if self.switches != ["activity"] or len(args) > 1:
+            self.caller.msg("Usage: +report/activity [days]")
             return
         try:
-            report = activity_report(int(args[1]) if len(args) == 2 else 7)
+            days = int(args[0]) if args else 7
+        except ValueError:
+            self.caller.msg("Usage: +report/activity [days]")
+            return
+        try:
+            report = activity_report(days)
         except ValueError as exc:
             self.caller.msg(str(exc))
             return

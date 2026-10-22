@@ -385,7 +385,7 @@ def apply_plan(plan, *, actor=None):
     it can't observe a half-written map, and — the case a plain "fire
     after the atomic block" would get wrong — it doesn't fire at all if
     an enclosing transaction later rolls back. That matters because the
-    atomic() below is normally *nested*: +map/reflow/apply wraps plan()
+    atomic() below is normally *nested*: +map/reflow <#room>=<token> wraps plan()
     and this call in one transaction, so leaving the inner block is a
     savepoint release, not a commit. There are no receivers today; this
     is forward-looking.

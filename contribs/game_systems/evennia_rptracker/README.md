@@ -278,7 +278,7 @@ The host XP multiplier resolver receives `rp_channel_session` with `room=None`.
 Awards retain this distinct ledger source; post-batch flags require a matching
 committed ledger row. Channel XP is optional and requires evennia-xp.
 
-Add `CmdRPActivityReport` to the character cmdset for staff `+report activity [days]`
+Add `CmdRPActivityReport` to the character cmdset for staff `+report/activity [days]`
 (default seven days, range 1–90). It reports activated active/completed sessions,
 distinct characters, known account snapshots and participant-minutes, clipped to
 the rolling UTC window. Flagged sessions are shown separately and excluded from

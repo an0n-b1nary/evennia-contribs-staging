@@ -146,7 +146,7 @@ TELEPORT_MODE = "visited"
 
 ```
 +roomconfig/hangout bar       - designate the current room as a bar
-+roomconfig/hangout/clear     - remove the designation
++roomconfig/unhangout     - remove the designation
 +roomconfig                   - show the current room's settings
 ```
 

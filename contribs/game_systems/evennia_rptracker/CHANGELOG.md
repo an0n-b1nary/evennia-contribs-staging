@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] - 2026-10-21
+
+### Breaking
+
+- Replace `+report activity [days]` with `+report/activity [days]`. The old
+  positional form and stacked switches are refused. Unique switch prefixes work;
+  the default seven-day window and 1–90 day range are unchanged.
+
 ## 0.2.6 — 2026-10-18
 
 - `+activity/detail` names a session's scenes by their public scene number, as `+scene` and `+log` do. It showed the database key, which players never see. `RPTRACKER_SCENE_DISPLAY` still overrides it.
