@@ -32,3 +32,35 @@ class PaginationTests(TestCase):
             Page(1)
         with self.assertRaises(FrozenInstanceError):
             Page("Text").text = "Changed"
+
+
+class ReadingTargetTests(TestCase):
+    def test_strict_targets_do_not_reinterpret_numeric_suffixes_as_pages(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from .pagination import reading_target
+
+        book = object()
+        actor = SimpleNamespace(contents=[book], location=None, search=Mock(return_value=None))
+        self.assertEqual(reading_target(actor, "Old tome 2", positional_page=False), (None, None))
+        actor.search.assert_called_once_with("Old tome 2", candidates=[book])
+        actor.search.reset_mock()
+        actor.search.return_value = book
+        self.assertEqual(
+            reading_target(actor, "Chronicle 2", "3", positional_page=False), (book, 3)
+        )
+        actor.search.assert_called_once_with("Chronicle 2", candidates=[book])
+        with self.assertRaisesRegex(ValueError, "read/contents"):
+            reading_target(actor, "Chronicle 2", "3", table=True, positional_page=False)
+
+    def test_existing_callers_keep_their_positional_page_behavior(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from .pagination import reading_target
+
+        book = object()
+        actor = SimpleNamespace(contents=[book], location=None, search=Mock(side_effect=[[], book]))
+        self.assertEqual(reading_target(actor, "Old tome 2"), (book, 2))
+        self.assertEqual(actor.search.call_args.args, ("Old tome",))

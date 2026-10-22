@@ -33,7 +33,7 @@ Web/API surface (requires [web] extra):
     from evennia_lore.api.views import LoreEntryViewSet, LoreTagViewSet
 """
 
-__version__ = "0.8.5"
+__version__ = "0.9.0"
 
 from evennia_lore.signals import (
     lore_acquired,

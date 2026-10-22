@@ -165,7 +165,7 @@ At Market Row, a sample field book can be read and a woven cloak shows a
 verified maker hallmark. The demonstration crafter owns a Workshop; resetting
 rebuilds demo stock while preserving player Workshops and craft history.
 The sample travel book demonstrates two titled pages:
-`read/contents a sample travel book`, `read a sample travel book 2`, then
+`read/contents a sample travel book`, `read a sample travel book=2`, then
 `read a sample travel book` to resume that character's bookmark. Create pages
 with repeated `+craft/page title = text`; each extra page costs one additional
 material by default. The shared pagination helper comes from Links 0.8.7.
@@ -179,11 +179,11 @@ attribution. Create your own with `+craft/journal = 3` in a Readable draft.
 copy draft: preview it with `+craft`, select resources and `/finish` at normal
 crafting cost. Source revisions never change completed editions.
 The old market chronicle is a staff tome, readable without crafting. Its second
-page cites lore: `read an old market chronicle 2` acquires that entry; contents
+page cites lore: `read an old market chronicle=2` acquires that entry; contents
 and the first page do not. The sample annotated guide carries the same citation
 and a recognition feature that appears after learning it. Crafters can attach
 references with `+lorecraft/cite [page] = #entry` and
-`+lorecraft/recognise = #entry | feature text` before previewing and finishing
+`+lorecraft/recognise #entry[/<niche>]=<feature text>` before previewing and finishing
 their draft. Staff can publish independent tomes through `+tome`; the host's
 `StaffTome` keeps the stock-deletion guard before the reusable `LoreTome` in
 its MRO. Journals and citation-preserving editions need their separate bridge.

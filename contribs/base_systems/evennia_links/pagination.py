@@ -47,11 +47,12 @@ def contents(pages):
     )
 
 
-def reading_target(actor, name, value=None, *, table=False):
+def reading_target(actor, name, value=None, *, table=False, positional_page=True):
     """Resolve a local book and optional page, preserving numeric item names.
 
     Search/identity belong to the host actor; this helper imports no engine.
     Access and the actual read belong to the resolved object's read service.
+    Set positional_page=False to require an equals value for page selection.
     """
     candidates = list(actor.contents)
     if actor.location:
@@ -64,7 +65,7 @@ def reading_target(actor, name, value=None, *, table=False):
             number = int(value.strip())
         except ValueError:
             raise ValueError("Choose a page number.") from None
-    else:
+    elif positional_page:
         matches = actor.search(name, candidates=candidates, quiet=True)
         tail = name.rsplit(" ", 1)
         if not matches and not table and len(tail) == 2 and tail[1].lstrip("-").isdecimal():

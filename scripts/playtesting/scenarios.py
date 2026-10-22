@@ -424,6 +424,62 @@ class Suite:
         self.command("alice", "+stall/close", "stock returned")
         assert len(self.state()["crafts"]) == len(before["crafts"]) + 2
 
+    def lore(self):
+        alice = self.session.host.credentials["alice"]["name"]
+        bob = self.session.host.credentials["bob"]["name"]
+        self.command("alice", "+lore/submit/rumor Old live account", "Use one switch")
+        self.command("alice", "+lore/submit/scene 1=Old live account", "Use one switch")
+        self.command("alice", "+lore/SuB Live road account")
+        self.command("alice", "A record of a journey along the market road.")
+        saved = self.command("alice", ":wq", "submitted")
+        number = int(re.search(r"Lore entry #(\d+)", saved["output"]).group(1))
+        self.command("alice", f"+lore/KI #{number}=rumor", "now a Rumor")
+        self.command("alice", f"+lore/accuracy #{number}=open", "now Open")
+        self.command("alice", f"+lore/tag/major #{number}=Live roads", "Use one switch")
+        self.command("alice", f"+lore/major #{number}=Live roads", "Only staff")
+        self.command("staff", f"+lore/MA #{number}=Live roads", "created and added")
+        self.command("alice", "+scene/open Live lore scene")
+        info = self.command("alice", "+scene/info", "Scene #")
+        scene = int(re.search(r"Scene #(\d+)", info["output"]).group(1))
+        self.command("alice", f"+lore/link/scene #{number}={scene}", "Use one switch")
+        self.command("alice", f"+lore/SC #{number}={scene}", "Linked scene")
+        plot = self.state()["plots"][0]["plot_number"]
+        self.command("alice", f"+lore/link/plot #{number}=#{plot}", "Use one switch")
+        self.command("alice", f"+lore/plot #{number}=#{plot}", "Linked entry")
+        self.command("alice", "+scene/close", "closed")
+        self.command("staff", f"+share {bob}=#{number}", "No lore entry")
+        self.command("bob", f"+share #{number}={alice}", "don't have")
+        self.command("staff", f"+share #{number}={alice}", "Shared")
+        self.command("alice", f"+share #{number}={bob}", "Shared")
+        self.command("bob", "+lore/acquired", "Live road account")
+        self.command("bob", f"+forget #{number}", "forgotten")
+        self.command("staff", "+tome/new Live chronicle 2", "draft saved")
+        self.command("staff", "+tome/desc = A chronicle of the market road.", "draft saved")
+        self.command("staff", "+tome/page First=An introduction.", "draft saved")
+        self.command("staff", "+tome/page Last=The market road.", "draft saved")
+        self.command("staff", f"+tome/cite 2=#{number}", "draft saved")
+        self.command("staff", "+tome/publish", "Published")
+        self.command("staff", "drop Live chronicle 2", "drop")
+        self.command("bob", "read Live chronicle 2 2", "Could not find")
+        self.command("bob", "read/CONT Live chronicle 2", r"Contents \(2 pages\)")
+        self.command("bob", "read Live chronicle 2=1", "Page 1 of 2")
+        unknown = self.command("bob", "+lore/acquired")
+        assert "Live road account" not in unknown["output"], unknown
+        self.command("bob", "read Live chronicle 2=2", "You recognise: Live road account")
+        self.command("bob", "+lore/acquired", "Live road account")
+        self.command("alice", "+craft/new writing/readable = Live lore guide", "draft saved")
+        self.command("alice", "+craft/desc = A guide to the road.", "draft saved")
+        self.command("alice", "+craft/text = A record of the road.", "draft saved")
+        self.command("alice", f"+lorecraft/recognise = #{number} | Old sign.", "Usage:")
+        self.command("alice", f"+lorecraft/recognise/nope #{number}=Old sign.", "Use one switch")
+        self.command(
+            "alice", f"+lorecraft/RECO #{number}/writing=A familiar road sign.", "facets saved"
+        )
+        preview = self.command("alice", "+craft", "2 materials")
+        assert "familiar road sign" in preview["output"], preview
+        self.command("alice", "+craft/resources = timber:2", "draft saved")
+        self.command("alice", "+craft/finish", "You craft Live lore guide")
+
     def events(self):
         alice_id = self.state()["actors"]["alice"]["id"]
         for resource in ("grain", "ember"):
@@ -817,6 +873,9 @@ def run_rp(session, smoke=False):
             ("real RP session end and scene-close expiry", suite.tracker),
             ("reconnect preserves sheet and audit", suite.reconnect),
         ]
+    cases.append(
+        ("lore authoring, links, sharing, addressed recognition and page acquisition", suite.lore)
+    )
     for name, function in cases:
         if not suite.case(name, function):
             break  # Subsequent cases depend on this state; never report them as passing.

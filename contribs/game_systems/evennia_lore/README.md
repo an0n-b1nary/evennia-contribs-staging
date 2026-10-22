@@ -75,6 +75,18 @@ class CharacterCmdSet(CmdSet):
 
 ---
 
+## Command syntax
+
+Write a new entry with `+lore/submit <title>`, save the editor, then set
+`+lore/kind <id>=<kind>` and `+lore/scene <id>=<scene#>` as needed. Authors
+can configure their own submissions before staff approval. Changing a kind
+preserves accuracy; use `/accuracy <id>=open` for an undecided rumor.
+`+lore/plot <id>=<plot#>` links a plot, and staff use
+`+lore/major <id>=<tag>` for major tags.
+
+Share held, published lore with `+share <id>=<character>`. Each command takes
+at most one switch; unique switch prefixes and mixed case are accepted.
+
 ## Settings
 
 | Setting | Default | Description |
@@ -338,11 +350,15 @@ Complete an ordinary `+craft` draft, then attach lore before paying:
 ```
 +lorecraft/cite 2 = #14
 +lorecraft/cite = #20
-+lorecraft/recognise = #14 | A familiar sign is woven into the hem.
++lorecraft/recognise #14=A familiar sign is woven into the hem.
 +craft
 +craft/resources = timber:3
 +craft/finish
 ```
+
+Recognition addresses the entry first: `#14` uses the primary contributing niche;
+`#14/weaving` charges the contributing weaving niche. The feature text is plain
+single-line prose. The former pipe-separated form is refused.
 
 Register `CmdLoreCraft` alongside your other lore commands. `/uncite N` and
 `/unrecognise N` remove draft features. A numbered citation applies to that
@@ -397,6 +413,8 @@ to provide a shared `read` command: staff tomes remain readable while crafting
 is hidden, and hidden crafted items are still refused. `+lorecraft` remains
 hidden until crafting is revealed.
 The staff permission uses the existing `LORE_STAFF_LOCK`.
+Select a page with `read <item>=<page>`; `read <item>` resumes your bookmark.
+Item names ending in numbers remain whole names. Positional page suffixes are refused.
 
 ```
 +tome/new an old chronicle
@@ -406,7 +424,7 @@ The staff permission uses the existing `LORE_STAFF_LOCK`.
 +tome/cite 2 = #14
 +tome
 +tome/publish
-read an old chronicle 2
+read an old chronicle=2
 ```
 
 Tomes have 1-100 fixed pages and at most 12,000 characters including their

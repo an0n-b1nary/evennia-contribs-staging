@@ -43,16 +43,16 @@ class LoreItemSeams(EvenniaCommandTest):
                     facets={"lore_citations": book.craft_record.prose["facets"]["lore_citations"]},
                 )
             for name in (crafting.JOURNAL_NAME, crafting.EDITION_NAME):
-                output = self.call(command(), f"{name} 1", f"{name}\n", caller=self.char2)
+                output = self.call(command(), f"{name}=1", f"{name}\n", caller=self.char2)
                 self.assertIn("Text by (OOC):", output)
             self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
         self.call(
             command(), f"/contents {tome.key}", f"{tome.key}\nContents (2 pages)", caller=self.char2
         )
-        self.call(command(), f"{tome.key} 1", f"{tome.key}\nPage 1 of 2", caller=self.char2)
+        self.call(command(), f"{tome.key}=1", f"{tome.key}\nPage 1 of 2", caller=self.char2)
         self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
         output = self.call(
-            command(), f"{tome.key} 2", f"{tome.key}\nPage 2 of 2", caller=self.char2
+            command(), f"{tome.key}=2", f"{tome.key}\nPage 2 of 2", caller=self.char2
         )
         self.assertIn("[Lore] You recognise", output)
         self.assertEqual(LoreAcquisition.objects.get(character=self.char2).source, "read")
@@ -107,3 +107,55 @@ class LoreItemSeams(EvenniaCommandTest):
         journal = ObjectDB.objects.get(db_key="New journal")
         self.assertNotIn("facets", journal.craft_record.prose)
         self.assertIn("no entries", journal.read(self.char2))
+
+    @skipUnless(apps.is_installed("evennia_rp_crafting"), "crafting absent")
+    def test_recognition_address_survives_real_crafting_and_unlocks_after_reading(self):
+        from evennia.utils.dbserialize import deserialize
+        from evennia_rp_crafting.commands import DRAFT_KEY
+        from evennia_rp_resources.services import total_held
+
+        call_command("seed_sandbox", verbosity=0)
+        source = ObjectDB.objects.get(db_key=crafting.LORE_BOOK_NAME).craft_record
+        author = ObjectDB.objects.get(pk=source.crafter_id)
+        lore = LoreEntry.objects.get(pk=source.prose["facets"]["lore_citations"][0]["entry"])
+        from commands.default_cmdsets import CharacterCmdSet
+
+        commands = {row.key: type(row) for row in CharacterCmdSet().commands}
+        for args in (
+            "/new writing/readable = Syntax guide",
+            "/desc = A guide.",
+            "/text = An account.",
+        ):
+            self.call(commands["+craft"](), args, "Craft draft saved", caller=author)
+        before = deserialize(author.attributes.get(DRAFT_KEY)), total_held(author)
+        self.call(
+            commands["+lorecraft"](),
+            f"/recognise = #{lore.entry_number} | Old sign.",
+            caller=author,
+        )
+        self.assertEqual(
+            (deserialize(author.attributes.get(DRAFT_KEY)), total_held(author)), before
+        )
+        self.call(
+            commands["+lorecraft"](),
+            f"/recognise #{lore.entry_number}/writing=A syntax sign.",
+            "Draft lore facets saved",
+            caller=author,
+        )
+        self.call(
+            commands["+lorecraft"](),
+            f"/cite = #{lore.entry_number}",
+            "Draft lore facets saved",
+            caller=author,
+        )
+        self.call(commands["+craft"](), "/resources = timber:2", "Craft draft saved", caller=author)
+        self.call(commands["+craft"](), "/finish", "You craft Syntax guide", caller=author)
+        self.assertEqual(total_held(author), before[1] - 2)
+        book = ObjectDB.objects.get(db_key="Syntax guide")
+        book.move_to(self.room1, quiet=True)
+        self.assertNotIn("A syntax sign", book.get_display_desc(self.char2))
+        self.call(commands["read"](), "Syntax guide 1", caller=self.char2)
+        self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
+        self.call(commands["read"](), "Syntax guide=1", caller=self.char2)
+        self.assertEqual(LoreAcquisition.objects.get(character=self.char2).source, "read")
+        self.assertIn("A syntax sign", book.get_display_desc(self.char2))

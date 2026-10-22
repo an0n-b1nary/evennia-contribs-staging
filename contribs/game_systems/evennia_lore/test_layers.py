@@ -400,25 +400,18 @@ class TestSealedLoreReminder(LayerTestMixin, EvenniaTest):
 class TestLayerCommands(LayerTestMixin, EvenniaCommandTest):
     """char1 is staff; char2 is a player."""
 
-    def test_submit_with_a_kind_switch(self):
+    def test_submit_uses_default_kind_then_author_can_change_it(self):
         from evennia_lore.commands import _lore_submit_save
 
-        self.char2.ndb._lore_submit_ctx = {"title": "Eyes Open", "scene_arg": None, "kind": "rumor"}
+        with patch.object(CmdLore, "start_new_edit"):
+            self.call(CmdLore(), "/submit Eyes Open", caller=self.char2)
         _lore_submit_save(self.char2, "The royal sleeps with their eyes open.")
         entry = LoreEntry.objects.get(title="Eyes Open")
+        self.assertEqual((entry.kind, entry.accuracy), ("fact", "accurate"))
+        self.call(CmdLore(), f"/kind #{entry.entry_number}=rumor", caller=self.char2)
+        self.call(CmdLore(), f"/accuracy #{entry.entry_number}=open", caller=self.char2)
+        entry.refresh_from_db()
         self.assertEqual((entry.kind, entry.accuracy), ("rumor", "open"))
-
-    def test_submit_switch_names_the_kind_or_is_refused(self):
-        with patch.object(CmdLore, "start_new_edit"):
-            self.call(CmdLore(), "/submit/rumor Eyes Open", caller=self.char2)
-            self.assertEqual(self.char2.ndb._lore_submit_ctx["kind"], "rumor")
-            self.call(CmdLore(), "/submit/scene/legend 4=Old Eyes", caller=self.char2)
-            self.assertEqual(self.char2.ndb._lore_submit_ctx["kind"], "legend")
-            self.char2.ndb._lore_submit_ctx = None
-            # An unknown kind must not quietly file the entry as an accurate Fact.
-            result = self.call(CmdLore(), "/submit/rumour Eyes Open", caller=self.char2)
-        self.assertIn("Unknown kind 'rumour'", result)
-        self.assertIsNone(self.char2.ndb._lore_submit_ctx)
 
     def test_kind_accuracy_and_notes(self):
         entry = _entry(author=self.char2, kind="rumor")

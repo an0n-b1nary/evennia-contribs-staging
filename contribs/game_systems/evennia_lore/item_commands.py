@@ -8,6 +8,7 @@ from evennia.utils.dbserialize import deserialize
 
 from evennia_links.pagination import reading_target
 
+from .command_syntax import SingleSwitchMixin
 from .items import LoreItemError, create_tome, staff, validate_citations, validate_pages
 
 TOME_DRAFT = "lore_tome_draft"
@@ -22,14 +23,12 @@ def entry_id(actor, value):
     return entry.pk
 
 
-class ItemCommand(MuxCommand):
+class ItemCommand(SingleSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Lore"
 
     def func(self):
         try:
-            if len(self.switches) > 1:
-                raise LoreItemError("Use one switch at a time.")
             self.run(self.switches[0] if self.switches else "")
         except ValueError as exc:
             self.msg(str(exc))
@@ -38,16 +37,21 @@ class ItemCommand(MuxCommand):
 class CmdReadTome(ItemCommand):
     """Read a staff tome or visible craft; lore is independent of crafting reveal.
 
-    Usage: read <item> [= page], read/contents <item>
+    Usage:
+      read <item>[=<page>]
+      read/contents <item>
     """
 
     key = "read"
     aliases = ["+read"]  # noqa: RUF012
+    switch_options = ("contents",)
 
     def run(self, switch):
         if switch not in ("", "contents") or not self.args.strip():
-            raise LoreItemError("Usage: read <item> [= page], or read/contents <item>")
-        item, number = reading_target(self.caller, self.lhs, self.rhs, table=switch == "contents")
+            raise LoreItemError("Usage: read <item>[=<page>], or read/contents <item>")
+        item, number = reading_target(
+            self.caller, self.lhs, self.rhs, table=switch == "contents", positional_page=False
+        )
         if item is None:
             return
         reader = getattr(item, "read", None)
@@ -74,7 +78,7 @@ class CmdLoreCraft(ItemCommand):
 
     Usage:
       +lorecraft/cite [page] = #entry
-      +lorecraft/recognise [contributing niche] = #entry | feature text
+      +lorecraft/recognise #entry[/<niche>]=<feature text>
       +lorecraft/uncite <number>
       +lorecraft/unrecognise <number>
       +lorecraft
@@ -85,6 +89,7 @@ class CmdLoreCraft(ItemCommand):
     """
 
     key = "+lorecraft"
+    switch_options = ("cite", "recognise", "uncite", "unrecognise")
 
     def access(self, srcobj, access_type="cmd", default=False, **kwargs):
         from .integrations.crafting import supported
@@ -122,12 +127,19 @@ class CmdLoreCraft(ItemCommand):
                 }
             )
         elif switch == "recognise":
-            if self.rhs is None or "|" not in self.rhs:
-                raise LoreItemError("Usage: +lorecraft/recognise [niche] = #entry | feature text")
-            reference, line = self.rhs.split("|", 1)
-            row = {"entry": entry_id(self.caller, reference), "text": line.strip()}
-            if self.lhs.strip():
-                row["niche"] = self.lhs.strip()
+            reference, slash, niche = self.lhs.strip().partition("/")
+            if (
+                not reference.startswith("#")
+                or not reference[1:].isascii()
+                or not reference[1:].isdigit()
+                or self.rhs is None
+                or not self.rhs.strip()
+                or (slash and (not niche.strip() or "/" in niche))
+            ):
+                raise LoreItemError("Usage: +lorecraft/recognise #entry[/<niche>]=<feature text>")
+            row = {"entry": entry_id(self.caller, reference), "text": self.rhs.strip()}
+            if slash:
+                row["niche"] = niche.strip()
             rows.append(row)
         elif switch in ("uncite", "unrecognise"):
             number = int(self.args.strip())
@@ -174,6 +186,7 @@ class CmdTome(ItemCommand):
     """
 
     key = "+tome"
+    switch_options = ("new", "desc", "page", "cite", "publish", "cancel")
 
     def access(self, srcobj, access_type="cmd", default=False, **kwargs):
         return staff(srcobj) and super().access(srcobj, access_type, default, **kwargs)

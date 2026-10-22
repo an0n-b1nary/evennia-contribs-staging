@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.9.0] - 2026-10-22
+
+### Breaking
+
+- Submit with `/submit <title>`, then set `/kind <id>=<kind>` and
+  `/scene <id>=<scene#>` separately. Scene and plot links use `/scene` and
+  `/plot`; staff major tags use `/major <id>=<tag>`.
+- Share with `+share <id>=<character>`. Recognition facets use
+  `+lorecraft/recognise #entry[/<niche>]=<feature text>`.
+- Select book pages with `read <item>=<page>`. Positional page suffixes and
+  stacked or unknown switches are refused before any action or draft change.
+- Authors can configure their own unpublished entries. Other players still
+  cannot resolve them, and sharing still requires published, held lore.
+
+- Require Links 0.8.12 for explicit page selection without positional fallback.
+  No stored lore, tome, citation or recognition data needs migration.
+
 ## [0.8.5] - 2026-10-21
 
 - Rename the staff web queue to Lore Review and show its publication-approval

@@ -595,23 +595,11 @@ class TestCmdLoreSubmitAndRead(EvenniaCommandTest):
         scene_model.objects.get.assert_called_once_with(scene_number=9001)
         self.assertEqual(LoreSceneLink.objects.get(entry=entry).scene_id, 55)
 
-    def test_submission_resolves_public_scene_number(self):
-        from evennia_lore.commands import _lore_submit_save
-
-        scene_model = MagicMock()
-        scene_model.objects.get.return_value = SimpleNamespace(pk=55, scene_number=9001)
-        self.char1.ndb._lore_submit_ctx = {"title": "Linked Submission", "scene_arg": "9001"}
-        with patch("evennia_lore.commands._get_model", return_value=scene_model):
-            _lore_submit_save(self.char1, "Full body content.")
-        scene_model.objects.get.assert_called_once_with(scene_number=9001)
-        entry = LoreEntry.objects.get(title="Linked Submission")
-        self.assertEqual(LoreSceneLink.objects.get(entry=entry).scene_id, 55)
-
     def test_submit_inline_via_editor_save(self):
         """Simulate what start_new_edit callback does on save."""
         from evennia_lore.commands import _lore_submit_save
 
-        self.char1.ndb._lore_submit_ctx = {"title": "My Entry", "scene_arg": None}
+        self.char1.ndb._lore_submit_ctx = {"title": "My Entry"}
         _lore_submit_save(self.char1, "Full body content.")
         entry = LoreEntry.objects.get(title="My Entry")
         self.assertEqual(entry.body, "Full body content.")
@@ -655,7 +643,7 @@ class TestCmdShare(EvenniaCommandTest):
     def test_share_creates_acquisition(self):
         entry = _make_entry("Shareable", author=self.char1)
         # char1 (staff) shares directly
-        self.call(CmdShare(), f"{self.char2.key}=#{entry.entry_number}", caller=self.char1)
+        self.call(CmdShare(), f"#{entry.entry_number}={self.char2.key}", caller=self.char1)
         self.assertTrue(
             LoreAcquisition.objects.filter(
                 entry=entry,

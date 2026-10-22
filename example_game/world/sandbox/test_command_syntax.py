@@ -217,3 +217,53 @@ class CommandSyntaxSeams(EvenniaCommandTest):
             self.assertEqual(profile.action_weights, {"standard": 3})
             self.assertEqual(profile.reaction_policy, {"appetite": "cautious"})
             self.assertEqual(profile.target_policy, "random")
+
+    def test_lore_author_configures_pending_entry_with_real_scene_and_plot_links(self):
+        from unittest.mock import patch
+
+        from django.test import override_settings
+        from evennia_lore.commands import _lore_submit_save
+        from evennia_lore.models import LoreEntry, LoreSceneLink, PlotLoreLink
+        from evennia_plots.models import PlotThread
+        from evennia_scenes.models import Scene
+
+        scene = Scene.objects.create(title="Syntax scene", room=self.room1, creator=self.char2)
+        plot = PlotThread.create_thread("Syntax plot", self.char2)
+        command = self.command("+lore")
+        with override_settings(LORE_REQUIRE_APPROVAL=True):
+            with patch.object(type(command), "start_new_edit") as editor:
+                self.expect(command, "/submit/rumor Old syntax", "one switch", caller=self.char2)
+                editor.assert_not_called()
+                self.call(command, "/submit Syntax account", caller=self.char2)
+                editor.assert_called_once()
+            _lore_submit_save(self.char2, "An account of the syntax scene.")
+        entry = LoreEntry.objects.get(title="Syntax account")
+        number = entry.entry_number
+        self.expect(command, f"/kind #{number}=rumor", "now a Rumor", caller=self.char2)
+        self.expect(
+            command, f"/scene #{number}={scene.scene_number}", "Linked scene", caller=self.char2
+        )
+        self.expect(
+            command, f"/plot #{number}=#{plot.plot_number}", "Linked entry", caller=self.char2
+        )
+        self.expect(command, f"/tag/major #{number}=Syntax theme", "one switch")
+        self.assertFalse(entry.tags.exists())
+        self.expect(command, f"/major #{number}=Syntax theme", "Only staff", caller=self.char2)
+        self.expect(command, f"/major #{number}=Syntax theme", "created and added")
+        self.assertTrue(entry.tags.get().is_major)
+        self.assertEqual(LoreSceneLink.objects.get(entry=entry).scene_id, scene.pk)
+        self.assertEqual(PlotLoreLink.objects.get(entry=entry).thread_id, plot.pk)
+        entry.refresh_from_db()
+        self.assertEqual((entry.status, entry.kind), ("submitted", "rumor"))
+
+    def test_lore_sharing_uses_host_character_identity_and_preserves_acquisition_source(self):
+        from evennia_lore.models import LoreAcquisition, LoreEntry
+
+        entry = LoreEntry.create_entry("Syntax sharing", self.char1, body="A shared account.")
+        entry.publish(reviewed_by=self.char1)
+        command = self.command("+share")
+        self.call(command, f"Char2=#{entry.entry_number}")
+        self.assertFalse(LoreAcquisition.objects.filter(entry=entry).exists())
+        self.expect(command, f"#{entry.entry_number}=Char2", "Shared")
+        acquisition = LoreAcquisition.objects.get(entry=entry, character=self.char2)
+        self.assertEqual((acquisition.source, acquisition.shared_by_id), ("shared", self.char1.pk))

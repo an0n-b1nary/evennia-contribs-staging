@@ -317,10 +317,11 @@ games migrating HTTP staff checks should set the one web-wide setting instead.
 
 ## Authored pages
 
-`pagination.reading_target(actor, name, value=None, table=False)` shares local
+`pagination.reading_target(actor, name, value=None, table=False, positional_page=True)` shares local
 book/page command resolution. It searches carried and current-room objects,
 preserves exact item names ending in numbers, and accepts an explicit page via
-`value`. The host's search method supplies identity matching; the resolved
+`value`. Set `positional_page=False` to require equals page selection and
+keep the entire target as the item name. The host's search method supplies identity matching; the resolved
 reader still checks access. The module imports no engine or Django code.
 
 Helpers in `evennia_links.pagination` import without Django or Evennia
