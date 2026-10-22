@@ -17,11 +17,13 @@ Settings:
 """
 
 from django.conf import settings
+from django.db.models import Q
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
 from evennia_lore import layers
+from evennia_lore.command_syntax import SingleSwitchMixin
 from evennia_lore.item_commands import CmdLoreCraft as CmdLoreCraft
 from evennia_lore.item_commands import CmdReadTome as CmdReadTome
 from evennia_lore.item_commands import CmdTome as CmdTome
@@ -80,7 +82,7 @@ def _resolve_entry(arg, caller, require_published=False):
     qs = (
         LoreEntry.objects.all()
         if staff
-        else LoreEntry.objects.filter(status=LoreEntry.Status.PUBLISHED)
+        else LoreEntry.objects.filter(Q(status=LoreEntry.Status.PUBLISHED) | Q(author=caller))
     )
     if require_published:
         qs = LoreEntry.objects.filter(status=LoreEntry.Status.PUBLISHED)
@@ -208,7 +210,7 @@ def _get_model(label_setting_key, model_name, default_label):
 # ---------------------------------------------------------------------------
 
 
-class CmdLore(EditingMixin, MuxCommand):
+class CmdLore(SingleSwitchMixin, EditingMixin, MuxCommand):
     """
     View and manage the lore compendium.
 
@@ -217,8 +219,6 @@ class CmdLore(EditingMixin, MuxCommand):
         +lore/read <id>                    Read an entry's full body
         +lore/search <term>                Search by title or body text
         +lore/submit <title>               Open editor to write a new entry
-        +lore/submit/scene <scene#>=<title> Submit + auto-link to a scene
-        +lore/submit/<kind> <title>        Submit as a kind, e.g. +lore/submit/rumor
         +lore/edit <id>                    Edit your entry's IC content (EvEditor)
         +lore/kind <id>=<kind>             Fact, Rumor or Legend (your game may differ)
         +lore/ooc <id>[=<text>]            Edit the OOC notes (EvEditor without text)
@@ -228,14 +228,14 @@ class CmdLore(EditingMixin, MuxCommand):
         +lore/seal <id>[=<text>]           Edit sealed OOC notes (staff only)
         +lore/unseal <id>=<accuracy>       Publish sealed notes, settle accuracy (staff)
         +lore/tag <id>=<tag>               Add a tag (creates if new)
-        +lore/tag/major <id>=<tag>         Add a major tag (staff only)
+        +lore/major <id>=<tag>             Add a major tag (staff only)
         +lore/untag <id>=<tag>             Remove a tag
         +lore/region <id>=<region>         Associate entry with a region
         +lore/unregion <id>=<region>       Remove a region association
         +lore/object <id>=<#objref>        Tag entry to an in-game object
         +lore/unobject <id>=<#objref>      Remove object tag
-        +lore/link/scene <id>=<scene#>     Link entry to a scene
-        +lore/link/plot <id>=<plot#>       Link entry to a plot
+        +lore/scene <id>=<scene#>          Link entry to a scene
+        +lore/plot <id>=<plot#>            Link entry to a plot
         +lore/approve <id>                 Approve a submitted entry (staff only)
         +lore/reject <id>=<reason>         Reject a submitted entry (staff only)
         +lore/flag <id>=<reason>           Flag an entry for staff review
@@ -265,6 +265,37 @@ class CmdLore(EditingMixin, MuxCommand):
     help_category = "Lore"
     locks = "cmd:all()"
 
+    switch_options = (
+        "read",
+        "search",
+        "submit",
+        "edit",
+        "kind",
+        "ooc",
+        "accuracy",
+        "affirm",
+        "decline",
+        "seal",
+        "unseal",
+        "tag",
+        "major",
+        "untag",
+        "region",
+        "unregion",
+        "object",
+        "unobject",
+        "scene",
+        "plot",
+        "approve",
+        "reject",
+        "flag",
+        "unflag",
+        "history",
+        "diff",
+        "acquired",
+        "queue",
+    )
+
     def func(self):
         sw = self.switches
         caller = self.caller
@@ -289,24 +320,10 @@ class CmdLore(EditingMixin, MuxCommand):
             return self._do_search(lhs or args)
 
         if "submit" in sw:
-            # Any other switch names the kind. One that names no kind is refused:
-            # filing it under the default would record a rumor as a Fact.
-            kind_switches = [s for s in sw if s not in ("submit", "scene")]
-            kind = layers.match_kind(kind_switches[0]) if len(kind_switches) == 1 else None
-            if kind_switches and kind is None:
-                names = ", ".join(layers.kinds())
-                caller.msg(f"Unknown kind '{'/'.join(kind_switches)}'. Choose from: {names}.")
-                return
-            if "scene" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+lore/submit/scene <scene#>=<title>|n")
-                    return
-                return self._do_submit(rhs, scene_arg=lhs, kind=kind)
-            title = lhs or args
-            if not title:
+            if not args:
                 caller.msg("Usage: |w+lore/submit <title>|n")
                 return
-            return self._do_submit(title, kind=kind)
+            return self._do_submit(args)
 
         if "edit" in sw:
             if not lhs and not args:
@@ -367,10 +384,10 @@ class CmdLore(EditingMixin, MuxCommand):
             text = rhs if "=" in self.args else None
             return self._do_layer_text(lhs, "sealed_notes", text)
 
-        if "tag" in sw and "untag" not in sw:
+        if "tag" in sw or "major" in sw:
             make_major = "major" in sw
             if not lhs or not rhs:
-                caller.msg("Usage: |w+lore/tag <id>=<tag>|n")
+                caller.msg(f"Usage: |w+lore/{'major' if make_major else 'tag'} <id>=<tag>|n")
                 return
             return self._do_tag(lhs, rhs, make_major=make_major)
 
@@ -404,19 +421,17 @@ class CmdLore(EditingMixin, MuxCommand):
                 return
             return self._do_unobject(lhs, rhs)
 
-        if "link" in sw:
-            if "scene" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+lore/link/scene <id>=<scene#>|n")
-                    return
-                return self._do_link_scene(lhs, rhs)
-            if "plot" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+lore/link/plot <id>=<plot#>|n")
-                    return
-                return self._do_link_plot(lhs, rhs)
-            caller.msg("Specify: |w+lore/link/scene|n or |w+lore/link/plot|n")
-            return
+        if "scene" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/scene <id>=<scene#>|n")
+                return
+            return self._do_link_scene(lhs, rhs)
+
+        if "plot" in sw:
+            if not lhs or not rhs:
+                caller.msg("Usage: |w+lore/plot <id>=<plot#>|n")
+                return
+            return self._do_link_plot(lhs, rhs)
 
         if "approve" in sw:
             if not is_staff(caller):
@@ -612,7 +627,7 @@ class CmdLore(EditingMixin, MuxCommand):
             lines.append(_format_entry_row(e))
         caller.msg("\n".join(lines))
 
-    def _do_submit(self, title, scene_arg=None, kind=None):
+    def _do_submit(self, title):
         caller = self.caller
         if LoreEntry.objects.filter(
             title__iexact=title, status=LoreEntry.Status.PUBLISHED
@@ -621,7 +636,7 @@ class CmdLore(EditingMixin, MuxCommand):
                 f"|rA PUBLISHED entry titled '{title}' already exists.|n Use a different title."
             )
             return
-        caller.ndb._lore_submit_ctx = {"title": title, "scene_arg": scene_arg, "kind": kind}
+        caller.ndb._lore_submit_ctx = {"title": title}
         self.start_new_edit(_lore_submit_save)
 
     def _do_edit(self, arg):
@@ -1115,32 +1130,8 @@ def _lore_submit_save(caller, content):
     """Called by EditingMixin.start_new_edit when the user saves a new entry."""
     ctx = getattr(caller.ndb, "_lore_submit_ctx", None)
     title = ctx["title"] if ctx else "Untitled"
-    scene_arg = ctx.get("scene_arg") if ctx else None
-    kind = ctx.get("kind") if ctx else None
     caller.ndb._lore_submit_ctx = None
-
-    entry = LoreEntry.create_entry(title=title, author=caller, body=content, kind=kind)
-
-    if scene_arg and scene_arg.isdigit():
-        try:
-            Scene = _get_model("LORE_SCENES_APP_LABEL", "Scene", "evennia_scenes")
-            scene = Scene.objects.get(scene_number=int(scene_arg))
-            LoreSceneLink.objects.get_or_create(
-                entry=entry,
-                scene_id=scene.pk,
-                defaults={"created_by": caller, "created_by_name": caller.key},
-            )
-            caller.msg(
-                f"|gLore entry #{entry.entry_number} '{entry.title}' submitted "
-                f"and linked to scene #{scene_arg}.|n\n"
-                f"Status: {entry.get_status_display()}"
-                f"{_layer_summary(entry)}"
-            )
-            return
-        except Exception:
-            caller.msg(
-                f"|yWarning: scene #{scene_arg} not found — entry submitted without scene link.|n"
-            )
+    entry = LoreEntry.create_entry(title=title, author=caller, body=content)
 
     caller.msg(
         f"|gLore entry #{entry.entry_number} '{entry.title}' submitted.|n\n"
@@ -1293,12 +1284,12 @@ class CmdInvestigate(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdShare(MuxCommand):
+class CmdShare(SingleSwitchMixin, MuxCommand):
     """
     Share a lore entry with another character.
 
     Usage:
-        +share <character>=<id>
+        +share <id>=<character>
 
     Gives a lore entry you possess to another character. Creates a
     LoreAcquisition(source=SHARED) for the recipient.
@@ -1312,20 +1303,20 @@ class CmdShare(MuxCommand):
     def func(self):
         caller = self.caller
         if not self.lhs or not self.rhs:
-            caller.msg("Usage: |w+share <character>=<id>|n")
+            caller.msg("Usage: |w+share <id>=<character>|n")
             return
 
-        target = caller.search(self.lhs.strip(), global_search=True)
+        entry, err = _resolve_entry(self.lhs.strip(), caller, require_published=True)
+        if err:
+            caller.msg(err)
+            return
+
+        target = caller.search(self.rhs.strip(), global_search=True)
         if not target:
             return
 
         if target == caller:
             caller.msg("You cannot share lore with yourself.")
-            return
-
-        entry, err = _resolve_entry(self.rhs.strip(), caller, require_published=True)
-        if err:
-            caller.msg(err)
             return
 
         if (

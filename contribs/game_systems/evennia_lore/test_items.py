@@ -144,7 +144,7 @@ class TomeTests(EvenniaCommandTest):
         book = self.tome()
         book.move_to(self.room1, quiet=True)
         with override_settings(RP_CRAFTING_REVEALED=False):
-            self.call(CmdReadTome(), f"{book.key} 2", f"{book.key}\nPage 2 of 2", caller=self.char2)
+            self.call(CmdReadTome(), f"{book.key}=2", f"{book.key}\nPage 2 of 2", caller=self.char2)
         self.assertTrue(
             LoreAcquisition.objects.filter(character=self.char2, source="read").exists()
         )
@@ -279,7 +279,7 @@ class CraftedLoreTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdLoreCraft(), f"/cite = #{self.lore.entry_number}", "Draft lore facets saved")
         self.call(
             CmdLoreCraft(),
-            f"/recognise = #{self.lore.entry_number} | A hidden sign.",
+            f"/recognise #{self.lore.entry_number}=A hidden sign.",
             "Draft lore facets saved",
         )
         output = self.call(CmdCraft(), "", "Draft: Codex")
@@ -308,7 +308,7 @@ class CraftedLoreTests(CraftingFixture, EvenniaCommandTest):
         for line in ("A hidden sign.", "Another sign."):
             self.call(
                 CmdLoreCraft(),
-                f"/recognise = #{self.lore.entry_number} | {line}",
+                f"/recognise #{self.lore.entry_number}={line}",
                 "Draft lore facets saved",
             )
         LoreAcquisition.objects.filter(character=self.char1, entry=self.lore).delete()
@@ -343,7 +343,7 @@ class CraftedLoreTests(CraftingFixture, EvenniaCommandTest):
         book.move_to(self.room1, quiet=True)
         with override_settings(RP_CRAFTING_REVEALED=False):
             self.assertFalse(CmdLoreCraft().access(self.char1))
-            self.call(CmdReadTome(), f"{book.key} 2", "Crafting is unavailable.", caller=self.char2)
+            self.call(CmdReadTome(), f"{book.key}=2", "Crafting is unavailable.", caller=self.char2)
         self.assertFalse(LoreAcquisition.objects.filter(character=self.char2).exists())
 
     def test_invalid_facets_and_changed_lore_never_spend(self):

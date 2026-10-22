@@ -1,5 +1,11 @@
 # Changelog — evennia-links
 
+## 0.8.12 — 2026-10-22
+
+- Add `positional_page=False` to `pagination.reading_target` so commands can
+  require equals page values while preserving whole numeric item names.
+  Existing callers retain their current behavior until they opt in.
+
 ## 0.8.11 — 2026-10-20
 
 - Add the staff-only `links-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

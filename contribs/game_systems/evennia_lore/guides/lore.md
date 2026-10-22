@@ -10,7 +10,7 @@ Lore is the world's shared memory, and players write most of it. Anyone can writ
 - `+lore` browses published entries, and `+lore/read <id>` reads one.
 - `+lore/submit <title>` writes a new entry in the editor.
 - `+lore/acquired` lists the entries your character knows.
-- `+share <character>=<id>` passes an entry you know to someone else.
+- `+share <id>=<character>` passes an entry you know to someone else.
 - `+investigate` shows what your character is looking into, and its switches change it.
 
 Your game may have staff approve new entries before they're published. If so, `+lore/submit` sends yours to their queue.
@@ -34,7 +34,7 @@ Characters can be fooled, and stories are better for it. Players shouldn't be. S
 | **Rumor** | A claim going around now, about recent or current things. |
 | **Legend** | An old story, told everywhere, that nobody living can check. |
 
-Choose the kind when you submit (`+lore/submit/rumor <title>`) or change it later with `+lore/kind`.
+Submit with `+lore/submit <title>`, then use `+lore/kind <id>=rumor` to change its kind. Authors can configure their own entries while they await approval. Use `+lore/scene <id>=<scene#>` to link the saved entry to a scene.
 
 ## Accuracy
 
@@ -45,7 +45,7 @@ Choose the kind when you submit (`+lore/submit/rumor <title>`) or change it late
 | Partly accurate | Some of it is true. The OOC notes say which part. |
 | Open | Not decided yet. |
 
-A new rumor or legend starts as **open**, so you can start one without deciding whether it's true. That's how mysteries begin. Use `+lore/accuracy` and `+lore/ooc` when you know more.
+New submissions use the game's default kind and accuracy. Changing the kind preserves its accuracy: after changing a Fact to a Rumor or Legend, use `+lore/accuracy <id>=open` if its truth is undecided. Use `+lore/ooc` when you know more.
 
 ## Learning lore
 
@@ -83,4 +83,4 @@ When staff unseal the notes, everyone who has the entry is told, either straight
 
 ## How it connects
 
-Lore can be linked to scenes, plots, regions and objects: `+lore/link/scene`, `+lore/link/plot`, `+lore/region` and `+lore/object`. If your game uses XP, writing a published entry earns some, and so does taking part in a scene that an entry is linked to. `+lore/flag <id>=<reason>` asks staff to look at an entry that seems wrong.
+Lore can be linked to scenes, plots, regions and objects: `+lore/scene`, `+lore/plot`, `+lore/region` and `+lore/object`. If your game uses XP, writing a published entry earns some, and so does taking part in a scene that an entry is linked to. `+lore/flag <id>=<reason>` asks staff to look at an entry that seems wrong.
