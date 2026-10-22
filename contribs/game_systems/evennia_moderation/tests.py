@@ -622,3 +622,70 @@ class TestCommands(AdmissionFixture, EvenniaCommandTest):
             "Application reviewed",
         )
         self.assertTrue(AccountDB.objects.filter(username="NewPlayer").exists())
+
+    def test_liftip_handles_ipv4_ipv6_and_unique_prefix(self):
+        for address, switch in (("192.0.2.0/24", "liftip"), ("2001:db8::/64", "lifti")):
+            with self.subTest(address=address):
+                action = services.restrict(
+                    self.char1, kind="softban", address=address, reason="Incident"
+                )
+                self.call(CmdSoftban(), f"/{switch} {address}", "Lifted 1")
+                action.refresh_from_db()
+                self.assertIsNotNone(action.lifted_at)
+
+    def test_old_ip_lift_and_extra_switches_preserve_restrictions(self):
+        action = services.restrict(
+            self.char1, kind="softban", address="192.0.2.0/24", reason="Incident"
+        )
+        for switch in ("lift/ip", "ip/lift", "liftip/unknown", "ip/unknown"):
+            with self.subTest(switch=switch):
+                self.call(CmdSoftban(), f"/{switch} 192.0.2.0/24")
+                action.refresh_from_db()
+                self.assertIsNone(action.lifted_at)
+                self.assertEqual(ModerationAction.objects.count(), 1)
+
+    def test_private_and_shared_decline_keep_referrer_notice_choice(self):
+        for switch, shared in (("decline", False), ("declineshare", True)):
+            with self.subTest(switch=switch):
+                code = admissions.issue_code(self.account2)
+                application = self.apply(
+                    "SharedPlayer" if shared else "PrivatePlayer", code=code.code
+                )
+                self.call(
+                    CmdAdmissions(),
+                    f"/{switch} {application.job.job_number}=Specific Reason",
+                    "Application reviewed",
+                )
+                application.refresh_from_db()
+                self.assertEqual(
+                    (application.status, application.share_decline_reason), ("declined", shared)
+                )
+                notice = Notice.objects.order_by("pk").last()
+                self.assertEqual("Specific Reason" in notice.text, shared)
+
+    def test_old_and_extra_admissions_switches_cannot_decide_or_change_sharing(self):
+        application = self.apply()
+        for switch in (
+            "decline/share",
+            "decline/unknown",
+            "approve/decline",
+            "declineshare/unknown",
+            "share",
+            "unknown",
+        ):
+            with self.subTest(switch=switch):
+                self.call(CmdAdmissions(), f"/{switch} {application.job.job_number}=Private reason")
+                application.refresh_from_db()
+                self.assertEqual(application.status, "pending")
+                self.assertFalse(application.share_decline_reason)
+                self.assertFalse(
+                    RequestDecision.objects.filter(submission__job=application.job).exists()
+                )
+
+    def test_unknown_or_stacked_switches_do_not_mute_or_add_notes(self):
+        for command in (CmdMute, CmdNotes):
+            for switch in ("unknown", "lift/unknown", "lift/lift"):
+                with self.subTest(command=command, switch=switch):
+                    self.call(command(), f"/{switch} {self.account2.key}=Should not write")
+        self.assertFalse(ModerationAction.objects.exists())
+        self.assertFalse(StaffNote.objects.exists())

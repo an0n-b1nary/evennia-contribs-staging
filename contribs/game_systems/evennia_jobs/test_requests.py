@@ -241,7 +241,9 @@ class TestRequestCommands(EvenniaCommandTest):
         self.assertEqual(
             RequestSubmission.objects.get().answers["description"], ANSWERS["description"]
         )
-        self.call(CmdJobs(), "/approve 1 1=Fits the setting.", "Ticket #1: Approved (revision 1).")
+        self.call(
+            CmdJobs(), "/approve 1.1 # Fits the setting.", "Ticket #1: Approved (revision 1)."
+        )
 
     def test_cancel_does_not_create_a_ticket(self):
         self.call(CmdRequest(), "/form build=Library")
@@ -286,7 +288,7 @@ class TestRequestCommands(EvenniaCommandTest):
         first = submit_request(
             author=self.char2, form_key="build", title="Library", answers=ANSWERS
         )
-        self.call(CmdJobs(), "/revise 1 1=Describe the entrance.")
+        self.call(CmdJobs(), "/revise 1.1 # Describe the entrance.")
         self.call(CmdRequest(), "/revise 1", caller=self.char2)
         self.call(
             CmdRequest(), "/answer description=A library with an entrance.", caller=self.char2
@@ -295,7 +297,7 @@ class TestRequestCommands(EvenniaCommandTest):
         self.assertEqual(first.job.submissions.count(), 1)
         self.call(CmdRequest(), "/answer reuse=yes", caller=self.char2)
         self.call(CmdRequest(), "/submit", "Ticket #1, revision 2, submitted.", caller=self.char2)
-        self.call(CmdJobs(), "/approve 1 2=Ready.")
+        self.call(CmdJobs(), "/approve 1.2 # Ready.")
         self.assertEqual(first.job.submissions.count(), 2)
         self.assertEqual(first.answers["description"], "A quiet library.")
 

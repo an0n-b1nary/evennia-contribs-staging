@@ -14,17 +14,8 @@ evennia_calendar stacked-switch +calendar
 evennia_calendar stacked-switch +rsvp
 evennia_economy option-stack +economy
 evennia_economy semicolon +shop
-evennia_jobs positional-chain +jobs
-evennia_jobs positional-chain +request
 evennia_lore pipe +lorecraft
 evennia_lore stacked-switch +lore
-evennia_moderation nested-equals +admissions
-evennia_moderation semicolon +admissions
-evennia_moderation semicolon +mute
-evennia_moderation semicolon +softban
-evennia_moderation stacked-switch +admissions
-evennia_moderation stacked-switch +jobs
-evennia_moderation stacked-switch +softban
 evennia_npcs colon +npc
 evennia_npcs json +npc
 evennia_plots colon +arc

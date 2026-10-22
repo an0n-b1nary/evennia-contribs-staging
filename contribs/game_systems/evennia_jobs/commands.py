@@ -21,9 +21,9 @@ Settings:
 
 from django.conf import settings
 from django.db import models
-from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
+from evennia_jobs.command_syntax import JobCommand
 from evennia_jobs.models import JobPriority, JobStatus, JobType
 from evennia_jobs.request_commands import format_submissions, handle_request, handle_review
 
@@ -302,7 +302,7 @@ def _open_editor(caller, job_type, title, mode="create", job_pk=None, staff_only
 # ---------------------------------------------------------------------------
 
 
-class CmdRequest(MuxCommand):
+class CmdRequest(JobCommand):
     """
     Submit a proposal or suggestion to staff.
 
@@ -322,7 +322,7 @@ class CmdRequest(MuxCommand):
         +request/submit                - Submit the questionnaire
         +request/cancel                - Discard unsubmitted answers
         +request/revise <id>            - Revise after staff request changes
-    +request/withdraw <id> <rev>=<reason> - Withdraw a pending revision
+        +request/withdraw <id>.<rev> [# reason] - Withdraw a pending revision
 
     Creates a ticket of type 'request' for staff review. Use this for
     proposals, suggestions, questions, or anything that needs staff input.
@@ -332,6 +332,20 @@ class CmdRequest(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Requests"
     locks = "cmd:all()"
+
+    switch_options = (
+        "comment",
+        "forms",
+        "form",
+        "answer",
+        "edit",
+        "resume",
+        "preview",
+        "submit",
+        "cancel",
+        "revise",
+        "withdraw",
+    )
 
     def func(self):
         caller = self.caller
@@ -468,7 +482,7 @@ class CmdRequest(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdBug(MuxCommand):
+class CmdBug(JobCommand):
     """
     Report a bug or technical problem.
 
@@ -514,7 +528,7 @@ class CmdBug(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdIssue(MuxCommand):
+class CmdIssue(JobCommand):
     """
     Report an interpersonal complaint or moderation request.
 
@@ -568,7 +582,7 @@ class CmdIssue(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdDiscuss(MuxCommand):
+class CmdDiscuss(JobCommand):
     """
     Create and manage staff-to-staff discussion tickets.
 
@@ -587,6 +601,8 @@ class CmdDiscuss(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Requests"
     locks = getattr(settings, "JOBS_STAFF_LOCK", "cmd:perm(Builder)")
+
+    switch_options = ("comment",)
 
     def func(self):
         caller = self.caller
@@ -687,7 +703,7 @@ class CmdDiscuss(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdJobs(MuxCommand):
+class CmdJobs(JobCommand):
     """
     Manage the staff ticket queue.
 
@@ -705,9 +721,9 @@ class CmdJobs(MuxCommand):
         +jobs/staffonly <id>=<text>     - Add staff-only note (inline)
         +jobs/close <id>                - Close a ticket
         +jobs/reopen <id>               - Reopen a closed ticket
-        +jobs/approve <id> <revision>=<reason> - Approve this revision
-        +jobs/decline <id> <revision>=<reason> - Decline this revision
-        +jobs/revise <id> <revision>=<reason>  - Ask for a new revision
+        +jobs/approve <id>.<revision> # <reason> - Approve this revision
+        +jobs/decline <id>.<revision> # <reason> - Decline this revision
+        +jobs/revise <id>.<revision> # <reason>  - Ask for a new revision
 
     Staff-only command for full ticket management. Staff-only notes
     (via /staffonly) are hidden from the ticket submitter.
@@ -717,6 +733,21 @@ class CmdJobs(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Staff"
     locks = getattr(settings, "JOBS_STAFF_LOCK", "cmd:perm(Builder)")
+
+    switch_options = (
+        "list",
+        "form",
+        "assign",
+        "status",
+        "priority",
+        "comment",
+        "staffonly",
+        "close",
+        "reopen",
+        "approve",
+        "decline",
+        "revise",
+    )
 
     def func(self):
         caller = self.caller

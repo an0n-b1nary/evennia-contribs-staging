@@ -68,3 +68,50 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         result = self.call(command, "/activity 1")
         self.assertIn("Region: Syntax report region", result)
         self.assertNotIn("RP activity:", self.call(command, "activity 1"))
+
+    def test_dotted_review_and_withdrawal_use_real_host_forms(self):
+        from evennia_jobs.models import RequestDecision, RequestWithdrawal
+        from evennia_jobs.review import submit_request
+
+        from world.sandbox import content
+
+        def submit():
+            return submit_request(
+                author=self.char2,
+                form_key="build",
+                title="Syntax proposal",
+                answers=content.REQUEST_DEMO_ANSWERS,
+            )
+
+        proposal = submit()
+        number = proposal.job.job_number
+        command = self.command("+jobs")
+        self.call(command, f"/approve {number} 1=Old syntax")
+        self.assertFalse(RequestDecision.objects.filter(submission=proposal).exists())
+        reason = "Fits #12.3 # keep the entrance"
+        self.call(command, f"/approve #{number}.1 # {reason}")
+        self.assertEqual(RequestDecision.objects.get(submission=proposal).reason, reason)
+        proposal = submit()
+        self.call(
+            self.command("+request"),
+            f"/withdraw #{proposal.job.job_number}.1 # Rework",
+            caller=self.char2,
+        )
+        self.assertEqual(RequestWithdrawal.objects.get(submission=proposal).reason, "Rework")
+
+    def test_single_ip_lift_switch_preserves_the_audit_history(self):
+        from evennia_moderation import services
+        from evennia_moderation.models import ModerationAction
+
+        action = services.restrict(
+            self.char1, kind="softban", address="192.0.2.0/24", reason="Incident"
+        )
+        command = self.command("+softban")
+        self.assertTrue(command.access(self.char1, "cmd"))
+        self.call(command, "/lift/ip 192.0.2.0/24")
+        action.refresh_from_db()
+        self.assertIsNone(action.lifted_at)
+        self.call(command, "/liftip 192.0.2.0/24", "Lifted 1")
+        action.refresh_from_db()
+        self.assertIsNotNone(action.lifted_at)
+        self.assertTrue(ModerationAction.objects.filter(kind="lift").exists())

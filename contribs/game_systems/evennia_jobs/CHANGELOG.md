@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.8.0] - 2026-10-21
+
+### Breaking
+
+- Staff review now uses `+jobs/approve|decline|revise <id>.<revision> # <reason>`.
+  Author withdrawal uses `+request/withdraw <id>.<revision> [# reason]`.
+  An optional leading `#` is accepted on the address. The old positional
+  revision and equals-separated reason forms are refused.
+- Jobs commands reject stacked, unknown and ambiguous switches before any
+  side effects. Decline reasons shared with admission referrers use
+  Moderation’s `+admissions/declineshare` command or the web checkbox.
+
 ## 0.7.4 — 2026-10-18
 
 - Guide pages: `requests` now covers structured forms (starting, answering, previewing and submitting), revisions after staff ask for changes, withdrawal, and what guests can send.

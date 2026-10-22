@@ -657,7 +657,7 @@ Questions and consent wording live in `world/sandbox/content.py`.
 `/jobs/all/`. Reseeding replaces that demonstration by its stored identity;
 player requests survive even if they have the same title.
 Staff can request changes, approve or decline via the ticket's **Review proposal**
-link or `+jobs/approve <ticket> <revision>=<explanation>` (also `/decline` and
+link or `+jobs/approve <ticket>.<revision> # <explanation>` (also `/decline` and
 `/revise`). Changes requested enable a new revision; previous answers and decisions
 stay visible. Pattern and Region form examples are disabled until those workflows
 are ready. This release collects and reviews proposals; room construction and
@@ -1914,7 +1914,7 @@ Players propose new Patterns with the Jobs form registered in settings:
 description, origin, niches such as `Weaver`, what makes it recognisable, an
 optional combination and the reuse acknowledgement) and `/submit`. The web
 form is at `/jobs/forms/pattern/`. Staff see what approval would create in
-`+jobs <number>`; `+jobs/approve <number> <revision>=<reason>` creates the
+`+jobs <number>`; `+jobs/approve <number>.<revision> # <reason>` creates the
 Pattern at Spreading, known to the proposer. Staff add tested combinations
 afterwards with `+pattern/combo`. The reference game enables the form because
 it reveals Patterns; a dark-launching game sets `"enabled": False` until then.

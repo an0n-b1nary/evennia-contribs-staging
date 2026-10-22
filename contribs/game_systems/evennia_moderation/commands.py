@@ -154,24 +154,49 @@ class StaffCommand(MuxCommand):
         except PermissionDenied as exc:
             _error(self, exc)
             return True
-        return super().at_pre_cmd()
+        if super().at_pre_cmd():
+            return True
+        raw = self.args.strip()
+        if not raw.startswith("/"):
+            return False
+        head, *tail = raw.split(maxsplit=1)
+        switch = head[1:].lower()
+        if "/" in switch:
+            self.msg("Use one switch at a time.")
+            return True
+        matches = [option for option in self.switch_options if option == switch] or [
+            option for option in self.switch_options if option.startswith(switch)
+        ]
+        if len(matches) != 1:
+            self.msg(f"Unknown or ambiguous switch. See help {self.key} for usage.")
+            return True
+        self.args = f"/{switch}" + (f" {tail[0]}" if tail else "")
+        return False
 
 
 class CmdSoftban(StaffCommand):
-    """Timed account/IP ban. +softban <account>=<reason>; /ip <CIDR>=<reason>.
+    """Timed account/IP ban.
 
-    /duration <account>=<hours> changes active bans. Apply a reason first.
-    /lift <account> lifts active bans; /lift/ip <CIDR> lifts IP bans.
+    Usage:
+        +softban <account>=<reason>
+        +softban/ip <CIDR>=<reason>
+        +softban/duration <account>=<hours>
+        +softban/lift <account>
+        +softban/liftip <CIDR>
+
+    Apply a reason before changing a restriction's duration.
     """
 
     key = "+softban"
-    switch_options = ("duration", "lift", "ip")
+    switch_options = ("duration", "lift", "ip", "liftip")
     kind = "softban"
 
     def func(self):
         try:
             require_staff(self.caller)
-            address = self.lhs.strip() if "ip" in self.switches else ""
+            address = self.lhs.strip() if set(self.switches) & {"ip", "liftip"} else ""
+            if set(self.switches) & {"ip", "liftip"} and not address:
+                raise ValidationError("Specify an IP address or CIDR.")
             if address:
                 import ipaddress
 
@@ -182,7 +207,7 @@ class CmdSoftban(StaffCommand):
                 if address
                 else active_actions(self.kind).filter(account=account)
             )
-            if "lift" in self.switches:
+            if set(self.switches) & {"lift", "liftip"}:
                 actions = list(query)
                 for action in actions:
                     services.lift(self.caller, action)
@@ -222,7 +247,12 @@ class CmdSoftban(StaffCommand):
 
 
 class CmdMute(CmdSoftban):
-    """Mute every alt: +mute <account>=<reason>; /duration <account>=<hours>; /lift <account>.
+    """Mute every alt.
+
+    Usage:
+        +mute <account>=<reason>
+        +mute/duration <account>=<hours>
+        +mute/lift <account>
 
     Blocks player pages, channels, board writing and OOC room speech. Staff
     requests, pages to staff, and IC posing remain available.
@@ -266,18 +296,28 @@ class CmdNotes(StaffCommand):
 
 
 class CmdAdmissions(StaffCommand):
-    """Staff admissions: +admissions [<job number>].
+    """Staff admissions.
 
-    /approve <job>=<reason>; /decline[/share] <job>=<reason>.
-    /tree <account>; /backfill <account>=<referrer>; /retire <account>;
-    /restore <account>; /reset resets the game-wide referral accounting period.
+    Usage:
+        +admissions [<job number>]
+        +admissions/approve <job>=<reason>
+        +admissions/decline <job>=<reason>
+        +admissions/declineshare <job>=<reason>
+        +admissions/tree <account>
+        +admissions/backfill <account>=<referrer>
+        +admissions/retire <account>
+        +admissions/restore <account>
+        +admissions/reset
+
+    Decline reasons stay private unless /declineshare is chosen. /reset resets
+    the game-wide referral accounting period.
     """
 
     key = "+admissions"
     switch_options = (
         "approve",
         "decline",
-        "share",
+        "declineshare",
         "tree",
         "backfill",
         "retire",
@@ -312,9 +352,9 @@ class CmdAdmissions(StaffCommand):
                 application = Application.objects.select_related("job", "code__owner").get(
                     job__job_number=int(self.lhs)
                 )
-                if "approve" in self.switches or "decline" in self.switches:
+                if set(self.switches) & {"approve", "decline", "declineshare"}:
                     with transaction.atomic():
-                        application.share_decline_reason = "share" in self.switches
+                        application.share_decline_reason = "declineshare" in self.switches
                         application.save(update_fields=["share_decline_reason"])
                         latest = application.job.submissions.last()
                         review_request(
