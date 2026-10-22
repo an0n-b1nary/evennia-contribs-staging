@@ -30,50 +30,50 @@ class AbilityCommandTests(ChargenCommandTest):
         self.call(CmdSpend(), "", "Starting allowance: 5.", caller=self.char2)
         self.call(
             CmdSpend(),
-            "/ability domain expertise: riddles",
-            "You learn Domain Expertise: Riddles and equip it. Paid: 3 starting allowance.",
+            "/ability domain expertise/riddles",
+            "You learn Domain Expertise/Riddles and equip it. Paid: 3 starting allowance.",
             caller=self.char2,
         )
         self.call(
             CmdUpgrade(),
             "domain expertise",
-            "Domain Expertise: Riddles is now level 2. Paid: 2 starting allowance.",
+            "Domain Expertise/Riddles is now level 2. Paid: 2 starting allowance.",
             caller=self.char2,
         )
         self.call(
             CmdUpgrade(), "domain expertise", "That costs 4, and you have 0", caller=self.char2
         )
         output = self.call(CmdAbilities(), "", None, caller=self.char2)
-        self.assertIn("Equipped: Domain Expertise: Riddles 2", output)
+        self.assertIn("Equipped: Domain Expertise/Riddles 2", output)
         self.assertIn("Loadout: 10 of 20 points used.", output)
         self.assertIn("Starting allowance: 0 of 5 left.", output)
         sheet = self.call(CmdSheet(), "", "Char2", caller=self.char2)
-        self.assertIn("Domain Expertise: Riddles 2", sheet)
+        self.assertIn("Domain Expertise/Riddles 2", sheet)
 
     def test_equip_and_flaws(self):
         abilities.acquire(self.char2, "domain expertise", "riddles")
         self.call(
             CmdAbilities(),
             "/unequip domain expertise",
-            "Domain Expertise: Riddles is no longer equipped.",
+            "Domain Expertise/Riddles is no longer equipped.",
             caller=self.char2,
         )
         self.call(
             CmdAbilities(),
-            "/equip domain expertise=riddles",
-            "Domain Expertise: Riddles is now equipped.",
+            "/equip domain expertise/riddles",
+            "Domain Expertise/Riddles is now equipped.",
             caller=self.char2,
         )
         self.call(
             CmdAbilities(),
-            "/flaw domain ineptitude: climbing",
-            "You now have the flaw Domain Ineptitude: Climbing.",
+            "/flaw domain ineptitude/climbing",
+            "You now have the flaw Domain Ineptitude/Climbing.",
             caller=self.char2,
         )
         self.call(
             CmdAbilities(),
             "/unflaw domain ineptitude",
-            "You no longer have the flaw Domain Ineptitude: Climbing.",
+            "You no longer have the flaw Domain Ineptitude/Climbing.",
             caller=self.char2,
         )
         self.call(CmdAbilities(), "/equip", "Usage: +abilities/equip", caller=self.char2)
@@ -81,7 +81,7 @@ class AbilityCommandTests(ChargenCommandTest):
 
     def test_catalog_and_info(self):
         output = self.call(CmdAbilities(), "/list", "Abilities", caller=self.char2)
-        self.assertIn("Domain Expertise: <domain>", output)
+        self.assertIn("Domain Expertise/<domain>", output)
         self.assertIn("(3 XP, 10 points, up to level 3)", output)
         self.assertIn("Flaws", output)
         self.call(CmdAbilities(), "/list nonsense", "No abilities match.", caller=self.char2)
@@ -101,35 +101,35 @@ class StaffAbilityCommandTests(ChargenCommandTest):
     def test_grant_revoke_refund(self):
         self.call(
             CmdChargen(),
-            "/grant Char2/lucky",
+            "/grant Char2=lucky",
             "Char2 now has Lucky at level 1 (equipped).",
             caller=self.char1,
         )
         self.call(
             CmdChargen(),
-            "/grant Char2/domain expertise: riddles=2",
-            "Char2 now has Domain Expertise: Riddles at level 2",
+            "/grant Char2=domain expertise/riddles",
+            "Char2 now has Domain Expertise/Riddles at level 1",
             caller=self.char1,
         )
         self.call(
             CmdChargen(),
-            "/grant Char2/lucky=x",
-            "The level must be a whole number.",
+            "/level Char2=x",
+            "Usage: +chargen/level",
             caller=self.char1,
         )
         self.call(CmdChargen(), "/grant Char2", "Usage: +chargen/grant", caller=self.char1)
         abilities.acquire(self.char2, "domain expertise", "climbing")
         self.call(
             CmdChargen(),
-            "/revoke/refund Char2/domain expertise: climbing",
-            "Revoked Domain Expertise: Climbing from Char2. Refunded 3 starting allowance.",
+            "/refund Char2=domain expertise/climbing",
+            "Revoked Domain Expertise/Climbing from Char2. Refunded 3 starting allowance.",
             caller=self.char1,
         )
         self.call(
-            CmdChargen(), "/revoke Char2/lucky", "Revoked Lucky from Char2.", caller=self.char1
+            CmdChargen(), "/revoke Char2=lucky", "Revoked Lucky from Char2.", caller=self.char1
         )
         self.call(
-            CmdChargen(), "/grant Char2/lucky", "You need staff permission", caller=self.char2
+            CmdChargen(), "/grant Char2=lucky", "You need staff permission", caller=self.char2
         )
 
     def test_allowance_and_tags(self):

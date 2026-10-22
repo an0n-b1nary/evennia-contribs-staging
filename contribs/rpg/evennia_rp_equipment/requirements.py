@@ -6,7 +6,7 @@ A requirement is one of:
 
     pips      at least `count` + pips on a stat        "Strength +2", "Strength ++"
     weakness  at least `count` weakness on a stat      "Resolve -1", "Resolve -"
-    ability   an ability equipped (with its tag)       "ability Proficiency: Blades"
+    ability   an ability equipped (with its tag)       "ability Proficiency/Blades"
     flaw      a flaw held (with its tag)               "flaw Reckless"
 
 Requirements are stored by key (stat, ability and tag keys), never by name, so
@@ -37,7 +37,7 @@ UNMET = "unmet"
 UNATTUNED = "unattuned"
 UNKNOWN = "unknown"
 
-USAGE = "Give a requirement like: <stat> +2, <stat> -1, ability <name>[: <tag>], or flaw <name>."
+USAGE = "Give a requirement like: <stat> +2, <stat> -1, ability <name>[/<tag>], or flaw <name>."
 
 _STAT_TEXT = re.compile(r"^(?P<stat>.+?)\s*(?P<marks>\++|-+|[+-]\s*\d+)$")
 
@@ -113,9 +113,13 @@ def parse(text: str) -> Requirement:
 
 def _parse_ability(kind: str, text: str) -> Requirement:
     from evennia_rp_chargen.catalog import find_ability, split_ability_text
+    from evennia_rp_chargen.services import ChargenError
     from evennia_rp_chargen.vocabulary import DBVocabulary
 
-    name, tag_text = split_ability_text(text)
+    try:
+        name, tag_text = split_ability_text(text)
+    except ChargenError as exc:
+        raise RequirementError(str(exc)) from None
     if not name:
         raise RequirementError(USAGE)
     try:
@@ -132,7 +136,7 @@ def _parse_ability(kind: str, text: str) -> Requirement:
     if ability.is_template:
         if not tag_text:
             raise RequirementError(
-                f"Which {ability.tag_kind}? For example: {kind} {ability.name}: <{ability.tag_kind}>"
+                f"Which {ability.tag_kind}? For example: {kind} {ability.name}/<{ability.tag_kind}>"
             )
         try:
             tag = DBVocabulary().find(tag_text, kind=ability.tag_kind).key
@@ -162,7 +166,7 @@ def _ability_name(req: Requirement) -> str | None:
 
 
 def describe(req: Requirement) -> str:
-    """`"Strength ++"`, `"Proficiency: Blades equipped"`, `"the flaw Reckless"`."""
+    """`"Strength ++"`, `"Proficiency/Blades equipped"`, `"the flaw Reckless"`."""
     if req.on_stat:
         from evennia_rp_rules.ruleset import get_ruleset
 
@@ -172,7 +176,7 @@ def describe(req: Requirement) -> str:
         return f"{stat.name} {('+' if req.kind == PIPS else '-') * req.count}"
     name = _ability_name(req)
     if name is None:
-        label = f"{req.ability}: {req.tag}" if req.tag else req.ability
+        label = f"{req.ability}/{req.tag}" if req.tag else req.ability
         return f"an unknown {req.kind} ({label})"
     return f"{name} equipped" if req.kind == ABILITY else f"the flaw {name}"
 

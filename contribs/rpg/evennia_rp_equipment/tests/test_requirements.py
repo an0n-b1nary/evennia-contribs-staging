@@ -36,12 +36,12 @@ class ParseTests(GearTest):
 
     def test_ability_and_flaw_forms(self):
         self.assertEqual(
-            parse("ability Domain Expertise: Riddles"),
+            parse("ability Domain Expertise/Riddles"),
             Requirement(ABILITY, ability="domain-expertise", tag="riddles"),
         )
         self.assertEqual(parse("ability lucky"), Requirement(ABILITY, ability="lucky"))
         self.assertEqual(
-            parse("flaw domain ineptitude: climbing"),
+            parse("flaw domain ineptitude/climbing"),
             Requirement(FLAW, ability="domain-ineptitude", tag="climbing"),
         )
 
@@ -52,11 +52,12 @@ class ParseTests(GearTest):
             ("Luck +1", "luck"),
             ("Brawn +4", "nobody could wear it"),
             ("Brawn +0", "at least one pip"),
-            ("ability Domain Ineptitude: Riddles", "is a flaw"),
+            ("ability Domain Ineptitude/Riddles", "is a flaw"),
             ("flaw Lucky", "isn't a flaw"),
             ("ability Domain Expertise", "Which domain?"),
-            ("ability Lucky: Riddles", "isn't chosen per tag"),
-            ("ability Domain Expertise: Fire", "fire"),
+            ("ability Lucky/Riddles", "isn't chosen per tag"),
+            ("ability Domain Expertise/Fire", "fire"),
+            ("ability Domain Expertise: Riddles", "Use <ability>"),
         ):
             with self.subTest(text=text), self.assertRaises(RequirementError) as caught:
                 parse(text)
@@ -65,8 +66,8 @@ class ParseTests(GearTest):
     def test_round_trip_through_storage(self):
         for req in (
             parse("Brawn +2"),
-            parse("ability Domain Expertise: Riddles"),
-            parse("flaw Domain Ineptitude: Climbing"),
+            parse("ability Domain Expertise/Riddles"),
+            parse("flaw Domain Ineptitude/Climbing"),
         ):
             self.assertEqual(Requirement.from_dict(req.to_dict()), req)
 
@@ -76,12 +77,12 @@ class DescribeTests(GearTest):
         self.assertEqual(describe(parse("Brawn +2")), "Brawn ++")
         self.assertEqual(describe(parse("Charm -1")), "Charm -")
         self.assertEqual(
-            describe(parse("ability Domain Expertise: Riddles")),
-            "Domain Expertise: Riddles equipped",
+            describe(parse("ability Domain Expertise/Riddles")),
+            "Domain Expertise/Riddles equipped",
         )
         self.assertEqual(
-            describe(parse("flaw Domain Ineptitude: Climbing")),
-            "the flaw Domain Ineptitude: Climbing",
+            describe(parse("flaw Domain Ineptitude/Climbing")),
+            "the flaw Domain Ineptitude/Climbing",
         )
 
     def test_unknown_keys_are_named_not_hidden(self):
@@ -90,7 +91,7 @@ class DescribeTests(GearTest):
         )
         self.assertEqual(
             describe(Requirement(ABILITY, ability="gone", tag="riddles")),
-            "an unknown ability (gone: riddles)",
+            "an unknown ability (gone/riddles)",
         )
 
 
@@ -105,18 +106,18 @@ class StatusTests(GearTest):
 
     def test_ability_requirements(self):
         self.make_sheet(self.char1)
-        req = parse("ability Domain Expertise: Riddles")
+        req = parse("ability Domain Expertise/Riddles")
         self.assertEqual(status(self.char1, req), UNATTUNED)
         abilities.acquire(self.char1, "domain expertise", "riddles")
         self.assertEqual(status(self.char1, req), MET)
         abilities.unequip(self.char1, "domain expertise", "riddles")
         self.assertEqual(status(self.char1, req), UNMET)
-        other_tag = parse("ability Domain Expertise: Climbing")
+        other_tag = parse("ability Domain Expertise/Climbing")
         self.assertEqual(status(self.char1, other_tag), UNATTUNED)
 
     def test_flaw_requirements(self):
         self.make_sheet(self.char1)
-        req = parse("flaw Domain Ineptitude: Climbing")
+        req = parse("flaw Domain Ineptitude/Climbing")
         self.assertEqual(status(self.char1, req), UNMET)
         abilities.take_flaw(self.char1, "domain ineptitude", "climbing")
         self.assertEqual(status(self.char1, req), MET)

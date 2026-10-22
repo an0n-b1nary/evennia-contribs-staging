@@ -179,6 +179,15 @@ def edit_blueprint(actor, blueprint, **changes):
         return blueprint
 
 
+def edit_stat(actor, blueprint, stat, rating):
+    """Set one validated stat without replacing other, possibly concurrent edits."""
+    require(actor, write=True)
+    cleaned = validate_stats({stat: rating})
+    with transaction.atomic():
+        blueprint = _locked(actor, blueprint, manage=True)
+        return edit_blueprint(actor, blueprint, stat_block={**blueprint.stat_block, **cleaned})
+
+
 def permit(actor, blueprint, holder, *, revoke=False):
     require(holder, cleanup=True)
     with transaction.atomic():
@@ -642,6 +651,68 @@ def edit_profile(actor, blueprint, data):
             setattr(profile, key, value)
         profile.save()
         return profile
+
+
+def edit_profile_field(actor, blueprint, field, value):
+    """Set a scalar/list field or one named mapping entry, without command-line JSON.
+
+    An empty value clears a list or mapping, or removes a mapping entry.
+    Mapping merges happen under the same blueprint lock as other profile edits.
+    """
+    require(actor, write=True)
+    if not runtime("NPCS_COMBAT_PROFILES_REVEALED"):
+        raise NPCError("NPC combat profiles are not available yet.")
+    if any(c in value for c in ("{", "}", "[", "]", ";", "~", "|")):
+        raise NPCError("Set one profile field at a time; use plain values.")
+    key, dot, entry = field.partition(".")
+    items = [part.strip() for part in value.split(",")] if value else []
+    if any(not item for item in items):
+        raise NPCError("Give a comma-separated list without empty entries.")
+    with transaction.atomic():
+        blueprint = _locked(actor, blueprint, manage=True)
+        profile, _ = NPCCombatProfile.objects.get_or_create(blueprint=blueprint)
+        if key in {"action_weights", "reaction_policy"}:
+            if not dot:
+                if value:
+                    raise NPCError("Name a mapping entry, for example action_weights.standard.")
+                parsed = {}
+            else:
+                if not entry or "." in entry:
+                    raise NPCError("Name one profile mapping entry.")
+                parsed = dict(getattr(profile, key))
+                if key == "action_weights":
+                    if value and (not value.isascii() or not value.isdigit()):
+                        raise NPCError("Action weights must be nonnegative whole numbers.")
+                    converted = int(value) if value else None
+                else:
+                    choices = {
+                        "appetite": ("cautious", "balanced", "bold"),
+                        "rps_appetite": ("cautious", "balanced", "bold"),
+                        "preferred_reaction": ("evade", "resist", "overpower"),
+                    }
+                    if entry == "preferred_moves":
+                        converted = validate_abilities(items)
+                    elif entry not in choices or (value and value not in choices[entry]):
+                        raise NPCError("Choose a documented reaction policy field and value.")
+                    else:
+                        converted = value
+                if value:
+                    parsed[entry] = converted
+                else:
+                    parsed.pop(entry, None)
+        elif dot:
+            raise NPCError("Only action_weights and reaction_policy have mapping entries.")
+        elif key == "target_policy":
+            parsed = value
+        elif key == "special_moves":
+            parsed = validate_abilities(items)
+        elif key == "boss_check_schedule":
+            if any(not item.isascii() or not item.isdigit() for item in items):
+                raise NPCError("Boss check schedule must list positive turn numbers.")
+            parsed = [int(item) for item in items]
+        else:
+            raise NPCError("Unknown NPC combat profile field.")
+        return edit_profile(actor, blueprint, {key: parsed})
 
 
 def partner_model(setting, model):

@@ -34,9 +34,9 @@ class XPLedgerTests(CatalogTest, EvenniaCommandTest):
 
         from evennia_rp_chargen.commands import CmdSpend, CmdUpgrade
 
-        result = self.call(CmdSpend(), "/ability domain expertise: climbing")
+        result = self.call(CmdSpend(), "/ability domain expertise/climbing")
         self.assertIn("1 starting allowance and 2 XP", result)
-        self.assertIn("level 2", self.call(CmdUpgrade(), "domain expertise: climbing"))
+        self.assertIn("level 2", self.call(CmdUpgrade(), "domain expertise/climbing"))
         self.assertEqual(abilities.balance(self.char1), (0, 6))
         self.assertEqual(XPSpend.objects.count(), 2)
 

@@ -83,7 +83,7 @@ These features are free for all gear, without a Workshop or crafting partner.
 |---|---|---|
 | `Strength +2` or `Strength ++` | pips | the stat carries at least 2 `+` pips |
 | `Resolve -1` or `Resolve -` | weakness | the stat carries at least 1 weakness |
-| `ability Proficiency: Blades` | ability | that ability (for that tag) is equipped |
+| `ability Proficiency/Blades` | ability | that ability (for that tag) is equipped |
 | `flaw Reckless` | flaw | that flaw is held |
 
 Requirements are stored by stat, ability and tag *key*, so renaming them in the

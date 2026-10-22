@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-22
+
+### Changed
+
+- Accept Chargen 0.5 and NPCs 0.2 in optional dependency ranges. Live combat rehearsals configure NPC stats with individual `/stat` edits.
+
 ## 0.2.5 — 2026-10-20
 
 - Add the staff-only `combat-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] - 2026-10-22
+
+### Breaking
+
+- Ability requirements use `ability/tag`, matching Chargen 0.5. Existing requirements stored by stable keys need no migration. Colon input is refused.
+
 ## [0.2.2] - 2026-10-18
 
 ### Added

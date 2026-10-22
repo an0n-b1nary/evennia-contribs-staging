@@ -2,4 +2,4 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Workshops, invested niches and provenance for cosmetic crafting."""
 
-__version__ = "0.10.5"
+__version__ = "0.10.6"

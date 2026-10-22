@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.5.0] - 2026-10-22
+
+### Breaking
+
+- Ability addresses use `ability/tag` in commands, displays and prompts; colon and equals-tag forms are refused. Staff grants use `character=ability/tag` at base level; `/level character=level` changes the most recently granted copy for that staff character until another grant or server reload. Revoke and refund are separate switches using `character=ability/tag`. Raw unknown, ambiguous and stacked switches are refused. Signature Move drafts remain part of the upcoming combat changes.
+
 ## [0.4.4] - 2026-10-22
 
 - Allow XP 0.6 in the optional `xp` extra; its award and spending services remain compatible with the revised grant command syntax.

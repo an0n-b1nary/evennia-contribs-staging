@@ -775,8 +775,8 @@ RP_GEAR = (
         "key": "blade charm",
         "slot": "accessory",
         "line": "a blade-shaped charm on a cord",
-        "desc": "[Placeholder] Wearing it keeps Combat Focus: Blades in the loadout.",
-        "requires": ("ability Combat Focus: Blades",),
+        "desc": "[Placeholder] Wearing it keeps Combat Focus/Blades in the loadout.",
+        "requires": ("ability Combat Focus/Blades",),
         "worn_by": 1,
     },
 )

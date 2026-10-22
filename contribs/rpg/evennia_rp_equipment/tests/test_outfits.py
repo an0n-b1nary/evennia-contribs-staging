@@ -66,7 +66,7 @@ class OutfitTests(GearTest):
         self.assert_unchanged(lambda: outfits.apply(self.char2, "Expedition"), "no longer has")
 
     def test_owned_but_unequipped_ability_refuses_and_unowned_only_notifies(self):
-        services.add_requirement(self.char2, self.cloak, "ability Domain Expertise: Riddles")
+        services.add_requirement(self.char2, self.cloak, "ability Domain Expertise/Riddles")
         abilities.acquire(self.char2, "domain expertise", "riddles")
         abilities.unequip(self.char2, "domain expertise", "riddles")
         self.assert_unchanged(lambda: outfits.apply(self.char2, "Expedition"), "equipped")

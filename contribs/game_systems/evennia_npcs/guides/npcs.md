@@ -22,7 +22,7 @@ A **template** is a kind of person, such as a city guard, and anyone can play on
 - **Asking:** `+npc/request <name>=<reason>` asks an NPC's owner for permission. Owners see requests with `+npc/requests` and answer with `+npc/approve` or `+npc/deny`.
 - **Retiring:** `+npc/archive` puts an NPC away, sending any of its spawns away too, and `+npc/restore` brings it back.
 
-An NPC can also have stats and abilities, so it can make tests: `+npc/stats` and `+npc/abilities` set them.
+An NPC can also have stats and abilities, so it can make tests: `+npc/stat <name>/<stat>=<rating>` changes one stat, and `+npc/abilities <name>=<stable identifiers>` sets the ability list. Each stat edit preserves the others.
 
 ## Playing an NPC
 

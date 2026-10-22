@@ -438,8 +438,8 @@ starting sheet sets every stat to B (14 allocation points), then finalizes:
 +stats/finalize
 +pips/set Intellect=3
 +pips/set Agility=2
-+spend/ability Proficiency:Athletics
-+upgrade Proficiency:Athletics
++spend/ability Proficiency/Athletics
++upgrade Proficiency/Athletics
 +sheet
 +test/list
 +test #2=Agility/Athletics~I leap across.
@@ -448,8 +448,8 @@ starting sheet sets every stat to B (14 allocation points), then finalizes:
 Domains suggest an approach in their descriptions; any stat/tag pairing is
 legal. The second tag kind is fighting styles: Blades, Blunt, Polearms,
 Archery, Unarmed and Spellcraft. A move would have a style, and any test may
-carry one. The seeded Storyteller has Proficiency:Performance, the Visitor has
-Combat Focus:Blades, and both have finalized sheets and a flaw. Builder mode lets you
+carry one. The seeded Storyteller has Proficiency/Performance, the Visitor has
+Combat Focus/Blades, and both have finalized sheets and a flaw. Builder mode lets you
 inspect them with `+sheet <name>`. The Stat-block Dummy has C in every stat
 and no chargen sheet; puppet it to exercise the adapter fallback.
 
@@ -469,12 +469,12 @@ The starting allowance is 10, acquisitions cost 3, and upgrades cost 2, 4,
 8, then 16. Purchases use the allowance first, then earned XP. To top up for
 playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10 # Playtest`.
 `+spend` shows both balances. Staff can revoke with an exact refund using
-`+chargen/revoke/refund <character>/<ability>:<tag>`.
+`+chargen/refund <character>=<ability>/<tag>`.
 
 **Practice gear.** Equipment grants nothing; it asks a build to commit. The
 Proving Grounds floor holds a travelling cloak that asks for nothing and a
 heavy maul that asks for Strength `++`. The Storyteller wears duelist's gloves
-(Agility `++`) and the Visitor a blade charm (Combat Focus:Blades equipped),
+(Agility `++`) and the Visitor a blade charm (Combat Focus/Blades equipped),
 so `look Storyteller` shows a *Wearing* section and the gloves leave the
 "You see" list. Try `+gear/info maul`, then make your own:
 
