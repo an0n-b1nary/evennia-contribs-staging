@@ -35,7 +35,7 @@ class CmdRoomConfig(MuxCommand):
     Usage:
         +roomconfig                         - Show current room settings
         +roomconfig/hangout <type>          - Designate as a hangout
-        +roomconfig/hangout/clear           - Remove hangout designation
+        +roomconfig/unhangout               - Remove hangout designation
         +roomconfig/smell <text>            - Free room sensory prose
         +roomconfig/sound <text>            - Free room sensory prose
         An empty smell or sound clears that sensory line.
@@ -51,9 +51,18 @@ class CmdRoomConfig(MuxCommand):
     aliases = ["+rconfig"]  # noqa: RUF012
     help_category = "Building"
     locks = "cmd:all()"
+    switch_options = ("hangout", "unhangout", "smell", "sound")
 
     def func(self):
         caller = self.caller
+        # MuxCommand drops unknown switches, so count the original input too.
+        raw_switch = self.raw.split(None, 1)[0] if self.raw.startswith("/") else ""
+        if raw_switch.count("/") > 1:
+            caller.msg("Use one switch at a time. See help +roomconfig for usage.")
+            return
+        if raw_switch and not self.switches:
+            caller.msg("See help +roomconfig for usage.")
+            return
         room = caller.location
 
         if not room:
@@ -73,7 +82,7 @@ class CmdRoomConfig(MuxCommand):
 
         if switches == ["hangout"]:
             self._set_hangout(room)
-        elif switches == ["hangout", "clear"] or switches == ["clear", "hangout"]:
+        elif switches == ["unhangout"]:
             self._clear_hangout(room)
         elif switches in (["smell"], ["sound"]):
             text = self.args.strip()

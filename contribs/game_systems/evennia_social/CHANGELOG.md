@@ -2,6 +2,13 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## [0.8.0] - 2026-10-21
+
+### Breaking
+
+- Replace `+roomconfig/hangout/clear` with `+roomconfig/unhangout`. Stacked
+  switches are refused, including unknown extras; unique switch prefixes work.
+
 ## 0.7.7 - 2026-10-18
 
 - Guide pages: `social` corrects summon and join: accepting doesn't admit anyone to a place they aren't allowed into. It adds `@tel`, `+home/set`, pending requests, multi-recipient pages and page history, theme visibility, room smells and sounds, hangout designation, guests, and that staff still see unfindable characters.

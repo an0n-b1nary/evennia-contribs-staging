@@ -18,7 +18,6 @@ evennia_jobs positional-chain +jobs
 evennia_jobs positional-chain +request
 evennia_lore pipe +lorecraft
 evennia_lore stacked-switch +lore
-evennia_maps stacked-switch +map
 evennia_moderation nested-equals +admissions
 evennia_moderation semicolon +admissions
 evennia_moderation semicolon +mute
@@ -68,5 +67,4 @@ evennia_rp_party semicolon-parse +party
 evennia_rp_party semicolon-parse boss_commands.py
 evennia_rp_party stacked-switch +party
 evennia_rp_resources option-stack +resources
-evennia_social stacked-switch +roomconfig
 evennia_xp colon +xp

@@ -24,7 +24,11 @@ Settings:
         that sits on one anyway; /place still honours an explicit request.
 """
 
+import json
+from hashlib import sha256
+
 from django.conf import settings
+from django.core import signing
 from django.db import IntegrityError, transaction
 from evennia.commands.default.muxcommand import MuxCommand
 
@@ -81,7 +85,7 @@ class CmdMap(MuxCommand):
         +map/unpin <#room>              - (Staff) Clear the pin
         +map/reflow <#room>             - (Staff) Dry-run BFS from <#room>;
                                            reports the moves a reflow would make
-        +map/reflow/apply <#room>       - (Staff) Writes exactly those moves,
+        +map/reflow <#room>=<token>     - (Staff) Confirms the preview and writes its moves,
                                            in one transaction (never moves a
                                            pinned tile; a move blocked by one
                                            doesn't stop the rest of the map)
@@ -94,8 +98,17 @@ class CmdMap(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Building"
     locks = "cmd:all()"
+    switch_options = ("here", "place", "move", "unplace", "pin", "unpin", "reflow", "check")
 
     def func(self):
+        # MuxCommand ignores unknown switches; inspect the original input first.
+        raw_switch = self.raw.split(None, 1)[0] if self.raw.startswith("/") else ""
+        if raw_switch.count("/") > 1:
+            self.caller.msg("Use one switch at a time. See help +map for usage.")
+            return
+        if raw_switch and not self.switches:
+            self.caller.msg("See help +map for usage.")
+            return
         if not self.switches:
             self._do_render()
             return
@@ -266,27 +279,36 @@ class CmdMap(MuxCommand):
         if not is_staff(self.caller):
             self.caller.msg("|rYou need staff permissions to reflow the map.|n")
             return
-        name = self.args.strip()
+        name = self.lhs.strip()
         if not name:
-            self.caller.msg("Usage: +map/reflow[/apply] <#room>")
+            self.caller.msg("Usage: +map/reflow <#room>[=<token>]")
             return
         room = _room_ref(self.caller, name)
         if not room:
             return
 
-        apply = "apply" in self.switches
+        apply = self.rhs is not None
         written = 0
         try:
-            if apply:
-                # plan() and apply_plan() share one transaction so a
-                # write that lands between them (e.g. the exit-creation
-                # listener firing on a `dig` elsewhere) rolls back
-                # cleanly instead of leaving a partial reflow.
-                with transaction.atomic():
-                    result = layout.plan(room)
-                    written = placement.apply_plan(result, actor=self.caller)
-            else:
+            with transaction.atomic():
+                # Recompute and validate the preview inside the write transaction.
                 result = layout.plan(room)
+                preview_lines = self._reflow_lines(room, result)
+                expected = self._reflow_confirmation(room, result, preview_lines)
+                if apply:
+                    try:
+                        confirmed = signing.loads(self.rhs, salt="maps-reflow", max_age=900)
+                    except signing.BadSignature:
+                        self.caller.msg("Invalid or expired token; request a new reflow preview.")
+                        return
+                    if confirmed != expected:
+                        self.caller.msg(
+                            "Map or confirmation details changed; request a new reflow preview."
+                        )
+                        return
+                    written = placement.apply_plan(result, actor=self.caller)
+                else:
+                    token = signing.dumps(expected, salt="maps-reflow")
         except ValueError:
             self.caller.msg(f"|r{room.key} isn't on the map yet. Use +map/place first.|n")
             return
@@ -294,8 +316,45 @@ class CmdMap(MuxCommand):
             self.caller.msg("|rMap changed underneath this reflow; nothing was written.|n")
             return
 
-        # Dry-run and apply render the same ReflowPlan, so what apply
-        # writes is always exactly what the dry run promised.
+        lines = self._reflow_lines(room, result, apply=apply, written=written)
+        if not apply:
+            lines.append(f"Confirm: +map/reflow #{room.pk}={token}")
+            lines.append("Token valid for 15 minutes; map changes require a new preview.")
+        self.caller.msg("\n".join(lines))
+
+    def _reflow_confirmation(self, room, result, lines):
+        """Bind the preview wording, destinations and current tile guards to its actor."""
+        room_ids = {r.pk for r, *_ in result.report.assignments}
+        room_ids.update(c.room.pk for c in result.report.conflicts)
+        room_ids.update(c.holder_room_id for c in result.report.conflicts)
+        room_ids.update(b.holder_room_id for b in result.blocked)
+        tiles = list(
+            RoomTile.objects.filter(room_id__in=room_ids)
+            .order_by("room_id")
+            .values_list(
+                "room_id",
+                "plane_id",
+                "x",
+                "y",
+                "pinned",
+                "room_name",
+                "terrain",
+                "plane__name",
+                "plane__zstack",
+                "plane__elevation",
+                "plane__visibility_room_id",
+                "plane__is_archived",
+            )
+        )
+        destinations = [
+            (move.room.pk, placement.plane_key(move.plane), move.plane.visibility_room_id)
+            for move in result.moves
+        ]
+        state = json.dumps([lines, tiles, destinations], sort_keys=True).encode()
+        return {"actor": self.caller.pk, "origin": room.pk, "state": sha256(state).hexdigest()}
+
+    def _reflow_lines(self, room, result, *, apply=False, written=0):
+        """Render the same plan for preview, its token guards and confirmation."""
         lines = [f"|wReflow from {room.key}|n ({'applying' if apply else 'dry run'}):"]
         for move in result.moves:
             lines.append(f"  {move.room.key} -> {move.plane.name}({move.x},{move.y})")
@@ -323,7 +382,7 @@ class CmdMap(MuxCommand):
         else:
             summary += f", {len(result.moves)} move(s) planned"
         lines.append(summary)
-        self.caller.msg("\n".join(lines))
+        return lines
 
     def _do_check(self):
         if not is_staff(self.caller):

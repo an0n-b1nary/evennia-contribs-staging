@@ -26,6 +26,8 @@ Run:
 """
 
 import contextlib
+import re
+import time
 from unittest import mock
 
 from django.contrib.auth.models import AnonymousUser
@@ -1345,6 +1347,120 @@ class TestCmdMapUnplacePin(MapsCommandTestCase):
 
 
 class TestCmdMapReflow(MapsCommandTestCase):
+    def _preview_token(self, caller=None):
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}", caller=caller or self.char1)
+        match = re.search(r"Confirm: \+map/reflow #\d+=(\S+)", result)
+        self.assertIsNotNone(match, result)
+        return match.group(1)
+
+    def _confirm(self):
+        token = self._preview_token()
+        return self.call(CmdMap(), f"/reflow #{self.room1.id}={token}", caller=self.char1)
+
+    def test_old_form_and_extra_switches_do_not_write(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        for switches in ("reflow/apply", "reflow/unknown", "reflow/reflow"):
+            with self.subTest(switches=switches):
+                result = self.call(CmdMap(), f"/{switches} #{self.room1.id}")
+                self.assertIn("Use one switch at a time", result)
+                self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    def test_forged_token_does_not_write(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        token = self._preview_token()
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}tampered")
+        self.assertIn("new reflow preview", result)
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    def test_changed_tile_requires_new_preview_even_when_proposal_is_the_same(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        placement.place_tile(self.room2, plane, 9, 9)
+        token = self._preview_token()
+        placement.place_tile(self.room2, plane, 8, 8)
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("changed", result)
+        tile = RoomTile.objects.get(room=self.room2)
+        self.assertEqual((tile.x, tile.y), (8, 8))
+
+    def test_changed_pin_and_exit_require_new_preview(self):
+        plane = _make_plane()
+        link = self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        placement.place_tile(self.room2, plane, 9, 9)
+        token = self._preview_token()
+        placement.set_pin(self.room2, True)
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("changed", result)
+        token = self._preview_token()
+        link.key = "east"
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("changed", result)
+        tile = RoomTile.objects.get(room=self.room2)
+        self.assertEqual((tile.x, tile.y, tile.pinned), (9, 9, True))
+
+    def test_token_is_bound_to_origin_and_staff_character(self):
+        plane = _make_plane()
+        placement.place_tile(self.room1, plane, 0, 0)
+        placement.place_tile(self.room2, plane, 5, 5)
+        token = self._preview_token()
+        self.char2.permissions.add("Builder")
+        self.char2.account.permissions.add("Builder")
+        self.assertTrue(is_staff(self.char2))
+        result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}", caller=self.char2)
+        self.assertIn("new reflow preview", result)
+        result = self.call(CmdMap(), f"/reflow #{self.room2.id}={token}")
+        self.assertIn("new reflow preview", result)
+
+    def test_reflow_rechecks_staff_permission(self):
+        plane = _make_plane()
+        placement.place_tile(self.room1, plane, 0, 0)
+        token = self._preview_token()
+        with mock.patch("evennia_maps.commands.is_staff", return_value=False):
+            result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("staff permissions", result)
+
+    def test_expired_token_requires_new_preview(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        token = self._preview_token()
+        with mock.patch("django.core.signing.time.time", return_value=time.time() + 901):
+            result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("expired", result)
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    def test_confirmation_rolls_back_partial_writes_on_conflict(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        token = self._preview_token()
+
+        def partial_write(*args, **kwargs):
+            placement.place_tile(self.room2, plane, 0, 1)
+            raise IntegrityError("Concurrent map write")
+
+        with mock.patch("evennia_maps.placement.apply_plan", side_effect=partial_write):
+            result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("nothing was written", result)
+        self.assertFalse(RoomTile.objects.filter(room=self.room2).exists())
+
+    def test_old_token_cannot_be_replayed_after_moves(self):
+        plane = _make_plane()
+        self._link("n", self.room1, self.room2)
+        placement.place_tile(self.room1, plane, 0, 0)
+        token = self._preview_token()
+        self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        with mock.patch("evennia_maps.placement.apply_plan") as apply:
+            result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}")
+        self.assertIn("new reflow preview", result)
+        apply.assert_not_called()
+
     def _link(self, key, source, destination):
         return create.create_object(
             self.exit_typeclass, key=key, location=source, destination=destination
@@ -1365,7 +1481,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         plane = _make_plane()
         self._link("n", self.room1, self.room2)
         placement.place_tile(self.room1, plane, 0, 0)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("applying", result)
         tile = RoomTile.objects.get(room=self.room2)
         self.assertEqual((tile.x, tile.y), (0, 1))
@@ -1375,7 +1491,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(self.room1, plane, 0, 0)
         placement.place_tile(self.room2, plane, 9, 9, pinned=True)
         self._link("n", self.room1, self.room2)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         tile = RoomTile.objects.get(room=self.room2)
         self.assertEqual((tile.x, tile.y), (9, 9))
         self.assertIn("pinned", result)
@@ -1406,7 +1522,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(self.room1, plane, 0, 0)
         placement.place_tile(self.room2, plane, 1, 0)
         placement.place_tile(room3, plane, 2, 0, pinned=True)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("0 written", result)
         self.assertIn("2 blocked", result)
         self.assertIn("1 pinned tile(s) skipped", result)
@@ -1427,7 +1543,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(self.room1, plane, 0, 0)
         placement.place_tile(self.room2, plane, 1, 0)
         placement.place_tile(room3, plane, 2, 0)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("3 written", result)
         self.assertIn("0 blocked", result)
         for room, expected in ((room_new, (1, 0)), (self.room2, (2, 0)), (room3, (3, 0))):
@@ -1447,7 +1563,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(self.room2, plane, 1, 0)
         placement.place_tile(room3, plane, 2, 0)
         dry = self.call(CmdMap(), f"/reflow #{self.room1.id}", caller=self.char1)
-        applied = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        applied = self._confirm()
         dry_lines = {line for line in dry.splitlines() if "->" in line}
         applied_lines = {line for line in applied.splitlines() if "->" in line}
         self.assertTrue(dry_lines)
@@ -1457,9 +1573,9 @@ class TestCmdMapReflow(MapsCommandTestCase):
         plane = _make_plane()
         self._link("n", self.room1, self.room2)
         placement.place_tile(self.room1, plane, 0, 0)
-        first = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        first = self._confirm()
         self.assertIn("1 written", first)
-        second = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        second = self._confirm()
         self.assertIn("0 written", second)
         self.assertIn("2 room(s) reachable", second)
 
@@ -1483,7 +1599,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(room_a, plane, 1, 1)
         placement.place_tile(room_b, plane, 0, 1)
         placement.place_tile(room_c, plane, 1, 0)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("3 written", result)
         self.assertIn("0 blocked", result)
         for room, expected in ((room_a, (1, 0)), (room_b, (1, 1)), (room_c, (0, 1))):
@@ -1502,7 +1618,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         self._link("n", self.room1, clear_branch)
         placement.place_tile(self.room1, plane, 0, 0)
         placement.place_tile(pinned_room, plane, 1, 0, pinned=True)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("1 blocked", result)
         self.assertIn("1 pinned tile(s) skipped", result)
         self.assertFalse(RoomTile.objects.filter(room=blocked_branch).exists())
@@ -1521,7 +1637,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         self._link("e", room_up, room_far)
         placement.place_tile(self.room1, surface, 0, 0)
         placement.place_tile(room_up, sky, 1, 0, pinned=True)
-        result = self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        result = self._confirm()
         self.assertIn("1 blocked", result)
         self.assertIn("is pinned", result)
         self.assertFalse(RoomTile.objects.filter(room=room_far).exists())
@@ -1537,7 +1653,7 @@ class TestCmdMapReflow(MapsCommandTestCase):
         surface = _make_plane("Surface", zstack="overworld", elevation=0)
         self._link("up", self.room1, self.room2)
         placement.place_tile(self.room1, surface, 0, 0)
-        self.call(CmdMap(), f"/reflow/apply #{self.room1.id}", caller=self.char1)
+        self._confirm()
         sky = MapPlane.all_objects.get(zstack="overworld", elevation=1)
         tile = RoomTile.objects.get(room=self.room2)
         self.assertEqual(tile.plane_id, sky.id)

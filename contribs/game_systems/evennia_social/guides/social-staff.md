@@ -13,7 +13,7 @@ Social is how players find each other and get together. Staff see more of it tha
 - **Going dark:** `+unfindable dark` hides a staff character from `+where`, the map and `who`. Players can be unfindable but can't go dark. Anyone in the same room still sees you.
 - **Travel:** `@tel <room>` takes staff anywhere, including private and secret rooms. `@tel <object>=<room>` moves a character or an object, which only staff can do.
 - **Staff rooms:** rooms whose type is "staff" are left out of players' `+where`, `+hangouts`, `+summon`, `+join` and `+home`.
-- **Rooms:** `+roomconfig/hangout <type>` lists a room under `+hangouts`, and `+roomconfig/smell` and `/sound` set its sensory lines. Staff can configure any room; players only rooms they own.
+- **Rooms:** `+roomconfig/hangout <type>` lists a room under `+hangouts`, and `+roomconfig/smell` and `/sound` set its sensory lines. `+roomconfig/unhangout` removes the hangout designation. Staff can configure any room; players only rooms they own.
 - **Mood:** `+mood <text>` sets a room's atmosphere line, and `+mood/clear` removes it. Staff can always set it. Players can in a room they own, or during a scene there: any participant in a public scene, or the host of any other.
 
 ## What players can and can't do to staff

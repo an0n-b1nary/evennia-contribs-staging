@@ -160,7 +160,7 @@ class TestCmdRoomConfig(SocialCommandTestCase):
 
     def test_clear_hangout(self):
         self.room1.hangout_type = "bar"
-        self.call(CmdRoomConfig(), "/hangout/clear", "Removed Bar hangout designation")
+        self.call(CmdRoomConfig(), "/unhangout", "Removed Bar hangout designation")
         self.assertIsNone(self.room1.hangout_type)
 
     def test_cleared_hangout_not_listed_as_empty_hangout(self):
@@ -170,9 +170,29 @@ class TestCmdRoomConfig(SocialCommandTestCase):
         listing a non-hangout as an empty hangout.
         """
         self.room1.hangout_type = "bar"
-        self.call(CmdRoomConfig(), "/hangout/clear")
+        self.call(CmdRoomConfig(), "/unhangout")
         result = self.call(CmdHangouts(), "/all")
         self.assertIn("No hangouts found", result)
+
+    def test_old_and_extra_switches_do_not_change_hangout(self):
+        self.room1.hangout_type = "bar"
+        for args in (
+            "/hangout/clear",
+            "/clear/hangout",
+            "/unhangout/unknown",
+            "/hangout/smell park",
+        ):
+            with self.subTest(args=args):
+                result = self.call(CmdRoomConfig(), args)
+                self.assertIn("Use one switch at a time", result)
+                self.assertEqual(self.room1.hangout_type, "bar")
+
+    def test_unhangout_prefix_and_unknown_switch(self):
+        self.room1.hangout_type = "bar"
+        self.call(CmdRoomConfig(), "/unknown")
+        self.assertEqual(self.room1.hangout_type, "bar")
+        self.call(CmdRoomConfig(), "/unh", "Removed Bar hangout designation")
+        self.assertIsNone(self.room1.hangout_type)
 
     def test_non_owner_non_staff_denied(self):
         self.account.permissions.remove("Builder")

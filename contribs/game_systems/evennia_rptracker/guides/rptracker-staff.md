@@ -13,7 +13,7 @@ Activity tracking notices roleplay on its own, and games usually pay XP for it. 
 - **Reviewing sessions:** `+rptracker/review` lists flagged sessions and the past week's completed sessions.
 - **Flagging:** `+rptracker/flag <id>=<reason>` flags a session that looks like gaming, and `+rptracker/unflag <id>` clears it. A flagged session earns no XP until the flag is cleared. A flag covers that one session; the player's other sessions are unaffected.
 - **Automatic flags:** the tracker also flags some patterns by itself, such as pose spam and repeatedly ending sessions by hand. With jobs installed, each automatic flag arrives as a staff discussion for someone to review.
-- **The activity report:** `+report activity [days]` totals sessions, characters and time across the game for the past week, or up to a few months. It groups them by region, or by room in a game without regions, and channels separately. Flagged sessions are shown apart and left out of the totals. Reading the report changes nothing.
+- **The activity report:** `+report/activity [days]` totals sessions, characters and time across the game for the past week, or up to a few months. It groups them by region, or by room in a game without regions, and channels separately. Flagged sessions are shown apart and left out of the totals. Reading the report changes nothing.
 
 :::insight[Read activity, never ration it]{rp-never-a-quota}
 The report shows where play is happening, so staff can see quiet corners and busy ones. It isn't a target for anyone to meet, and it never decides who earns what.

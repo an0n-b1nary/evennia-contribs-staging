@@ -13,7 +13,7 @@ Staff keep room geometry readable and repair placement conflicts. See [[map]] fo
 
 - **Place or move:** `+map/place <#room>=<plane>` puts a room at the plane's origin; a new name creates an interior plane. `+map/move <#room>=<x>,<y>` changes its mapped position. `/unplace <#room>` removes its tile, not the room or exits.
 - **Protect a landmark:** `+map/pin <#room>` keeps automatic placement and reflow from moving its tile; `/unpin` releases it. A pin is a layout constraint, not a privacy flag.
-- **Preview before reflow:** `+map/reflow <#room>` walks the connected layout and reports proposed moves and conflicts without applying them. `/reflow/apply <#room>` applies the allowed moves atomically. Pinned or conflicting tiles stay put; a blocked move does not stop unrelated moves. Read the fresh report and check the result afterwards.
+- **Preview before reflow:** `+map/reflow <#room>` walks the connected layout and reports proposed moves and conflicts without applying them. `+map/reflow <#room>=<token>` applies the allowed moves atomically using the token from that preview. The token is valid for 15 minutes and only for the staff character and origin that requested it; if the layout changes, request a new preview. Pinned or conflicting tiles stay put; a blocked move does not stop unrelated moves. Read the fresh report and check the result afterwards.
 - **Find drift:** `+map/check` reports unmapped neighbours, missing terrain snapshots and tiles on room types declared off-map. Correct the underlying exits, terrain or placement rather than repeatedly moving a symptom.
 
 ## What's safe to change

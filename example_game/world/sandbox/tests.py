@@ -32,6 +32,7 @@ from world.sandbox.seeding import SeededSandboxMixin
 from world.sandbox.test_apartments import ApartmentSeams
 from world.sandbox.test_building import BuildingFoundationCommandSeams, BuildingFoundationSeams
 from world.sandbox.test_channels import ChannelSeams
+from world.sandbox.test_command_syntax import CommandSyntaxSeams
 from world.sandbox.test_economy import EconomySeams
 from world.sandbox.test_frontier import FrontierSeams
 from world.sandbox.test_interiors import BuildingInteriorSeams

@@ -13,6 +13,12 @@ with the game, with no separate mapping step.
 placement conflict, pinning a landmark room so auto-placement/reflow never moves it, and
 reconciling drift (`+map/check`, `+map/reflow`).
 
+`+map/reflow <#room>` previews moves without writing and prints a confirmation
+token. Apply that preview with `+map/reflow <#room>=<token>`. The token expires
+after 15 minutes and belongs to the staff character and origin that requested it.
+Changes to the previewed layout require a fresh preview. Pinned and blocked tiles
+stay put; allowed moves apply together in one transaction.
+
 ---
 
 ## What's included

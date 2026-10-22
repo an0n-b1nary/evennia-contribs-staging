@@ -978,7 +978,7 @@ The seeded `IC RP` channel uses `evennia_rptracker.typeclasses.ICChannel`.
 Puppet a character, subscribe with `channel/sub IC RP`, and send with
 `channel IC RP = <message>`. Channel activity has separate session and XP sources;
 it does not alter room pose timers or create scene links. Staff can inspect
-rolling region and channel totals with `+report activity [days]`.
+rolling region and channel totals with `+report/activity [days]`.
 
 ### 6. Snapshot the golden DB
 
@@ -1381,7 +1381,7 @@ Three mechanisms, for three different needs:
 13. **`+map/check` and `+map/reflow` have something to report** — as staff, run
     `+map/check`: it should name the Study as an unmapped neighbour of the
     Lobby, the Warren as a blank-terrain tile, and the Drafting Room as a tile
-    on an off-map room type. Then run `+map/reflow` from the Cistern as a dry
+    on an off-map room type. Then run `+map/reflow The Cistern` as a dry
     run and confirm the two-step cascade: Service Tunnel `blocked_by_pinned`,
     Vault `blocked_by_blocked`. Do **not** apply it — the misalignment is the
     demo.
