@@ -138,7 +138,11 @@ class PatternSeams(SeededSandboxMixin, EvenniaCommandTest):
         self.assertIn(
             "Knotted Cords (knotted-cords), Spreading", self.call(jobs(), str(job.job_number))
         )
-        self.call(jobs(), f"/approve {job.job_number} 1=Welcome to the market.", None)
+        self.call(
+            jobs(),
+            f"/approve {job.job_number}.1 # Welcome to the market.",
+            f"Ticket #{job.job_number}: Approved (revision 1).",
+        )
         known = PatternKnowledge.objects.get(pattern__key="knotted-cords")
         self.assertEqual((known.character, known.learned_via), (self.char2, "proposal"))
         self.assertIn(
