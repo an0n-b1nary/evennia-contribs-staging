@@ -52,6 +52,10 @@ class Probe(MuxCommand):
 
 class ProbeCmdSet(CmdSet):
     key = "PlaytestProbe"
+    # Keep framing available above EvEditor's priority-150 Replace cmdset.
+    # Union adds only this guarded fixture command to the editor.
+    priority = 151
+    mergetype = "Union"
 
     def at_cmdset_creation(self):
         self.add(Probe())
