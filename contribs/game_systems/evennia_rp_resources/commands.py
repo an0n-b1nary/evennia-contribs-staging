@@ -8,6 +8,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from . import conf
 from .batch import holdings_cap, run_weekly_batch
 from .catalog import seed_catalog
+from .command_syntax import SingleSwitchMixin, split_comment
 from .gathering import LEAN_ATTRIBUTE, lean_description, pool, set_lean
 from .models import ResourceGrant, ResourceHolding
 from .services import ResourceError, grant, spend, total_held
@@ -54,7 +55,7 @@ class CmdGather(_ResourceCommand):
             self.msg(str(exc))
 
 
-class CmdResources(_ResourceCommand):
+class CmdResources(SingleSwitchMixin, _ResourceCommand):
     """View holdings and recent accrual; staff can seed, grant, spend and audit.
 
     Usage:
@@ -62,10 +63,10 @@ class CmdResources(_ResourceCommand):
       +resources/catalog
       +resources/run [dry]                    (staff)
       +resources/seed                         (staff; update configured catalogue)
-      +resources/grant <character>=<key>,<quantity>[,<note>]   (staff)
-      +resources/spend <character>=<key>,<quantity>[,<note>]   (staff)
+      +resources/grant <character>=<quantity> <resource> [# note]   (staff)
+      +resources/spend <character>=<quantity> <resource> [# note]   (staff)
       +resources/audit [character]            (staff; last 30 ledger rows)
-      +resources/payout <plot>=<resource>,<quantity> (owner/staff proposal)
+      +resources/payout <plot>=<quantity> <resource> (owner/staff proposal)
       +resources/payoutremove <plot>=<resource>      (owner/staff)
       +resources/payouts <plot>                    (owner/staff inspection)
       +resources/payoutapprove <plot>              (staff)
@@ -73,6 +74,19 @@ class CmdResources(_ResourceCommand):
     """
 
     key = "+resources"
+    switch_options = (
+        "catalog",
+        "run",
+        "seed",
+        "grant",
+        "spend",
+        "audit",
+        "payout",
+        "payoutremove",
+        "payouts",
+        "payoutapprove",
+        "payoutretry",
+    )
 
     def func(self):
         if not conf.visible(self.caller):
@@ -105,8 +119,8 @@ class CmdResources(_ResourceCommand):
                     raise ResourceError("No such plot.")
                 plot_id = plot.pk
                 if switch == "payout":
-                    key, _, amount = (self.rhs or "").partition(",")
-                    payouts.propose(self.caller, plot_id, key.strip(), int(amount))
+                    key, amount = quantity_resource(self.rhs or "")
+                    payouts.propose(self.caller, plot_id, key, amount)
                     self.msg("Payout proposed; staff approval is required.")
                 elif switch == "payoutremove":
                     payouts.remove(self.caller, plot_id, (self.rhs or "").strip())
@@ -158,22 +172,21 @@ class CmdResources(_ResourceCommand):
                 self.msg(f"Catalogue seeded: {len(seed_catalog(update=True))} resources.")
                 return
             if switch in ("grant", "spend"):
-                if not self.rhs:
-                    raise ResourceError("Usage: +resources/grant character=key,quantity[,note]")
-                target = self.caller.search(self.lhs, global_search=True)
+                text, note = split_comment(self.args)
+                target_text, separator, stock = text.partition("=")
+                if not separator or not target_text.strip() or not stock.strip():
+                    raise ResourceError(
+                        f"Usage: +resources/{switch} <character>=<quantity> <resource> [# note]"
+                    )
+                key, amount = quantity_resource(stock)
+                target = self.caller.search(target_text.strip(), global_search=True)
                 if not target:
                     return
-                parts = self.rhs.split(",", 2)
-                if len(parts) < 2:
-                    raise ResourceError(
-                        "Supply a resource key and whole quantity separated by a comma."
-                    )
-                key, amount = parts[:2]
-                note = parts[2].strip() if len(parts) == 3 else "Staff adjustment"
+                note = note or "Staff adjustment"
                 if switch == "grant":
-                    grant(target, key.strip(), int(amount), "staff", by=self.caller, note=note)
+                    grant(target, key, amount, "staff", by=self.caller, note=note)
                 else:
-                    spend(target, key.strip(), int(amount), note, source="staff", by=self.caller)
+                    spend(target, key, amount, note, source="staff", by=self.caller)
                 self.msg(f"Resources updated for {target.key}.")
                 return
             if switch == "audit":
@@ -214,6 +227,17 @@ class CmdResources(_ResourceCommand):
         if receipt:
             message += f"\nLast batch ({receipt.week}): {gains_text(self.caller, receipt.week)}."
         self.msg(message)
+
+
+def quantity_resource(text):
+    """Read one give-style quantity and resource key, without inline options."""
+    try:
+        amount, key = text.split()
+        return key, int(amount)
+    except ValueError as exc:
+        raise ResourceError(
+            "Supply a whole quantity followed by a resource key, such as 2 timber."
+        ) from exc
 
 
 class ResourcesCmdSet(CmdSet):

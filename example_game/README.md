@@ -147,7 +147,7 @@ The **Supply Court** off the market holds **Sample Supply Shop**, with a timber
 lot available through `+browse` and `+buy`. `The Supply Expedition` demonstrates
 a staff-approved rare-crystal payout budget. Eligible active participants
 receive rewards when the Plot concludes. Owners propose with
-`+resources/payout #<plot>=key,quantity`; staff use `/payoutapprove` and
+`+resources/payout #<plot>=quantity resource`; staff use `/payoutapprove` and
 `/payoutretry` for authorization and recovery.
 
 The market also has a system seller, switched off by default. Staff may enable
@@ -467,7 +467,7 @@ build. Tracker session end or three idle hours releases it. Abilities use
 a 100-point loadout; Proficiency and Combat Focus cost 10 each, flaws cost none.
 The starting allowance is 10, acquisitions cost 3, and upgrades cost 2, 4,
 8, then 16. Purchases use the allowance first, then earned XP. To top up for
-playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10:Playtest`.
+playtesting, run `+sandbox/builder on`, then `+xp/grant <character>=10 # Playtest`.
 `+spend` shows both balances. Staff can revoke with an exact refund using
 `+chargen/revoke/refund <character>/<ability>:<tag>`.
 

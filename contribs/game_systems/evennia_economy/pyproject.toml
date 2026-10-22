@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-economy"
-version = "0.3.3"
+version = "0.4.0"
 description = "Integer purses, passive income, atomic exchanges and reserved-stock stalls for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -24,7 +24,7 @@ dependencies = ["evennia>=6.0", "evennia-links>=0.8.4,<0.9"]
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 shops = ["evennia-building>=0.3.1,<0.4"]
-resources = ["evennia-rp-resources>=0.2,<0.3"]
+resources = ["evennia-rp-resources>=0.2,<0.4"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"

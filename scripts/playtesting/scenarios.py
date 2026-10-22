@@ -85,9 +85,11 @@ class Suite:
             )
 
         self.command("alice", "+resources", "Resources:.*trickle cap")
-        self.command("alice", f"+resources/grant #{alice_id}=grain,3", "Only staff")
+        self.command("alice", f"+resources/grant #{alice_id}=3 grain", "Only staff")
+        self.command("staff", f"+resources/grant #{alice_id}=grain,3,Old syntax", "whole quantity")
+        assert grain(self.state()) == grain(before)
         self.command(
-            "staff", f"+resources/grant #{alice_id}=grain,3,Live playtest", "Resources updated"
+            "staff", f"+resources/grant #{alice_id}=3 grain # Live playtest", "Resources updated"
         )
         assert grain(self.state()) >= grain(before) + 3
         self.command("alice", "+gather grain", "Gathering lean: Grain")
@@ -167,8 +169,12 @@ class Suite:
 
         self.command("alice", "+balance", "Purse:")
         self.command("alice", "+economy", "Only staff")
-        self.command("staff", f"+economy/credit #{alice_id}=20,Live trade", "Purse updated")
-        self.command("staff", f"+resources/grant #{bob_id}=grain,3,Live trade", "Resources updated")
+        self.command("staff", f"+economy/credit #{alice_id}=20,Old syntax", "Usage:")
+        assert purse(self.state(), alice_id) == purse(state, alice_id)
+        self.command("staff", f"+economy/credit #{alice_id}=20 # Live trade", "Purse updated")
+        self.command(
+            "staff", f"+resources/grant #{bob_id}=3 grain # Live trade", "Resources updated"
+        )
         before = self.state()
         self.command("alice", f"+offer {bob_name}=5 coins for resource:grain:2", "Offer #")
         offer_id = self.state()["economy_offers"][-1]["id"]
@@ -263,7 +269,8 @@ class Suite:
         self.command(
             "alice", f"+plot/update #{number}=We returned with supplies.", "Update|added|posted"
         )
-        self.command("alice", f"+resources/payout #{number}=rare-crystal,2", "approval is required")
+        self.command("alice", f"+resources/payout #{number}=rare-crystal,2", "whole quantity")
+        self.command("alice", f"+resources/payout #{number}=2 rare-crystal", "approval is required")
         self.command("alice", f"+plot/conclude #{number}", "Approve all payout resources")
         self.command("staff", f"+resources/payoutapprove #{number}", "Approved 1")
         self.session.disconnect("alice")
@@ -324,12 +331,12 @@ class Suite:
         state = self.state()
         alice_id = state["actors"]["alice"]["id"]
         self.command(
-            "staff", f"+resources/grant #{alice_id}=timber,20,Live crafting", "Resources updated"
+            "staff", f"+resources/grant #{alice_id}=20 timber # Live crafting", "Resources updated"
         )
         self.command(
-            "staff", f"+resources/grant #{alice_id}=ember,2,Live crafting", "Resources updated"
+            "staff", f"+resources/grant #{alice_id}=2 ember # Live crafting", "Resources updated"
         )
-        self.command("staff", f"+economy/credit #{alice_id}=500,Live crafting", "Purse updated")
+        self.command("staff", f"+economy/credit #{alice_id}=500 # Live crafting", "Purse updated")
         self.command("alice", "+workshop/catalog", "Weaver.*Scribe|Scribe.*Weaver")
         self.command("alice", "+workshop/unlock weaving=timber:3", "Unlocked Weaver")
         self.command("alice", "+craft/new weaving/wearable = live crafted cloak", "draft saved")
@@ -404,10 +411,10 @@ class Suite:
         for resource in ("grain", "ember"):
             self.command(
                 "staff",
-                f"+resources/grant #{alice_id}={resource},20,Live EVENT",
+                f"+resources/grant #{alice_id}=20 {resource} # Live EVENT",
                 "Resources updated",
             )
-        self.command("staff", f"+economy/credit #{alice_id}=1000,Live EVENT", "Purse updated")
+        self.command("staff", f"+economy/credit #{alice_id}=1000 # Live EVENT", "Purse updated")
         self.command("alice", "+workshop/unlock cooking=grain:6", "Unlocked Cook")
         self.command("alice", "+workshop/unlock illusions=ember:9", "Unlocked Illusionist")
         for niche, kind, resource, name, beat in (
@@ -460,9 +467,9 @@ class Suite:
         self.command("staff", "+runtime RP_CRAFTING_ACTIVATION_ITEM_COOLDOWN=86400", "86400")
         alice_id = self.state()["actors"]["alice"]["id"]
         self.command(
-            "staff", f"+resources/grant #{alice_id}=timber,50,Wave two", "Resources updated"
+            "staff", f"+resources/grant #{alice_id}=50 timber # Wave two", "Resources updated"
         )
-        self.command("staff", f"+economy/credit #{alice_id}=1000,Wave two", "Purse updated")
+        self.command("staff", f"+economy/credit #{alice_id}=1000 # Wave two", "Purse updated")
         active = sum(
             row["workshop__character_id"] == alice_id and row["abandoned_at"] is None
             for row in self.state()["crafting_niches"]
@@ -571,7 +578,10 @@ class Suite:
 
     def mixed_funding(self):
         self.command("staff", "+chargen/allowance pt-bob=1", "allowance")
-        self.command("staff", "+xp/grant pt-bob=10:Live playtest", "10")
+        before = self.state()["xp"]
+        self.command("staff", "+xp/grant pt-bob=10:Old syntax", "reason is required")
+        assert self.state()["xp"] == before
+        self.command("staff", "+xp/grant pt-bob=10 # Live playtest", "10")
         self.command("bob", "+spend/ability proficiency: performance", "You learn")
         state = self.state()
         bob = state["actors"]["bob"]["id"]

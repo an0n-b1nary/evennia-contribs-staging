@@ -6,6 +6,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 
 from . import assets, conf
 from .batch import money_cap, run_stipends, run_weekly_batch
+from .command_syntax import SingleSwitchMixin, split_comment
 from .exchange import accept_offer, cancel_offer, create_offer, expire_offers, give
 from .models import LedgerEntry, Listing, Offer, ReviewFlag, Storefront
 from .reports import account_accrual, reconciliation
@@ -143,14 +144,14 @@ class CmdGive(EconomyCommand):
         target.msg(f"{self.caller.key} gives you {described}.")
 
 
-class CmdEconomy(EconomyCommand):
+class CmdEconomy(SingleSwitchMixin, EconomyCommand):
     """Staff economy reconciliation, adjustments and review queue.
 
     +economy                     (money/partner totals and per-account accrual)
     +economy/run [dry]            (weekly UBI preview/payment)
     +economy/stipends             (reconcile first eligibility/reveal stipends)
-    +economy/credit character=amount[,note]
-    +economy/debit character=amount[,note]
+    +economy/credit character=amount [# note]
+    +economy/debit character=amount [# note]
     +economy/audit [character]    (last 50 journal entries)
     +economy/flags                (unreviewed round trips, floor transfers, quiet stalls)
     +economy/reviewed number
@@ -158,6 +159,7 @@ class CmdEconomy(EconomyCommand):
     """
 
     key = "+economy"
+    switch_options = ("run", "stipends", "credit", "debit", "audit", "flags", "reviewed")
 
     def run(self):
         if not conf.is_staff(self.caller):
@@ -185,15 +187,19 @@ class CmdEconomy(EconomyCommand):
         elif switch == "stipends":
             self.msg(f"Stipends: {run_stipends()}")
         elif switch in ("credit", "debit"):
-            if not self.rhs:
-                raise EconomyError("Usage: +economy/credit character=amount[,note]")
-            target = self.caller.search(self.lhs, global_search=True)
+            text, note = split_comment(self.args)
+            target_text, separator, amount = text.partition("=")
+            usage = f"Usage: +economy/{switch} <character>=<amount> [# note]"
+            if not separator or not target_text.strip() or not amount.strip():
+                raise EconomyError(usage)
+            try:
+                amount = int(amount)
+            except ValueError as exc:
+                raise EconomyError(usage) from exc
+            target = self.caller.search(target_text.strip(), global_search=True)
             if not target:
                 return
-            amount, _, note = self.rhs.partition(",")
-            (credit if switch == "credit" else debit)(
-                target, int(amount), by=self.caller, note=note.strip()
-            )
+            (credit if switch == "credit" else debit)(target, amount, by=self.caller, note=note)
             self.msg(f"Purse updated for {target.key}.")
         elif switch == "audit":
             rows = LedgerEntry.objects.all()
@@ -328,16 +334,22 @@ class CmdStall(EconomyCommand):
             self.msg(f"{noun.title()} updated.")
 
 
-class CmdShop(CmdStall):
+class CmdShop(SingleSwitchMixin, CmdStall):
     """Manage an approved property shop.
 
-    +shop; +shop/name|desc [shop]=text; +shop/list [shop/]item or lot=price
-    +shop/unlist listing; +shop/close [shop]; +shop/reopen shop
-    +shop/reconcile property (staff; explicitly open a previously approved shop)
+    +shop
+    +shop/name [shop]=text
+    +shop/desc [shop]=text
+    +shop/list [shop/]item or lot=price
+    +shop/unlist listing
+    +shop/close [shop]
+    +shop/reopen shop
+    +shop/reconcile property (staff: explicitly open a previously approved shop)
     """
 
     key = "+shop"
     store_kind = "shop"
+    switch_options = ("name", "desc", "list", "unlist", "close", "reopen", "reconcile", "claim")
 
     def run(self):
         from . import shops

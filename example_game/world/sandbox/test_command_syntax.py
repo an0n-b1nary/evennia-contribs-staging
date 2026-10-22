@@ -115,3 +115,46 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         action.refresh_from_db()
         self.assertIsNotNone(action.lifted_at)
         self.assertTrue(ModerationAction.objects.filter(kind="lift").exists())
+
+    def test_xp_grant_uses_the_real_host_ledger_and_staff_lock(self):
+        from decimal import Decimal
+
+        from evennia_xp.models import CharacterXP, XPLog
+
+        command = self.command("+xp")
+        self.call(command, "/grant Char2=3:Old syntax")
+        self.assertFalse(XPLog.objects.exists())
+        self.call(command, "/grant Char2=3 # Player attempt", caller=self.char2)
+        self.assertFalse(XPLog.objects.exists())
+        reason = "Award for #12.3 # A=B"
+        self.call(command, f"/grant #{self.char2.pk}=3 # {reason}", "Granted 3 XP")
+        self.assertEqual(XPLog.objects.get().reason, reason)
+        self.assertEqual(
+            CharacterXP.objects.get(character_id=self.char2.pk).current_balance, Decimal("3")
+        )
+
+    def test_money_and_resource_adjustments_keep_host_audit_metadata(self):
+        from evennia_economy.models import LedgerEntry
+        from evennia_economy.services import balance
+        from evennia_rp_resources.models import ResourceDefinition, ResourceGrant
+        from evennia_rp_resources.services import total_held
+
+        ResourceDefinition.objects.create(key="syntax-timber", name="Timber", category="materials")
+        economy, resources = self.command("+economy"), self.command("+resources")
+        self.call(economy, "/credit Char2=10,Old syntax")
+        self.call(resources, "/grant Char2=syntax-timber,4,Old syntax")
+        self.assertFalse(LedgerEntry.objects.exists())
+        self.assertFalse(ResourceGrant.objects.exists())
+        note = "For #12.3 # A=B"
+        self.call(economy, f"/credit #{self.char2.pk}=10 # {note}", "Purse updated")
+        self.call(
+            resources, f"/grant #{self.char2.pk}=4 syntax-timber # {note}", "Resources updated"
+        )
+        self.call(economy, "/debit Char2=2 # Used", "Purse updated")
+        self.call(resources, "/spend Char2=1 syntax-timber # Used", "Resources updated")
+        self.assertEqual((balance(self.char2), total_held(self.char2)), (8, 3))
+        for row in (
+            LedgerEntry.objects.order_by("pk").first(),
+            ResourceGrant.objects.order_by("pk").first(),
+        ):
+            self.assertEqual((row.note, row.by_id), (note, self.char1.pk))

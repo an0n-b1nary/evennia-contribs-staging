@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.0] - 2026-10-22
+
+- Breaking: credit and debit notes follow ` # ` after the amount; comma-separated notes are refused. Guard Economy and Shop switches before parsing, retain unique prefixes, and list Shop help forms separately. Allow Resources 0.3 in the optional extra.
+
 ## 0.3.3 - 2026-10-19
 
 - Add a staff guide page for evennia-guides, `economy-staff`: the weekly run and stipends, adjusting purses, audits and review flags, shops, closing stalls, and freezing and revealing.

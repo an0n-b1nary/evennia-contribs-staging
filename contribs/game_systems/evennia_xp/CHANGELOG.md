@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.0] - 2026-10-22
+
+- Breaking: manual grants use `+xp/grant <character>=<amount> # <reason>`. Reject the old colon form and invalid or stacked switches; retain unique switch prefixes and case-insensitive matching.
+
 ## 0.5.4 — 2026-10-20
 
 - Add the staff-only `xp-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

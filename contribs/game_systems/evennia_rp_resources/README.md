@@ -107,7 +107,7 @@ channels and direct players to `+resources`.
 - `+resources/catalog`: open trickle catalogue.
 - `+gather [resource or category]`, `+gather/clear`: persistent composition choice.
 - Staff: `+resources/run [dry]`, `/seed`, `/audit [character]`,
-  `/grant character=key,quantity[,note]`, `/spend character=key,quantity[,note]`.
+  `/grant character=quantity resource [# note]`, `/spend character=quantity resource [# note]`.
 
 ```python
 from evennia_rp_resources.services import ResourceError, grant, spend
@@ -166,7 +166,7 @@ smaller Threads; Python keeps the `PlotThread` and `plot_thread_concluded`
 names until Plots 1.0.
 
 Owners or staff propose a per-participant budget:
-`+resources/payout #<plot number>=rare-crystal,2`. Inspect with
+`+resources/payout #<plot number>=2 rare-crystal`. Inspect with
 `/payouts #<plot>`, remove a resource with `/payoutremove #<plot>=rare-crystal`.
 Only staff authorize it with `/payoutapprove #<plot>`. Editing a resource clears
 its approval. Conclusion refuses unapproved or archived budget resources.

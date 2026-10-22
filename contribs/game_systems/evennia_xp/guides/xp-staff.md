@@ -11,7 +11,7 @@ Staff explain XP awards and make explicit one-off grants when needed. See [[xp]]
 
 ## Tasks and commands
 
-- **Manual awards:** `+xp/grant <character>=<amount>:<reason>` awards a positive amount and records your identity and reason. An online recipient is told. Repeating it makes another award, so check the record before retrying an uncertain grant.
+- **Manual awards:** `+xp/grant <character>=<amount> # <reason>` awards a positive amount and records your identity and reason. An online recipient is told. Repeating it makes another award, so check the record before retrying an uncertain grant.
 - **Reading the weekly run:** the batch script checks for the completed week and normally pays after the Monday UTC boundary. It runs the configured anti-gaming sweeps, then collectors, then the post-batch hooks. Check the server log for the week, award totals and errors; a collector or hook failure is logged separately from per-character write failures.
 - **Checking a disputed award:** `+xp/sources` lists registered sources, and players can inspect their own `+xp/log`. Staff with admin access can inspect XPLog by character, week and source, including the multiplier and grant attribution, alongside CharacterXP totals and XPSpend records. There is no `+xp/log <character>` staff switch.
 - **Repairing a failed batch:** ask the host operator to inspect its collector and batch errors before rerunning a particular week. The batch API supports source selection and a dry run. Dry run skips award writes and post-batch hooks, but still runs anti-gaming sweeps and collectors, which may write their own records. It is not a promise of no database changes.

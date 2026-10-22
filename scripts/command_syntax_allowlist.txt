@@ -12,8 +12,6 @@ evennia_building semicolon-parse +build
 evennia_building stacked-switch +build
 evennia_calendar stacked-switch +calendar
 evennia_calendar stacked-switch +rsvp
-evennia_economy option-stack +economy
-evennia_economy semicolon +shop
 evennia_lore pipe +lorecraft
 evennia_lore stacked-switch +lore
 evennia_npcs colon +npc
@@ -57,5 +55,3 @@ evennia_rp_party semicolon-parse +bosscheck
 evennia_rp_party semicolon-parse +party
 evennia_rp_party semicolon-parse boss_commands.py
 evennia_rp_party stacked-switch +party
-evennia_rp_resources option-stack +resources
-evennia_xp colon +xp
