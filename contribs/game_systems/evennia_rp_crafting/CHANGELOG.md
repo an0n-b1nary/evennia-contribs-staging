@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.5] - 2026-10-22
+
+- Allow Resources 0.3 and Economy 0.4 in dependency constraints. Their service integrations remain compatible with the revised command syntax.
+
 ## [0.10.4] - 2026-10-21
 
 - Allow Jobs 0.8 in the optional `jobs` extra; its service integration remains

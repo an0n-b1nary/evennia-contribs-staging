@@ -643,9 +643,9 @@ class EconomyCommandTests(BaseEvenniaCommandTest):
     def test_balance_and_staff_permissions(self):
         self.assertIn("Purse:", self.call(CmdBalance(), "", caller=self.char2))
         self.assertIn("Only staff", self.call(CmdEconomy(), "", caller=self.char2))
-        self.call(CmdEconomy(), "/credit Char2=10,Test")
+        self.call(CmdEconomy(), "/credit Char2=10 # Test")
         self.assertEqual(balance(self.char2), 10)
-        self.call(CmdEconomy(), "/debit Char2=2,Test")
+        self.call(CmdEconomy(), "/debit Char2=2 # Test")
         self.assertEqual(balance(self.char2), 8)
 
     def test_offer_accept_list_cancel(self):

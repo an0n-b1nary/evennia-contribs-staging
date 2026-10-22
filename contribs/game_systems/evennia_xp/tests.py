@@ -411,7 +411,7 @@ class TestCmdXpStaffLock(EvenniaCommandTest):
         # char2's account has no Builder/Developer permission, so the lock fails.
         self.call(
             CmdXp(),
-            "/grant TestChar=1:reason",
+            "/grant TestChar=1 # reason",
             "You need staff permission",
             caller=self.char2,
         )
@@ -429,7 +429,7 @@ class TestCmdXpStaffLock(EvenniaCommandTest):
             mock_grant.return_value = mock_log
             self.call(
                 CmdXp(),
-                f"/grant {self.char1.key}=2:for testing",
+                f"/grant {self.char1.key}=2 # for testing",
                 "Granted",
                 caller=self.char1,
             )

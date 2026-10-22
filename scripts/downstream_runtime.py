@@ -354,7 +354,7 @@ def preserved(session, baseline):
     for actor, command, pattern in workflows:
         output = session.send(actor, command)["output"]
         assert re.search(pattern, output, re.I), output
-    denied = session.send("alice", "+xp/grant pt-alice=10:Forbidden")
+    denied = session.send("alice", "+xp/grant pt-alice=10 # Forbidden")
     assert re.search(
         "not permitted|permission|not available|not found|not access|not allowed|staff",
         denied["output"],
@@ -480,6 +480,8 @@ def main():
                         if not suite.case(operation.__name__, operation):
                             break
                     cases = suite.results
+                    # This branch populates a historical, allowance-only release
+                    # with its original XP command, before the syntax break.
                     suite.command("staff", "+xp/grant pt-bob=10:Upgrade fixture", "10")
                 else:
                     cases = scenarios.run_rp(session)

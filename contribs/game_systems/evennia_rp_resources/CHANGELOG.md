@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.0] - 2026-10-22
+
+- Breaking: grants and spending use `<character>=<quantity> <resource> [# note]`; plot payout proposals use `<plot>=<quantity> <resource>`. Reject the old comma forms and invalid or stacked switches, retaining unique prefixes and the existing audit and payout approval services.
+
 ## 0.2.2 — 2026-10-19
 
 - Add a staff guide page for evennia-guides, `resources-staff`: the weekly run, the catalogue, grants and spending, audits, and approving and retrying plot payouts.

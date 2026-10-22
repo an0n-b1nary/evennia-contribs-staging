@@ -48,8 +48,8 @@ give item:#12 = character        immediate gift (items only while hidden)
 +economy                         staff reconciliation and account accrual
 +economy/run [dry]
 +economy/stipends
-+economy/credit character=amount[,note]
-+economy/debit character=amount[,note]
++economy/credit character=amount [# note]
++economy/debit character=amount [# note]
 +economy/audit [character]
 +economy/flags
 +economy/reviewed number

@@ -411,9 +411,9 @@ class ResourceCommandTests(BaseEvenniaCommandTest):
         self.assertIsNone(gathering.lean(self.char1))
 
     def test_staff_grant_spend_and_audit(self):
-        self.call(CmdResources(), "/grant Char2=wood,4,Test")
+        self.call(CmdResources(), "/grant Char2=4 wood # Test")
         self.assertEqual(total_held(self.char2), 4)
-        self.call(CmdResources(), "/spend Char2=wood,2,Test")
+        self.call(CmdResources(), "/spend Char2=2 wood # Test")
         self.assertEqual(total_held(self.char2), 2)
         self.assertIn("staff", self.call(CmdResources(), "/audit Char2"))
 
@@ -421,7 +421,7 @@ class ResourceCommandTests(BaseEvenniaCommandTest):
         self.call(CmdResources(), "/run", "Only staff may use this switch.", caller=self.char2)
         self.call(
             CmdResources(),
-            "/grant Char2=wood,3",
+            "/grant Char2=3 wood",
             "Only staff may use this switch.",
             caller=self.char2,
         )

@@ -120,7 +120,7 @@ class SnapshotFixtureTests(unittest.TestCase):
                     "+sheet": "Presence B ++",
                     "+abilities": "Proficiency: Performance",
                     "+xp": "XP 10",
-                    "+xp/grant pt-alice=10:Forbidden": "Not permitted",
+                    "+xp/grant pt-alice=10 # Forbidden": "Not permitted",
                 }
                 if command == "+test presence~Upgrade and restore confirmation":
                     self.checked = True

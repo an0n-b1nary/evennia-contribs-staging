@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.4] - 2026-10-22
+
+- Allow XP 0.6 in the optional `xp` extra; its award and spending services remain compatible with the revised grant command syntax.
+
 ## 0.4.3 — 2026-10-20
 
 - Add the staff-only `chargen-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

@@ -225,7 +225,7 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self.call(
             CmdResources(),
-            f"/payout #{self.plot.plot_number}=rare,4",
+            f"/payout #{self.plot.plot_number}=4 rare",
             "Payout proposed; staff approval is required.",
             caller=self.char2,
         )

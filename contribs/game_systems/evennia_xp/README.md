@@ -20,7 +20,8 @@ aggregation, scheduling, and the web/API surface.
   scaling.
 - **`XPBatchScript`** — Evennia Script that runs the batch every Monday at
   00:00 UTC; idempotent across server restarts.
-- **`CmdXp`** — `+xp`, `+xp/log`, `+xp/sources`, `+xp/grant` with
+- **`CmdXp`** — `+xp`, `+xp/log`, `+xp/sources`,
+  `+xp/grant <character>=<amount> # <reason>` with
   `XP_STAFF_LOCK` and optional `evennia-accessibility` screen-reader support.
 - **First-login summary** — `XPSummaryCharacterMixin` shows each character
   what the last weekly batch paid it, once, the next time it is puppeted.

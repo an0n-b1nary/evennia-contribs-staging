@@ -10,7 +10,7 @@ Usage:
     +xp/log                              View your last 20 XP awards
     +xp/log <N>                          View your last N awards (max 100)
     +xp/sources                          List registered XP sources
-    +xp/grant <character>=<amt>:<reason> Award XP manually (staff)
+    +xp/grant <character>=<amt> # <reason> Award XP manually (staff)
 
 Staff permission is governed by XP_STAFF_LOCK (default "cmd:perm(Builder)").
 
@@ -23,6 +23,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
+
+from .command_syntax import SingleSwitchMixin, split_comment
 
 try:
     from evennia_accessibility import uses_screenreader
@@ -41,7 +43,7 @@ def _staff_lock_expr():
     return lock[4:] if lock.startswith("cmd:") else lock
 
 
-class CmdXp(MuxCommand):
+class CmdXp(SingleSwitchMixin, MuxCommand):
     """
     View your XP balance, history, and registered sources.
 
@@ -50,7 +52,7 @@ class CmdXp(MuxCommand):
         +xp/log                          View your last 20 XP awards
         +xp/log <N>                      View your last N XP awards (max 100)
         +xp/sources                      List active XP sources
-        +xp/grant <character>=<amt>:<reason>  Award XP manually (staff)
+        +xp/grant <character>=<amt> # <reason>  Award XP manually (staff)
 
     XP is earned automatically every Monday from activities registered in
     XP_COLLECTORS. +xp also shows what you have earned since then that has
@@ -61,6 +63,7 @@ class CmdXp(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Character"
     locks = "cmd:all()"
+    switch_options = ("grant", "log", "sources")
 
     def func(self):
         caller = self.caller
@@ -278,7 +281,7 @@ class CmdXp(MuxCommand):
         caller.msg("\n".join(lines))
 
     # ------------------------------------------------------------------
-    # +xp/grant <character>=<amount>:<reason>  (staff)
+    # +xp/grant <character>=<amount> # <reason>  (staff)
     # ------------------------------------------------------------------
 
     def _do_grant(self, caller):
@@ -286,17 +289,13 @@ class CmdXp(MuxCommand):
             caller.msg("|rYou need staff permission to grant XP.|n")
             return
 
-        if not self.lhs or not self.rhs:
-            caller.msg("Usage: +xp/grant <character>=<amount>:<reason>")
+        text, reason = split_comment(self.args)
+        target_text, separator, amt_str = text.partition("=")
+        if not separator or not target_text.strip() or not amt_str.strip():
+            caller.msg("Usage: +xp/grant <character>=<amount> # <reason>")
             return
 
-        if ":" not in self.rhs:
-            caller.msg("Usage: +xp/grant <character>=<amount>:<reason>")
-            return
-
-        amt_str, reason = self.rhs.split(":", 1)
         amt_str = amt_str.strip()
-        reason = reason.strip()
 
         if not reason:
             caller.msg("|rA reason is required for manual XP grants.|n")
@@ -304,13 +303,13 @@ class CmdXp(MuxCommand):
 
         try:
             amount = Decimal(amt_str)
-            if amount <= 0:
+            if not amount.is_finite() or amount <= 0:
                 raise ValueError
         except (InvalidOperation, ValueError):
             caller.msg(f"|r'{amt_str}' is not a valid positive XP amount.|n")
             return
 
-        target = caller.search(self.lhs.strip(), global_search=True)
+        target = caller.search(target_text.strip(), global_search=True)
         if not target:
             return
 
