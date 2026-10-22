@@ -1410,6 +1410,8 @@ class TestCmdMapReflow(MapsCommandTestCase):
         placement.place_tile(self.room2, plane, 5, 5)
         token = self._preview_token()
         self.char2.permissions.add("Builder")
+        self.char2.account.permissions.add("Builder")
+        self.assertTrue(is_staff(self.char2))
         result = self.call(CmdMap(), f"/reflow #{self.room1.id}={token}", caller=self.char2)
         self.assertIn("new reflow preview", result)
         result = self.call(CmdMap(), f"/reflow #{self.room2.id}={token}")
