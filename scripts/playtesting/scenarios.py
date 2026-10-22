@@ -453,8 +453,10 @@ class Suite:
         self.command("alice", "+craft/resources 2 timber", "draft saved")
         self.command("alice", "+craft/finish", "You craft Live syntax journal")
         self.command("alice", "+journal/write Live syntax journal=Original words.", "page 1 saved")
-        self.command("alice", "+journal/title Live syntax journal/1=Arrival", "revision 2")
-        self.command("alice", "+journal/revise Live syntax journal/1=Revised words.", "revision 3")
+        self.command("alice", "+journal/title Live syntax journal/1=|wArrival|n", "revision 2")
+        self.command(
+            "alice", "+journal/revise Live syntax journal/1=|gRevised words.|n", "revision 3"
+        )
         self.command(
             "alice", "+journal/history Live syntax journal/1", "Original words.*Revised words"
         )

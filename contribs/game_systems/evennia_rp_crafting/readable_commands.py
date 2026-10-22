@@ -3,6 +3,7 @@
 """Journal authoring and reviewable copy drafts."""
 
 from evennia.objects.models import ObjectDB
+from evennia.utils.ansi import strip_ansi
 
 from . import services
 from .command_base import CraftCommand
@@ -145,7 +146,8 @@ class CmdJournal(CraftCommand):
         if switch == "history":
             if self.rhs is not None:
                 raise CraftingError("Usage: +journal/history <journal>/<page>")
-        elif self.rhs is None or "|" in self.rhs:
+        # Colour markup and escaped literal pipes are authored text, not separators.
+        elif self.rhs is None or "|" in strip_ansi(self.rhs.replace("||", "")):
             raise CraftingError(
                 f"Usage: +journal/{switch} <journal>"
                 + ("/<page>" if switch != "write" else "")

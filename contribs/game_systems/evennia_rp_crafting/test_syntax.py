@@ -209,3 +209,14 @@ class SyntaxTests(CraftingFixture, EvenniaCommandTest):
             self.assertEqual(dict(self.char1.attributes.get("rp_workshop_unlock_drafts")), before)
         self.expect(CmdWorkshop(), "/unlock writing-0", "Confirm:")
         self.assertEqual(self.held(), 200)
+
+    def test_journal_formatting_codes_are_not_pipe_separators(self):
+        self.unlock()
+        journal = self.book(configuration={"journal": 2}, selected={"wood": 2})
+        self.expect(CmdJournal(), f"/write {journal.key}=|rRed words.|n", "page 1 saved")
+        self.expect(CmdJournal(), f"/title {journal.key}/1=|wArrival|n", "revision 2")
+        self.expect(CmdJournal(), f"/revise {journal.key}/1=|gGreen || words.|n", "revision 3")
+        latest = JournalRevision.objects.latest("revision")
+        self.assertEqual((latest.title, latest.text), ("|wArrival|n", "|gGreen || words.|n"))
+        self.expect(CmdJournal(), f"/write {journal.key}=Title | Text", "Usage:")
+        self.assertEqual(JournalRevision.objects.count(), 3)
