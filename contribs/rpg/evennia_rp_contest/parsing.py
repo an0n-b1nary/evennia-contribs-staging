@@ -5,6 +5,7 @@
 from dataclasses import dataclass
 
 from evennia_rp_contest import conf
+from evennia_rp_contest.command_syntax import split_comment
 from evennia_rp_rules.ruleset import get_ruleset, match_spelling
 from evennia_rp_rules.vocabulary import get_vocabulary
 
@@ -76,7 +77,7 @@ def approach(text):
 
 
 def parse_test(text):
-    body, _, comment = text.partition("~")
+    body, comment = split_comment(text)
     challenge = None
     if "=" in body:
         ref, body = body.split("=", 1)
@@ -86,11 +87,9 @@ def parse_test(text):
 
 
 def parse_challenge(text, *, once=False):
-    body, separator, prompt = text.partition("~")
+    difficulty, separator, prompt = text.partition("=")
     if not separator or not prompt.strip():
-        raise ContestError("Usage: +test/set <difficulty>[=<stat>[/<tag>]]~<prompt>")
-    difficulty, suggestion, proposed = body.partition("=")
+        raise ContestError("Usage: +challenge/new <difficulty>=<prompt>")
     if not difficulty.strip():
         raise ContestError("Give a difficulty rating or preset.")
-    stat, tag = approach(proposed) if suggestion else (None, None)
-    return ChallengeRequest(difficulty.strip(), limited(prompt), stat, tag, once)
+    return ChallengeRequest(difficulty.strip(), limited(prompt), once=once)

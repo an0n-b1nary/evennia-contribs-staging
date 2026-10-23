@@ -101,7 +101,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
 
         self.assertEqual(self.grounds.room_type, "ooc")
         plaque = next(obj for obj in self.grounds.contents if obj.key == content.PLAQUE_KEY)
-        self.assertIn("+test/set", plaque.db.desc)
+        self.assertIn("+challenge/new", plaque.db.desc)
         from world.ruleset import COMBAT_ABILITIES
 
         combat = apps.is_installed("evennia_rp_combat")
@@ -202,7 +202,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         self.char2.record_pose("takes the hand.", pose_type="pose")
         self.char2.record_pose("steps across.", pose_type="pose")
         self.assertTrue(RPSession.objects.filter(character=self.char2, status="active").exists())
-        challenge = services.open_challenge(self.char2, parse_challenge("C~Balance"))
+        challenge = services.open_challenge(self.char2, parse_challenge("C=Balance"))
         end_session(self.char2.id)
         self.assertFalse(locks.is_locked(self.char2))
         challenge.refresh_from_db()

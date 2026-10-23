@@ -152,7 +152,7 @@ class TestRPPartners(RPSeedMixin, EvenniaTest):
         self.char2.cmdset.update()
         commands = list(self.char2.cmdset.current)
         for label, keys in (
-            ("evennia_rp_contest", ("test",)),
+            ("evennia_rp_contest", ("test", "challenge")),
             (
                 "evennia_rp_chargen",
                 (

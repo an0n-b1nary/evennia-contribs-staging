@@ -21,7 +21,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from evennia_jobs.commands import CmdJobs
-from evennia_npcs.commands import CmdNPCPose, contest_command
+from evennia_npcs.commands import CmdNPCPose, challenge_command, contest_command
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 from world.sandbox.seeding import SeededSandboxMixin
@@ -99,9 +99,10 @@ class TestCharacterCmdSet(EvenniaTest):
 
     def test_rp_commands_resolve_to_their_implementations(self):
         from evennia.commands.cmdparser import cmdparser
-        from evennia_rp_contest.commands import CmdTest
+        from evennia_rp_contest.commands import CmdChallenge, CmdTest
 
-        expected = {"+test": contest_command()}
+        expected = {"+test": contest_command(), "+challenge": challenge_command()}
+        self.assertTrue(issubclass(expected["+challenge"], CmdChallenge))
         self.assertTrue(issubclass(expected["+test"], CmdTest))
         chargen = importlib.import_module("evennia_rp_chargen.commands")
         for name in (

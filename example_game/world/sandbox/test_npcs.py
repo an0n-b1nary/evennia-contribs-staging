@@ -159,7 +159,7 @@ class NPCCommandSeams(EvenniaCommandTest):
 
     @skipUnless(apps.is_installed("evennia_rp_contest"), "contest absent")
     def test_contest_uses_npc_stats_without_pc_sheet_or_rewards(self):
-        from evennia_npcs.commands import contest_command
+        from evennia_npcs.commands import challenge_command, contest_command
         from evennia_rp_contest.models import CheckRecord
 
         blueprint = svc.create_blueprint(
@@ -167,6 +167,15 @@ class NPCCommandSeams(EvenniaCommandTest):
         )
         spawn = svc.spawn(self.char1, blueprint)
         svc.control(self.char1, spawn)
+        from evennia_rp_contest.models import Challenge
+
+        self.call(
+            challenge_command()(),
+            "/new B=Portrayed challenge",
+            "Release NPC portrayal",
+            caller=self.char1,
+        )
+        self.assertFalse(Challenge.objects.filter(room=self.room1).exists())
         with patch("world.sandbox.glue.on_pose_recorded") as pc_pose:
             self.call(
                 contest_command()(),

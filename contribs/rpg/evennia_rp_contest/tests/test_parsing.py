@@ -11,32 +11,42 @@ from evennia_rp_rules.testing import RulesetTestMixin, fresh_test_ruleset
 
 class ParsingTests(RulesetTestMixin, SimpleTestCase):
     def test_stat_alias_and_comment_delimiters(self):
-        req = parse_test(" #2=str/clim~a {brace} $You() |r~more=still ")
+        req = parse_test(" #2=str/clim # a {brace} $You() |r~more=still ")
         self.assertEqual((req.stat, req.tag, req.challenge_number), ("brawn", "climbing", 2))
         self.assertEqual(req.comment, "a {brace} $You() |r~more=still")
 
     def test_optional_tag_and_suggestion(self):
         self.assertIsNone(parse_test("brains").tag)
-        req = parse_challenge("High~Cross the chasm")
+        req = parse_challenge("High=Cross the chasm")
         self.assertIsNone(req.stat)
         self.assertIsNone(req.tag)
-        req = parse_challenge("High=brains/Fire~Read the flames", once=True)
-        self.assertEqual((req.stat, req.tag, req.once), ("brains", "fire", True))
+        req = parse_challenge("High=Read #12 = the flames ~ carefully", once=True)
+        self.assertEqual((req.stat, req.tag, req.once), (None, None, True))
+        self.assertEqual(req.description, "Read #12 = the flames ~ carefully")
 
     def test_invalid_input(self):
-        for text in ("", "#0=brawn", "#foo=brawn", "brains/", "unknown", "brains/nope"):
+        for text in (
+            "",
+            "#0=brawn",
+            "#foo=brawn",
+            "brains/",
+            "unknown",
+            "brains/nope",
+            "brawn~old",
+            "#2/brawn",
+        ):
             with self.subTest(text=text), self.assertRaises(ContestError):
                 parse_test(text)
-        for text in ("Mid", "~prompt", "Mid~", "Mid=~prompt"):
+        for text in ("Mid", "~prompt", "Mid~", "=prompt", "Mid="):
             with self.subTest(text=text), self.assertRaises(ContestError):
                 parse_challenge(text)
 
     @override_settings(RP_CONTEST_COMMENT_MAX=5)
     def test_long_text_is_refused(self):
         with self.assertRaises(ContestError):
-            parse_test("brawn~longer")
+            parse_test("brawn # longer")
         with self.assertRaises(ContestError):
-            parse_challenge("Mid~longer")
+            parse_challenge("Mid=longer")
 
     @override_settings(RP_CONTEST_TAG_KIND="domain")
     def test_single_kind(self):

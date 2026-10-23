@@ -202,7 +202,7 @@ OOC_ROOMS = (
             "[Placeholder] Start a sheet with +stats, choose a grade for every stat, "
             "then +stats/finalize. +pips sets + and weakness pips; +spend/ability "
             "buys a specialization from your starting allowance. Anyone may set "
-            "a challenge with +test/set. Choose an approach; suggestions are optional. "
+            "a challenge with +challenge/new. Choose an approach; suggestions are optional. "
             "IC poses and tests lock pips and loadout. +unlock announces a change. "
             "The two demonstration characters have finalized sheets; Builder mode "
             "lets you inspect them with +sheet <name> or puppet the stat-block dummy. "
@@ -225,11 +225,11 @@ OOC_ROOMS = (
             "+lock",
             "+unlock",
             "+test",
-            "+test/set",
-            "+test/edit",
-            "+test/void",
-            "+test/history",
-            "+test/review",
+            "+challenge/new",
+            "+challenge/edit",
+            "+challenge/void",
+            "+challenge/history",
+            "+challenge/review",
             "+chargen",
             "+gear",
             "+gear/make",
@@ -719,8 +719,13 @@ RP_RETIRED_ABILITIES = (
     "elemental-vulnerability",
 )
 RP_CHALLENGES = (
-    "A=Presence/Performance~Hold the audience's attention",
-    "B~Cross the chasm",
+    {
+        "difficulty": "A",
+        "description": "Hold the audience's attention",
+        "stat": "presence",
+        "tag": "performance",
+    },
+    {"difficulty": "B", "description": "Cross the chasm"},
 )
 MARKET_STALL_NAME = "The Sample Counter"
 MARKET_STALL_DESC = "[Placeholder] Try +browse, +buy, +market and +stall. Stock stays reserved while the seller is away."

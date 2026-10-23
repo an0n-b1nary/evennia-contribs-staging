@@ -349,3 +349,52 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         self.expect(cluster_command, f"/mine {cluster.pk}", "Assigned event", caller=self.char2)
         self.call(self.command("+rsvp"), f"/confirm {event.pk}", caller=self.char2)
         self.expect(self.command("+calendar"), "/mine", "Confirmed", caller=self.char2)
+
+    def test_challenge_companion_and_npc_aware_tests_keep_scene_privacy(self):
+        from unittest.mock import patch
+
+        from evennia_rp_chargen.models import CharacterBuild
+        from evennia_rp_chargen.stats import StatHandler
+        from evennia_rp_contest.models import Challenge, CheckRecord
+        from evennia_scenes.models import LogEntry, Scene
+
+        from evennia_rp_rules.dice import ScriptedRoller
+        from evennia_rp_rules.ruleset import get_ruleset
+
+        CharacterBuild.objects.create(character=self.char2)
+        stats = StatHandler(self.char2)
+        for key in get_ruleset().stats:
+            stats.set(key, get_ruleset().parse_rating("B"))
+        build = CharacterBuild.objects.get(character=self.char2)
+        build.status = "finalized"
+        build.save(update_fields=["status"])
+        scene = Scene.objects.create(room=self.room1, room_name=self.room1.key)
+        self.room1.active_scene_id = scene.pk
+        challenge = self.command("+challenge")
+        self.expect(challenge, "/new A=Hold the audience", "challenge #1", caller=self.char2)
+        self.expect(challenge, "/suggest #1=Presence/Performance", "edits", caller=self.char2)
+        self.expect(challenge, "/difficulty #1=B", "edits", caller=self.char2)
+        self.expect(challenge, "/once #1", "once", caller=self.char2)
+        with patch("evennia_rp_rules.pipeline.default_roller", return_value=ScriptedRoller([0])):
+            self.expect(
+                self.command("+test"),
+                "#1=Presence/Performance # At #12 ~ = {actor}",
+                "tests Presence",
+                caller=self.char2,
+            )
+        record = CheckRecord.objects.get()
+        self.assertEqual(record.challenge_id, Challenge.objects.get().pk)
+        self.assertEqual(record.comment, "At #12 ~ = {actor}")
+        log = LogEntry.objects.get(scene=scene)
+        self.assertIn(record.comment, log.content)
+        self.assertNotIn("roll", log.content)
+        self.assertNotIn("vs B", log.content)
+        self.expect(challenge, f"/void #1.{record.pk} # Agreed", "voids", caller=self.char2)
+        self.expect(challenge, "/history #1", "[VOID: Agreed]", caller=self.char2)
+        self.expect(challenge, "/review #1", "Only staff", caller=self.char2)
+        self.expect(challenge, "/review #1", '"roll"', caller=self.char1)
+        self.expect(
+            self.command("+test"), "/set B~Retired", "Unknown or ambiguous", caller=self.char2
+        )
+        self.assertEqual(Challenge.objects.count(), 1)
+        self.assertEqual(CheckRecord.objects.count(), 1)

@@ -361,7 +361,7 @@ def preserved(session, baseline):
         re.I,
     ), denied
     assert session.snapshot()["xp"] == current["xp"], "Ordinary player changed the XP ledger"
-    output = session.send("alice", f"+test {stats[0]}~Upgrade and restore confirmation")["output"]
+    output = session.send("alice", f"+test {stats[0]} # Upgrade and restore confirmation")["output"]
     assert re.search("Success|Failure", output, re.I), output
     assert len(session.snapshot()["checks"]) == len(current["checks"]) + 1
 

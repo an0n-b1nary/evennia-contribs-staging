@@ -44,7 +44,7 @@ Each system's staff tools are listed below by task, with a link to its staff pag
 ## Characters and conflict
 
 - **Character sheets:** `+chargen` lists, approves and reopens sheets; `+sheet <character>` reads anyone's. See [[chargen-staff]].
-- **Tests:** `+test/review` is the staff view of a test's history. See [[contest-staff]].
+- **Tests:** `+challenge/review` is the staff view of a test's history. See [[contest-staff]].
 - **Combat:** `+combat/rollback` returns a whole fight to a consistent checkpoint. See [[combat-staff]].
 - **Party:** `+bosscheck` offers manual Party challenges; committed consequences use combat staff recovery. See [[party-staff]].
 - **Gear:** `+gear/audit` lists worn gear whose requirements no longer hold. See [[equipment-staff]].
