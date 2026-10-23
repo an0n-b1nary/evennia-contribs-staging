@@ -45,6 +45,7 @@ class CmdModify(CraftCommand):
     """
 
     key = "+modify"
+    switch_options = ("offer", "undo", "accept", "cancel", "layers", "hide", "show")
     wave_three = True
 
     def run(self, switch):
@@ -164,8 +165,14 @@ class CmdModify(CraftCommand):
 
 
 class CmdPet(CraftCommand):
-    """Direct a Companion: +pet, +pet/follow <name>, +pet/stay <name>,
-    +pet/pose <name> = <prose>, +pet/trick <name> [= <mode>].
+    """Direct a Companion.
+
+    Usage:
+      +pet
+      +pet/follow <name>
+      +pet/stay <name>
+      +pet/pose <name> = <prose>
+      +pet/trick <name> [= <mode>]
 
     Only owner-written poses count as posing. Pick up a Companion before gifting
     or selling it; handoff changes ownership and resets it to stay. Companions
@@ -173,6 +180,7 @@ class CmdPet(CraftCommand):
     """
 
     key = "+pet"
+    switch_options = ("follow", "stay", "pose", "trick")
     wave_three = True
 
     def run(self, switch):

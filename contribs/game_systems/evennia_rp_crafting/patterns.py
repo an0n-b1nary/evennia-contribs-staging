@@ -152,12 +152,39 @@ def validate_combinations(value):
     return result
 
 
-def parse_combination(value):
-    """`wearable:readable+activatable` → (lifecycle, sorted verbs)."""
-    lifecycle, _, verbs = (value or "").partition(":")
-    keys = sorted(key.strip() for key in verbs.split("+") if key.strip())
-    validate_combinations({lifecycle.strip(): [keys]})
-    return lifecycle.strip(), keys
+@transaction.atomic
+def edit_verb(actor, pattern, lifecycle, verb, *, add=True):
+    """Edit a complete combination under its Pattern lock, without lost updates.
+
+    Existing alternative combinations are never collapsed or rewritten by an
+    address that cannot distinguish them. Hosts can still curate alternatives
+    with edit(combinations=...). No persisted format changes are required.
+    """
+    locked = _fresh(pattern)
+    _require(actor, staff=True)
+    validate_combinations({lifecycle: [[verb]]})
+    combinations = {
+        key: [list(choice) for choice in value] for key, value in locked.combinations.items()
+    }
+    choices = combinations.get(lifecycle, [])
+    if len(choices) > 1:
+        raise CraftingError(
+            "This lifecycle has multiple stored combinations; staff must curate those through the Pattern service before editing individual verbs."
+        )
+    verbs = list(choices[0]) if choices else []
+    if add:
+        if verb in verbs:
+            raise CraftingError("That Pattern already unlocks this verb combination.")
+        verbs.append(verb)
+    else:
+        if verb not in verbs:
+            raise CraftingError("That Pattern doesn't unlock this verb combination.")
+        verbs.remove(verb)
+    if verbs:
+        combinations[lifecycle] = [sorted(verbs)]
+    else:
+        combinations.pop(lifecycle, None)
+    return edit(actor, locked, combinations=combinations)
 
 
 def for_craft(actor, key, primary):

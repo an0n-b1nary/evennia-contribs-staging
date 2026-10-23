@@ -151,7 +151,13 @@ class LoreSyntaxTests(EvenniaCommandTest):
         self.expect(CmdTome(), "/page/nope Preface=Unwanted text.", "one switch")
         self.expect(CmdTome(), "/publish/nope", "one switch")
         self.expect(CmdTome(), "/notaswitch", "Unknown or ambiguous")
+        self.expect(CmdTome(), "/desc = Old description", "Usage:")
         self.assertEqual(deserialize(self.char1.attributes.get("lore_tome_draft")), before)
+        self.expect(CmdTome(), "/desc A=B: a chronicle", "draft saved")
+        self.assertEqual(
+            deserialize(self.char1.attributes.get("lore_tome_draft"))["description"],
+            "A=B: a chronicle",
+        )
 
 
 if apps.is_installed("evennia_rp_crafting"):
@@ -172,7 +178,7 @@ class RecognitionSyntaxTests(CraftingFixture, EvenniaCommandTest):
         LoreAcquisition.objects.create(entry=self.lore, character=self.char1, source="seed")
         from evennia_rp_crafting.commands import CmdCraft
 
-        for args in ("/new writing-0/readable = Codex", "/desc = A codex.", "/text = An account."):
+        for args in ("/new writing-0/readable = Codex", "/desc A codex.", "/text An account."):
             self.call(CmdCraft(), args)
 
     def test_recognition_addresses_entry_and_optional_contributing_niche(self):

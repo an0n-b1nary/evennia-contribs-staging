@@ -165,7 +165,7 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
 
     def test_draft_append_remove_preview_finish_and_read_navigation(self):
         self.call(CmdCraft(), "/new writing-0/readable = travel book", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = A travel book.", "Craft draft saved")
+        self.call(CmdCraft(), "/desc A travel book.", "Craft draft saved")
         self.call(CmdCraft(), "/page Departure = First.", "Craft draft saved")
         self.call(CmdCraft(), "/page Arrival = Second.", "Craft draft saved")
         output = self.call(CmdCraft(), "", "Draft: travel book")
@@ -175,9 +175,9 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
         self.call(CmdCraft(), "/unpage 3", "No such draft page.")
         self.call(CmdCraft(), "/unpage 1", "Craft draft saved")
         self.call(CmdCraft(), "/page Return = Third.", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = wood:2", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 2 wood", "Craft draft saved")
         self.call(CmdCraft(), "/finish", "You craft travel book")
-        self.call(CmdRead(), "travel book 2", "travel book\nPage 2 of 2: Return\nThird.")
+        self.call(CmdRead(), "travel book=2", "travel book\nPage 2 of 2: Return\nThird.")
         self.call(
             CmdRead(),
             "/contents travel book",
@@ -188,11 +188,11 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
 
     def test_text_replaces_draft_pages_and_failed_validation_keeps_draft(self):
         self.call(CmdCraft(), "/new writing-0/readable = notes", "Craft draft saved")
-        self.call(CmdCraft(), "/text = First.\n---PAGE---\nSecond.", "Craft draft saved")
+        self.call(CmdCraft(), "/text First.\n---PAGE---\nSecond.", "Craft draft saved")
         self.assertEqual(len(self.char1.attributes.get(DRAFT_KEY)["configuration"]["pages"]), 2)
         self.call(CmdCraft(), "/page Empty = ", "Page text must contain")
         self.assertEqual(len(self.char1.attributes.get(DRAFT_KEY)["configuration"]["pages"]), 2)
-        self.call(CmdCraft(), "/text = Replacement.", "Craft draft saved")
+        self.call(CmdCraft(), "/text Replacement.", "Craft draft saved")
         self.assertEqual(
             dict(self.char1.attributes.get(DRAFT_KEY)["configuration"]), {"text": "Replacement."}
         )
@@ -222,12 +222,12 @@ class PageTests(CraftingFixture, EvenniaCommandTest):
         with override_settings(RP_CRAFTING_COMBINATIONS={"wearable": [["readable"]]}):
             for args in (
                 "/new weaving/wearable = book pendant",
-                "/desc = A small book-shaped pendant.",
-                "/line = a small silver book pendant",
+                "/desc A small book-shaped pendant.",
+                "/line a small silver book pendant",
                 "/verb writing-0/readable",
                 "/page First = An opening.",
                 "/page Last = A closing.",
-                "/resources = wood:3",
+                "/resources 3 wood",
             ):
                 self.call(CmdCraft(), args, "Craft draft saved")
             output = self.call(CmdCraft(), "", "Draft: book pendant")

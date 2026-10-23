@@ -35,13 +35,15 @@ def catalog():
 
 ```
 +workshop/catalog
-+workshop/unlock weaving = timber:3
++workshop/unlock weaving = 3 timber
++workshop/unlock weaving
++workshop/unlock weaving = <token from preview>
 +workshop
 +craft/new weaving/wearable = a woven cloak
-+craft/desc = A soft cloak with a striped hem.
-+craft/line = a woven cloak
-+craft/slot = body
-+craft/resources = timber:1
++craft/desc A soft cloak with a striped hem.
++craft/line a woven cloak
++craft/slot body
++craft/resources 1 timber
 +craft
 +craft/finish
 +wear a woven cloak
@@ -50,7 +52,7 @@ def catalog():
 ```
 
 For Readable, use `+craft/new writing/readable = a field book`, `/desc`,
-`/text = ...`, `/resources`, then `/finish`. `read <item>` displays its text.
+`/text ...`, `/resources`, then `/finish`. `read <item>` displays its text.
 
 Authored pages use `+craft/page [title] = page text` repeatedly, then
 `+craft/unpage <number>` to remove a draft page. `/text` replaces the draft's
@@ -62,8 +64,9 @@ Published pages stay in the immutable CraftRecord. Each additional page costs
 cost map must configure that rule before crafting multiple pages; old
 single-text books retain their original price.
 
-`read <item> 3` or `read <item> = 3` selects a page. The equals form also works
-for item names ending in numbers: exact whole-name matches take precedence.
+`read <item> = 3` selects a page, including for item names ending in numbers.
+Without `=`, the complete argument is the item name; positional page suffixes
+are no longer accepted.
 `read/contents <item>` lists titles without moving the reader's bookmark.
 `read <item>` resumes the last page read by that character, initially page 1.
 Progress is stored in character Attributes under category
@@ -93,16 +96,17 @@ Success clears the draft, so repeating finish cannot duplicate the craft.
 ### Journals and editions
 
 For a blank journal, start a Readable draft, set `/desc`, then
-`+craft/journal = 10` and select resources for ten pages. Capacity is 1–100;
+`+craft/journal 10` and select resources for ten pages. Capacity is 1–100;
 the base and extra-page rules price the binding and capacity up front. This
 replaces any authored draft text. `/text` or `/page` replaces the blank journal
 with an ordinary fixed Readable. Blank capacity also works on deliberately
 allowed composed Readables; other components retain their own costs.
 
 ```
-+journal/write journal = Arrival | We reached the market at dawn.
-+journal/revise journal = 1 | Arrival | We reached the well at dawn.
-+journal/history journal = 1
++journal/write journal = We reached the market at dawn.
++journal/title journal/1 = Arrival
++journal/revise journal/1 = We reached the well at dawn.
++journal/history journal/1
 ```
 
 Any current holder can write without a niche, fee or material payment. Carry
@@ -123,7 +127,7 @@ renaming a writer never attributes old text to the binding maker or new owner.
 ```
 +craft/copy journal = writing/a journal edition
 +craft
-+craft/resources = timber:2
++craft/resources 2 timber
 +craft/finish
 ```
 
@@ -170,10 +174,10 @@ Add a niche granting `consumable` with `provisions` inputs, or `broadcast` with
 
 ```
 +craft/new cooking/consumable = a spice cake
-+craft/desc = A small cake dusted with aromatic spice.
-+craft/beat = A warm scent of spice fills the air.
-+craft/beat = A faint sweetness lingers, then fades.
-+craft/resources = grain:2
++craft/desc A small cake dusted with aromatic spice.
++craft/beat A warm scent of spice fills the air.
++craft/beat A faint sweetness lingers, then fades.
++craft/resources 2 grain
 +craft
 +craft/finish
 use a spice cake
@@ -276,10 +280,10 @@ sets. A crafter holding both contributing niches can then draft one with:
 ```text
 +craft/new weaving/wearable = a locket
 +craft/verb writing/readable
-+craft/desc = A small locket with a note inside.
-+craft/text = Meet me at the market.
-+craft/slot = neck
-+craft/resources = timber:2
++craft/desc A small locket with a note inside.
++craft/text Meet me at the market.
++craft/slot neck
++craft/resources 2 timber
 +craft
 +craft/finish
 ```
@@ -417,18 +421,18 @@ subject to the item's `use` lock; using never grants editing/removal rights.
 
 ```text
 +craft/new music/activatable = a carved flute
-+craft/desc = A small carved flute.
++craft/desc A small carved flute.
 +craft/mode play = A clear melody carries through the room.
-+craft/resources = timber:1
++craft/resources 1 timber
 +craft/finish
 use a carved flute = play
 
 +craft/new decoration/installable = a lantern
-+craft/desc = A brass lantern.
-+craft/room_line = Warm lamplight falls across the wall.
-+craft/smell = A trace of beeswax.
-+craft/sound = A faint candlewick hiss.
-+craft/resources = timber:1
++craft/desc A brass lantern.
++craft/room_line Warm lamplight falls across the wall.
++craft/smell A trace of beeswax.
++craft/sound A faint candlewick hiss.
++craft/resources 1 timber
 +craft/finish
 +fixture/install a lantern
 +smell
@@ -624,10 +628,10 @@ Accessibility. Quiet Companions work without that partner.
 
 ```text
 +craft/new companions/companion = a clockwork bird
-+craft/desc = A little brass bird with decorative feathers.
++craft/desc A little brass bird with decorative feathers.
 +craft/verb music/activatable
 +craft/mode bow = The little bird bows and spreads its wings.
-+craft/resources = timber:2
++craft/resources 2 timber
 +craft/finish
 +pet/follow a clockwork bird
 +pet/stay a clockwork bird
@@ -666,7 +670,7 @@ facets remain separate milestones.
 ## Letters and signets
 
 A letter is a carried Readable, including an owner-written journal. Set its
-optional, descriptive IC addressee with `+craft/addressee = The Keeper` while
+optional, descriptive IC addressee with `+craft/addressee The Keeper` while
 crafting, or `+letter/address <item> = The Keeper` while carrying it. Addressing
 adds no resource surcharge and confers no exclusive reading permission;
 normal object/view/read access still applies.
@@ -674,7 +678,7 @@ normal object/view/read access still applies.
 Hosts opt wearable niches into signet production with
 `RP_CRAFTING_SIGNET_NICHES = ["jewellery"]` (default: no permitted niches).
 Craft a Wearable from a permitted niche and add
-`+craft/signet = The Courier's Rose`; `/unsignet` removes that draft feature.
+`+craft/signet The Courier's Rose`; `/unsignet` removes that draft feature.
 The immutable `signet` facet records its design and contributing niche.
 `RP_CRAFTING_COSTS["signet"]["base"]` adds one material input by default, on top
 of wearable costs; custom cost maps must supply this rule. The contributing
@@ -809,13 +813,13 @@ Base prose and the immutable craft snapshot remain intact.
 
 ```
 +craft/new weaving/wearable = a hooded cloak
-+craft/desc = A grey cloak.
-+craft/line = a grey cloak
++craft/desc A grey cloak.
++craft/line a grey cloak
 +craft/state hood down = a grey cloak, hood down
 +craft/state hood up = a grey cloak, hood raised
 +craft/statedesc hood up = A cloak with its hood raised.
 +craft/defaultstate hood down
-+craft/resources = timber:3
++craft/resources 3 timber
 +craft
 +craft/finish
 +adjust a hooded cloak
@@ -842,6 +846,24 @@ registers a base-state provider and a Modifier-extra provider during startup. De
 state presentation and visible Modifier layers once, with auras retained.
 Wearable states are the first consumer; fixture, companion and activatable
 state consumers, automatic transitions and timed states are separate work.
+
+## Command syntax
+
+Use one switch; case-insensitive unique prefixes work. Unknown, ambiguous and
+stacked switches are refused before dispatch. Draft fields take bare values;
+old leading `=` forms and colon resource lists no longer work. Authored prose
+retains its punctuation. Select each material with `+craft/resources 2 timber`;
+repeating a key replaces its quantity, and `+craft/unresource timber` removes it.
+The same selection commands work in copy drafts.
+
+Workshop selections also reserve and spend nothing. Use
+`+workshop/unlock weaving=3 timber` once per resource, then
+`+workshop/unlock weaving` to review the full cost and selected payment. Copy the
+printed `+workshop/unlock weaving=<token>` to pay and unlock. Tokens expire after
+15 minutes, belong to the reviewing character, and cannot be reused. Changing
+materials, catalogue terms or Workshop history requires another preview.
+`+workshop/unresource weaving=timber` removes a selection;
+`+workshop/cancel weaving` discards that niche's unlock draft.
 
 ## Patterns
 
@@ -877,9 +899,18 @@ move back, and every change is logged. Later threads can still grant a Pattern
 without resetting its stage. Common-stage learning is by teaching only; lore
 entries, recipe books and premium sources are separate future features.
 
+### Editing combinations
+
+Staff add one verb at a time: `+pattern/combo <Pattern>/<lifecycle>=<verb>`.
+Repeated calls build one complete verb set for that lifecycle; `/uncombo` with
+that address and verb removes it. Removing the last verb removes the set.
+Existing stored alternatives remain valid and unchanged. If a lifecycle already
+has several alternatives, curate it with the host's `patterns.edit` service;
+the command refuses an ambiguous edit rather than merging those alternatives.
+
 ### Teaching
 
-`+pattern/teach <character> = <Pattern>` offers to teach; the student answers
+`+pattern/teach <Pattern> = <character>` offers to teach; the student answers
 with `+pattern/accept <Pattern>` or `/decline`. The offer and the acceptance
 each check that:
 
@@ -897,7 +928,7 @@ nobody can teach. The scene is recorded in the student's lineage.
 
 Staff (`RP_CRAFTING_STAFF_LOCK`) use `+pattern/create <key> = <name>` (keys are
 permanent), `/describe`, `/rename`, `/niches`, `/combo` and `/uncombo`
-(`<lifecycle>:<verb>[+<verb>...]`), `/grant <Pattern> = <character>`,
+(`<Pattern>/<lifecycle>=<verb>`), `/grant <Pattern> = <character>`,
 `/archive`, `/unarchive` and `/roster`. Archiving blocks new crafts, grants and
 teaching; existing items and knowledge are unchanged.
 

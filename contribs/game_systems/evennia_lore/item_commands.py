@@ -177,7 +177,7 @@ class CmdTome(ItemCommand):
 
     Usage:
       +tome/new <name>
-      +tome/desc = <description>
+      +tome/desc <description>
       +tome/page [title] = <text>  (repeat for additional pages)
       +tome/cite [page] = #entry
       +tome
@@ -209,9 +209,9 @@ class CmdTome(ItemCommand):
                 raise LoreItemError("Start a draft with +tome/new <name>.")
             draft = deserialize(stored)
             if switch == "desc":
-                draft["description"] = (
-                    self.rhs if self.rhs is not None else self.args.lstrip("= ")
-                ).strip()
+                if self.args.strip().startswith("="):
+                    raise LoreItemError("Usage: +tome/desc <description>")
+                draft["description"] = self.args.strip()
             elif switch == "page":
                 if self.rhs is None:
                     raise LoreItemError("Usage: +tome/page [title] = page text")

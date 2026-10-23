@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-lore"
-version = "0.9.0"
+version = "0.10.0"
 description = "Wiki-like lore compendium (+lore/+investigate/+share/+hint/+forget) with passive RP-driven acquisition for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -25,7 +25,7 @@ classifiers = [
 dependencies = ["evennia>=6.0", "evennia-links>=0.8.12,<0.9"]
 
 [project.optional-dependencies]
-crafting = ["evennia-rp-crafting>=0.8,<0.11"]
+crafting = ["evennia-rp-crafting>=0.11,<0.12"]
 # [web] enables website views, DRF API, and accessible forms/templates.
 web = [
     "evennia-accessibility>=0.3.1",

@@ -171,10 +171,10 @@ with repeated `+craft/page title = text`; each extra page costs one additional
 material by default. The shared pagination helper comes from Links 0.8.7.
 The sample field journal has three prepaid pages and one attributed entry;
 the sample journal edition freezes that entry. Pick up the journal, then try
-`+journal/write a sample field journal = Visit | I stopped by the well.`
+`+journal/write a sample field journal = I stopped by the well.`
 Use `/revise` and `/history` to see preserved revisions. Gifting or selling
 the journal lets its new holder append entries while keeping earlier writers'
-attribution. Create your own with `+craft/journal = 3` in a Readable draft.
+attribution. Create your own with `+craft/journal 3` in a Readable draft.
 `+craft/copy a sample field journal = writing/a journal edition` starts a
 copy draft: preview it with `+craft`, select resources and `/finish` at normal
 crafting cost. Source revisions never change completed editions.
@@ -202,13 +202,14 @@ continues through the ordinary owner posing path. The actual-partner assertions
 live in `world.sandbox.test_emissions` and the wave-two/three seam suites.
 
 Use `+workshop/catalog` for current unlock costs, then
-`+workshop/unlock writing = timber:3`. A second active niche costs twice its
+`+workshop/unlock writing = 3 timber`, then `+workshop/unlock writing`
+and the printed token confirmation. A second active niche costs twice its
 base inputs, then three times for a third. The five-niche cap is mandatory
 and runtime-tunable. `+workshop/abandon writing` frees the slot without a
 refund and lowers the money/resource cap raise.
 
 Compose with `+craft/new writing/readable = a field book`, `/desc`,
-`/text`, `/resources = timber:1`, preview with `+craft`, then `/finish`.
+`/text`, `/resources 1 timber`, preview with `+craft`, then `/finish`.
 Wearable drafts use `/line`, optional `/aura`, `/slot` and `/require`.
 Crafted wearables reuse equipment's requirements and sealing and do not use
 the plain-gear cap. Staff `+crafting/review` sees the original prose and costs.
@@ -1902,7 +1903,7 @@ sample verse scarf` reads the verse stitched into a wearable scarf. Both
 niches still contribute and are paid for.
 
 Try `+pattern/info market-lettering`. To teach, open a scene, have both
-characters pose, then `+pattern/teach <character> = market-lettering` and
+characters pose, then `+pattern/teach market-lettering = <character>` and
 `+pattern/accept market-lettering`. Staff can `+pattern/create`, attach a
 Pattern to a plot thread with `+pattern/thread`, and conclude the thread to
 grant it to its participants. The reference setting moves Spreading Patterns to

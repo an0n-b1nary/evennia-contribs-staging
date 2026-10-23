@@ -11,7 +11,7 @@ summary: Workshops and crafts, drafting and finishing an item, what crafted thin
 Crafting turns your character's [[resources]] into things others can wear, read, use and see. You open **crafts** in your [[glossary-workshop|workshop]], then make items in them: a cloak, a book, a cake that fills the room with the smell of spice. Crafted things are for the story. They never change a check or make anyone stronger.
 
 - `+workshop/catalog` lists the crafts your game offers, and `+workshop` shows yours and what the next one costs.
-- `+workshop/unlock <craft>=<resources>` opens a craft.
+- `+workshop/unlock <craft>=<amount> <resource>` selects one material. Repeat per resource, then `+workshop/unlock <craft>` previews the cost and prints a token confirmation to pay and open it.
 - `+craft/new <craft>/<kind>=<name>` starts a draft. The other `+craft` switches describe it.
 - `+craft` previews the draft and its cost, and `+craft/finish` makes the item.
 - `use <item>` uses something made to be used.
@@ -28,7 +28,7 @@ Your first item in a new craft is as good as anyone's. There's no skill to grind
 
 ## Making an item
 
-`+craft/new` starts a draft: the craft, the kind of item and its name. Then write it: `+craft/desc` for its description, and whatever else that kind needs, such as `+craft/line` for a worn line. `+craft/resources <resource>:<amount>` chooses what to pay with, and `+craft` shows what it still needs. The craft decides which kinds of resource count; you choose which ones from your stores.
+`+craft/new` starts a draft: the craft, the kind of item and its name. Then write it: `+craft/desc` for its description, and whatever else that kind needs, such as `+craft/line` for a worn line. `+craft/resources <amount> <resource>` chooses one resource to pay with. Repeat for another key; the same key replaces its quantity, and `+craft/unresource <resource>` removes it. `+craft` shows what it still needs. The craft decides which kinds of resource count; you choose which ones from your stores.
 
 Drafts are kept until you finish or `+craft/cancel` them, even across logins. Previewing costs nothing. Your game may also charge a small fee for each craft. `+craft/finish` checks everything again, takes the cost and makes the item once, so finishing twice can't make two.
 

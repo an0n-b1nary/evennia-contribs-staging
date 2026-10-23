@@ -345,6 +345,16 @@ class Suite:
         finally:
             self.command("staff", "+runtime/reset RP_ECONOMY_SYSTEM_SELLER", "False")
 
+    def unlock(self, key, amount, resource, expected):
+        self.command("alice", f"+workshop/unlock {key}={amount} {resource}", "resources selected")
+        before = self.state()
+        preview = self.command("alice", f"+workshop/unlock {key}", "Nothing paid.*Confirm:")
+        after = self.state()
+        for field in ("resource_holdings", "crafting_niches", "economy_purses"):
+            assert after[field] == before[field], (field, before[field], after[field])
+        token = re.search(r"Confirm: \+workshop/unlock [^=]+=([^\s]+)", preview["output"])[1]
+        self.command("alice", f"+workshop/unlock {key}={token}", expected)
+
     def crafting(self):
         state = self.state()
         alice_id = state["actors"]["alice"]["id"]
@@ -356,18 +366,19 @@ class Suite:
         )
         self.command("staff", f"+economy/credit #{alice_id}=500 # Live crafting", "Purse updated")
         self.command("alice", "+workshop/catalog", "Weaver.*Scribe|Scribe.*Weaver")
-        self.command("alice", "+workshop/unlock weaving=timber:3", "Unlocked Weaver")
+        self.unlock("weaving", 3, "timber", "Unlocked Weaver")
         self.command("alice", "+craft/new weaving/wearable = live crafted cloak", "draft saved")
         self.command(
             "alice",
             "+craft/verb writing/readable",
             "That lifecycle and verb combination is unavailable",
         )
-        self.command("alice", "+craft/desc = A cloak made for the live market.", "draft saved")
-        self.command("alice", "+craft/line = a bright woven cloak", "draft saved")
-        self.command("alice", "+craft/aura = soft ember sparks", "draft saved")
-        self.command("alice", "+craft/slot = body", "draft saved")
-        self.command("alice", "+craft/resources = timber:1,ember:1", "draft saved")
+        self.command("alice", "+craft/desc A cloak made for the live market.", "draft saved")
+        self.command("alice", "+craft/line a bright woven cloak", "draft saved")
+        self.command("alice", "+craft/aura soft ember sparks", "draft saved")
+        self.command("alice", "+craft/slot body", "draft saved")
+        self.command("alice", "+craft/resources 1 timber", "draft saved")
+        self.command("alice", "+craft/resources 1 ember", "draft saved")
         before = self.state()
         self.command("alice", "+craft", "Cost:.*1 materials.*1 essences")
         self.session.host.reload()
@@ -394,11 +405,11 @@ class Suite:
         self.session.connect("alice")
         self.command("bob", "+gear/info live crafted cloak", r"Craft hallmark \(OOC\):.*Weaver")
         self.command("bob", "+gear/desc live crafted cloak = Forged", "Only its maker|fixed now")
-        self.command("alice", "+workshop/unlock writing=timber:6", "Unlocked Scribe")
+        self.unlock("writing", 6, "timber", "Unlocked Scribe")
         self.command("alice", "+craft/new writing/readable = live field notes", "draft saved")
-        self.command("alice", "+craft/desc = A bound field notebook.", "draft saved")
-        self.command("alice", "+craft/text = A record of the market road.", "draft saved")
-        self.command("alice", "+craft/resources = timber:1", "draft saved")
+        self.command("alice", "+craft/desc A bound field notebook.", "draft saved")
+        self.command("alice", "+craft/text A record of the market road.", "draft saved")
+        self.command("alice", "+craft/resources 1 timber", "draft saved")
         self.command("alice", "+craft/finish", "You craft live field notes")
         self.command("alice", "read live field notes", "record of the market road")
         book = next(
@@ -423,6 +434,65 @@ class Suite:
             self.command("staff", "+runtime/reset RP_CRAFTING_REVEALED", "True")
         self.command("alice", "+stall/close", "stock returned")
         assert len(self.state()["crafts"]) == len(before["crafts"]) + 2
+
+    def crafting_syntax(self):
+        """Journal revisions, material drafts and refusal through real cmdsets."""
+        state = self.state()
+        alice_id = state["actors"]["alice"]["id"]
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=10 timber # Journal checks", "Resources updated"
+        )
+        self.command("alice", "+craft/new writing/readable=Live syntax journal", "draft saved")
+        self.command("alice", "+craft/desc A=B: a journal", "draft saved")
+        self.command("alice", "+craft/journal 2", "draft saved")
+        self.command("alice", "+craft/desc = Old form", "Usage:")
+        self.command("alice", "+craft/finish/nope", "one switch")
+        self.command("alice", "+craft/resources timber:2", "Select one resource")
+        self.command("alice", "+craft/resources 1 timber", "draft saved")
+        self.command("alice", "+craft/unresource timber", "draft saved")
+        self.command("alice", "+craft/resources 2 timber", "draft saved")
+        self.command("alice", "+craft/finish", "You craft Live syntax journal")
+        self.command("alice", "+journal/write Live syntax journal=Original words.", "page 1 saved")
+        self.command("alice", "+journal/title Live syntax journal/1=|wArrival|n", "revision 2")
+        self.command(
+            "alice", "+journal/revise Live syntax journal/1=|gRevised words.|n", "revision 3"
+        )
+        self.command(
+            "alice", "+journal/history Live syntax journal/1", "Original words.*Revised words"
+        )
+        self.command("alice", "read Live syntax journal=1", "Arrival.*Revised words")
+        self.command("alice", "+journal/revise Live syntax journal=1 | Old | Forgery", "Usage:")
+        self.command("alice", "read Live syntax journal 1", "Could not find")
+        self.command(
+            "alice", "+craft/copy Live syntax journal=writing/Live syntax copy", "Copy draft saved"
+        )
+        self.command("alice", "+craft/desc A copied binding", "Copy draft saved")
+        self.command("alice", "+craft/resources 1 timber", "Copy draft saved")
+        self.command("alice", "+craft/finish", "You copy Live syntax copy")
+        self.command("bob", "read Live syntax copy", "Could not find")
+        self.command("alice", "read Live syntax copy", "Arrival.*Revised words")
+        self.command("staff", "+pattern/create live-syntax=Live syntax", "created")
+        self.command("staff", "+pattern/niches live-syntax=writing", "Niches: writing")
+        self.command("staff", "+pattern/combo live-syntax/carried=readable", "carried.*readable")
+        self.command(
+            "staff",
+            "+pattern/combo live-syntax/carried=activatable",
+            "carried.*activatable.*readable",
+        )
+        self.command(
+            "staff", "+pattern/uncombo live-syntax/carried=activatable", "carried.*readable"
+        )
+        self.command("staff", "+pattern/combo live-syntax=carried:readable+activatable", "Usage:")
+        self.command("staff", f"+pattern/grant live-syntax=#{alice_id}", "learns Live syntax")
+        # Existing logged scene from the Lore acceptance case supports teaching.
+        self.command("staff", "+pattern/advance live-syntax", "Spreading")
+        self.command("alice", "+scene/open Live syntax lesson", "opened")
+        self.command("alice", "pose teaches a careful lettering lesson.", "lettering lesson")
+        self.command("bob", "pose follows the lettering lesson.", "lettering lesson")
+        bob_name = self.session.host.credentials["bob"]["name"]
+        self.command("alice", f"+pattern/teach live-syntax={bob_name}", "offer to teach")
+        self.command("bob", "+pattern/accept live-syntax", "learn Live syntax")
+        self.command("alice", "+scene/close", "closed")
 
     def lore(self):
         alice = self.session.host.credentials["alice"]["name"]
@@ -454,7 +524,7 @@ class Suite:
         self.command("bob", "+lore/acquired", "Live road account")
         self.command("bob", f"+forget #{number}", "forgotten")
         self.command("staff", "+tome/new Live chronicle 2", "draft saved")
-        self.command("staff", "+tome/desc = A chronicle of the market road.", "draft saved")
+        self.command("staff", "+tome/desc A chronicle of the market road.", "draft saved")
         self.command("staff", "+tome/page First=An introduction.", "draft saved")
         self.command("staff", "+tome/page Last=The market road.", "draft saved")
         self.command("staff", f"+tome/cite 2=#{number}", "draft saved")
@@ -468,8 +538,8 @@ class Suite:
         self.command("bob", "read Live chronicle 2=2", "You recognise: Live road account")
         self.command("bob", "+lore/acquired", "Live road account")
         self.command("alice", "+craft/new writing/readable = Live lore guide", "draft saved")
-        self.command("alice", "+craft/desc = A guide to the road.", "draft saved")
-        self.command("alice", "+craft/text = A record of the road.", "draft saved")
+        self.command("alice", "+craft/desc A guide to the road.", "draft saved")
+        self.command("alice", "+craft/text A record of the road.", "draft saved")
         self.command("alice", f"+lorecraft/recognise = #{number} | Old sign.", "Usage:")
         self.command("alice", f"+lorecraft/recognise/nope #{number}=Old sign.", "Use one switch")
         self.command(
@@ -477,7 +547,7 @@ class Suite:
         )
         preview = self.command("alice", "+craft", "2 materials")
         assert "familiar road sign" in preview["output"], preview
-        self.command("alice", "+craft/resources = timber:2", "draft saved")
+        self.command("alice", "+craft/resources 2 timber", "draft saved")
         self.command("alice", "+craft/finish", "You craft Live lore guide")
 
     def events(self):
@@ -489,8 +559,8 @@ class Suite:
                 "Resources updated",
             )
         self.command("staff", f"+economy/credit #{alice_id}=1000 # Live EVENT", "Purse updated")
-        self.command("alice", "+workshop/unlock cooking=grain:6", "Unlocked Cook")
-        self.command("alice", "+workshop/unlock illusions=ember:9", "Unlocked Illusionist")
+        self.unlock("cooking", 6, "grain", "Unlocked Cook")
+        self.unlock("illusions", 9, "ember", "Unlocked Illusionist")
         for niche, kind, resource, name, beat in (
             (
                 "cooking",
@@ -509,9 +579,9 @@ class Suite:
             ),
         ):
             self.command("alice", f"+craft/new {niche}/{kind}={name}", "draft saved")
-            self.command("alice", "+craft/desc = A small live demonstration.", "draft saved")
-            self.command("alice", f"+craft/beat = {beat}", "draft saved")
-            self.command("alice", f"+craft/resources = {resource}:1", "draft saved")
+            self.command("alice", "+craft/desc A small live demonstration.", "draft saved")
+            self.command("alice", f"+craft/beat {beat}", "draft saved")
+            self.command("alice", f"+craft/resources 1 {resource}", "draft saved")
             self.command("alice", "+craft/finish", "You craft")
         self.command("bob", "+ambient/mute", "muted")
         result = self.command("alice", "use live spice cake", "You use")
@@ -548,17 +618,13 @@ class Suite:
             row["workshop__character_id"] == alice_id and row["abandoned_at"] is None
             for row in self.state()["crafting_niches"]
         )
-        self.command(
-            "alice", f"+workshop/unlock music=timber:{3 * (active + 1)}", "Unlocked Artisan"
-        )
-        self.command(
-            "alice", f"+workshop/unlock decoration=timber:{3 * (active + 2)}", "Unlocked Decorator"
-        )
+        self.unlock("music", 3 * (active + 1), "timber", "Unlocked Artisan")
+        self.unlock("decoration", 3 * (active + 2), "timber", "Unlocked Decorator")
         for command in (
             "+craft/new music/activatable = live carved lute",
-            "+craft/desc = A small carved lute.",
+            "+craft/desc A small carved lute.",
             "+craft/mode play = A bright wave-two melody rings out.",
-            "+craft/resources = timber:1",
+            "+craft/resources 1 timber",
         ):
             self.command("alice", command, "draft saved")
         self.command("alice", "+craft/finish", "You craft live carved lute")
@@ -573,13 +639,13 @@ class Suite:
         self.command("alice", "+roomconfig/smell Cool stone.", "Room smell set")
         for command in (
             "+craft/new decoration/installable = live music lantern",
-            "+craft/desc = A lantern with a musical crank.",
-            "+craft/room_line = Warm amber lamplight fills the shop.",
-            "+craft/smell = A faint beeswax scent.",
-            "+craft/sound = A candlewick hisses.",
+            "+craft/desc A lantern with a musical crank.",
+            "+craft/room_line Warm amber lamplight fills the shop.",
+            "+craft/smell A faint beeswax scent.",
+            "+craft/sound A candlewick hisses.",
             "+craft/verb music/activatable",
             "+craft/mode turn = The lantern plays a gentle tune.",
-            "+craft/resources = timber:2",
+            "+craft/resources 2 timber",
         ):
             self.command("alice", command, "draft saved")
         self.command("alice", "+craft/finish", "You craft live music lantern")
@@ -875,6 +941,9 @@ def run_rp(session, smoke=False):
         ]
     cases.append(
         ("lore authoring, links, sharing, addressed recognition and page acquisition", suite.lore)
+    )
+    cases.append(
+        ("Crafting field syntax, journal revisions and Pattern teaching", suite.crafting_syntax)
     )
     for name, function in cases:
         if not suite.case(name, function):

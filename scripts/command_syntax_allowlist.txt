@@ -29,11 +29,6 @@ evennia_rp_combat stacked-switch +combat
 evennia_rp_contest nested-equals +test
 evennia_rp_contest stacked-switch +test
 evennia_rp_contest tilde +test
-evennia_rp_crafting colon +craft
-evennia_rp_crafting colon +pattern
-evennia_rp_crafting colon +workshop
-evennia_rp_crafting nested-equals +pet
-evennia_rp_crafting pipe +journal
 evennia_rp_crafting semicolon +modify
 evennia_rp_crafting semicolon-parse +modify
 evennia_rp_party json +party

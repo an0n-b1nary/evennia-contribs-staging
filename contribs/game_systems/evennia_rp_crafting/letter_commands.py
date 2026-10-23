@@ -21,6 +21,7 @@ class CmdLetter(CraftCommand):
     """
 
     key = "+letter"
+    switch_options = ("address", "seal")
 
     def run(self, switch):
         if switch not in ("address", "seal") or self.rhs is None:

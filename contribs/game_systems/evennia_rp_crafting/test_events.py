@@ -314,11 +314,11 @@ class EventTests(EventFixture, EvenniaTest):
 class EventCommandTests(EventFixture, EvenniaCommandTest):
     def test_compose_preview_remove_beat_and_use_through_commands(self):
         self.call(CmdCraft(), "/new cooking/consumable = command cake", "Craft draft saved")
-        self.call(CmdCraft(), "/desc = A tiny cake.", "Craft draft saved")
-        self.call(CmdCraft(), "/beat = Warm spice fills the air.", "Craft draft saved")
-        self.call(CmdCraft(), "/beat = An extra beat.", "Craft draft saved")
+        self.call(CmdCraft(), "/desc A tiny cake.", "Craft draft saved")
+        self.call(CmdCraft(), "/beat Warm spice fills the air.", "Craft draft saved")
+        self.call(CmdCraft(), "/beat An extra beat.", "Craft draft saved")
         self.call(CmdCraft(), "/unbeat 2", "Craft draft saved")
-        self.call(CmdCraft(), "/resources = grain:1", "Craft draft saved")
+        self.call(CmdCraft(), "/resources 1 grain", "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: command cake")
         self.call(CmdCraft(), "/finish", "You craft command cake")
         self.call(CmdUse(), "command cake", "You use command cake")
@@ -326,10 +326,10 @@ class EventCommandTests(EventFixture, EvenniaCommandTest):
 
     def test_beat_errors_name_the_beat(self):
         self.call(CmdCraft(), "/new cooking/consumable = command cake", "Craft draft saved")
-        self.call(CmdCraft(), "/beat = " + "x" * 401, "EVENT beat must contain 1-400 characters.")
+        self.call(CmdCraft(), "/beat " + "x" * 401, "EVENT beat must contain 1-400 characters.")
 
     def test_requirement_errors_still_name_the_requirement(self):
         if not apps.is_installed("evennia_rp_equipment"):
             self.skipTest("equipment absent")
         self.call(CmdCraft(), "/new weaving/wearable = command cloak", "Craft draft saved")
-        self.call(CmdCraft(), "/require = ", "Requirement must contain 1-200 characters.")
+        self.call(CmdCraft(), "/require ", "Requirement must contain 1-200 characters.")

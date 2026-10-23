@@ -66,7 +66,7 @@ class PatternSeams(SeededSandboxMixin, EvenniaCommandTest):
             character.move_to(self.room1, quiet=True)
         self.call(
             command(),
-            "/teach Char2 = market-lettering",
+            "/teach market-lettering = Char2",
             "Teaching needs a logged scene",
             caller=self.owner,
         )
@@ -77,7 +77,7 @@ class PatternSeams(SeededSandboxMixin, EvenniaCommandTest):
         self.owner.record_pose("traces each stroke of the sign-writer's hand.")
         self.char2.record_pose("copies the letters carefully.")
         self.assertEqual(SceneParticipant.objects.filter(scene=scene, pose_count__gte=1).count(), 2)
-        self.call(command(), "/teach Char2 = market-lettering", "You offer", caller=self.owner)
+        self.call(command(), "/teach market-lettering = Char2", "You offer", caller=self.owner)
         self.call(
             command(),
             "/accept market-lettering",

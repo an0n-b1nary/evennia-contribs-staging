@@ -3,10 +3,11 @@
 from evennia.commands.default.muxcommand import MuxCommand
 
 from . import conf
+from .command_syntax import SingleSwitchMixin
 from .errors import CraftingError
 
 
-class CraftCommand(MuxCommand):
+class CraftCommand(SingleSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Crafting"
     wave_two = False

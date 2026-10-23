@@ -12,7 +12,7 @@ A [[glossary-pattern|Pattern]] is something a crafter knows: a recipe, a weaving
 - `+pattern` lists the Patterns you know and any offers to teach you.
 - `+pattern/all` lists the Patterns known in the game, and `+pattern/info <Pattern>` describes one.
 - `+craft/pattern <Pattern>` works your draft in a Pattern you know.
-- `+pattern/teach <character>=<Pattern>` offers to teach one.
+- `+pattern/teach <Pattern>=<character>` offers to teach one.
 
 ## Using a Pattern
 

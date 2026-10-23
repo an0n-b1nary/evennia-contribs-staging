@@ -92,12 +92,12 @@ class WearableTests(CraftingFixture, EvenniaCommandTest):
     def test_draft_requirements_round_trip_through_persistent_attribute_storage(self):
         for args in (
             "/new weaving/wearable = drafted cloak",
-            "/desc = A useful cloak.",
-            "/line = a useful cloak",
-            "/require = Brawn +1",
-            "/require = Brains +1",
+            "/desc A useful cloak.",
+            "/line a useful cloak",
+            "/require Brawn +1",
+            "/require Brains +1",
             "/unrequire 2",
-            "/resources = wood:1",
+            "/resources 1 wood",
         ):
             self.call(CmdCraft(), args, "Craft draft saved")
         self.call(CmdCraft(), "", "Draft: drafted cloak")

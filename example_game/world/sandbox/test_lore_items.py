@@ -92,7 +92,7 @@ class LoreItemSeams(EvenniaCommandTest):
         from commands.default_cmdsets import CharacterCmdSet
 
         commands = {row.key: type(row) for row in CharacterCmdSet().commands}
-        for args in ("/new writing/readable = New journal", "/desc = A journal.", "/text = Notes."):
+        for args in ("/new writing/readable = New journal", "/desc A journal.", "/text Notes."):
             self.call(commands["+craft"](), args, "Craft draft saved", caller=author)
         self.call(
             commands["+lorecraft"](),
@@ -100,9 +100,9 @@ class LoreItemSeams(EvenniaCommandTest):
             "Draft lore facets saved",
             caller=author,
         )
-        self.call(commands["+craft"](), "/journal = 2", "Craft draft saved", caller=author)
+        self.call(commands["+craft"](), "/journal 2", "Craft draft saved", caller=author)
         self.call(commands["+lorecraft"](), "/uncite 1", "Draft lore facets saved", caller=author)
-        self.call(commands["+craft"](), "/resources = timber:2", "Craft draft saved", caller=author)
+        self.call(commands["+craft"](), "/resources 2 timber", "Craft draft saved", caller=author)
         self.call(commands["+craft"](), "/finish", "You craft New journal", caller=author)
         journal = ObjectDB.objects.get(db_key="New journal")
         self.assertNotIn("facets", journal.craft_record.prose)
@@ -123,8 +123,8 @@ class LoreItemSeams(EvenniaCommandTest):
         commands = {row.key: type(row) for row in CharacterCmdSet().commands}
         for args in (
             "/new writing/readable = Syntax guide",
-            "/desc = A guide.",
-            "/text = An account.",
+            "/desc A guide.",
+            "/text An account.",
         ):
             self.call(commands["+craft"](), args, "Craft draft saved", caller=author)
         before = deserialize(author.attributes.get(DRAFT_KEY)), total_held(author)
@@ -148,7 +148,7 @@ class LoreItemSeams(EvenniaCommandTest):
             "Draft lore facets saved",
             caller=author,
         )
-        self.call(commands["+craft"](), "/resources = timber:2", "Craft draft saved", caller=author)
+        self.call(commands["+craft"](), "/resources 2 timber", "Craft draft saved", caller=author)
         self.call(commands["+craft"](), "/finish", "You craft Syntax guide", caller=author)
         self.assertEqual(total_held(author), before[1] - 2)
         book = ObjectDB.objects.get(db_key="Syntax guide")

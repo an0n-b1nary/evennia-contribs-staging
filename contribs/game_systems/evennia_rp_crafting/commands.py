@@ -8,6 +8,7 @@ from . import conf, services
 from .behaviours import registry
 from .catalog import seed_catalog
 from .command_base import CraftCommand as _CraftCommand
+from .command_syntax import bare_value, select_resource
 from .composition import specifications
 from .detail_commands import CmdLook as CmdLook
 from .errors import CraftingError
@@ -56,7 +57,11 @@ class CmdWorkshop(_CraftCommand):
     Usage:
       +workshop
       +workshop/catalog
-      +workshop/unlock <niche key> = <resource key>:<quantity>[,...]
+      +workshop/unlock <niche key> = <quantity> <resource key>  (repeat per resource)
+      +workshop/unresource <niche key> = <resource key>
+      +workshop/cancel <niche key>
+      +workshop/unlock <niche key>            preview the selected payment
+      +workshop/unlock <niche key> = <token>  confirm within 15 minutes
       +workshop/abandon <niche key>
 
     Unlock costs escalate with the number of active niches. Abandoning frees
@@ -64,6 +69,7 @@ class CmdWorkshop(_CraftCommand):
     """
 
     key = "+workshop"
+    switch_options = ("catalog", "unlock", "unresource", "cancel", "abandon")
 
     def run(self, switch):
         workshop = Workshop.objects.filter(character=self.caller).first()
@@ -93,11 +99,38 @@ class CmdWorkshop(_CraftCommand):
                     f"{definition.key}: {definition.name} [{', '.join(available) or 'unavailable'}] — {cost}\n  {definition.description}"
                 )
             self.msg("\n".join(rows))
-        elif switch == "unlock":
-            if self.rhs is None:
-                raise CraftingError("Usage: +workshop/unlock niche = resource:quantity")
-            result = services.unlock(self.caller, self.lhs.strip(), resource_spec(self.rhs))
-            self.msg(f"Unlocked {result.niche.name} in your Workshop.")
+        elif switch in ("unlock", "unresource", "cancel"):
+            from . import unlocks
+
+            key = self.lhs.strip()
+            if switch == "cancel":
+                unlocks.cancel(self.caller, key)
+                self.msg("Workshop unlock draft discarded.")
+            elif switch == "unresource" or (
+                self.rhs is not None and not self.rhs.startswith("confirm-")
+            ):
+                selected = unlocks.select(
+                    self.caller, key, self.rhs or "", remove=switch == "unresource"
+                )
+                choices = (
+                    ", ".join(f"{amount} {resource}" for resource, amount in selected.items())
+                    or "none"
+                )
+                self.msg(
+                    f"Workshop resources selected for {key}: {choices}. Nothing paid. Preview: +workshop/unlock {key}"
+                )
+            elif self.rhs is None:
+                definition, cost, selected, token = unlocks.preview(self.caller, key)
+                choices = (
+                    ", ".join(f"{amount} {resource}" for resource, amount in selected.items())
+                    or "none"
+                )
+                self.msg(
+                    f"Unlock {definition.name}: {costs_text(cost)}. Selected: {choices}. Nothing paid.\nConfirm: +workshop/unlock {key}={token}\nToken valid for 15 minutes; changes require a new preview."
+                )
+            else:
+                result = unlocks.confirm(self.caller, key, self.rhs)
+                self.msg(f"Unlocked {result.niche.name} in your Workshop.")
         elif switch == "abandon":
             result = services.abandon(self.caller, self.args.strip())
             self.msg(f"Abandoned {result.niche.name}; investment is not refunded.")
@@ -133,20 +166,20 @@ class CmdCraft(_CraftCommand):
 
     Usage:
       +craft/new <niche key>/<behaviour key> = <item name>
-      +craft/desc = <description>
-      +craft/line = <worn line>
-      +craft/aura = <optional aura line>
+      +craft/desc <description>
+      +craft/line <worn line>
+      +craft/aura <optional aura line>
       +craft/state <name> = <worn line>
       +craft/statedesc <name> = <description>
       +craft/defaultstate <name>
       +craft/unstate <name>
-      +craft/slot = <flavour slot>
-      +craft/require = <equipment requirement>  (repeat for several)
+      +craft/slot <flavour slot>
+      +craft/require <equipment requirement>  (repeat for several)
       +craft/unrequire <number>
-      +craft/text = <readable text>
-      +craft/journal = <blank page capacity>
-      +craft/addressee = <descriptive IC addressee>  (blank clears)
-      +craft/signet = <named IC seal design>  (permitted wearable niche)
+      +craft/text <readable text>
+      +craft/journal <blank page capacity>
+      +craft/addressee <descriptive IC addressee>  (blank clears)
+      +craft/signet <named IC seal design>  (permitted wearable niche)
       +craft/unsignet
       +craft/detail <name> = <exterior detail prose>
       +craft/undetail <name>
@@ -159,17 +192,18 @@ class CmdCraft(_CraftCommand):
       +craft/pattern <Pattern>  (one you know; stamps its hallmark)
       +craft/unpattern
       +craft/unverb <verb key>
-      +craft/beat = <EVENT prose>  (repeat for up to three beats)
+      +craft/beat <EVENT prose>  (repeat for up to three beats)
       +craft/unbeat <number>
-      +craft/reach = adjacent  (Broadcast; the default)
+      +craft/reach adjacent  (Broadcast; the default)
       +craft/mode <mode key> = <reading>  (repeat for random readings)
       +craft/unmode <mode key>
-      +craft/room_line = <room description layer>
-      +craft/smell = <sensory line>
-      +craft/sound = <sensory line>
-      +craft/ambient = <periodic EVENT prose>
-      +craft/arrival = <Companion arrival prose>
-      +craft/resources = <resource key>:<quantity>[,...]
+      +craft/room_line <room description layer>
+      +craft/smell <sensory line>
+      +craft/sound <sensory line>
+      +craft/ambient <periodic EVENT prose>
+      +craft/arrival <Companion arrival prose>
+      +craft/resources <quantity> <resource key>  (repeat per resource; replaces that key)
+      +craft/unresource <resource key>
       +craft                   preview; consumes nothing
       +craft/finish            pay and create once; clears the draft on success
       +craft/cancel
@@ -179,6 +213,49 @@ class CmdCraft(_CraftCommand):
     """
 
     key = "+craft"
+    switch_options = (
+        "new",
+        "copy",
+        "cancel",
+        "finish",
+        "detail",
+        "undetail",
+        "sense",
+        "unsense",
+        "state",
+        "statedesc",
+        "defaultstate",
+        "unstate",
+        "addressee",
+        "signet",
+        "unsignet",
+        "journal",
+        "page",
+        "unpage",
+        "verb",
+        "pattern",
+        "unpattern",
+        "unverb",
+        "mode",
+        "unmode",
+        "desc",
+        "line",
+        "aura",
+        "slot",
+        "require",
+        "text",
+        "beat",
+        "reach",
+        "room_line",
+        "smell",
+        "sound",
+        "ambient",
+        "arrival",
+        "resources",
+        "unresource",
+        "unrequire",
+        "unbeat",
+    )
 
     def run(self, switch):
         if switch == "copy":
@@ -256,7 +333,7 @@ class CmdCraft(_CraftCommand):
                 if switch == "unsignet":
                     facets.pop("signet", None)
                 else:
-                    value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
+                    value = bare_value(self)
                     if switch == "addressee":
                         addressee = line(value, "Addressee")
                         # Blank clears it, so a non-Readable draft is never stuck.
@@ -276,7 +353,7 @@ class CmdCraft(_CraftCommand):
                 implementation = registry().get(entry["key"] if entry else draft["behaviour"])
                 if implementation is None or "journal" not in implementation.fields:
                     raise CraftingError("Add a Readable verb first.")
-                value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
+                value = bare_value(self)
                 normalized = validate({"journal": int(value)})
                 target = entry["configuration"] if entry else draft["configuration"]
                 target.clear()
@@ -370,6 +447,8 @@ class CmdCraft(_CraftCommand):
                     modes[key] = [*modes.get(key, []), line(self.rhs)]
                     implementation.validate({"modes": modes})
                 target["modes"] = modes
+            elif switch in ("resources", "unresource"):
+                select_resource(draft, bare_value(self), remove=switch == "unresource")
             elif switch in (
                 "desc",
                 "line",
@@ -377,7 +456,6 @@ class CmdCraft(_CraftCommand):
                 "slot",
                 "text",
                 "require",
-                "resources",
                 "beat",
                 "reach",
                 "room_line",
@@ -386,14 +464,12 @@ class CmdCraft(_CraftCommand):
                 "ambient",
                 "arrival",
             ):
-                value = self.rhs if self.rhs is not None else self.args.lstrip("= ")
+                value = bare_value(self)
                 from .behaviours import text
 
                 value = text(value, "Draft field", 12000)
                 if switch == "desc":
                     draft["description"] = text(value, "Description", 4000)
-                elif switch == "resources":
-                    draft["selected"] = resource_spec(value)
                 else:
                     field = {
                         "line": "worn_line",
@@ -537,7 +613,7 @@ class CmdRead(_CraftCommand):
     """Read the text held in a crafted item you carry or can see here.
 
     Usage:
-      read <item> [page number]
+      read <item>
       read <item> = <page number>
       read/contents <item>
 
@@ -546,6 +622,7 @@ class CmdRead(_CraftCommand):
     """
 
     key = "read"
+    switch_options = ("contents",)
     aliases = ["+read"]  # noqa: RUF012
 
     def run(self, switch):
@@ -553,7 +630,9 @@ class CmdRead(_CraftCommand):
             raise CraftingError("Usage: read <item> [= page number], or read/contents <item>")
         from evennia_links.pagination import reading_target
 
-        item, number = reading_target(self.caller, self.lhs, self.rhs, table=switch == "contents")
+        item, number = reading_target(
+            self.caller, self.lhs, self.rhs, table=switch == "contents", positional_page=False
+        )
         if item is None:
             return
         from .pages import read
@@ -614,6 +693,7 @@ class CmdCrafting(_CraftCommand):
     """
 
     key = "+crafting"
+    switch_options = ("seed", "archive", "restore", "review")
 
     def access(self, srcobj, access_type="cmd", default=False, **kwargs):
         return super().access(srcobj, access_type, default, **kwargs) and conf.is_staff(srcobj)

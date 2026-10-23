@@ -34,7 +34,7 @@ class ReadableSeams(EvenniaCommandTest):
         journal.move_to(self.char1, quiet=True)
         self.call(
             CmdJournal(),
-            f"/write {journal.key} = Two | A visitor wrote this.",
+            f"/write {journal.key} = A visitor wrote this.",
             "Journal page 2 saved",
         )
         give = next(command for command in CharacterCmdSet().commands if command.key == "give")
@@ -44,13 +44,13 @@ class ReadableSeams(EvenniaCommandTest):
             )
         self.call(
             CmdJournal(),
-            f"/revise {journal.key} = 2 | Wrong | Wrong.",
+            f"/revise {journal.key}/2 = Wrong.",
             "You may revise only your own",
             caller=self.char2,
         )
         self.call(
             CmdJournal(),
-            f"/write {journal.key} = Three | Another writer.",
+            f"/write {journal.key} = Another writer.",
             "Journal page 3 saved",
             caller=self.char2,
         )
