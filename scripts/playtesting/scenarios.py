@@ -500,6 +500,17 @@ class Suite:
         alice_id = state["actors"]["alice"]["id"]
         bob_id = state["actors"]["bob"]["id"]
         bob = self.session.host.credentials["bob"]["name"]
+        # Earlier EVENT checks have finished with cooking. Retire that niche
+        # through the player command so this case also works after all five
+        # Workshop slots have been filled by the preceding scenarios.
+        if any(
+            row["workshop__character_id"] == alice_id
+            and row["niche__key"] == "cooking"
+            and row["abandoned_at"] is None
+            for row in state["crafting_niches"]
+        ):
+            self.command("alice", "+workshop/abandon cooking", "not refunded")
+            state = self.state()
         active = sum(
             row["workshop__character_id"] == alice_id and row["abandoned_at"] is None
             for row in state["crafting_niches"]
