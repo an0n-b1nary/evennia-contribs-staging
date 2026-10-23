@@ -122,7 +122,7 @@ class SnapshotFixtureTests(unittest.TestCase):
                     "+xp": "XP 10",
                     "+xp/grant pt-alice=10 # Forbidden": "Not permitted",
                 }
-                if command == "+test presence # Upgrade and restore confirmation":
+                if command == "+test presence":
                     self.checked = True
                     return {"output": "Success"}
                 return {"output": outputs.get(command, "Unknown command")}
