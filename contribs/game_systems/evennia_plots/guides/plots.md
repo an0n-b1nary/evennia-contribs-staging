@@ -9,8 +9,8 @@ A **plot** is a storyline that players run, anything from a feud between two fam
 
 - `+plot` lists active public plots, and `+plot <number>` shows one.
 - `+plot/create <name>=<tagline>` proposes a plot, and `+plot/activate <number>` starts it.
-- `+plot/update <number>` adds an in-character update to the plot's story, and `+plot/update/ooc` adds an OOC note that only the plot's participants and staff can read.
-- `+plot/link/scene <number>=<scene>` ties a scene to the plot. `/link/event` and `/link/post` do the same for calendar events and board posts.
+- `+plot/update <number>` adds an in-character update to the plot's story, and `+plot/note` adds an OOC note that only the plot's participants and staff can read.
+- `+plot/scene <number>=<scene>` ties a scene to the plot. `/event` and `/post` do the same for calendar events and board posts.
 - `+plot/conclude <number>` ends it.
 
 ## Owners
@@ -21,9 +21,9 @@ Whoever starts a plot is its first **owner**. Owners run the plot: its tagline, 
 
 A [[glossary-thread|thread]] is an open question, problem or lead inside a plot: "Investigate the drowned bell", "Venture to the salt flats", "Why do the wells run red?". Threads are numbered within their plot, so the third thread of plot 12 is `#12.3`.
 
-- `+plot/thread <number>=<title>` adds a thread.
-- `+plot/thread/lead #12.3` says you're chasing it, and `/thread/interest` marks your interest. Neither gives you any special powers. They show who's working on what.
-- `+plot/thread/resolve #12.3=<what happened>` closes it with a short summary.
+- `+thread/new <number>=<title>` adds a thread.
+- `+thread/lead #12.3` says you're chasing it, and `+thread/interest` marks your interest. Neither gives you any special powers. They show who's working on what.
+- `+thread/resolve #12.3=<what happened>` closes it with a short summary.
 
 Each plot's owners decide who may add threads:
 
@@ -33,7 +33,7 @@ Each plot's owners decide who may add threads:
 | **By request** | Anyone may ask; the owners accept or decline |
 | **Owners only** | The owners |
 
-`+plot/threads <number>=<open|request|owners>` changes it. Under **By request**, `+plot/thread` sends your thread to the owners instead, and `+plot/thread/withdraw` takes the request back if you change your mind.
+`+plot/threads <number>=<open|request|owners>` changes it. Under **By request**, `+thread/new` sends your thread to the owners instead, and `+thread/withdraw` takes the request back if you change your mind.
 
 ### Held threads
 
@@ -43,7 +43,7 @@ Owners can also write the answer down as a **sealed answer**. Only the owners an
 
 ### Loose ends
 
-When a plot ends, any threads still open become **loose ends**. That's fine: not every question needs an answer. If the story carries on in a sequel plot, its owners can pick a loose end up there with `+plot/thread/carry`.
+When a plot ends, any threads still open become **loose ends**. That's fine: not every question needs an answer. If the story carries on in a sequel plot, its owners can pick a loose end up there with `+thread/carry`.
 
 :::insight[Threads are a tool, not a scoreboard]
 Threads never earn or cost anything. A plot isn't worth more for having many threads, or for resolving them all. They're there to help people run a story together.
@@ -61,7 +61,7 @@ Threads never earn or cost anything. A plot isn't worth more for having many thr
 
 ## Related plots
 
-Owners can mark their plot as a sequel to an earlier one with `+plot/sequel <number>=<earlier>`. `+plot/relate <number>=<other>` proposes a link to another plot, and it shows once that plot's owners accept it with `+plot/relate/accept`, so nobody's story is tied to yours without their say.
+Owners can mark their plot as a sequel to an earlier one with `+plot/sequel <number>=<earlier>`. `+plot/relate <number>=<other>` proposes a link to another plot, and it shows once that plot's owners accept it with `+plot/accept`, so nobody's story is tied to yours without their say.
 
 ## Concluding a plot
 

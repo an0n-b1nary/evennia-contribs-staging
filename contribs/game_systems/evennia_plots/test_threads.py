@@ -6,7 +6,7 @@ Tests for plot owners and threads (StoryThread).
 Covers ownership and the owner backfill, the thread lifecycle under each
 policy, held threads and sealed answers (including that a sealed answer never
 leaks through any surface), leads and interest, loose ends and carrying, the
-+plot thread switches, the web pages and the API, and that threads leave XP
++thread command, the web pages and the API, and that threads leave XP
 untouched.
 
 EvenniaTest defaults: char1 is staff (Developer); char2 is not. ``self.char3``
@@ -27,7 +27,7 @@ from evennia.utils import create
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_plots import threads as svc
-from evennia_plots.commands import CmdPlot
+from evennia_plots.commands import CmdPlot, CmdThread
 from evennia_plots.models import (
     PlotCalendarLink,
     PlotOwner,
@@ -499,12 +499,15 @@ class TestCmdPlotThreads(EvenniaCommandTest):
     def _plot_cmd(self, args, caller):
         return self.call(CmdPlot(), args, caller=caller)
 
+    def _thread_cmd(self, args, caller):
+        return self.call(CmdThread(), args, caller=caller)
+
     def test_the_thread_alias_is_gone(self):
         self.assertEqual(CmdPlot.aliases, [])
 
     def test_owners_and_staff_add_directly_under_request_policy(self):
-        self.assertIn("Added thread", self._plot_cmd(f"/thread #{self.n}=Who rang?", self.char2))
-        self.assertIn("Added thread", self._plot_cmd(f"/thread #{self.n}=Dredge it", self.char1))
+        self.assertIn("Added thread", self._thread_cmd(f"/new #{self.n}=Who rang?", self.char2))
+        self.assertIn("Added thread", self._thread_cmd(f"/new #{self.n}=Dredge it", self.char1))
         self.assertEqual(
             list(self.plot.story_threads.values_list("status", flat=True)), ["open", "open"]
         )
@@ -513,24 +516,24 @@ class TestCmdPlotThreads(EvenniaCommandTest):
         player = create.create_object(
             "evennia.objects.objects.DefaultCharacter", key="Char3", location=self.room1
         )
-        out = self._plot_cmd(f"/thread #{self.n}=Dredge the harbour", player)
+        out = self._thread_cmd(f"/new #{self.n}=Dredge the harbour", player)
         self.assertIn("Requested thread", out)
-        self.assertIn("is open", self._plot_cmd(f"/thread/accept #{self.n}.1", self.char2))
+        self.assertIn("is open", self._thread_cmd(f"/accept #{self.n}.1", self.char2))
         out = self._plot_cmd(f"#{self.n}", player)
         self.assertIn("Threads (by request)", out)
         self.assertIn("Dredge the harbour", out)
 
     def test_seal_resolve_and_reveal(self):
-        self._plot_cmd(f"/thread #{self.n}=Who rang the bell?", self.char2)
-        out = self._plot_cmd(f"/thread/seal #{self.n}.1={SECRET}", self.char2)
+        self._thread_cmd(f"/new #{self.n}=Who rang the bell?", self.char2)
+        out = self._thread_cmd(f"/seal #{self.n}.1={SECRET}", self.char2)
         self.assertIn("Sealed the answer", out)
         shown = self._plot_cmd(f"#{self.n}", self.char2)
         self.assertIn("[Held]", shown)
         self.assertIn("Owner-led", shown)
-        out = self._plot_cmd(f"/thread/resolve #{self.n}.1=The king rang it.", self.char2)
+        out = self._thread_cmd(f"/resolve #{self.n}.1=The king rang it.", self.char2)
         self.assertIn("stays sealed", out)
         self.assertNotIn(SECRET, self._plot_cmd(f"#{self.n}", self.char2))
-        self.assertIn("Revealed", self._plot_cmd(f"/thread/reveal #{self.n}.1", self.char2))
+        self.assertIn("Revealed", self._thread_cmd(f"/reveal #{self.n}.1", self.char2))
         self.assertIn(SECRET, self._plot_cmd(f"#{self.n}", self.char2))
 
     def test_thread_policy_and_owner_switches(self):
@@ -542,11 +545,11 @@ class TestCmdPlotThreads(EvenniaCommandTest):
         self.assertTrue(self.plot.is_owner(self.char1))
 
     def test_a_bad_reference_is_explained(self):
-        out = self._plot_cmd(f"/thread/lead #{self.n}", self.char2)
+        out = self._thread_cmd(f"/lead #{self.n}", self.char2)
         self.assertIn("not a thread reference", out)
 
     def test_conclude_names_the_loose_ends(self):
-        self._plot_cmd(f"/thread #{self.n}=Who rang the bell?", self.char2)
+        self._thread_cmd(f"/new #{self.n}=Who rang the bell?", self.char2)
         out = self._plot_cmd(f"/conclude #{self.n}", self.char2)
         self.assertIn(f"Loose ends: #{self.n}.1", out)
 
@@ -584,11 +587,11 @@ class TestSealedAnswerNeverLeaks(ThreadTestMixin, EvenniaCommandTest):
         self.assertNotIn(
             SECRET, self.call(CmdPlot(), f"#{self.plot.plot_number}", caller=self.char3)
         )
-        out = self.call(CmdPlot(), f"/thread/answer #{self.plot.plot_number}.1", caller=self.char3)
+        out = self.call(CmdThread(), f"/answer #{self.plot.plot_number}.1", caller=self.char3)
         self.assertNotIn(SECRET, out)
         self.assertIn(
             SECRET,
-            self.call(CmdPlot(), f"/thread/answer #{self.plot.plot_number}.1", caller=self.char2),
+            self.call(CmdThread(), f"/answer #{self.plot.plot_number}.1", caller=self.char2),
         )
 
     def test_plot_page(self):
@@ -651,9 +654,7 @@ class TestSealedAnswerNeverLeaks(ThreadTestMixin, EvenniaCommandTest):
             from_thread=sequel, to_thread=self.plot, link_type="sequel", is_accepted=True
         )
         new, _ = svc.carry(self.thread, self.char2, sequel)
-        self.assertNotIn(
-            SECRET, self.call(CmdPlot(), f"/thread/answer {new.ref}", caller=self.char3)
-        )
+        self.assertNotIn(SECRET, self.call(CmdThread(), f"/answer {new.ref}", caller=self.char3))
         self.assertFalse(svc.can_read_answer(new, self.char3))
 
 

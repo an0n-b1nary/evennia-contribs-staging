@@ -32,7 +32,7 @@ class CmdPattern(CraftCommand):
       +pattern/combo <Pattern>/<lifecycle> = <verb>  (repeat to add a verb)
       +pattern/uncombo <Pattern>/<lifecycle> = <verb>
       +pattern/grant <Pattern> = <character>
-      +pattern/thread <Pattern> = <plot thread id>
+      +pattern/thread <Pattern> = <plot id>
       +pattern/advance <Pattern> [= <reason>]
       +pattern/archive <Pattern>, +pattern/unarchive <Pattern>
       +pattern/roster <Pattern>
@@ -199,7 +199,7 @@ class CmdPattern(CraftCommand):
         try:
             thread_id = int((self.rhs or "").strip().lstrip("#"))
         except ValueError:
-            raise CraftingError("Usage: +pattern/thread <Pattern> = <plot thread id>") from None
+            raise CraftingError("Usage: +pattern/thread <Pattern> = <plot id>") from None
         row = patterns.attach(self.caller, self.lookup(self.lhs), thread_id)
         self.msg(f"Active participants learn {row.pattern.name} when {row.thread_name} concludes.")
 

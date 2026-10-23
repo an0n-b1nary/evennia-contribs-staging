@@ -265,8 +265,8 @@ def add_thread(plot, actor, title, detail=""):
             _owners(plot),
             f"|y[Plot]|n {_name(actor)} asks to open thread {thread.ref} on "
             f"|w{plot.name}|n: {thread.title}\n"
-            f"Accept with |w+plot/thread/accept {thread.ref}|n or decline with "
-            f"|w+plot/thread/decline {thread.ref}=<reason>|n.",
+            f"Accept with |w+thread/accept {thread.ref}|n or decline with "
+            f"|w+thread/decline {thread.ref}=<reason>|n.",
             skip=actor,
         )
     else:
@@ -350,7 +350,7 @@ def set_held(thread, actor, held):
     if not held and thread.has_sealed_answer:
         raise ThreadError(
             f"{thread.ref} has a sealed answer. Clear it first with "
-            f"|w+plot/thread/seal {thread.ref}=|n (an empty answer)."
+            f"|w+thread/seal {thread.ref}=|n (an empty answer)."
         )
     thread.is_held = held
     thread.save(update_fields=["is_held", "updated_at"])

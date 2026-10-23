@@ -29,6 +29,7 @@ control a single globally-current arc that gates XP rates across the game.
 | `ThreadLink` | Sequel/related links between plots |
 | `ScenePlotLink`, `PlotCalendarLink`, `PlotBoardLink` | Bridge models (integer soft-refs) |
 | `PlotBonusCredit` | Idempotent XP-award eligibility rows |
+| `+thread` | Questions, leads, requests and sealed answers inside plots |
 | `+plot` | Plot lifecycle, owners, threads, linking, journaling |
 | `+arc` (staff) | Arc management + per-source XP multiplier overrides |
 | `+hook` (staff) | Anti-favoritism audit log |
@@ -92,11 +93,12 @@ evennia migrate evennia_plots
 ## Add commands to your CharacterCmdSet
 
 ```python
-from evennia_plots.commands import CmdPlot, CmdArc, CmdHook
+from evennia_plots.commands import CmdPlot, CmdThread, CmdArc, CmdHook
 
 class CharacterCmdSet(CmdSet):
     def at_cmdset_creation(self):
         self.add(CmdPlot)
+        self.add(CmdThread)
 
 class StaffCmdSet(CmdSet):
     def at_cmdset_creation(self):
@@ -215,8 +217,8 @@ every earlier wording kept in `StoryThreadAnswerVersion`. Sealing marks the
 thread held, and a held thread with an answer can't be released until the
 answer is cleared (a database constraint backs this).
 
-The answer is revealed only by choice: when resolving or dropping the thread,
-or later with `+plot/thread/reveal`. Once revealed, anyone who can see the plot
+The answer is revealed only by choice: resolve or drop the thread, then use
+`+thread/reveal`. Once revealed, anyone who can see the plot
 can read it and its history. A sealed answer is never shown in `+plot <#N>`,
 on the plot page, in the API (revealed or not), on the map, or to a carried
 thread's new owners: carrying copies it only when every owner of the sequel
@@ -273,7 +275,7 @@ Bonus".
 | `thread_bonus` | 1.0× | 0.0× |
 | `rp_channel_session` | 1.0× | 0.0× |
 
-Staff can override any source via `+arc/xp-set #N rp_session=2.5`. A DOWNTIME
+Staff can override any source via `+arc/xp #N/rp_session=2.5`. A DOWNTIME
 arc with all multipliers at 0× effectively pauses XP for the game while allowing
 players to continue playing. At most one arc can be `is_current=True` at a time
 (enforced by a partial unique constraint).
@@ -315,14 +317,32 @@ ScenePlotLink.create_link(scene=scene_obj, thread=thread, linked_by=character)
 mult = resolve_xp_multiplier("rp_session", thread=thread)
 ```
 
+## Upgrading to 0.8.0
+
+Register `CmdThread` beside `CmdPlot`. `+thread #N.T` views a question inside a
+plot; `/new #N=title` creates one and its single switches manage it. Resolving
+or dropping always leaves a sealed answer sealed; use `/reveal` afterwards.
+The former nested plot switches are refused. Plot updates use `/note` for OOC
+blocks and `/revise #N/block` to open the editor. `/major`, `/unowner`, `/scene`,
+`/post`, `/event` and `/accept` are single switches. `/list [status]` filters
+by status and `/tags [tag]` lists tags or filters plots by a tag.
+
+Arc updates use `/note` and `/revise` too. Set one XP override with
+`+arc/xp #N/source=value`, clear it with `=default`, and list with `+arc/xp #N`.
+Manual awards take `+arc/award #N=amount # reason`. Hooks take
+`+hook #N=character`. All commands refuse stacked, unknown or ambiguous
+switches and accept unique prefixes. Plot's retired `/thread` spelling is
+reserved to prevent it from becoming a prefix of `/threads`.
+No migrations or changes to plot/thread IDs are needed.
+
 ## Upgrading to 0.7.0
 
 - **Migrations.** `0002` adds owners, threads and the thread policy; `0003`
   makes every existing plot's creator its first owner. Run `evennia migrate`.
   Nothing existing is renamed, and plot numbers and primary keys are unchanged,
   so partner soft-references stay valid.
-- **The `+thread` alias is gone.** `+thread` used to mean `+plot`; threads are
-  now part of a plot (`+plot/thread`), so the alias would mislead.
+- **The old `+thread` plot alias is gone.** Since 0.8, `+thread` manages the
+  questions inside a plot; use `+plot` to view the containing plot.
 - **Owners replace the creator in permission checks.** Anything that checked
   `creator_id` to decide who manages a plot should call `plot.is_owner()` or
   `plot.can_manage()`.

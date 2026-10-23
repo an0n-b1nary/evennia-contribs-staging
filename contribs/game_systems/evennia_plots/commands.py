@@ -8,6 +8,7 @@ Includes a staff nudge command for connecting players to storylines.
 
 Commands:
     CmdPlot  (+plot) — create, manage, view, and follow plots
+    CmdThread (+thread) — manage questions, problems and leads inside plots
     CmdArc   (+arc)  — manage plot arcs (PLOTS_STAFF_LOCK)
     CmdHook  (+hook) — nudge a player toward a plot (PLOTS_STAFF_LOCK)
 
@@ -20,9 +21,9 @@ URLs. Set ``SITE_URL = "https://yourdomain.com"`` in your settings to emit
 absolute URLs for MXP telnet clients.
 
 **Optional dependencies (imported lazily):**
-- ``evennia_scenes`` — scene lookup in ``+plot/link/scene``
-- ``evennia_calendar`` — event lookup in ``+plot/link/event``
-- ``evennia_boards`` — board/post lookup in ``+plot/link/post``
+- ``evennia_scenes`` — scene lookup in ``+plot/scene``
+- ``evennia_calendar`` — event lookup in ``+plot/event``
+- ``evennia_boards`` — board/post lookup in ``+plot/post``
 - ``evennia_jobs`` — job ticket creation in ``+plot/request-conclude``
 - ``evennia_xp`` — XP award in ``+arc/award``
 """
@@ -36,6 +37,7 @@ from django.utils import timezone
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
+from evennia_plots.command_syntax import SingleSwitchMixin, split_comment
 from evennia_plots.models import PlotArc
 from evennia_plots.permissions import can_manage_arc, is_plot_staff
 from evennia_plots.signals import arc_currency_changed, arc_type_changed
@@ -319,7 +321,7 @@ def _loose_end_note(plot):
     refs = ", ".join(t.ref for t in loose)
     return (
         f"\nLoose ends: {refs}. Leaving threads open is fine. To pick one up in a sequel, "
-        f"use |w+plot/thread/carry <#N.T>=<#sequel>|n."
+        f"use |w+thread/carry <#N.T>=<#sequel>|n."
     )
 
 
@@ -330,8 +332,7 @@ def _seal_note(thread):
     if thread.sealed_answer_revealed:
         return "\nThe planned answer is now revealed."
     return (
-        f"\nThe sealed answer stays sealed. Reveal it later with "
-        f"|w+plot/thread/reveal {thread.ref}|n."
+        f"\nThe sealed answer stays sealed. Reveal it later with |w+thread/reveal {thread.ref}|n."
     )
 
 
@@ -542,7 +543,7 @@ def _display_thread(thread, caller):
         pend = ", ".join(
             f"#{lk.from_thread.plot_number} {lk.from_thread.name}" for lk in pending_related
         )
-        lines.append(f"|y[Pending related links from: {pend} — use +plot/relate/accept]|n")
+        lines.append(f"|y[Pending related links from: {pend} — use +plot/accept]|n")
 
     if is_plot_staff(caller) and thread.hook_log:
         lines.append("\n|w[Staff] Hook log:|n")
@@ -564,58 +565,43 @@ def _display_thread(thread, caller):
 # ---------------------------------------------------------------------------
 
 
-class CmdPlot(MuxCommand):
+class CmdPlot(SingleSwitchMixin, MuxCommand):
     """
     Manage plots and their threads.
 
     Usage:
         +plot                              List active public plots
         +plot <#N|name>                    View a plot's details and threads
-        +plot/list[/active|proposed|concluded|tag <tag>]
+        +plot/list [<status>]               Filter plots by status
         +plot/create <name>[=<tagline>]    Create a new plot (proposed)
         +plot/activate <#N>               Proposed → active
         +plot/desc <#N>=<tagline>          Edit the brief tagline
         +plot/update <#N>[=<text>]         Append an IC narrative update
-        +plot/update/ooc <#N>[=<text>]     Append an OOC note (participants only)
-        +plot/update/edit <#N>/<block#>    Edit an existing update block
+        +plot/note <#N>[=<text>]     Append an OOC note (participants only)
+        +plot/revise <#N>/<block#>    Edit an existing update block
         +plot/tag <#N>=<tag>               Add a tag to the plot
-        +plot/tag/major <#N>=<tag>         Add a major tag (staff only)
+        +plot/major <#N>=<tag>         Add a major tag (staff only)
         +plot/untag <#N>=<tag>             Remove a tag
-        +plot/tags                         List all plot tags
+        +plot/tags [<tag>]                 List tags, or filter plots by a tag
         +plot/privacy <#N>=<public|private|invite>
         +plot/invite <#N>=<character>      Add to invite list
         +plot/owner <#N>=<character>       Add an owner
-        +plot/owner/remove <#N>=<character>  Remove an owner
+        +plot/unowner <#N>=<character>  Remove an owner
+        +plot/threads <#N>=<policy>        Set owners, request or open thread policy
         +plot/follow <#N>[=<detail>]       Follow for updates
         +plot/unfollow <#N>               Stop following
         +plot/public <#N>                 Toggle follow visibility
-        +plot/link/scene <#N>=<scene#>     Link a scene to this plot
-        +plot/link/post <#N>=<board>/<post>  Link a board post
-        +plot/link/event <#N>=<event#>     Link a calendar event
+        +plot/scene <#N>=<scene#>     Link a scene to this plot
+        +plot/post <#N>=<board>/<post>  Link a board post
+        +plot/event <#N>=<event#>     Link a calendar event
         +plot/sequel <#N>=<#M>            Declare #N as sequel to #M
         +plot/relate <#N>=<#M>            Propose a related link (requires acceptance)
-        +plot/relate/accept <#N>=<#M>     Accept a pending related link from #M
+        +plot/accept <#N>=<#M>     Accept a pending related link from #M
         +plot/conclude <#N>               Conclude a plot (computes bonus XP)
         +plot/request-conclude <#N>       Ask staff to conclude or archive a plot
         +plot/archive <#N>               Archive a plot (staff only)
 
-    Threads (open questions, problems or leads inside a plot, as #N.T):
-        +plot/threads <#N>=<owners|request|open>  Who may add threads
-        +plot/thread <#N>=<title>          Add a thread (or request one)
-        +plot/thread/detail <#N.T>=<text>  Set a thread's OOC detail
-        +plot/thread/accept <#N.T>         Accept a requested thread
-        +plot/thread/decline <#N.T>[=<reason>]  Decline a request
-        +plot/thread/withdraw <#N.T>       Withdraw your own request
-        +plot/thread/hold <#N.T>           Toggle held: the owners know the answer
-        +plot/thread/seal <#N.T>=<answer>  Seal the intended answer (empty clears it)
-        +plot/thread/answer <#N.T>         Read a sealed answer and its history
-        +plot/thread/resolve[/reveal] <#N.T>=<summary>  Resolve a thread
-        +plot/thread/drop[/reveal] <#N.T>  Drop a thread
-        +plot/thread/reveal <#N.T>         Reveal the sealed answer later
-        +plot/thread/reopen <#N.T>         Reopen a resolved or dropped thread
-        +plot/thread/lead <#N.T>           Toggle yourself as a lead
-        +plot/thread/interest <#N.T>       Toggle your interest
-        +plot/thread/carry <#N.T>=<#M>     Carry a loose end into sequel plot #M
+    Use +thread to view and manage questions, problems and leads inside a plot.
 
     A plot links scenes, board posts and calendar events into a storyline.
     Concluding a plot awards up to 5 bonus XP to all participants. Threads are
@@ -628,6 +614,39 @@ class CmdPlot(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Storytelling"
     locks = "cmd:all()"
+
+    # /thread formerly created a story thread; never treat it as a prefix of /threads.
+    retired_switches = ("thread",)
+    switch_options = (
+        "list",
+        "create",
+        "activate",
+        "desc",
+        "update",
+        "note",
+        "revise",
+        "tag",
+        "major",
+        "untag",
+        "tags",
+        "privacy",
+        "invite",
+        "owner",
+        "unowner",
+        "follow",
+        "unfollow",
+        "public",
+        "scene",
+        "post",
+        "event",
+        "sequel",
+        "relate",
+        "accept",
+        "conclude",
+        "request-conclude",
+        "archive",
+        "threads",
+    )
 
     def func(self):
         sw = self.switches
@@ -646,37 +665,24 @@ class CmdPlot(MuxCommand):
             caller.msg(_display_thread(thread, caller))
             return
 
-        # Threads and owners come first: their sub-switches (accept, remove…)
-        # would otherwise be caught by older switches below.
-        if "thread" in sw:
-            return self._do_story_thread(sw, lhs, rhs, args)
-
         if "threads" in sw:
             if not lhs or not rhs:
                 caller.msg("Usage: |w+plot/threads <#N>=<owners|request|open>|n")
                 return
             return self._do_thread_policy(lhs, rhs)
 
-        if "owner" in sw:
+        if "owner" in sw or "unowner" in sw:
             if not lhs or not rhs:
-                caller.msg("Usage: |w+plot/owner[/remove] <#N>=<character>|n")
+                caller.msg("Usage: |w+plot/owner <#N>=<character>|n")
                 return
-            return self._do_owner(lhs, rhs, remove="remove" in sw)
+            return self._do_owner(lhs, rhs, remove="unowner" in sw)
 
-        if "list" in sw and "scene" not in sw and "post" not in sw and "event" not in sw:
-            status_filter = None
-            tag_filter = None
-            if "active" in sw:
-                status_filter = "active"
-            elif "proposed" in sw:
-                status_filter = "proposed"
-            elif "concluded" in sw:
-                status_filter = "concluded"
-            elif "archived" in sw:
-                status_filter = "archived"
-            if "tag" in sw and args:
-                tag_filter = args
-            return self._do_list(status_filter=status_filter, tag_filter=tag_filter)
+        if "list" in sw:
+            status = args.lower() or None
+            if status is not None and status not in ("active", "proposed", "concluded", "archived"):
+                caller.msg("Usage: +plot/list [active|proposed|concluded|archived]")
+                return
+            return self._do_list(status_filter=status)
 
         if "create" in sw:
             if not lhs:
@@ -725,20 +731,21 @@ class CmdPlot(MuxCommand):
             caller.msg(f"Tagline updated for #{thread.plot_number}.")
             return
 
-        if "update" in sw:
-            if "edit" in sw:
-                return self._do_update_edit(lhs or args)
-            update_type = "ooc" if "ooc" in sw else "ic"
-            return self._do_update(lhs or args, rhs, update_type)
+        if "revise" in sw:
+            return self._do_update_edit(args)
 
-        if "tag" in sw and "untag" not in sw and "link" not in sw:  # noqa: SIM102
-            if not set(sw) - {"tag", "major"}:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+plot/tag <#N>=<tag>|n")
-                    return
-                return self._do_tag(lhs, rhs, make_major="major" in sw)
+        if "update" in sw or "note" in sw:
+            return self._do_update(lhs or args, rhs, "ooc" if "note" in sw else "ic")
+
+        if "tag" in sw or "major" in sw:
+            if not lhs or not rhs:
+                caller.msg(f"Usage: +plot/{sw[0]} <#N>=<tag>")
+                return
+            return self._do_tag(lhs, rhs, make_major="major" in sw)
 
         if "tags" in sw:
+            if args:
+                return self._do_list(tag_filter=args)
             return self._do_tags()
 
         if "untag" in sw:
@@ -777,28 +784,11 @@ class CmdPlot(MuxCommand):
                 return
             return self._do_public(lhs or args)
 
-        if "link" in sw:
-            if "scene" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+plot/link/scene <#N>=<scene#>|n")
-                    return
-                return self._do_link_scene(lhs, rhs)
-            elif "post" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+plot/link/post <#N>=<board#>/<post#>|n")
-                    return
-                return self._do_link_post(lhs, rhs)
-            elif "event" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+plot/link/event <#N>=<event#>|n")
-                    return
-                return self._do_link_event(lhs, rhs)
-            else:
-                caller.msg(
-                    "Specify what to link: |w+plot/link/scene|n, "
-                    "|w+plot/link/post|n, or |w+plot/link/event|n"
-                )
+        if sw[0] in ("scene", "post", "event"):
+            if not lhs or not rhs:
+                caller.msg(f"Usage: +plot/{sw[0]} <#N>=<reference>")
                 return
+            return getattr(self, f"_do_link_{sw[0]}")(lhs, rhs)
 
         if "sequel" in sw:
             if not lhs or not rhs:
@@ -806,15 +796,12 @@ class CmdPlot(MuxCommand):
                 return
             return self._do_sequel(lhs, rhs)
 
-        if "relate" in sw:
-            if "accept" in sw:
-                if not lhs or not rhs:
-                    caller.msg("Usage: |w+plot/relate/accept <#N>=<#M>|n")
-                    return
-                return self._do_relate_accept(lhs, rhs)
+        if "relate" in sw or "accept" in sw:
             if not lhs or not rhs:
-                caller.msg("Usage: |w+plot/relate <#N>=<#M>|n")
+                caller.msg(f"Usage: +plot/{sw[0]} <#N>=<#M>")
                 return
+            if "accept" in sw:
+                return self._do_relate_accept(lhs, rhs)
             return self._do_relate(lhs, rhs)
 
         if "conclude" in sw:
@@ -823,7 +810,7 @@ class CmdPlot(MuxCommand):
                 return
             return self._do_conclude(lhs or args)
 
-        if "request-conclude" in sw or "request" in sw:
+        if "request-conclude" in sw:
             if not lhs and not args:
                 caller.msg("Usage: |w+plot/request-conclude <#N>|n")
                 return
@@ -977,7 +964,7 @@ class CmdPlot(MuxCommand):
     def _do_update_edit(self, arg):
         caller = self.caller
         if "/" not in arg:
-            caller.msg("Usage: |w+plot/update/edit <#N>/<block#>|n")
+            caller.msg("Usage: |w+plot/revise <#N>/<block#>|n")
             return
         thread_arg, _, block_str = arg.partition("/")
         if not block_str.isdigit():
@@ -1219,7 +1206,7 @@ class CmdPlot(MuxCommand):
             caller.msg("Board post linking requires the evennia_boards app to be installed.")
             return
         if "/" not in post_arg:
-            caller.msg("Usage: |w+plot/link/post <#N>=<board#>/<post#>|n")
+            caller.msg("Usage: |w+plot/post <#N>=<board#>/<post#>|n")
             return
         board_str, _, post_str = post_arg.partition("/")
         board, err = _lookup_board(board_str.strip())
@@ -1347,14 +1334,14 @@ class CmdPlot(MuxCommand):
             caller.msg(
                 f"|gProposed a related link: #{thread.plot_number} ↔ #{target.plot_number}.|n\n"
                 f"An owner of '{target.name}' must accept with "
-                f"|w+plot/relate/accept #{target.plot_number}=#{thread.plot_number}|n."
+                f"|w+plot/accept #{target.plot_number}=#{thread.plot_number}|n."
             )
             for owner in _owner_characters(target, skip=caller):
                 owner.msg(
                     f"|y[Plot]|n {caller.key} has proposed a 'related' link between "
                     f"#{thread.plot_number} '{thread.name}' and your plot "
                     f"#{target.plot_number} '{target.name}'.\n"
-                    f"Accept with: |w+plot/relate/accept #{target.plot_number}=#{thread.plot_number}|n"
+                    f"Accept with: |w+plot/accept #{target.plot_number}=#{thread.plot_number}|n"
                 )
         else:
             caller.msg("A link between those plots already exists (or is pending).")
@@ -1513,7 +1500,45 @@ class CmdPlot(MuxCommand):
             f"Threads on plot #{plot.plot_number}: |w{plot.get_thread_policy_display().lower()}|n."
         )
 
-    _THREAD_ACTIONS = (
+
+# ---------------------------------------------------------------------------
+# CmdThread
+# ---------------------------------------------------------------------------
+
+
+class CmdThread(SingleSwitchMixin, MuxCommand):
+    """
+    Manage questions, problems and leads inside a plot.
+
+    Usage:
+        +thread <#N.T>                    View a thread
+        +thread/new <#N>=<title>           Add a thread or request one
+        +thread/detail <#N.T>=<text>       Set OOC detail
+        +thread/accept <#N.T>              Accept a requested thread
+        +thread/decline <#N.T>[=<reason>]  Decline a request
+        +thread/withdraw <#N.T>            Withdraw your request
+        +thread/hold <#N.T>                Toggle held status
+        +thread/seal <#N.T>=<answer>       Seal an answer (empty clears it)
+        +thread/answer <#N.T>              Read an answer and its history
+        +thread/resolve <#N.T>=<summary>   Resolve without revealing an answer
+        +thread/drop <#N.T>                Drop without revealing an answer
+        +thread/reveal <#N.T>              Reveal an answer after closing
+        +thread/reopen <#N.T>              Reopen a resolved or dropped thread
+        +thread/lead <#N.T>                Toggle yourself as a lead
+        +thread/interest <#N.T>            Toggle your interest
+        +thread/carry <#N.T>=<#M>          Carry a loose end into a sequel
+
+    Plot owners decide who may add threads with +plot/threads. Sealed answers
+    stay private until an owner explicitly uses /reveal on a closed thread.
+    """
+
+    key = "+thread"
+    aliases = []  # noqa: RUF012
+    help_category = "Storytelling"
+    locks = "cmd:all()"
+
+    switch_options = (
+        "new",
         "detail",
         "accept",
         "decline",
@@ -1530,28 +1555,39 @@ class CmdPlot(MuxCommand):
         "carry",
     )
 
-    def _do_story_thread(self, sw, lhs, rhs, args):
-        """Dispatch +plot/thread[/<action>]."""
+    def func(self):
         from evennia_plots import threads as svc
 
         caller = self.caller
-        actions = [s for s in sw if s != "thread"]
-        action = next((a for a in self._THREAD_ACTIONS if a in actions), None)
-        if action is None:
-            if actions:
-                caller.msg("Unknown thread switch. See |w+help +plot|n for options.")
-                return
+        args = self.args.strip()
+        lhs = self.lhs.strip() if self.lhs else ""
+        rhs = self.rhs.strip() if self.rhs else ""
+        action = self.switches[0] if self.switches else None
+        if action == "new":
             return self._do_thread_add(lhs, rhs)
+        if action is None:
+            thread, err = _resolve_story_thread(args, caller)
+            if err:
+                caller.msg(err)
+                return
+            lines = [_thread_line(thread, uses_screenreader(caller))]
+            if thread.detail:
+                lines.append(thread.detail)
+            if thread.resolution:
+                lines.append(f"Resolved: {thread.resolution}")
+            if thread.sealed_answer_revealed and thread.has_sealed_answer:
+                lines.append(f"The planned answer: {thread.sealed_answer}")
+            caller.msg("\n".join(lines))
+            return
 
         target = lhs or args
         if not target:
-            caller.msg(f"Usage: |w+plot/thread/{action} <#N.T>|n")
+            caller.msg(f"Usage: |w+thread/{action} <#N.T>|n")
             return
         thread, err = _resolve_story_thread(target, caller)
         if err:
             caller.msg(err)
             return
-        reveal = "reveal" in actions and action in ("resolve", "drop")
         try:
             if action == "detail":
                 svc.set_detail(thread, caller, rhs)
@@ -1582,12 +1618,12 @@ class CmdPlot(MuxCommand):
                 self._show_answer(thread)
             elif action == "resolve":
                 if not rhs:
-                    caller.msg("Usage: |w+plot/thread/resolve[/reveal] <#N.T>=<summary>|n")
+                    caller.msg("Usage: |w+thread/resolve <#N.T>=<summary>|n")
                     return
-                svc.resolve(thread, caller, rhs, reveal_answer=reveal)
+                svc.resolve(thread, caller, rhs, reveal_answer=False)
                 caller.msg(f"|gResolved {thread.ref}: {thread.title}|n{_seal_note(thread)}")
             elif action == "drop":
-                svc.drop(thread, caller, reveal_answer=reveal)
+                svc.drop(thread, caller, reveal_answer=False)
                 caller.msg(f"Dropped {thread.ref}: {thread.title}{_seal_note(thread)}")
             elif action == "reveal":
                 svc.reveal(thread, caller)
@@ -1620,7 +1656,7 @@ class CmdPlot(MuxCommand):
 
         caller = self.caller
         if not plot_arg or not title:
-            caller.msg("Usage: |w+plot/thread <#N>=<title>|n")
+            caller.msg("Usage: |w+thread/new <#N>=<title>|n")
             return
         plot, err = _resolve_thread(plot_arg, caller)
         if err:
@@ -1646,7 +1682,7 @@ class CmdPlot(MuxCommand):
         if not target_arg:
             options = ", ".join(f"#{p.plot_number} {p.name}" for p in carry_targets(thread, caller))
             caller.msg(
-                "Usage: |w+plot/thread/carry <#N.T>=<#sequel>|n"
+                "Usage: |w+thread/carry <#N.T>=<#sequel>|n"
                 + (f"\nSequels you could carry it into: {options}" if options else "")
             )
             return
@@ -1692,7 +1728,7 @@ class CmdPlot(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdArc(MuxCommand):
+class CmdArc(SingleSwitchMixin, MuxCommand):
     """
     Manage plot arcs (staff only).
 
@@ -1702,21 +1738,21 @@ class CmdArc(MuxCommand):
         +arc/create <name>[=<tagline>] Create a new arc (defaults to Story type)
         +arc/type <#N>=<story|downtime> Change arc type
         +arc/xp <#N>                   List XP multipliers for arc
-        +arc/xp <#N>=<source>:<value>  Set per-source XP multiplier (0.0–99.99)  # noqa: RUF002
-        +arc/xp <#N>=<source>:default  Clear override (revert to type default)
+        +arc/xp <#N>/<source>=<value>  Set per-source XP multiplier (0.0–99.99)  # noqa: RUF002
+        +arc/xp <#N>/<source>=default  Clear override (revert to type default)
         +arc/current <#N>              Mark arc as the global current arc
         +arc/uncurrent                 Clear the current arc
         +arc/desc <#N>=<tagline>       Edit arc tagline
         +arc/update <#N>[=<text>]      Append an IC update block
-        +arc/update/ooc <#N>[=<text>]  Append an OOC note block
-        +arc/update/edit <#N>/<block#> Edit an existing block
+        +arc/note <#N>[=<text>]  Append an OOC note block
+        +arc/revise <#N>/<block#> Edit an existing block
         +arc/tag <#N>=<tag>            Add a tag to the arc
         +arc/untag <#N>=<tag>          Remove a tag
         +arc/link <#N>=<plot#>         Add a plot to this arc
         +arc/unlink <#N>=<plot#>       Remove a plot from this arc
         +arc/conclude <#N>             Conclude the arc
-        +arc/award <#N>=<amt>[:<reason>]  Distribute manual XP to all arc participants
-        +arc/list[/tag <tag>]          List arcs, optional tag filter
+        +arc/award <#N>=<amt> # <reason>  Distribute manual XP to all arc participants
+        +arc/list [<tag>]          List arcs, optional tag filter
 
     Plot arcs group multiple plots into a higher-level storyline.
     A Downtime arc pauses XP gain while it is active (all sources 0.0x by
@@ -1729,6 +1765,25 @@ class CmdArc(MuxCommand):
     aliases = []  # noqa: RUF012
     help_category = "Storytelling"
     locks = "cmd:all()"
+
+    switch_options = (
+        "list",
+        "create",
+        "type",
+        "xp",
+        "current",
+        "uncurrent",
+        "desc",
+        "update",
+        "note",
+        "revise",
+        "tag",
+        "untag",
+        "link",
+        "unlink",
+        "conclude",
+        "award",
+    )
 
     def func(self):
         caller = self.caller
@@ -1751,7 +1806,7 @@ class CmdArc(MuxCommand):
             return
 
         if "list" in sw:
-            tag_filter = args if "tag" in sw else None
+            tag_filter = args or None
             return self._do_list(tag_filter=tag_filter)
 
         if "create" in sw:
@@ -1793,7 +1848,11 @@ class CmdArc(MuxCommand):
             return
 
         if "xp" in sw:
-            arc, err = _resolve_arc(lhs or args, caller)
+            arc_arg, address, source = (lhs or args).partition("/")
+            if (self.rhs is not None and not address) or (address and not rhs):
+                caller.msg("Usage: +arc/xp <#N>/<source>=<value|default>, or +arc/xp <#N> to list.")
+                return
+            arc, err = _resolve_arc(arc_arg, caller)
             if err:
                 caller.msg(err)
                 return
@@ -1801,7 +1860,7 @@ class CmdArc(MuxCommand):
                 caller.msg("You do not have permission to set XP multipliers.")
                 return
             source_labels = PlotArc.XP_SOURCE_LABELS
-            if not rhs:
+            if not address:
                 lines = [
                     f"|wXP multipliers for arc #{arc.arc_number} ({arc.get_arc_type_display()} defaults):|n"
                 ]
@@ -1816,14 +1875,8 @@ class CmdArc(MuxCommand):
                         lines.append(f"  {source_labels[source]}: {effective}x (type default)")
                 caller.msg("\n".join(lines))
                 return
-            if ":" not in rhs:
-                caller.msg(
-                    "Usage: |w+arc/xp <#N>=<source>:<value>|n  or  |w+arc/xp <#N>|n to list."
-                )
-                return
-            source, _, value_str = rhs.partition(":")
             source = source.strip().lower()
-            value_str = value_str.strip()
+            value_str = rhs
             if source not in PlotArc.XP_SOURCES:
                 caller.msg(f"Unknown source '{source}'. Valid: {', '.join(PlotArc.XP_SOURCES)}.")
                 return
@@ -1839,6 +1892,9 @@ class CmdArc(MuxCommand):
                 value = Decimal(value_str)
             except InvalidOperation:
                 caller.msg(f"'{value_str}' is not a valid decimal number.")
+                return
+            if not value.is_finite():
+                caller.msg("Multiplier must be a finite decimal number.")
                 return
             if value < 0:
                 caller.msg("Multiplier cannot be negative.")
@@ -1929,11 +1985,11 @@ class CmdArc(MuxCommand):
             caller.msg(f"Tagline updated for arc #{arc.arc_number}.")
             return
 
-        if "update" in sw:
-            if "edit" in sw:
-                return self._do_update_edit(lhs or args)
-            update_type = "ooc" if "ooc" in sw else "ic"
-            return self._do_update(lhs or args, rhs, update_type)
+        if "revise" in sw:
+            return self._do_update_edit(args)
+
+        if "update" in sw or "note" in sw:
+            return self._do_update(lhs or args, rhs, "ooc" if "note" in sw else "ic")
 
         if "tag" in sw and "untag" not in sw:
             if not lhs or not rhs:
@@ -2049,7 +2105,7 @@ class CmdArc(MuxCommand):
             return
         if not rhs:
             caller.msg(
-                "Usage: |w+arc/award <#N>=<amount>[:<reason>]|n  "
+                "Usage: |w+arc/award <#N>=<amount> # <reason>|n  "
                 "(distributes manually to every participant)"
             )
             return
@@ -2063,15 +2119,13 @@ class CmdArc(MuxCommand):
 
         from evennia_plots.models import PlotParticipant
 
-        amt_str, _, extra_reason = rhs.partition(":")
-        amt_str = amt_str.strip()
-        extra_reason = extra_reason.strip()
+        amt_str, extra_reason = split_comment(rhs)
         try:
             amount = Decimal(amt_str)
         except InvalidOperation:
             caller.msg(f"|r'{amt_str}' is not a valid XP amount.|n")
             return
-        if amount <= 0:
+        if not amount.is_finite() or amount <= 0:
             caller.msg("|rArc award amount must be positive.|n")
             return
 
@@ -2228,7 +2282,7 @@ class CmdArc(MuxCommand):
     def _do_update_edit(self, arg):
         caller = self.caller
         if "/" not in arg:
-            caller.msg("Usage: |w+arc/update/edit <#N>/<block#>|n")
+            caller.msg("Usage: |w+arc/revise <#N>/<block#>|n")
             return
         arc_arg, _, block_str = arg.partition("/")
         if not block_str.isdigit():
@@ -2264,12 +2318,12 @@ class CmdArc(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdHook(MuxCommand):
+class CmdHook(SingleSwitchMixin, MuxCommand):
     """
     Nudge a player toward a plot (staff only).
 
     Usage:
-        +hook <character>=<#N|name>
+        +hook <#N|name>=<character>
 
     Sends a suggestion to a specific player encouraging them to look into
     an existing plot. Cannot be used for private plots.
@@ -2289,20 +2343,20 @@ class CmdHook(MuxCommand):
             caller.msg("You do not have permission to use +hook.")
             return
         if not self.lhs or not self.rhs:
-            caller.msg("Usage: |w+hook <character>=<#N|name>|n")
+            caller.msg("Usage: |w+hook <#N|name>=<character>|n")
             return
 
-        target = caller.search(self.lhs.strip(), global_search=True)
-        if not target:
-            return
-
-        thread, err = _resolve_thread(self.rhs.strip(), caller)
+        thread, err = _resolve_thread(self.lhs.strip(), caller)
         if err:
             caller.msg(err)
             return
 
         if thread.privacy == "private":
             caller.msg("You cannot hook players toward a private plot.")
+            return
+
+        target = caller.search(self.rhs.strip(), global_search=True)
+        if not target:
             return
 
         target.msg(

@@ -933,8 +933,9 @@ permanent), `/describe`, `/rename`, `/niches`, `/combo` and `/uncombo`
 teaching; existing items and knowledge are unchanged.
 
 With `evennia-plots` installed (the `plots` extra),
-`+pattern/thread <Pattern> = <thread id>` attaches a Pattern to a proposed or
-active thread. The first attached thread is its origin. When the thread
+`+pattern/thread <Pattern> = <plot id>` attaches a Pattern to a proposed or
+active plot (`+plot #N`), not an individual question (`+thread #N.T`). The first
+attached plot is its origin. When the plot
 concludes, its active, playable participants learn the Pattern, the grant is
 frozen with its recipient list, and an origin Pattern moves from Recovered to
 Spreading. Repeated conclusion signals grant nothing twice.
