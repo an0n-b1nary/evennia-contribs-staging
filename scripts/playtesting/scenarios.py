@@ -550,6 +550,94 @@ class Suite:
         self.command("alice", "+craft/resources 2 timber", "draft saved")
         self.command("alice", "+craft/finish", "You craft Live lore guide")
 
+    def plots_syntax(self):
+        bob = self.session.host.credentials["bob"]["name"]
+        created = self.command("alice", "+plot/create Live thread mystery", "Created plot")
+        plot = "#" + re.search(r"Created plot #(\d+)", created["output"]).group(1)
+        self.command("alice", f"+plot/activate {plot}", "now active")
+        self.command("alice", f"+plot/thread {plot}=owners", "Unknown")
+        self.command("alice", f"+plot/threads {plot}=request", "by request")
+        self.command("bob", f"+thread/Ne {plot}=A requested question", "Requested thread")
+        request = plot + ".1"
+        self.command("bob", f"+thread {request}", "A requested question")
+        self.command("alice", f"+thread/accept {request}", "is open")
+        self.command("alice", f"+thread/detail {request}=Ask at the harbour", "Detail updated")
+        self.command("bob", f"+thread/lead {request}", "now leading")
+        self.command("alice", f"+thread/interest {request}", "Marked your interest")
+        self.command("alice", f"+thread/hold {request}", "held")
+        self.command("alice", f"+thread/seal {request}=The ferryman rang it", "Sealed")
+        self.command("bob", f"+thread/answer {request}", "no answer")
+        self.command("alice", f"+thread/answer {request}", "The ferryman rang it")
+        self.command("alice", f"+thread/resolve/reveal {request}=Found him", "one switch")
+        shown = self.command("bob", f"+thread {request}", "A requested question")
+        assert "The ferryman rang it" not in shown["output"], shown
+        self.command("alice", f"+thread/resolve {request}=Found him", "stays sealed")
+        shown = self.command("bob", f"+thread {request}", "Found him")
+        assert "The ferryman rang it" not in shown["output"], shown
+        self.command("alice", f"+thread/reveal {request}", "Revealed")
+        self.command("bob", f"+thread {request}", "The ferryman rang it")
+        self.command("alice", f"+thread/reopen {request}", "Reopened")
+        self.command("alice", f"+thread/drop/reveal {request}", "one switch")
+        self.command("alice", f"+thread/drop {request}", "Dropped")
+        for title, action in (
+            ("Withdraw this request", "withdraw"),
+            ("Decline this request", "decline"),
+        ):
+            created = self.command("bob", f"+thread/new {plot}={title}", "Requested thread")
+            ref = re.search(r"Requested thread (#[0-9]+\.[0-9]+)", created["output"]).group(1)
+            self.command(
+                "bob" if action == "withdraw" else "alice",
+                f"+thread/{action} {ref}",
+                "Withdrew" if action == "withdraw" else "Declined",
+            )
+        self.command("alice", f"+plot/note {plot}=An OOC note", "Added OOC")
+        self.command("alice", f"+plot/revise {plot}/1")
+        self.command("alice", ":DD")
+        self.command("alice", "A revised OOC note")
+        self.command("alice", ":wq", "saved")
+        self.command("staff", f"+plot/major {plot}=Live mystery", "added")
+        self.command("alice", "+plot/tags Live mystery", "Live thread mystery")
+        self.command("alice", "+plot/list active", "Live thread mystery")
+        self.command("alice", "+plot/list/active", "one switch")
+        self.command("alice", f"+plot/owner {plot}={bob}", "now owns")
+        self.command("alice", f"+plot/unowner {plot}={bob}", "no longer owns")
+        self.command("alice", "+scene/open Live plot link", "opened")
+        scene = self.state()["scenes"][-1]["id"]
+        self.command("alice", f"+plot/link/scene {plot}={scene}", "one switch")
+        self.command("alice", f"+plot/scene {plot}={scene}", "Linked scene")
+        self.command("alice", "+scene/close", "closed")
+        self.command("staff", f"+plot/post {plot}=Cutscenes/1", "Linked post")
+        self.command("alice", f"+plot/event {plot}=1", "Linked event")
+        created = self.command("bob", "+plot/create Live companion plot", "Created plot")
+        companion = "#" + re.search(r"Created plot #(\d+)", created["output"]).group(1)
+        self.command("bob", f"+plot/activate {companion}", "now active")
+        self.command("alice", f"+plot/relate {plot}={companion}", "Proposed")
+        self.command("bob", f"+plot/accept {companion}={plot}", "Accepted")
+        self.command("staff", f"+hook {plot}={bob}", "Hook sent")
+        created = self.command("staff", "+arc/create Live syntax arc", "Created arc")
+        arc = "#" + re.search(r"Created arc #(\d+)", created["output"]).group(1)
+        self.command("staff", f"+arc/link {arc}={plot}", "added")
+        self.command("staff", f"+arc/note {arc}=Arc OOC note", "Added OOC")
+        self.command("staff", f"+arc/revise {arc}/1")
+        self.command("staff", ":DD")
+        self.command("staff", "Revised arc OOC note")
+        self.command("staff", ":wq", "saved")
+        self.command("staff", f"+arc/tag {arc}=Live mystery", "added")
+        self.command("staff", "+arc/list Live mystery", "Live syntax arc")
+        self.command("staff", f"+arc/xp {arc}/lore=2.5", "set to 2.5")
+        self.command("staff", f"+arc/xp {arc}=lore:3", "Usage:")
+        self.command("staff", f"+arc/xp {arc}/lore=default", "cleared")
+        self.command("staff", f"+arc/award {arc}=1:Old reason", "not a valid")
+        self.command("staff", f"+arc/award {arc}=1 # Live milestone #12.3", "awarded 1 XP")
+        created = self.command("alice", f"+thread/new {plot}=Carry this loose end", "Added thread")
+        loose = re.search(r"Added thread (#[0-9]+\.[0-9]+)", created["output"]).group(1)
+        self.command("alice", f"+plot/conclude {plot}", "concluded")
+        created = self.command("alice", "+plot/create Live sequel plot", "Created plot")
+        sequel = "#" + re.search(r"Created plot #(\d+)", created["output"]).group(1)
+        self.command("alice", f"+plot/activate {sequel}", "now active")
+        self.command("alice", f"+plot/sequel {sequel}={plot}", "sequel")
+        self.command("alice", f"+thread/carry {loose}={sequel}", "Carried")
+
     def events(self):
         alice_id = self.state()["actors"]["alice"]["id"]
         for resource in ("grain", "ember"):
@@ -944,6 +1032,9 @@ def run_rp(session, smoke=False):
     )
     cases.append(
         ("Crafting field syntax, journal revisions and Pattern teaching", suite.crafting_syntax)
+    )
+    cases.append(
+        ("Plots companion, thread privacy, flattened links and arc XP", suite.plots_syntax)
     )
     for name, function in cases:
         if not suite.case(name, function):

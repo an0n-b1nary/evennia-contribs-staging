@@ -1167,13 +1167,13 @@ class TestCmdArc(EvenniaCommandTest):
 class TestCmdHook(EvenniaCommandTest):
     def test_hook_appends_to_thread_hook_log(self):
         thread = _make_thread("HookTest", creator=self.char1, status="active")
-        self.call(CmdHook(), f"{self.char2.key}=#{thread.plot_number}", caller=self.char1)
+        self.call(CmdHook(), f"#{thread.plot_number}={self.char2.key}", caller=self.char1)
         thread.refresh_from_db()
         self.assertEqual(len(thread.hook_log), 1)
 
     def test_hook_records_staff_and_target_names(self):
         thread = _make_thread("HookLog", creator=self.char1, status="active")
-        self.call(CmdHook(), f"{self.char2.key}=#{thread.plot_number}", caller=self.char1)
+        self.call(CmdHook(), f"#{thread.plot_number}={self.char2.key}", caller=self.char1)
         thread.refresh_from_db()
         entry = thread.hook_log[0]
         self.assertIn("staff", entry)
@@ -1181,12 +1181,12 @@ class TestCmdHook(EvenniaCommandTest):
 
     def test_hook_non_staff_denied(self):
         thread = _make_thread("HookDenied", creator=self.char1, status="active")
-        result = self.call(CmdHook(), f"{self.char1.key}=#{thread.plot_number}", caller=self.char2)
+        result = self.call(CmdHook(), f"#{thread.plot_number}={self.char1.key}", caller=self.char2)
         self.assertIn("permission", result.lower())
 
     def test_hook_rejects_private_thread(self):
         thread = _make_thread("PrivateHook", creator=self.char1, status="active", privacy="private")
-        result = self.call(CmdHook(), f"{self.char2.key}=#{thread.plot_number}", caller=self.char1)
+        result = self.call(CmdHook(), f"#{thread.plot_number}={self.char2.key}", caller=self.char1)
         self.assertIn("private", result.lower())
 
 

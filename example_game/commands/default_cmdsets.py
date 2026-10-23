@@ -31,7 +31,7 @@ from evennia_lore.commands import (
     CmdShare,
     CmdTome,
 )
-from evennia_plots.commands import CmdArc, CmdHook, CmdPlot
+from evennia_plots.commands import CmdArc, CmdHook, CmdPlot, CmdThread
 
 from commands.sandbox import CmdSandbox
 from evennia_links.commands import CmdRuntime
@@ -220,6 +220,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # (locks = "cmd:all()") but self-enforce PLOTS_STAFF_LOCK inside
         # func(), so they're safe to add here alongside CmdPlot.
         self.add(CmdPlot)
+        self.add(CmdThread)
         self.add(CmdArc)
         self.add(CmdHook)
 

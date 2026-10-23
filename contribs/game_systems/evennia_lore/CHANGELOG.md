@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.1 — 2026-10-22
+
+### Documentation
+- Distinguish whole-plot lore links from questions managed with `+thread`.
+
 ## 0.10.0 — 2026-10-22
 
 - **Breaking:** `+tome/desc <description>` takes a bare value; the former leading

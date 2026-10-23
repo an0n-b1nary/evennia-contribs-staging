@@ -33,7 +33,7 @@ Signals (eagerly exported — plain Signal() objects, safe at app-load time):
 
 Commands (import explicitly):
 
-    from evennia_plots.commands import CmdPlot, CmdArc, CmdHook
+    from evennia_plots.commands import CmdPlot, CmdThread, CmdArc, CmdHook
 
 Web/API surface (requires [web] extra):
 
@@ -41,7 +41,7 @@ Web/API surface (requires [web] extra):
     from evennia_plots.api.views import PlotThreadViewSet
 """
 
-__version__ = "0.7.3"
+__version__ = "0.8.0"
 
 from evennia_plots.signals import (
     arc_currency_changed,

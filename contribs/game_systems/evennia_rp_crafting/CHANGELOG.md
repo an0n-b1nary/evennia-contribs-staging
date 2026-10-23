@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 — 2026-10-22
+
+### Changed
+- The plots extra accepts evennia-plots 0.8. Clarify that `+pattern/thread`
+  attaches a Pattern to a whole plot, rather than one of its questions.
+
 ## 0.11.0 — 2026-10-22
 
 - **Breaking:** no-target draft fields take bare values. Select one resource per

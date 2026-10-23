@@ -12,9 +12,6 @@ evennia_building semicolon-parse +build
 evennia_building stacked-switch +build
 evennia_calendar stacked-switch +calendar
 evennia_calendar stacked-switch +rsvp
-evennia_plots colon +arc
-evennia_plots stacked-switch +arc
-evennia_plots stacked-switch +plot
 evennia_rp_chargen json +moves
 evennia_rp_combat json +combat
 evennia_rp_combat json +tactics

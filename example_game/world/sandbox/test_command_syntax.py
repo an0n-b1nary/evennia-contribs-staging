@@ -267,3 +267,52 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         self.expect(command, f"#{entry.entry_number}=Char2", "Shared")
         acquisition = LoreAcquisition.objects.get(entry=entry, character=self.char2)
         self.assertEqual((acquisition.source, acquisition.shared_by_id), ("shared", self.char1.pk))
+
+    def test_thread_companion_preserves_host_permissions_and_sealed_answers(self):
+        from evennia_plots.models import PlotThread, StoryThread
+
+        plot = PlotThread.create_thread(name="Syntax plot", creator=self.char2)
+        plot.activate()
+        command = self.command("+thread")
+        self.expect(
+            command, f"/new #{plot.plot_number}=An open question", "Added thread", caller=self.char2
+        )
+        thread = plot.story_threads.get()
+        self.expect(command, f"/seal {thread.ref}=Hidden answer", "Sealed", caller=self.char2)
+        self.assertNotIn("Hidden answer", self.call(command, thread.ref, caller=self.char2))
+        self.call(command, f"/resolve/reveal {thread.ref}=Solved", caller=self.char2)
+        thread.refresh_from_db()
+        self.assertEqual(thread.status, StoryThread.Status.OPEN)
+        self.assertFalse(thread.sealed_answer_revealed)
+        self.call(command, f"/resolve {thread.ref}=Solved", caller=self.char2)
+        self.assertNotIn("Hidden answer", self.call(command, thread.ref, caller=self.char2))
+        self.call(command, f"/reveal {thread.ref}", caller=self.char2)
+        self.assertIn("Hidden answer", self.call(command, thread.ref, caller=self.char2))
+
+    def test_flat_plot_links_use_real_scene_board_and_calendar_partners(self):
+        from django.utils import timezone
+        from evennia_boards.models import Board, Post
+        from evennia_calendar.models import CalendarEvent
+        from evennia_plots.models import PlotBoardLink, PlotCalendarLink, PlotThread, ScenePlotLink
+        from evennia_scenes.models import Scene
+
+        plot = PlotThread.create_thread(name="Syntax links", creator=self.char2)
+        plot.activate()
+        scene = Scene.objects.create(title="Linked scene", room=self.room1, creator=self.char2)
+        board = Board.objects.create(name="Syntax board")
+        post = Post.create_post(board=board, author=self.char2, title="Report", content="News")
+        event = CalendarEvent.create_event(
+            creator=self.char2, title="Syntax event", scheduled_time=timezone.now()
+        )
+        command = self.command("+plot")
+        for switch, value, model in (
+            ("scene", str(scene.pk), ScenePlotLink),
+            ("post", f"{board.name}/{post.post_number}", PlotBoardLink),
+            ("event", str(event.pk), PlotCalendarLink),
+        ):
+            self.call(command, f"/link/{switch} #{plot.plot_number}={value}", caller=self.char2)
+            self.assertFalse(model.objects.filter(thread=plot).exists())
+            self.expect(
+                command, f"/{switch} #{plot.plot_number}={value}", "Linked", caller=self.char2
+            )
+            self.assertEqual(model.objects.filter(thread=plot).count(), 1)

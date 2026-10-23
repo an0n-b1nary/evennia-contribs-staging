@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.8.0 — 2026-10-22
+
+### Breaking
+- Add the standalone `+thread` command and refuse the former nested plot forms.
+  Resolving or dropping a thread and revealing its sealed answer are separate actions.
+- Flatten plot management and arc update switches; filter plots with `/list status`
+  or `/tags tag`, and arcs with `/list tag`.
+- Set arc XP with `#N/source=value` and awards with `amount # reason`;
+  hooks now take `plot=character`. Reject stacked, unknown and ambiguous switches.
+- Register `CmdThread` in host character cmdsets. Plot and thread IDs and
+  existing ownership, privacy, lifecycle and XP rules are preserved.
+
 ## 0.7.3 — 2026-10-20
 
 - Add the staff-only `plots-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

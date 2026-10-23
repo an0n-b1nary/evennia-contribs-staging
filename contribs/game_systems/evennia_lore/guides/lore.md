@@ -84,3 +84,6 @@ When staff unseal the notes, everyone who has the entry is told, either straight
 ## How it connects
 
 Lore can be linked to scenes, plots, regions and objects: `+lore/scene`, `+lore/plot`, `+lore/region` and `+lore/object`. If your game uses XP, writing a published entry earns some, and so does taking part in a scene that an entry is linked to. `+lore/flag <id>=<reason>` asks staff to look at an entry that seems wrong.
+
+`+lore/plot <entry>=<plot>` links the whole plot (`+plot #N`). Questions inside
+it use `+thread #N.T`; those references are not plot IDs.
