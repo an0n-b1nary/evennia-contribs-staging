@@ -19,7 +19,7 @@ from importlib import import_module
 from django.apps import apps
 from evennia import default_cmds
 from evennia_boards.commands import CmdBoard
-from evennia_calendar.commands import CmdCalendar, CmdRsvp
+from evennia_calendar.commands import CmdCalendar, CmdCluster, CmdRsvp
 from evennia_jobs.commands import CmdBug, CmdDiscuss, CmdIssue, CmdJobs, CmdRequest
 from evennia_lore.commands import (
     CmdForget,
@@ -207,6 +207,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
 
         # Calendar
         self.add(CmdCalendar)
+        self.add(CmdCluster)
         self.add(CmdRsvp)
 
         # Lore

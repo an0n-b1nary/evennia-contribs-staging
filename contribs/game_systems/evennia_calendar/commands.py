@@ -4,9 +4,10 @@
 Calendar commands for evennia_calendar.
 
 CmdCalendar (+calendar / +cal): event creation, viewing, editing, tagging,
-  mutual exclusion, and EventCluster management.
-CmdRsvp (+rsvp): single-event RSVP, cluster ranked-choice RSVP, host
-  invite/ping, priority token management, waitlist, and confirmation flows.
+  mutual exclusion, and personal event listings.
+CmdRsvp (+rsvp): single-event RSVP, host invite/ping, priority tokens,
+  waitlist, and confirmation flows.
+CmdCluster (+cluster): cluster management and player ranked-choice applications.
 """
 
 import contextlib
@@ -15,6 +16,8 @@ import datetime
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
+
+from evennia_calendar.command_syntax import SingleSwitchMixin
 
 try:
     from evennia_accessibility import uses_screenreader
@@ -141,7 +144,7 @@ def _format_event_detail(event, sr_mode=False):
         if event.is_clustered:
             lines.append(
                 f"  Cluster: {event.cluster.title} (#{event.cluster.pk})"
-                " — use +rsvp/cluster to sign up"
+                " — use +cluster/rank to sign up"
             )
         if event.description:
             lines.append(f"  Description: {event.description}")
@@ -179,7 +182,7 @@ def _format_event_detail(event, sr_mode=False):
     if event.is_clustered:
         lines.append(
             f" Cluster : |m{event.cluster.title}|n (#{event.cluster.pk}) — "
-            f"use +rsvp/cluster to sign up"
+            f"use +cluster/rank to sign up"
         )
     if event.description:
         lines.append(sep)
@@ -297,15 +300,16 @@ def _finalize_create(caller, ctx):
 # ---------------------------------------------------------------------------
 
 
-class CmdCalendar(MuxCommand):
+class CmdCalendar(SingleSwitchMixin, MuxCommand):
     """
     View and manage the event calendar.
 
     Usage:
         +calendar                           - Upcoming events
+        +calendar/mine                      - Your upcoming hosted events and current RSVPs
         +calendar/past                      - Past events
         +calendar/view <id>                 - Event details and RSVP list
-        +calendar/create <title>            - Schedule a new event (opens editor)
+        +calendar/create <title>=<time>     - Schedule a new event (opens editor)
         +calendar/edit <id>                 - Edit your event description
         +calendar/cancel <id>               - Cancel an event
         +calendar/cap <id>=<number>         - Set or change participant cap
@@ -315,12 +319,7 @@ class CmdCalendar(MuxCommand):
         +calendar/exclusive <id>=<id>       - Declare mutual exclusion
         +calendar/staff <id>                - Toggle staff-event lottery mode
 
-    Cluster management:
-        +calendar/cluster <title>           - Create a new event cluster
-        +calendar/cluster/add <eid>=<cid>   - Add event to cluster
-        +calendar/cluster/remove <eid>      - Remove event from cluster
-        +calendar/cluster/lock <cid>        - Lock cluster and arm the draw
-        +calendar/cluster/view <cid>        - View cluster details
+    Use +cluster to manage related events and submit ranked preferences.
 
     Events have an emphasis category (Combat, Skill, Social, Freeform) set
     during creation, describing expected mechanical focus. Thematic tags
@@ -339,22 +338,28 @@ class CmdCalendar(MuxCommand):
     help_category = "Events"
     locks = "cmd:all()"
 
+    switch_options = (
+        "mine",
+        "past",
+        "view",
+        "create",
+        "edit",
+        "cancel",
+        "cap",
+        "tag",
+        "untag",
+        "tags",
+        "exclusive",
+        "staff",
+    )
+
     def func(self):
         sw = self.switches
 
-        # Cluster sub-commands (check compound switches before bare "cluster").
-        # MuxCommand splits "+calendar/cluster/add" into switches=["cluster","add"],
-        # so compound checks must test both parts individually.
-        if "cluster" in sw and "add" in sw:
-            self._cluster_add()
-        elif "cluster" in sw and "remove" in sw:
-            self._cluster_remove()
-        elif "cluster" in sw and "lock" in sw:
-            self._cluster_lock()
-        elif "cluster" in sw and "view" in sw:
-            self._cluster_view()
-        elif "cluster" in sw:
-            self._cluster_create()
+        if not sw:
+            self._list_upcoming()
+        elif "mine" in sw:
+            self._list_mine()
         elif "past" in sw:
             self._list_past()
         elif "view" in sw:
@@ -378,7 +383,7 @@ class CmdCalendar(MuxCommand):
         elif "staff" in sw:
             self._toggle_staff()
         else:
-            self._list_upcoming()
+            self.caller.msg("Unknown switch. See help +calendar for usage.")
 
     # ------------------------------------------------------------------
     # Listing
@@ -422,6 +427,41 @@ class CmdCalendar(MuxCommand):
             lines.append(_format_event_row(ev))
         lines.append(sep)
         lines.append("Use |w+calendar/view <id>|n for details and RSVP status.")
+        self.caller.msg("\n".join(lines))
+
+    def _list_mine(self):
+        from django.db.models import Prefetch, Q
+        from django.utils import timezone
+
+        from evennia_calendar.models import RSVP, CalendarEvent
+
+        current = RSVP.objects.filter(character=self.caller).exclude(status=RSVP.Status.RELEASED)
+        events = (
+            CalendarEvent.objects.filter(is_cancelled=False, scheduled_time__gte=timezone.now())
+            .filter(Q(creator=self.caller) | Q(pk__in=current.values("event_id")))
+            .select_related("cluster")
+            .prefetch_related(Prefetch("rsvps", queryset=current, to_attr="own_rsvps"))
+            .order_by("scheduled_time", "pk")
+        )
+        lines = ["Your upcoming events:"]
+        sr_mode = uses_screenreader(self.caller)
+        for event in events:
+            roles = ["Host"] if event.creator_id == self.caller.pk else []
+            for rsvp in event.own_rsvps:
+                status = rsvp.get_status_display()
+                if rsvp.status == RSVP.Status.WAITLISTED and rsvp.waitlist_position is not None:
+                    status += f" (position {rsvp.waitlist_position})"
+                roles.append(f"RSVP: {status}")
+            summary = (
+                f"  #{event.pk}: {event.title} — "
+                f"{event.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC"
+                if sr_mode
+                else _format_event_row(event)
+            )
+            lines.append(f"{summary} — {', '.join(roles)}")
+        if len(lines) == 1:
+            lines.append("  No upcoming events you host or have a current RSVP for.")
+        lines.append("Pending ranked applications: +cluster/mine <cluster id>.")
         self.caller.msg("\n".join(lines))
 
     def _list_past(self):
@@ -484,9 +524,8 @@ class CmdCalendar(MuxCommand):
         title = self.args.strip()
         if not title:
             self.caller.msg(
-                "Usage: |w+calendar/create <title>|n\n"
-                "After entering a title, you will be asked for time and emphasis, "
-                "then an editor opens for the description."
+                "Usage: |w+calendar/create <title>=YYYY-MM-DD HH:MM|n\n"
+                "Then an editor opens for the description."
             )
             return
 
@@ -724,158 +763,6 @@ class CmdCalendar(MuxCommand):
         mode = "|ystaff lottery|n" if event.is_staff_event else "|gnormal|n"
         self.caller.msg(f"Event #{event.pk} RSVP mode set to: {mode}")
 
-    # ------------------------------------------------------------------
-    # Cluster management
-    # ------------------------------------------------------------------
-
-    def _cluster_create(self):
-        title = self.args.strip()
-        if not title:
-            self.caller.msg("Usage: |w+calendar/cluster <title>|n")
-            return
-        from evennia_calendar.models import EventCluster
-
-        cluster = EventCluster.objects.create(
-            title=title,
-            creator=self.caller,
-            creator_name=self.caller.key,
-        )
-        self.caller.msg(
-            f"|gCluster |w#{cluster.pk}|n '{cluster.title}' created.\n"
-            f"Add events: |w+calendar/cluster/add <event_id>={cluster.pk}|n\n"
-            f"Lock when ready: |w+calendar/cluster/lock {cluster.pk}|n"
-        )
-
-    def _cluster_add(self):
-        if "=" not in self.args:
-            self.caller.msg("Usage: |w+calendar/cluster/add <event_id>=<cluster_id>|n")
-            return
-        eid_part, cid_part = self.args.split("=", 1)
-        event, err = _lookup_event(eid_part)
-        if err:
-            self.caller.msg(err)
-            return
-        cluster, err = _lookup_cluster(cid_part)
-        if err:
-            self.caller.msg(err)
-            return
-        if cluster.is_locked:
-            self.caller.msg("|rThis cluster is locked. No changes to membership allowed.|n")
-            return
-        if not (_is_event_owner(self.caller, event) or _is_staff(self.caller)):
-            self.caller.msg("|rYou must be the event creator or staff.|n")
-            return
-        event.cluster = cluster
-        event.save(update_fields=["cluster", "updated_at"])
-        self.caller.msg(
-            f"Event #{event.pk} '{event.title}' added to cluster #{cluster.pk} '{cluster.title}'."
-        )
-
-    def _cluster_remove(self):
-        event, err = _lookup_event(self.args)
-        if err:
-            self.caller.msg(err)
-            return
-        if not event.is_clustered:
-            self.caller.msg("That event is not in a cluster.")
-            return
-        cluster = event.cluster
-        if cluster.is_locked:
-            self.caller.msg("|rThis cluster is locked. No changes to membership allowed.|n")
-            return
-        if not (_is_event_owner(self.caller, event) or _is_staff(self.caller)):
-            self.caller.msg("|rYou must be the event creator or staff.|n")
-            return
-        event.cluster = None
-        event.save(update_fields=["cluster", "updated_at"])
-        self.caller.msg(f"Event #{event.pk} removed from cluster #{cluster.pk} '{cluster.title}'.")
-
-    def _cluster_lock(self):
-        cluster, err = _lookup_cluster(self.args)
-        if err:
-            self.caller.msg(err)
-            return
-        if not _is_staff(self.caller):
-            self.caller.msg("|rOnly staff can lock a cluster.|n")
-            return
-        if cluster.is_locked:
-            self.caller.msg("That cluster is already locked.")
-            return
-        events = list(cluster.events.all())
-        if not events:
-            self.caller.msg("|rCannot lock an empty cluster. Add events first.|n")
-            return
-        flags = set(e.is_staff_event for e in events)
-        if len(flags) > 1:
-            self.caller.msg(
-                "|rAll events in the cluster must share the same staff-event "
-                "setting before locking. Use +calendar/staff to adjust.|n"
-            )
-            return
-        from django.utils import timezone
-
-        now = timezone.now()
-        for ev in events:
-            if ev.lottery_draw_time and ev.lottery_draw_time < now:
-                self.caller.msg(
-                    f"|rEvent #{ev.pk} '{ev.title}' is within 72h of its "
-                    f"scheduled time. Cannot lock a cluster this close to draw time.|n"
-                )
-                return
-        cluster.is_locked = True
-        cluster.save(update_fields=["is_locked", "updated_at"])
-        self.caller.msg(
-            f"|gCluster #{cluster.pk} '{cluster.title}' is now locked.|n\n"
-            f"Players can RSVP via |w+rsvp/cluster {cluster.pk}=<event_ids>|n.\n"
-            f"The lottery draw will run 72h before the earliest event "
-            f"({cluster.draw_time.strftime('%Y-%m-%d %H:%M') if cluster.draw_time else 'N/A'} UTC)."
-        )
-
-    def _cluster_view(self):
-        cluster, err = _lookup_cluster(self.args)
-        if err:
-            self.caller.msg(err)
-            return
-        from evennia_calendar.models import ClusterRSVP
-
-        sep = "|b" + "=" * 70 + "|n"
-        locked_tag = " |y[LOCKED]|n" if cluster.is_locked else " |g[open]|n"
-        drawn_tag = " |m[DRAWN]|n" if cluster.has_run else ""
-        lines = [
-            sep,
-            f" Cluster |w#{cluster.pk}|n — {cluster.title}{locked_tag}{drawn_tag}",
-            f" Created by: {cluster.creator_name}",
-            sep,
-        ]
-        if cluster.description:
-            lines.append(cluster.description)
-            lines.append(sep)
-        events = cluster.events.filter(is_cancelled=False).order_by("scheduled_time")
-        lines.append(" Member Events:")
-        for ev in events:
-            rsvp_pool = ev.rsvps.count()
-            lines.append(
-                f"   |w#{ev.pk}|n {ev.title} — "
-                f"{ev.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC  "
-                f"cap: {ev.participant_cap or 'open'}  "
-                f"seated: {rsvp_pool}"
-            )
-        total_pending = ClusterRSVP.objects.filter(
-            cluster=cluster, status=ClusterRSVP.Status.PENDING
-        ).count()
-        lines.append(sep)
-        lines.append(f" Total ranked preferences submitted: {total_pending}")
-        if not cluster.is_locked:
-            lines.append(
-                f" RSVP opens after staff locks with |w+calendar/cluster/lock {cluster.pk}|n"
-            )
-        else:
-            lines.append(f" RSVP: |w+rsvp/cluster {cluster.pk}=<event_id1>,<event_id2>,...|n")
-        if cluster.draw_time:
-            lines.append(f" Draw time: {cluster.draw_time.strftime('%Y-%m-%d %H:%M')} UTC")
-        lines.append(sep)
-        self.caller.msg("\n".join(lines))
-
 
 # ---------------------------------------------------------------------------
 # +rsvp helpers
@@ -893,19 +780,6 @@ def _rsvp_lookup_event(arg):
         return CalendarEvent.objects.get(pk=int(arg)), None
     except CalendarEvent.DoesNotExist:
         return None, f"No event #{arg} found."
-
-
-def _rsvp_lookup_cluster(arg):
-    """Resolve an EventCluster by PK string. Returns (cluster, err)."""
-    from evennia_calendar.models import EventCluster
-
-    arg = (arg or "").strip()
-    if not arg.isdigit():
-        return None, "Cluster ID must be a number."
-    try:
-        return EventCluster.objects.get(pk=int(arg)), None
-    except EventCluster.DoesNotExist:
-        return None, f"No cluster #{arg} found."
 
 
 def _get_rsvp(event, character):
@@ -955,9 +829,9 @@ def _format_token_row(token):
 # ---------------------------------------------------------------------------
 
 
-class CmdRsvp(MuxCommand):
+class CmdRsvp(SingleSwitchMixin, MuxCommand):
     """
-    RSVP to a calendar event or cluster.
+    RSVP to a calendar event. Use +cluster for ranked-choice applications.
 
     Usage:
         +rsvp <event id>                     - RSVP to an event
@@ -973,14 +847,9 @@ class CmdRsvp(MuxCommand):
         +rsvp/ping <event id>                - Offer spot to next waitlisted
 
     Priority tokens:
-        +rsvp/token                          - View your priority tokens
-        +rsvp/token/use <event id>           - Redeem a token for guaranteed
+        +rsvp/tokens                         - View your priority tokens
+        +rsvp/redeem <event id>           - Redeem a token for guaranteed
                                                entry to a staff event
-
-    Cluster (ranked-choice) RSVP:
-        +rsvp/cluster <cid>=<eid1>,<eid2>,...  - Submit ranked preferences
-        +rsvp/cluster/view <cluster id>         - Your current preferences
-        +rsvp/cluster/cancel <cluster id>       - Withdraw from cluster
 
     Three RSVP modes:
       Open (no cap):    RSVP and you're confirmed immediately.
@@ -992,7 +861,7 @@ class CmdRsvp(MuxCommand):
                         selected receive a priority token.
 
     Clustered events use ranked-choice RSVP across all member events. Use
-    +rsvp/cluster instead of +rsvp for events that belong to a cluster.
+    +cluster/rank instead of +rsvp for events that belong to a cluster.
     """
 
     key = "+rsvp"
@@ -1000,15 +869,15 @@ class CmdRsvp(MuxCommand):
     help_category = "Events"
     locks = "cmd:all()"
 
+    # The old /token spelling must not become a unique prefix of /tokens.
+    retired_switches = ("token",)
+    switch_options = ("cancel", "confirm", "list", "waitlist", "invite", "ping", "tokens", "redeem")
+
     def func(self):
         sw = self.switches
 
-        if "cluster" in sw and "view" in sw:
-            self._cluster_view()
-        elif "cluster" in sw and "cancel" in sw:
-            self._cluster_cancel()
-        elif "cluster" in sw:
-            self._cluster_rsvp()
+        if not sw:
+            self._rsvp()
         elif "cancel" in sw:
             self._cancel()
         elif "confirm" in sw:
@@ -1021,12 +890,12 @@ class CmdRsvp(MuxCommand):
             self._invite()
         elif "ping" in sw:
             self._ping()
-        elif "token" in sw and "use" in sw:
+        elif "redeem" in sw:
             self._token_use()
-        elif "token" in sw:
+        elif "tokens" in sw:
             self._token_list()
         else:
-            self._rsvp()
+            self.caller.msg("Unknown switch. See help +rsvp for usage.")
 
     # ------------------------------------------------------------------
     # Single-event RSVP
@@ -1050,9 +919,9 @@ class CmdRsvp(MuxCommand):
             self.caller.msg(
                 f"|yEvent #{event.pk} is part of cluster "
                 f"|w#{event.cluster.pk}|n |y'{event.cluster.title}'|n.\n"
-                f"Use |w+rsvp/cluster {event.cluster.pk}=<event_id1>,<event_id2>,...|n "
+                f"Use |w+cluster/rank {event.cluster.pk}=<event_id1>,<event_id2>,...|n "
                 f"to submit your ranked preferences.\n"
-                f"View the cluster: |w+calendar/cluster/view {event.cluster.pk}|n"
+                f"View the cluster: |w+cluster {event.cluster.pk}|n"
             )
             return
 
@@ -1370,7 +1239,7 @@ class CmdRsvp(MuxCommand):
         lines.append(sep)
         lines.append(f"  Available: {available}  Total: {tokens.count()}")
         lines.append(
-            "  Redeem an EVENT token: |w+rsvp/token/use <event id>|n\n"
+            "  Redeem an EVENT token: |w+rsvp/redeem <event id>|n\n"
             "  CLUSTER_RANK1 tokens are redeemed automatically at draw time."
         )
         lines.append(sep)
@@ -1400,7 +1269,7 @@ class CmdRsvp(MuxCommand):
         if not token:
             self.caller.msg(
                 "You don't have an available EVENT priority token.\n"
-                "Check your tokens with |w+rsvp/token|n."
+                "Check your tokens with |w+rsvp/tokens|n."
             )
             return
         token.redeemed_event = event
@@ -1426,25 +1295,225 @@ class CmdRsvp(MuxCommand):
             f"({event.lottery_draw_time.strftime('%Y-%m-%d %H:%M') if event.lottery_draw_time else 'N/A'} UTC).|n"
         )
 
+
+# ---------------------------------------------------------------------------
+# CmdCluster
+# ---------------------------------------------------------------------------
+
+
+class CmdCluster(SingleSwitchMixin, MuxCommand):
+    """
+    Manage parallel events and your ranked-choice application.
+
+    Usage:
+        +cluster <cid>                    View cluster details
+        +cluster/new <title>              Create a cluster
+        +cluster/add <eid>=<cid>           Add your event (or any event as staff)
+        +cluster/remove <eid>             Remove your event before locking
+        +cluster/lock <cid>               Lock membership and arm the draw (staff)
+        +cluster/rank <cid>=<eid>,<eid>    Submit or replace ranked preferences
+        +cluster/mine <cid>               View your preferences and draw status
+        +cluster/withdraw <cid>           Withdraw your pending application
+
+    Rank event IDs from most to least preferred. An application creates no
+    event RSVP until the draw seats you. After seating, use +rsvp/confirm or
+    +rsvp/cancel on the assigned event. +calendar/mine lists hosted events and
+    current attendance; +cluster/mine keeps pending applications discoverable.
+    """
+
+    key = "+cluster"
+    aliases = []  # noqa: RUF012
+    help_category = "Events"
+    locks = "cmd:all()"
+    switch_options = ("new", "add", "remove", "lock", "rank", "mine", "withdraw")
+
+    def func(self):
+        if not self.switches:
+            return self._cluster_view()
+        handlers = {
+            "new": self._cluster_create,
+            "add": self._cluster_add,
+            "remove": self._cluster_remove,
+            "lock": self._cluster_lock,
+            "rank": self._rank,
+            "mine": self._mine,
+            "withdraw": self._withdraw,
+        }
+        handler = handlers.get(self.switches[0])
+        if handler is None:
+            self.caller.msg("Unknown switch. See help +cluster for usage.")
+            return
+        return handler()
+
+    # ------------------------------------------------------------------
+    # Cluster management
+    # ------------------------------------------------------------------
+
+    def _cluster_create(self):
+        title = self.args.strip()
+        if not title:
+            self.caller.msg("Usage: |w+cluster/new <title>|n")
+            return
+        from evennia_calendar.models import EventCluster
+
+        cluster = EventCluster.objects.create(
+            title=title,
+            creator=self.caller,
+            creator_name=self.caller.key,
+        )
+        self.caller.msg(
+            f"|gCluster |w#{cluster.pk}|n '{cluster.title}' created.\n"
+            f"Add events: |w+cluster/add <event_id>={cluster.pk}|n\n"
+            f"Lock when ready: |w+cluster/lock {cluster.pk}|n"
+        )
+
+    def _cluster_add(self):
+        if "=" not in self.args:
+            self.caller.msg("Usage: |w+cluster/add <event_id>=<cluster_id>|n")
+            return
+        eid_part, cid_part = self.args.split("=", 1)
+        event, err = _lookup_event(eid_part)
+        if err:
+            self.caller.msg(err)
+            return
+        cluster, err = _lookup_cluster(cid_part)
+        if err:
+            self.caller.msg(err)
+            return
+        if cluster.is_locked:
+            self.caller.msg("|rThis cluster is locked. No changes to membership allowed.|n")
+            return
+        if not (_is_event_owner(self.caller, event) or _is_staff(self.caller)):
+            self.caller.msg("|rYou must be the event creator or staff.|n")
+            return
+        event.cluster = cluster
+        event.save(update_fields=["cluster", "updated_at"])
+        self.caller.msg(
+            f"Event #{event.pk} '{event.title}' added to cluster #{cluster.pk} '{cluster.title}'."
+        )
+
+    def _cluster_remove(self):
+        event, err = _lookup_event(self.args)
+        if err:
+            self.caller.msg(err)
+            return
+        if not event.is_clustered:
+            self.caller.msg("That event is not in a cluster.")
+            return
+        cluster = event.cluster
+        if cluster.is_locked:
+            self.caller.msg("|rThis cluster is locked. No changes to membership allowed.|n")
+            return
+        if not (_is_event_owner(self.caller, event) or _is_staff(self.caller)):
+            self.caller.msg("|rYou must be the event creator or staff.|n")
+            return
+        event.cluster = None
+        event.save(update_fields=["cluster", "updated_at"])
+        self.caller.msg(f"Event #{event.pk} removed from cluster #{cluster.pk} '{cluster.title}'.")
+
+    def _cluster_lock(self):
+        cluster, err = _lookup_cluster(self.args)
+        if err:
+            self.caller.msg(err)
+            return
+        if not _is_staff(self.caller):
+            self.caller.msg("|rOnly staff can lock a cluster.|n")
+            return
+        if cluster.is_locked:
+            self.caller.msg("That cluster is already locked.")
+            return
+        events = list(cluster.events.all())
+        if not events:
+            self.caller.msg("|rCannot lock an empty cluster. Add events first.|n")
+            return
+        flags = set(e.is_staff_event for e in events)
+        if len(flags) > 1:
+            self.caller.msg(
+                "|rAll events in the cluster must share the same staff-event "
+                "setting before locking. Use +calendar/staff to adjust.|n"
+            )
+            return
+        from django.utils import timezone
+
+        now = timezone.now()
+        for ev in events:
+            if ev.lottery_draw_time and ev.lottery_draw_time < now:
+                self.caller.msg(
+                    f"|rEvent #{ev.pk} '{ev.title}' is within 72h of its "
+                    f"scheduled time. Cannot lock a cluster this close to draw time.|n"
+                )
+                return
+        cluster.is_locked = True
+        cluster.save(update_fields=["is_locked", "updated_at"])
+        self.caller.msg(
+            f"|gCluster #{cluster.pk} '{cluster.title}' is now locked.|n\n"
+            f"Players can RSVP via |w+cluster/rank {cluster.pk}=<event_ids>|n.\n"
+            f"The lottery draw will run 72h before the earliest event "
+            f"({cluster.draw_time.strftime('%Y-%m-%d %H:%M') if cluster.draw_time else 'N/A'} UTC)."
+        )
+
+    def _cluster_view(self):
+        cluster, err = _lookup_cluster(self.args)
+        if err:
+            self.caller.msg(err)
+            return
+        from evennia_calendar.models import ClusterRSVP
+
+        sep = "|b" + "=" * 70 + "|n"
+        locked_tag = " |y[LOCKED]|n" if cluster.is_locked else " |g[open]|n"
+        drawn_tag = " |m[DRAWN]|n" if cluster.has_run else ""
+        lines = [
+            sep,
+            f" Cluster |w#{cluster.pk}|n — {cluster.title}{locked_tag}{drawn_tag}",
+            f" Created by: {cluster.creator_name}",
+            sep,
+        ]
+        if cluster.description:
+            lines.append(cluster.description)
+            lines.append(sep)
+        events = cluster.events.filter(is_cancelled=False).order_by("scheduled_time")
+        lines.append(" Member Events:")
+        for ev in events:
+            rsvp_pool = ev.rsvps.count()
+            lines.append(
+                f"   |w#{ev.pk}|n {ev.title} — "
+                f"{ev.scheduled_time.strftime('%Y-%m-%d %H:%M')} UTC  "
+                f"cap: {ev.participant_cap or 'open'}  "
+                f"seated: {rsvp_pool}"
+            )
+        total_pending = ClusterRSVP.objects.filter(
+            cluster=cluster, status=ClusterRSVP.Status.PENDING
+        ).count()
+        lines.append(sep)
+        lines.append(f" Total ranked preferences submitted: {total_pending}")
+        if not cluster.is_locked:
+            lines.append(f" RSVP opens after staff locks with |w+cluster/lock {cluster.pk}|n")
+        else:
+            lines.append(f" RSVP: |w+cluster/rank {cluster.pk}=<event_id1>,<event_id2>,...|n")
+        if cluster.draw_time:
+            lines.append(f" Draw time: {cluster.draw_time.strftime('%Y-%m-%d %H:%M')} UTC")
+        lines.append(sep)
+        self.caller.msg("\n".join(lines))
+
     # ------------------------------------------------------------------
     # Cluster RSVP
     # ------------------------------------------------------------------
 
-    def _cluster_rsvp(self):
+    def _rank(self):
         """
-        +rsvp/cluster <cluster_id>=<event_id1>,<event_id2>,...
+        +cluster/rank <cluster_id>=<event_id1>,<event_id2>,...
 
         Submits or replaces the player's ranked preference list for a cluster.
         """
         if "=" not in self.args:
             self.caller.msg(
-                "Usage: |w+rsvp/cluster <cluster_id>=<event_id1>,<event_id2>,...|n\n"
+                "Usage: |w+cluster/rank <cluster_id>=<event_id1>,<event_id2>,...|n\n"
                 "List event IDs in order from most to least preferred.\n"
                 "Events you omit are treated as 'I'd rather sit this one out.'"
             )
             return
         cid_part, pref_part = self.args.split("=", 1)
-        cluster, err = _rsvp_lookup_cluster(cid_part)
+        cluster, err = _lookup_cluster(cid_part)
         if err:
             self.caller.msg(err)
             return
@@ -1452,7 +1521,7 @@ class CmdRsvp(MuxCommand):
             self.caller.msg(
                 "|rThis cluster hasn't been locked yet. "
                 "RSVPs open after staff lock it with "
-                f"+calendar/cluster/lock {cluster.pk}|n"
+                f"+cluster/lock {cluster.pk}|n"
             )
             return
         if cluster.has_run:
@@ -1509,13 +1578,13 @@ class CmdRsvp(MuxCommand):
             f"{pref_summary}\n"
             f"(Rank 1 = most preferred. The draw seats you in the highest-ranked "
             f"event with capacity.)\n"
-            f"View: |w+rsvp/cluster/view {cluster.pk}|n  "
-            f"Cancel: |w+rsvp/cluster/cancel {cluster.pk}|n"
+            f"View: |w+cluster/mine {cluster.pk}|n  "
+            f"Cancel: |w+cluster/withdraw {cluster.pk}|n"
         )
 
-    def _cluster_view(self):
+    def _mine(self):
         """Show the player's own ranked preferences and draw status."""
-        cluster, err = _rsvp_lookup_cluster(self.args)
+        cluster, err = _lookup_cluster(self.args)
         if err:
             self.caller.msg(err)
             return
@@ -1526,7 +1595,7 @@ class CmdRsvp(MuxCommand):
         except ClusterRSVP.DoesNotExist:
             self.caller.msg(
                 f"You don't have a cluster RSVP for '{cluster.title}'.\n"
-                f"Submit preferences with |w+rsvp/cluster {cluster.pk}=<event_ids>|n."
+                f"Submit preferences with |w+cluster/rank {cluster.pk}=<event_ids>|n."
             )
             return
 
@@ -1557,9 +1626,9 @@ class CmdRsvp(MuxCommand):
         lines.append(sep)
         self.caller.msg("\n".join(lines))
 
-    def _cluster_cancel(self):
+    def _withdraw(self):
         """Withdraw from cluster before draw."""
-        cluster, err = _rsvp_lookup_cluster(self.args)
+        cluster, err = _lookup_cluster(self.args)
         if err:
             self.caller.msg(err)
             return

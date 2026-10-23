@@ -316,3 +316,36 @@ class CommandSyntaxSeams(EvenniaCommandTest):
                 command, f"/{switch} #{plot.plot_number}={value}", "Linked", caller=self.char2
             )
             self.assertEqual(model.objects.filter(thread=plot).count(), 1)
+
+    def test_cluster_companion_seating_enters_the_personal_calendar(self):
+        import datetime
+        import random
+
+        from django.utils import timezone
+        from evennia_calendar.models import RSVP, CalendarEvent, ClusterRSVP, EventCluster
+        from evennia_calendar.scheduler import run_cluster_lottery
+
+        cluster_command = self.command("+cluster")
+        self.call(cluster_command, "/new Syntax calendar cluster")
+        cluster = EventCluster.objects.get(title="Syntax calendar cluster")
+        event = CalendarEvent.create_event(
+            creator=self.char1,
+            title="Syntax seating",
+            scheduled_time=timezone.now() + datetime.timedelta(days=7),
+            is_staff_event=True,
+            participant_cap=2,
+        )
+        self.call(cluster_command, f"/add {event.pk}={cluster.pk}")
+        self.call(cluster_command, f"/lock {cluster.pk}")
+        self.call(cluster_command, f"/rank {cluster.pk}={event.pk}", caller=self.char2)
+        self.assertTrue(ClusterRSVP.objects.filter(character=self.char2, status="pending").exists())
+        self.assertFalse(RSVP.objects.filter(character=self.char2).exists())
+        self.assertNotIn(
+            "Syntax seating", self.call(self.command("+calendar"), "/mine", caller=self.char2)
+        )
+        cluster.refresh_from_db()
+        run_cluster_lottery(cluster, rng=random.Random(19))
+        self.expect(self.command("+calendar"), "/mine", "Lottery Selected", caller=self.char2)
+        self.expect(cluster_command, f"/mine {cluster.pk}", "Assigned event", caller=self.char2)
+        self.call(self.command("+rsvp"), f"/confirm {event.pk}", caller=self.char2)
+        self.expect(self.command("+calendar"), "/mine", "Confirmed", caller=self.char2)

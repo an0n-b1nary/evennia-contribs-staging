@@ -29,7 +29,7 @@ Signals (eagerly exported — plain Signal() objects, safe at app-load time):
 
 Commands (import explicitly when needed):
 
-    from evennia_calendar.commands import CmdCalendar, CmdRsvp
+    from evennia_calendar.commands import CmdCalendar, CmdCluster, CmdRsvp
 
 Scheduler (import explicitly when needed):
 
@@ -60,7 +60,7 @@ Integration contract — IMPORTANT:
     started). See README for details.
 """
 
-__version__ = "0.5.3"
+__version__ = "0.6.0"
 
 from evennia_calendar.signals import (
     cluster_drawn,

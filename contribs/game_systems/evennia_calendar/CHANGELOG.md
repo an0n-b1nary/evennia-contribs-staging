@@ -7,6 +7,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.6.0 — 2026-10-22
+
+### Breaking
+- Register `CmdCluster` for cluster management and player ranked preferences.
+  Use its bare view, `/new`, `/add`, `/remove`, `/lock`, `/rank`, `/mine` and
+  `/withdraw`; the former Calendar and RSVP cluster forms are refused.
+- Priority token commands are now `+rsvp/tokens` and `/redeem`. All three
+  commands reject stacked, unknown and ambiguous switches before parsing.
+
+### Changed
+- A generated metadata-only migration updates the cluster field help text.
+
+### Added
+- `+calendar/mine` lists upcoming hosted events and current RSVPs, including
+  waitlist position and lottery status. Released RSVPs, past and cancelled
+  events are excluded. Pending ranked applications remain in `+cluster/mine`
+  until seating creates an event RSVP.
+
 ## 0.5.3 — 2026-10-20
 
 - Add the staff-only `calendar-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

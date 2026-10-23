@@ -91,7 +91,7 @@ class EventCluster(models.Model):
     Lifecycle:
     1. Staff create the cluster and add events (is_locked=False).
     2. Staff lock it once all events are added and RSVPs are open
-       (+calendar/cluster/lock). Locks prevent membership changes and arm
+       (+cluster/lock). Locks prevent membership changes and arm
        the scheduler to run the draw at lottery_draw_time.
     3. The scheduler runs run_cluster_lottery() which seats players by rank.
     4. Players confirm their concrete RSVP on the assigned member event.
@@ -219,7 +219,7 @@ class CalendarEvent(models.Model):
 
     cluster (FK EventCluster nullable): when set, this event is part of a
     grouped ranked-choice draw. Standalone RSVP is blocked; players must
-    use +rsvp/cluster on the parent cluster.
+    use +cluster/rank on the parent cluster.
 
     lottery_drawn_at: set when the lottery draw fires. Also serves as an
     idempotency guard (the scheduler no-ops if this is set).
@@ -286,7 +286,7 @@ class CalendarEvent(models.Model):
         related_name="events",
         help_text=(
             "If set, this event is part of a ranked-choice cluster. "
-            "Direct RSVP is blocked; players use +rsvp/cluster."
+            "Direct RSVP is blocked; players use +cluster/rank."
         ),
     )
 

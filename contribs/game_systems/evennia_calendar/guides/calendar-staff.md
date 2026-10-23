@@ -12,8 +12,8 @@ Staff schedule events with fair allocation when places are limited. See [[calend
 ## Tasks and commands
 
 - **Lottery mode:** `+calendar/staff <event>` toggles an event between normal and staff-event mode. Staff-event means lottery admission, not a private event. Check its time, participant cap and description with `+calendar/view <event>` before opening it to players.
-- **Related events:** `+calendar/cluster <title>` creates a cluster. `/cluster/add <event>=<cluster>` and `/cluster/remove <event>` arrange membership before locking. Events in a cluster use ranked-choice `+rsvp/cluster`, rather than separate event RSVPs.
-- **Locking a cluster:** `+calendar/cluster/lock <cluster>` opens cluster RSVPs and arms the draw. It refuses an empty cluster, mixed staff-event modes, or events whose draw time has already passed. Lock while there is still ample notice. Membership cannot be changed after locking; inspect it first with `/cluster/view <cluster>`.
+- **Related events:** `+cluster/new <title>` creates a cluster. `+cluster/add <event>=<cluster>` and `+cluster/remove <event>` arrange membership before locking. Events in a cluster use ranked-choice `+cluster/rank`, rather than separate event RSVPs.
+- **Locking a cluster:** `+cluster/lock <cluster>` opens cluster RSVPs and arms the draw. It refuses an empty cluster, mixed staff-event modes, or events whose draw time has already passed. Lock while there is still ample notice. Membership cannot be changed after locking; inspect it first with `+cluster <cluster>`.
 - **After the draw:** selected players must confirm; unselected players receive priority tokens, and declined or expired places can pass to the waitlist. Players receive notices for draws, waitlist moves and reminders. `+rsvp/list <event>` and `/waitlist <event>` show the current state. Staff cannot pre-invite players to staff events to bypass the draw.
 
 ## What's safe to change
