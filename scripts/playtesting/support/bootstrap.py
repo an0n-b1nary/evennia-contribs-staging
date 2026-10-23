@@ -72,6 +72,10 @@ def at_initial_setup():
                 abilities.grant(character, "proficiency", "performance")
         identities[role] = {"account": account.pk, "character": character.pk, "name": character.key}
         if role == "alice":
+            # A retained consolation token exercises ordinary player redemption.
+            from evennia_calendar.models import PriorityToken
+
+            PriorityToken.objects.create(character=character, character_name=character.key)
             alt, errors = account.create_character(
                 key="Playtest alternate", location=room, home=room
             )

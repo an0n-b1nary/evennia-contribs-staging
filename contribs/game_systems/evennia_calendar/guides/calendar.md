@@ -28,7 +28,7 @@ You're told when you're drawn in a lottery, when a place opens for you on a wait
 
 ## Priority tokens
 
-If you sign up for a lottery event and aren't drawn, you get a **priority token**. `+rsvp/token/use <id>` spends it on a later staff event to be seated before the draw. `+rsvp/token` shows the tokens you have.
+If you sign up for a lottery event and aren't drawn, you get a **priority token**. `+rsvp/redeem <id>` spends it on a later staff event to be seated before the draw. `+rsvp/tokens` shows the tokens you have.
 
 :::insight[Losing a draw counts for something]
 A lottery is fair once, but bad luck can repeat. The token means losing a draw this time puts you first in line next time, so the same people don't miss out week after week.
@@ -36,8 +36,18 @@ A lottery is fair once, but bad luck can repeat. The token means losing a draw t
 
 ## Event groups
 
-Sometimes several events run at the same time, such as three parts of one plot night. Staff group them, and you rank them in order of preference with `+rsvp/cluster <group>=<first>,<second>,...`. The draw gives each person the highest-ranked event that still has room. Anyone left without a place gets a token that seats them by first preference next time that group draws.
+Sometimes several events run at the same time, such as three parts of one plot night. Staff group them, and you rank them in order of preference with `+cluster/rank <group>=<first>,<second>,...`. The draw gives each person the highest-ranked event that still has room. Anyone left without a place gets a token that seats them by first preference next time that group draws.
 
 ## Tags and clashes
 
 Events have an emphasis, such as combat, skill, social or freeform, and can carry thematic tags. An event can be marked as clashing with another, so you can only sign up for one of the two.
+
+## Your events and applications
+
+`+calendar/mine` lists upcoming events you host or have a current RSVP for,
+including waitlist position and lottery/invitation status. Past and cancelled
+events are omitted. A released RSVP does not count as attendance; a host still
+sees their own event. Pending ranked applications have no event RSVP yet:
+check them with `+cluster/mine <group>`, or withdraw before the draw with
+`+cluster/withdraw <group>`. Once seated, confirm or cancel the assigned event
+with `+rsvp/confirm` or `+rsvp/cancel`.

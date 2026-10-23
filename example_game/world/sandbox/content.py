@@ -162,7 +162,7 @@ OOC_ROOMS = (
             "[Placeholder] Should convey: a hook is how you advertise a plot to "
             "strangers, and scheduling it on the calendar is how they find it."
         ),
-        commands=("+plot", "+thread", "+arc", "+hook", "+calendar", "+rsvp"),
+        commands=("+plot", "+thread", "+arc", "+hook", "+calendar", "+cluster", "+rsvp"),
     ),
     OocRoom(
         slug="lore",

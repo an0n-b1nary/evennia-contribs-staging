@@ -3,6 +3,7 @@
 from django.conf import settings
 from evennia.accounts.models import AccountDB
 from evennia_building.models import BuildProject, BuildSubmission, Property
+from evennia_calendar.models import RSVP, CalendarEvent, ClusterRSVP, PriorityToken
 from evennia_economy.models import (
     LedgerEntry,
     Listing,
@@ -69,6 +70,36 @@ def snapshot():
             ),
         }
     return {
+        "calendar_events": rows(
+            CalendarEvent.objects.filter(creator_id__in=ids),
+            "id",
+            "title",
+            "cluster_id",
+            "is_cancelled",
+            "is_staff_event",
+        ),
+        "calendar_rsvps": rows(
+            RSVP.objects.filter(character_id__in=ids),
+            "id",
+            "character_id",
+            "event_id",
+            "status",
+            "waitlist_position",
+        ),
+        "calendar_applications": rows(
+            ClusterRSVP.objects.filter(character_id__in=ids),
+            "id",
+            "character_id",
+            "cluster_id",
+            "status",
+        ),
+        "calendar_tokens": rows(
+            PriorityToken.objects.filter(character_id__in=ids),
+            "id",
+            "character_id",
+            "redeemed_event_id",
+            "redeemed_at",
+        ),
         "plots": rows(
             PlotThread.objects.filter(creator_id__in=ids), "id", "plot_number", "name", "status"
         ),

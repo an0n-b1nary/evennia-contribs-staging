@@ -73,12 +73,13 @@ def at_server_start():
 
 ```python
 # In your default_cmdsets.py
-from evennia_calendar.commands import CmdCalendar, CmdRsvp
+from evennia_calendar.commands import CmdCalendar, CmdCluster, CmdRsvp
 
 class CharacterCmdSet(CmdSet):
     def at_cmdset_creation(self):
         ...
         self.add(CmdCalendar)
+        self.add(CmdCluster)
         self.add(CmdRsvp)
 ```
 
@@ -132,17 +133,41 @@ Consuming apps that create soft-reference bridges to calendar objects are respon
 A cluster groups parallel events (same `scheduled_time`) for ranked-choice RSVP:
 
 1. Staff creates events and a cluster, then adds events to the cluster.
-2. Staff locks the cluster: `+calendar/cluster/lock <id>`.
-3. Players submit ranked preferences: `+rsvp/cluster <cid>=<eid1>,<eid2>,...`.
+2. Staff locks the cluster: `+cluster/lock <id>`.
+3. Players submit ranked preferences: `+cluster/rank <cid>=<eid1>,<eid2>,...`.
 4. The scheduler runs `run_cluster_lottery()` 72 h before the earliest event.
 5. Each player is seated in their highest-ranked event with remaining capacity.
 6. Players not seated receive a `CLUSTER_RANK1` priority token.
+
+## Personal calendar and cluster commands
+
+Upgrading to 0.6: run `evennia migrate evennia_calendar`. Migration `0004`
+updates the cluster field's help text for the new commands; existing event,
+cluster, RSVP and token data and IDs are preserved.
+
+`+calendar/mine` lists every upcoming, non-cancelled event the character hosts
+or has a current RSVP for. It shows Host, RSVP status and waitlist position,
+without duplicates when a host also attends. Released RSVPs are excluded.
+
+Register `CmdCluster` beside `CmdCalendar` and `CmdRsvp`. `+cluster <cid>` views
+a cluster; `/new <title>`, `/add <eid>=<cid>`, `/remove <eid>` and staff-only
+`/lock <cid>` manage it. Players use `/rank <cid>=<eid>,<eid>,...`,
+`/mine <cid>` and `/withdraw <cid>`. An application creates no event RSVP until
+the draw seats the player, so pending applications appear through
+`+cluster/mine`, rather than in `+calendar/mine`. After seating, the assigned
+event appears in the personal calendar and uses the ordinary `+rsvp` controls.
+
+`+rsvp/tokens` lists priority tokens; `/redeem <eid>` earmarks an EVENT token
+for the lottery. Cluster tokens are still redeemed automatically by the draw.
+Commands accept unique switch prefixes, but the retired `/token` spelling is
+explicitly refused. The former cluster forms on Calendar and RSVP, stacked
+switches and unknown or ambiguous switches are refused as well.
 
 ## Priority tokens
 
 | Scope | When issued | When redeemed |
 |---|---|---|
-| `EVENT` | Player not selected in a single-event lottery | Earmarked for a specific staff event via `+rsvp/token/use <eid>` — guaranteed pre-seating before the random draw |
+| `EVENT` | Player not selected in a single-event lottery | Earmarked for a specific staff event via `+rsvp/redeem <eid>` — guaranteed pre-seating before the random draw |
 | `CLUSTER_RANK1` | Player unseated in a cluster draw | Automatically applied at the next cluster lottery for the same cluster — guaranteed first-preference seating |
 
 ## Signals

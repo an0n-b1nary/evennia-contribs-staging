@@ -986,10 +986,17 @@ class TestCmdRsvp(EvenniaTest):
         rsvp = RSVP.objects.filter(event=ev, character=self.char2).first()
         self.assertIsNone(rsvp)
 
+    def _run_cluster(self, caller, args):
+        from evennia_calendar.commands import CmdCluster
+
+        cmd = CmdCluster()
+        cmd.caller, cmd.switches, cmd.args = caller, ["rank"], args
+        cmd.func()
+
     def test_cluster_rsvp_requires_locked_cluster(self):
         cluster = _make_cluster(self.char1, locked=False)
         ev = _make_staff_event(self.char1, hours=96, cluster=cluster)
-        self._run_rsvp(self.char2, ["cluster"], f"{cluster.pk}={ev.pk}")
+        self._run_cluster(self.char2, f"{cluster.pk}={ev.pk}")
         # ClusterRSVP must NOT be created.
         self.assertFalse(ClusterRSVP.objects.filter(cluster=cluster, character=self.char2).exists())
 
@@ -997,7 +1004,7 @@ class TestCmdRsvp(EvenniaTest):
         cluster = _make_cluster(self.char1, locked=True)
         ev1 = _make_staff_event(self.char1, hours=100, cluster=cluster)
         ev2 = _make_staff_event(self.char1, hours=100, cluster=cluster)
-        self._run_rsvp(self.char2, ["cluster"], f"{cluster.pk}={ev1.pk},{ev2.pk}")
+        self._run_cluster(self.char2, f"{cluster.pk}={ev1.pk},{ev2.pk}")
         crsvp = ClusterRSVP.objects.filter(cluster=cluster, character=self.char2).first()
         self.assertIsNotNone(crsvp)
         prefs = list(crsvp.get_ordered_preferences())
