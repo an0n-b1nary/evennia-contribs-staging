@@ -24,6 +24,8 @@ from evennia_rp_crafting.models import (
     CraftRecord,
     EventUse,
     FixtureInstallation,
+    ModificationLayer,
+    ModificationOffer,
     NicheUnlock,
     RoomLayer,
     Workshop,
@@ -70,6 +72,28 @@ def snapshot():
             ),
         }
     return {
+        "modification_offers": rows(
+            ModificationOffer.objects.filter(maker_id__in=ids),
+            "id",
+            "maker_id",
+            "customer_id",
+            "target_id",
+            "modifier",
+            "configuration",
+            "resources",
+            "commission",
+            "applied_at",
+            "cancelled_at",
+        ),
+        "modification_layers": rows(
+            ModificationLayer.objects.filter(maker_id__in=ids),
+            "id",
+            "service_id",
+            "target_id",
+            "text",
+            "hidden",
+            "removed_by_id",
+        ),
         "calendar_events": rows(
             CalendarEvent.objects.filter(creator_id__in=ids),
             "id",

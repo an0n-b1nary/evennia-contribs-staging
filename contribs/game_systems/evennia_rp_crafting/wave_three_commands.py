@@ -4,11 +4,16 @@
 
 from django.db.models import Q
 from evennia.objects.models import ObjectDB
+from evennia.utils.dbserialize import deserialize
 
-from . import companions, modifiers
+from . import companions, conf, modifiers, services
+from .behaviours import behaviour
 from .command_base import CraftCommand
+from .command_syntax import bare_value, select_resource
 from .errors import CraftingError
 from .models import CompanionState, ModificationLayer, ModificationOffer
+
+MODIFY_DRAFT_KEY = "rp_crafting_modify_draft"
 
 
 def _number(value, message, *, minimum=1, prefix=False):
@@ -29,28 +34,183 @@ class CmdModify(CraftCommand):
 
     Usage:
       +modify
-      +modify/offer <customer>/<target> = <niche>/<modifier> ; <line> ; <resources> ; <commission> [; <replace layer>]
-      +modify/undo <customer>/<target> = <niche> ; <layer> ; <resources> ; <commission>
+      +modify/new <customer>/<target> = <niche>/<modifier>
+      +modify/undo <customer>/<target> = <niche>
+      +modify/line <prose>
+      +modify/resources <quantity> <resource key>  (repeat per resource; replaces that key)
+      +modify/unresource <resource key>
+      +modify/price <commission>  (defaults to zero)
+      +modify/replace <layer number>  (blank clears; required for undo)
+      +modify/offer
+      +modify/cancel
       +modify/accept <service number>
       +modify/cancel <service number>
       +modify/layers <target>
       +modify/hide <layer number>
       +modify/show <layer number>
 
-    Resources use key:quantity, key:quantity. The maker supplies materials and
-    pays the craft fee; the customer pays the commission. Offers reserve nothing.
+    /new and /undo start persistent drafts; bare +modify previews yours and lists
+    recent services. /cancel alone discards your draft; with a service number it
+    cancels that offer. /offer sends the exact terms and clears the draft only on
+    success. Drafts and offers reserve nothing. The maker supplies materials and
+    pays the craft fee; the customer pays the commission.
     A changed target, ownership, layer or cost requires a new offer. Self services
     still require acceptance with zero commission. Hiding is free OOC visibility;
     undoing is a paid IC service. Both preserve history.
     """
 
     key = "+modify"
-    switch_options = ("offer", "undo", "accept", "cancel", "layers", "hide", "show")
+    switch_options = (
+        "new",
+        "undo",
+        "line",
+        "resources",
+        "unresource",
+        "price",
+        "replace",
+        "offer",
+        "accept",
+        "cancel",
+        "layers",
+        "hide",
+        "show",
+    )
     wave_three = True
 
-    def run(self, switch):
-        from .commands import resource_spec
+    def start_draft(self, switch):
+        usage = (
+            "Usage: +modify/new customer/target = niche/modifier"
+            if switch == "new"
+            else "Usage: +modify/undo customer/target = niche"
+        )
+        if self.rhs is None or self.lhs.count("/") != 1:
+            raise CraftingError(usage)
+        customer_name, target_name = (part.strip() for part in self.lhs.split("/"))
+        terms = [part.strip() for part in self.rhs.split("/")]
+        if (
+            not customer_name
+            or not target_name
+            or not all(terms)
+            or len(terms) != (2 if switch == "new" else 1)
+        ):
+            raise CraftingError(usage)
+        niche = services.niche(terms[0])
+        kind = terms[1] if switch == "new" else "modifier_undo"
+        implementation = behaviour(kind)
+        if implementation.role != "service" or kind not in niche.behaviours:
+            raise CraftingError("That niche doesn't grant this Modifier service.")
+        if not implementation.available() or not conf.component_visible(self.caller, kind):
+            raise CraftingError("That Modifier service is unavailable; services require Economy.")
+        if switch == "new" and implementation.kind == "undo":
+            raise CraftingError("Start an undo draft with +modify/undo customer/target = niche.")
+        customer = self.caller.search(customer_name)
+        if customer is None:
+            return
+        target = self.caller.search(
+            target_name,
+            candidates=[
+                customer,
+                *customer.contents,
+                *(customer.location.contents if customer.location else []),
+            ],
+        )
+        if target is None:
+            return
+        draft = {
+            "customer_id": customer.pk,
+            "target_id": target.pk,
+            "niche": niche.key,
+            "modifier": kind,
+            "configuration": {},
+            "selected": {},
+            "commission": 0,
+        }
+        self.caller.attributes.add(MODIFY_DRAFT_KEY, draft)
+        self.preview_draft(draft)
 
+    def preview_draft(self, draft):
+        def name(pk):
+            obj = ObjectDB.objects.filter(pk=pk).first()
+            return f"{obj.key} (#{pk})" if obj else f"unavailable (#{pk})"
+
+        config = draft["configuration"]
+        selected = (
+            ", ".join(f"{quantity} {key}" for key, quantity in draft["selected"].items()) or "none"
+        )
+        self.msg(
+            f"Service draft: {draft['niche']}/{draft['modifier']}\n"
+            f"Customer: {name(draft['customer_id'])}; target: {name(draft['target_id'])}.\n"
+            f"Line: {config.get('line', '(not set)')}\n"
+            f"Layer to replace or undo: {config.get('layer_id', 'none')}.\n"
+            f"Maker resources: {selected}. Customer commission: {draft['commission']}.\n"
+            "Nothing reserved or paid. +modify/offer validates costs and sends the exact quote for acceptance."
+        )
+
+    def edit_draft(self, switch):
+        if switch == "offer" and self.args.strip():
+            raise CraftingError("Usage: +modify/offer (send your draft). Start with +modify/new.")
+        stored = self.caller.attributes.get(MODIFY_DRAFT_KEY)
+        if not stored:
+            raise CraftingError("Start a service draft with +modify/new or +modify/undo.")
+        draft = deserialize(stored)
+        if switch == "offer":
+            customer = ObjectDB.objects.filter(pk=draft["customer_id"]).first()
+            target = ObjectDB.objects.filter(pk=draft["target_id"]).first()
+            if customer is None or target is None:
+                raise CraftingError("The customer or target no longer exists; start a new draft.")
+            row = modifiers.propose(
+                self.caller,
+                customer,
+                target,
+                draft["niche"],
+                draft["modifier"],
+                draft["configuration"],
+                draft["selected"],
+                commission=draft["commission"],
+            )
+            self.caller.attributes.remove(MODIFY_DRAFT_KEY)
+            details = modifiers.ServiceAsset().describe(str(row.pk))
+            self.msg(details)
+            customer.msg(
+                f"{self.caller.key} offers {details}. Use +modify/accept {row.pk} or +modify/cancel {row.pk}."
+            )
+            return
+        value = bare_value(self)
+        if switch == "line":
+            from .wave_two import line
+
+            if behaviour(draft["modifier"]).kind == "undo":
+                raise CraftingError(
+                    "Undo drafts have no replacement prose; select the layer with /replace."
+                )
+            draft["configuration"]["line"] = line(value, "Modification")
+        elif switch in ("resources", "unresource"):
+            select_resource(draft, value, remove=switch == "unresource")
+        elif switch == "price":
+            draft["commission"] = _number(
+                value, "Use a nonnegative whole-number commission.", minimum=0
+            )
+        elif switch == "replace":
+            if value:
+                draft["configuration"]["layer_id"] = _number(
+                    value, "Use a layer number.", prefix=True
+                )
+            else:
+                draft["configuration"].pop("layer_id", None)
+        self.caller.attributes.add(MODIFY_DRAFT_KEY, draft)
+        self.preview_draft(draft)
+
+    def run(self, switch):
+        if switch in ("new", "undo"):
+            self.start_draft(switch)
+            return
+        if switch in ("line", "resources", "unresource", "price", "replace", "offer"):
+            self.edit_draft(switch)
+            return
+        if switch == "cancel" and not self.args.strip():
+            self.caller.attributes.remove(MODIFY_DRAFT_KEY)
+            self.msg("Service draft discarded.")
+            return
         if switch in ("accept", "cancel", "hide", "show"):
             kind = "service" if switch in ("accept", "cancel") else "layer"
             number = _number(
@@ -68,70 +228,7 @@ class CmdModify(CraftCommand):
                 modifiers.set_hidden(self.caller, number, switch == "hide")
                 self.msg(f"Layer #{number}: {'hidden' if switch == 'hide' else 'visible'} (OOC).")
             return
-        if switch in ("offer", "undo"):
-            if self.rhs is None or "/" not in self.lhs:
-                raise CraftingError("Use customer/target = service terms; see help +modify.")
-            customer_name, target_name = self.lhs.split("/", 1)
-            customer = self.caller.search(customer_name.strip())
-            if customer is None:
-                return
-            target = self.caller.search(
-                target_name.strip(),
-                candidates=[
-                    customer,
-                    *customer.contents,
-                    *(customer.location.contents if customer.location else []),
-                ],
-            )
-            if target is None:
-                return
-            parts = [part.strip() for part in self.rhs.split(";")]
-            if switch == "undo":
-                if len(parts) != 4:
-                    raise CraftingError("Use niche ; layer ; resources ; commission.")
-                niche, layer_id, materials, price = parts
-                modifier, configuration = (
-                    "modifier_undo",
-                    {
-                        "layer_id": _number(
-                            layer_id, "Use a layer number; see help +modify/undo.", prefix=True
-                        )
-                    },
-                )
-            else:
-                if len(parts) < 4 or "/" not in parts[0]:
-                    raise CraftingError(
-                        "Use niche/modifier ; line ; resources ; commission [; replace layer]."
-                    )
-                niche, modifier = parts[0].split("/", 1)
-                # Read fixed terms from the right, preserving semicolons in
-                # authored prose. Resource terms contain keys, never just an int.
-                replacement = len(parts) >= 5 and ":" in parts[-3] and ":" not in parts[-2]
-                tail = 3 if replacement else 2
-                configuration = {"line": "; ".join(parts[1:-tail])}
-                materials, price = parts[-tail:-1] if replacement else parts[-2:]
-                if replacement:
-                    configuration["layer_id"] = _number(
-                        parts[-1], "Use a layer number; see help +modify/offer.", prefix=True
-                    )
-            row = modifiers.propose(
-                self.caller,
-                customer,
-                target,
-                niche,
-                modifier,
-                configuration,
-                resource_spec(materials),
-                commission=_number(
-                    price, "Use a nonnegative whole-number commission; see help +modify.", minimum=0
-                ),
-            )
-            details = modifiers.ServiceAsset().describe(str(row.pk))
-            self.msg(details)
-            customer.msg(
-                f"{self.caller.key} offers {details}. Use +modify/accept {row.pk} or +modify/cancel {row.pk}."
-            )
-        elif switch == "layers":
+        if switch == "layers":
             target = self.caller.search(self.args.strip())
             if target is not None:
                 self.msg(
@@ -145,6 +242,11 @@ class CmdModify(CraftCommand):
                     )
                 )
         elif not switch:
+            if self.args.strip():
+                raise CraftingError("Usage: +modify (preview your draft and list recent services).")
+            draft = self.caller.attributes.get(MODIFY_DRAFT_KEY)
+            if draft:
+                self.preview_draft(deserialize(draft))
             rows = list(
                 ModificationOffer.objects.filter(
                     Q(maker_id=self.caller.pk) | Q(customer_id=self.caller.pk)
@@ -160,7 +262,7 @@ class CmdModify(CraftCommand):
             )
         else:
             raise CraftingError(
-                "See help +modify for offer, undo, accept, cancel, layers, hide and show."
+                "See help +modify for service drafts, acceptance and layer history."
             )
 
 

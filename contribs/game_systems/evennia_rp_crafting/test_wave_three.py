@@ -391,9 +391,13 @@ class WaveThreeCommandTests(WaveThreeFixture, EvenniaCommandTest):
     def test_modify_offer_accept_and_visibility(self):
         self.call(
             CmdModify(),
-            f"/offer {self.char2.key}/{self.item.key} = layers/modifier_aura ; A silver shimmer; motes drift. ; spark:1 ; 30",
-            "service #",
+            f"/new {self.char2.key}/{self.item.key}=layers/modifier_aura",
+            "Service draft",
         )
+        self.call(CmdModify(), "/line A silver shimmer; motes drift.")
+        self.call(CmdModify(), "/resources 1 spark")
+        self.call(CmdModify(), "/price 30")
+        self.call(CmdModify(), "/offer", "service #")
         row = ModificationOffer.objects.latest("pk")
         self.call(
             CmdModify(), f"/accept {row.pk}", f"Service #{row.pk} completed.", caller=self.char2
@@ -405,9 +409,14 @@ class WaveThreeCommandTests(WaveThreeFixture, EvenniaCommandTest):
         )
         self.call(
             CmdModify(),
-            f"/offer {self.char2.key}/{self.item.key} = layers/modifier_aura ; A new; golden shimmer. ; spark:1 ; 10 ; {layer.pk}",
-            "service #",
+            f"/new {self.char2.key}/{self.item.key}=layers/modifier_aura",
+            "Service draft",
         )
+        self.call(CmdModify(), "/line A new; golden shimmer.")
+        self.call(CmdModify(), "/resources 1 spark")
+        self.call(CmdModify(), "/price 10")
+        self.call(CmdModify(), f"/replace {layer.pk}")
+        self.call(CmdModify(), "/offer", "service #")
         replacement = ModificationOffer.objects.latest("pk")
         self.assertEqual(
             replacement.configuration, {"line": "A new; golden shimmer.", "layer_id": layer.pk}
