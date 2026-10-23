@@ -35,7 +35,8 @@ class ModifierDraftWithoutEconomyTests(WaveThreeFixture, EvenniaCommandTest):
             "commission": 0,
         }
         self.char1.attributes.add(DRAFT_KEY, draft)
-        self.call(CmdModify(), "", "Service draft")
+        self.call(CmdModify(), "", "Your recent services:")
+        self.call(CmdModify(), "/proof", "Service draft:")
         self.call(CmdModify(), "/offer", "Modifier services require Economy")
         self.assertEqual(deserialize(self.char1.attributes.get(DRAFT_KEY)), draft)
         self.assertFalse(ModificationOffer.objects.exists())
@@ -61,13 +62,69 @@ class ModifierDraftTests(WaveThreeFixture, EvenniaCommandTest):
         self.call(CmdModify(), "/resources 1 spark")
         self.call(CmdModify(), "/price 30")
 
-    def test_draft_and_preview_persist_without_spending_or_creating_an_offer(self):
+    def test_recent_services_has_only_a_short_named_draft_reminder(self):
+        row = self.offer()
+        self.ready()
+        saved = self.draft()
+        output = self.call(CmdModify(), "")
+        self.assertTrue(output.startswith("Your recent services:"))
+        self.assertIn(f"service #{row.pk}", output)
+        self.assertIn(f"Service draft: {self.item.key}.", output)
+        self.assertIn("+modify/proof", output)
+        self.assertNotIn(saved["configuration"]["line"], output)
+        self.assertNotIn("Maker resources:", output)
+        self.assertEqual(self.draft(), saved)
+
+    def test_proof_is_an_explicit_read_only_view_of_only_the_callers_draft(self):
+        self.call(CmdModify(), "/proof", "Start a service draft")
+        self.ready()
+        saved = self.draft()
+        for switch in ("proof", "PRO"):
+            output = self.call(CmdModify(), f"/{switch}")
+            for text in (
+                "modifier_aura",
+                self.item.key,
+                saved["configuration"]["line"],
+                "1 spark",
+                "commission: 30",
+                "Nothing reserved",
+            ):
+                self.assertIn(text, output)
+            self.assertNotIn("Your recent services:", output)
+        self.call(CmdModify(), "/proof", "Start a service draft", caller=self.char2)
+        for args, message in (
+            ("/proof unexpected", "Usage: +modify/proof"),
+            ("/proof =", "Usage: +modify/proof"),
+            ("/proof/price", "Use one switch"),
+            ("/pr", "Unknown or ambiguous"),
+        ):
+            self.call(CmdModify(), args, message)
+        self.assertEqual(self.draft(), saved)
+        self.assertFalse(ModificationOffer.objects.exists())
+        self.assertFalse(ModificationLayer.objects.exists())
+
+    def test_draft_acknowledgements_keep_long_target_names_short(self):
+        self.item.key = "|g" + "A very long cloak name " * 8 + "|n"
+        output = self.call(
+            CmdModify(), f"/new #{self.char2.pk}/#{self.item.pk}=layers/modifier_aura"
+        )
+        self.assertIn("A very long cloak", output)
+        self.assertIn("+modify/proof", output)
+        self.assertLessEqual(len(output), 80)
+        output = self.call(CmdModify(), "/line A private draft line.")
+        self.assertNotIn("A private draft line.", output)
+        self.assertLessEqual(len(output), 80)
+        reminder = self.call(CmdModify(), "").splitlines()[-1]
+        self.assertIn("A very long cloak", reminder)
+        self.assertLessEqual(len(reminder), 80)
+
+    def test_draft_and_proof_persist_without_spending_or_creating_an_offer(self):
         from evennia_economy.models import Offer
         from evennia_economy.services import balance
 
         before = (balance(self.char1), balance(self.char2), self.held("spark"))
         self.ready()
-        output = self.call(CmdModify(), "")
+        output = self.call(CmdModify(), "/proof")
         for text in ("Service draft", "modifier_aura", "1 spark", "30", "Nothing reserved"):
             self.assertIn(text, output)
         self.assertEqual(

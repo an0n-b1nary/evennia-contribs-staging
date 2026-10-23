@@ -579,7 +579,7 @@ acceptance and zero commission, but still consume materials and the craft fee.
 +modify/line The fabric is a deep red.
 +modify/resources 1 timber
 +modify/price 30
-+modify
++modify/proof
 +modify/offer
 +modify/accept 1
 +modify/layers a cloak
@@ -595,8 +595,10 @@ acceptance and zero commission, but still consume materials and the craft fee.
 Drafts persist on the maker across reconnects. Set one field per command with
 bare values. `/resources <quantity> <key>` replaces that resource's selection;
 `/unresource <key>` removes it. `/price` defaults to zero, and `/replace` with no
-number clears a layer selection. Bare `+modify` previews the draft and lists
-recent services. `/offer` revalidates all terms and clears the draft only after
+number clears a layer selection. `+modify/proof` shows the full draft. Bare
+`+modify` lists recent services and adds a short reminder naming your draft
+target, when one exists. Successful draft edits give a short saved acknowledgement.
+`/offer` revalidates all terms and clears the draft only after
 creating an offer; failures leave it editable. `/cancel` alone discards your
 draft. Starting `/new` or `/undo` replaces your current draft, never an offer.
 Drafts reserve and spend nothing. The former packed offer/undo forms are refused.

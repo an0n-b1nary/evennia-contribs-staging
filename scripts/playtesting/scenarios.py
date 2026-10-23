@@ -530,9 +530,10 @@ class Suite:
         self.command("alice", "+modify/line A silver mark; gold = silver.", "Service draft")
         self.command("alice", "+modify/resources 2 ember", "Service draft")
         self.command("alice", "+modify/resources 1 ember", "Service draft")
-        self.command("alice", "+modify/unresource ember", "Maker resources: none")
+        self.command("alice", "+modify/unresource ember", "Service draft saved")
+        self.command("alice", "+modify/proof", "Maker resources: none")
         self.command("alice", "+modify/resources 1 ember", "Service draft")
-        self.command("alice", "+modify/price 3", "commission: 3")
+        self.command("alice", "+modify/price 3", "Service draft saved")
         self.command("alice", "+modify/price -1", "nonnegative whole-number")
         self.command("alice", "+modify/resources ember:1", "Select one resource")
         self.command("alice", "+modify/offer/nope", "one switch")
@@ -544,8 +545,12 @@ class Suite:
         self.session.disconnect("alice")
         self.session.connect("alice")
         self.session.host.reload()
+        listing = self.command(
+            "alice", "+modify", f"Your recent services:.*Service draft: {bob}.*modify/proof"
+        )
+        assert "A silver mark; gold = silver." not in listing["output"]
         self.command(
-            "alice", "+modify", "Service draft.*A silver mark; gold = silver.*commission: 3"
+            "alice", "+modify/proof", "Service draft.*A silver mark; gold = silver.*commission: 3"
         )
         after = self.state()
         for field in (

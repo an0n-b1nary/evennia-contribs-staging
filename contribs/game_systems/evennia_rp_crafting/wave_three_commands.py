@@ -4,7 +4,9 @@
 
 from django.db.models import Q
 from evennia.objects.models import ObjectDB
+from evennia.utils.ansi import strip_ansi
 from evennia.utils.dbserialize import deserialize
+from evennia.utils.utils import crop
 
 from . import companions, conf, modifiers, services
 from .behaviours import behaviour
@@ -34,6 +36,7 @@ class CmdModify(CraftCommand):
 
     Usage:
       +modify
+      +modify/proof
       +modify/new <customer>/<target> = <niche>/<modifier>
       +modify/undo <customer>/<target> = <niche>
       +modify/line <prose>
@@ -49,10 +52,12 @@ class CmdModify(CraftCommand):
       +modify/hide <layer number>
       +modify/show <layer number>
 
-    /new and /undo start persistent drafts; bare +modify previews yours and lists
-    recent services. /cancel alone discards your draft; with a service number it
-    cancels that offer. /offer sends the exact terms and clears the draft only on
-    success. Drafts and offers reserve nothing. The maker supplies materials and
+    /new and /undo start persistent drafts; /proof shows your full draft.
+    Bare +modify lists recent services and briefly names your draft target.
+    Draft edits give a short saved acknowledgement. /cancel alone discards your
+    draft; with a service number it cancels that offer. /offer sends the exact
+    terms and clears the draft only on success. Drafts and offers reserve nothing.
+    The maker supplies materials and
     pays the craft fee; the customer pays the commission.
     A changed target, ownership, layer or cost requires a new offer. Self services
     still require acceptance with zero commission. Hiding is free OOC visibility;
@@ -67,6 +72,7 @@ class CmdModify(CraftCommand):
         "resources",
         "unresource",
         "price",
+        "proof",
         "replace",
         "offer",
         "accept",
@@ -127,9 +133,20 @@ class CmdModify(CraftCommand):
             "commission": 0,
         }
         self.caller.attributes.add(MODIFY_DRAFT_KEY, draft)
-        self.preview_draft(draft)
+        self.draft_notice(draft, saved=True)
 
-    def preview_draft(self, draft):
+    def draft_notice(self, draft, *, saved=False):
+        target = ObjectDB.objects.filter(pk=draft["target_id"]).first()
+        name = (
+            " ".join(strip_ansi(target.key).split())
+            if target
+            else f"unavailable (#{draft['target_id']})"
+        )
+        name = crop(name, width=36, suffix="...")
+        label = "Service draft saved" if saved else "Service draft"
+        self.msg(f"{label}: {name}. Proof: +modify/proof")
+
+    def proof_draft(self, draft):
         def name(pk):
             obj = ObjectDB.objects.filter(pk=pk).first()
             return f"{obj.key} (#{pk})" if obj else f"unavailable (#{pk})"
@@ -148,12 +165,17 @@ class CmdModify(CraftCommand):
         )
 
     def edit_draft(self, switch):
+        if switch == "proof" and self.args.strip():
+            raise CraftingError("Usage: +modify/proof")
         if switch == "offer" and self.args.strip():
             raise CraftingError("Usage: +modify/offer (send your draft). Start with +modify/new.")
         stored = self.caller.attributes.get(MODIFY_DRAFT_KEY)
         if not stored:
             raise CraftingError("Start a service draft with +modify/new or +modify/undo.")
         draft = deserialize(stored)
+        if switch == "proof":
+            self.proof_draft(draft)
+            return
         if switch == "offer":
             customer = ObjectDB.objects.filter(pk=draft["customer_id"]).first()
             target = ObjectDB.objects.filter(pk=draft["target_id"]).first()
@@ -199,13 +221,13 @@ class CmdModify(CraftCommand):
             else:
                 draft["configuration"].pop("layer_id", None)
         self.caller.attributes.add(MODIFY_DRAFT_KEY, draft)
-        self.preview_draft(draft)
+        self.draft_notice(draft, saved=True)
 
     def run(self, switch):
         if switch in ("new", "undo"):
             self.start_draft(switch)
             return
-        if switch in ("line", "resources", "unresource", "price", "replace", "offer"):
+        if switch in ("line", "resources", "unresource", "price", "replace", "offer", "proof"):
             self.edit_draft(switch)
             return
         if switch == "cancel" and not self.args.strip():
@@ -244,10 +266,9 @@ class CmdModify(CraftCommand):
                 )
         elif not switch:
             if self.args.strip():
-                raise CraftingError("Usage: +modify (preview your draft and list recent services).")
-            draft = self.caller.attributes.get(MODIFY_DRAFT_KEY)
-            if draft:
-                self.preview_draft(deserialize(draft))
+                raise CraftingError(
+                    "Usage: +modify (list recent services). See +modify/proof for your draft."
+                )
             rows = list(
                 ModificationOffer.objects.filter(
                     Q(maker_id=self.caller.pk) | Q(customer_id=self.caller.pk)
@@ -261,6 +282,9 @@ class CmdModify(CraftCommand):
                     for row in rows
                 )
             )
+            draft = self.caller.attributes.get(MODIFY_DRAFT_KEY)
+            if draft:
+                self.draft_notice(deserialize(draft))
         else:
             raise CraftingError(
                 "See help +modify for service drafts, acceptance and layer history."

@@ -1833,8 +1833,10 @@ before gifting/selling it; ownership changes with ordinary handoffs and sales.
 `+modify/new customer/target=niche/modifier` starts a persistent service draft.
 Set `/line <prose>`, `/resources <quantity> <key>` (one key at a time),
 `/price <commission>` and optional `/replace <layer number>`, then `/offer`.
-Bare `+modify` previews the draft and lists recent services; `/cancel` alone
-discards the draft, while `/cancel <number>` cancels an offer.
+`+modify/proof` shows the full draft. Bare `+modify` lists recent services and
+adds a short reminder naming your draft target. Draft edits give brief saved
+acknowledgements. `/cancel` alone discards the draft, while `/cancel <number>`
+cancels an offer.
 `+modify/accept <number>` consents and commits materials, payment and the layer
 change once. `/layers <target>` lists layer numbers; `/hide` and `/show` are free
 OOC toggles. `/undo customer/target=niche` starts a removal draft: select the

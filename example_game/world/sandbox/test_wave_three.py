@@ -291,6 +291,13 @@ class ModifierCommandSeams(WaveThreeFixture, EvenniaCommandTest):
         self.call(command(), "/line A shimmer; gold = silver.", "Service draft")
         self.call(command(), "/resources 1 spark", "Service draft")
         self.call(command(), "/price 20", "Service draft")
+        listing = self.call(command(), "")
+        self.assertIn("Your recent services:", listing)
+        self.assertIn("Service draft: a host heirloom.", listing)
+        self.assertNotIn("A shimmer; gold = silver.", listing)
+        proof = self.call(command(), "/proof")
+        self.assertIn("A shimmer; gold = silver.", proof)
+        self.assertNotIn("Your recent services:", proof)
         self.call(command(), "/offer/accept", "Use one switch")
         self.call(
             command(),

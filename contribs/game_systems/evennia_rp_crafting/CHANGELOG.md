@@ -8,8 +8,10 @@
   separately, then `/offer`. The old packed offer and undo forms are refused.
 - `+modify/undo customer/target=niche` starts a removal draft; select the layer
   with `/replace`, select resources and price, then `/offer` as usual.
-- Bare `+modify` previews your draft and lists recent services. `/cancel` alone
-  discards the draft; `/cancel <service number>` still cancels a service offer.
+- `+modify/proof` shows the full draft. Bare `+modify` lists recent services
+  with a short reminder naming the draft target. Draft edits give brief saved
+  acknowledgements. `/cancel` alone discards the draft; `/cancel <service number>`
+  still cancels a service offer.
 
 ### Changed
 - Draft customer and target addresses accept names or dbrefs for ordinary players.

@@ -18,7 +18,8 @@ Some crafts offer services on things that already exist: dyeing a cloak, engravi
 - `+modify/accept <number>` accepts one, and `+modify/cancel <number>` calls it off.
 - `+modify/layers <target>` shows an item's layers and their history.
 - `+modify/hide <layer>` and `+modify/show <layer>` hide or show a layer on something of yours.
-- `+modify` previews your draft and lists recent services.
+- `+modify/proof` shows your full draft.
+- `+modify` lists recent services, with a short reminder naming your draft target if you have one.
 
 ## Agreeing a service
 
