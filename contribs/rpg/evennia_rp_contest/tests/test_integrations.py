@@ -19,8 +19,8 @@ HAS_CHARGEN = apps.is_installed("evennia_rp_chargen")
 
 class PublicHookTests(ContestTest):
     def test_public_expiry_hooks_are_scoped(self):
-        first = services.open_challenge(self.char2, parse_challenge("Mid~One"))
-        other = services.open_challenge(self.char1, parse_challenge("Mid~Two"))
+        first = services.open_challenge(self.char2, parse_challenge("Mid=One"))
+        other = services.open_challenge(self.char1, parse_challenge("Mid=Two"))
         self.assertEqual(expiry.close_for_setter(self.char2), 1)
         other.refresh_from_db()
         self.assertEqual(other.status, "open")
@@ -53,9 +53,9 @@ class ScenesTests(ContestTest):
         from evennia_scenes.models import LogEntry
         from evennia_scenes.signals import scene_closed
 
-        challenge = services.open_challenge(self.char2, parse_challenge("Mid~Prompt"))
+        challenge = services.open_challenge(self.char2, parse_challenge("Mid=Prompt"))
         record = services.perform_test(
-            self.char2, parse_test("brains/fire"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brains/fire"), roller=self.scripted(0)
         )
         self.assertEqual(record.scene_id, self.scene.pk)
         log = LogEntry.objects.get(scene=self.scene)
@@ -70,7 +70,7 @@ class ScenesTests(ContestTest):
         self.assertEqual(challenge.closed_reason, "scene_closed")
 
     def test_hard_delete_detaches_without_losing_audit(self):
-        challenge = services.open_challenge(self.char2, parse_challenge("Mid~Prompt"))
+        challenge = services.open_challenge(self.char2, parse_challenge("Mid=Prompt"))
         record = services.perform_test(self.char2, parse_test("brawn"), roller=self.scripted(0))
         self.scene.delete()
         challenge.refresh_from_db()
@@ -94,8 +94,8 @@ class TrackerTests(ContestTest):
         from evennia_rptracker.models import RPSession
         from evennia_rptracker.signals import rp_session_ended
 
-        challenge = services.open_challenge(self.char2, parse_challenge("Mid~Prompt"))
-        other = services.open_challenge(self.char1, parse_challenge("Mid~Other"))
+        challenge = services.open_challenge(self.char2, parse_challenge("Mid=Prompt"))
+        other = services.open_challenge(self.char1, parse_challenge("Mid=Other"))
         session = RPSession.objects.create(character=self.char2, room=self.room1)
         rp_session_ended.send(sender=RPSession, session=session)
         challenge.refresh_from_db()

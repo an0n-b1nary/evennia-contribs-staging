@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.2.5
+
+- Require `evennia-rp-contest>=0.2,<0.3` for the optional `contest` extra. Bound boss-check behavior is unchanged.
+
 ## 0.2.4 — 2026-10-20
 
 - Require combat 0.2.5 so the linked combat staff guide is available.

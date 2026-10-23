@@ -91,19 +91,44 @@ def open_challenge(caller, req):
 
 
 def edit_challenge(caller, challenge, req):
+    return edit_fields(
+        caller,
+        challenge,
+        difficulty=req.difficulty,
+        description=req.description,
+        stat_key=req.stat,
+        tag=req.tag,
+    )
+
+
+def edit_fields(caller, challenge, **fields):
+    """Edit only authored fields, retaining other fields and historical attempts."""
     require_manager(caller, challenge)
-    difficulty = _difficulty(req)
+    if not fields or fields.keys() - {"description", "difficulty", "stat_key", "tag"}:
+        raise ValueError("Unsupported challenge fields.")
     with transaction.atomic():
+        # Serialize with attempts and other edits on SQLite as well as PostgreSQL.
         changed = Challenge.objects.filter(pk=challenge.pk, status=Challenge.Status.OPEN).update(
-            difficulty=difficulty,
-            description=limited(req.description),
-            stat_key=req.stat,
-            tag=req.tag,
-            edited_at=timezone.now(),
-            edited_by=caller,
+            last_activity=F("last_activity")
         )
         if not changed:
             raise ContestError("That challenge is closed.")
+        challenge.refresh_from_db()
+        if "difficulty" in fields:
+            from evennia_rp_contest.parsing import ChallengeRequest
+
+            fields["difficulty"] = _difficulty(
+                ChallengeRequest(
+                    fields["difficulty"], "", stat=fields.get("stat_key", challenge.stat_key)
+                )
+            )
+        if "description" in fields:
+            fields["description"] = limited(fields["description"])
+            if not fields["description"]:
+                raise ContestError("Give a challenge prompt.")
+        Challenge.objects.filter(pk=challenge.pk).update(
+            **fields, edited_at=timezone.now(), edited_by=caller
+        )
         challenge.refresh_from_db()
     signals.challenge_edited.send(sender=Challenge, challenge=challenge, actor=caller)
     narration.announce_challenge(challenge, verb="edits", actor=caller)
@@ -146,7 +171,7 @@ def void_attempt(caller, challenge, attempt, *, reason=""):
     reason = limited(reason)
     record = CheckRecord.objects.filter(pk=attempt, challenge=challenge).first()
     if record is None:
-        raise ContestError("No such attempt on this challenge. Use the id in +test/history.")
+        raise ContestError("No such attempt on this challenge. Use the id in +challenge/history.")
     changed = CheckRecord.objects.filter(pk=record.pk, voided_at__isnull=True).update(
         voided_at=timezone.now(),
         voided_by=caller,
@@ -177,14 +202,6 @@ def bind_challenge(caller, req):
     sweep_idle(room=room)
     if req.challenge_number is not None:
         return find_challenge(caller, req.challenge_number, open_only=True)
-    matches = [
-        c
-        for c in Challenge.objects.filter(room=room, status=Challenge.Status.OPEN)
-        if (not c.stat_key or c.stat_key == req.stat) and (not c.tag or c.tag == req.tag)
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    # Ambiguous or unmatched automatic binding uses the ad-hoc difficulty.
     return None
 
 

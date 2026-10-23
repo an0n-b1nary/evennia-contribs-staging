@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Register the standalone `+challenge` command and retain the existing refusal to manage challenges during virtual NPC portrayal.
+- Require `evennia-rp-contest>=0.2,<0.3` when installing the `contest` extra.
+
 ## [0.2.0] - 2026-10-22
 
 ### Breaking

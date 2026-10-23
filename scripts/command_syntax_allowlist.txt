@@ -21,9 +21,6 @@ evennia_rp_combat semicolon +combatstory
 evennia_rp_combat semicolon-parse +combat
 evennia_rp_combat semicolon-parse +combatstory
 evennia_rp_combat stacked-switch +combat
-evennia_rp_contest nested-equals +test
-evennia_rp_contest stacked-switch +test
-evennia_rp_contest tilde +test
 evennia_rp_crafting semicolon +modify
 evennia_rp_crafting semicolon-parse +modify
 evennia_rp_party json +party

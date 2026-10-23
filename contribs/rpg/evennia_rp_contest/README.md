@@ -9,7 +9,7 @@ create normal private audit records with a binding, without room-challenge
 matching or award signals. Public history renders them without ratings even
 when ordinary room tests reveal ratings. Staff review retains the breakdown.
 
-> **Preview (0.1.4, Pre-Alpha).** Authored directly as a contrib-native pilot.
+> **Preview (0.2.0, Pre-Alpha).** Authored directly as a contrib-native pilot.
 > APIs and migrations may change; pin an exact commit.
 
 Non-combat stat checks and room challenges, with no game-specific stat names,
@@ -28,27 +28,35 @@ alternatively use a game adapter returning `DictStatSource` and the default
 ruleset vocabulary. Character typeclass changes are unnecessary.
 
 ```
-+test [#n=]<stat>[/<tag>][~comment]
-+test/set[/once] <difficulty>[=<stat>[/<tag>]]~<prompt>
-+test/edit #n=<difficulty>[=<stat>[/<tag>]]~<prompt>
-+test/once #n
-+test/void #n/<attempt id>[~reason]
-+test/close #n
-+test/list
-+test/history [#n]
-+test/review [#n]   (staff)
++test <stat>[/<tag>] [# comment]
++test #n=<stat>[/<tag>] [# comment]
++challenge
++challenge/new <difficulty>=<prompt>
++challenge/suggest #n=<stat>[/<tag>]
++challenge/edit #n=<prompt>
++challenge/difficulty #n=<difficulty>
++challenge/once #n
++challenge/void #n.<attempt id> [# reason]
++challenge/close #n
++challenge/history [#n]
++challenge/review [#n]   (staff)
 ```
 
 Suggestions are optional guidance. Players may choose any approach, including
 an element. Departures are marked "alternative approach". An unnumbered test
-binds when exactly one open challenge matches its approach (an unspecified
-suggestion matches anything); otherwise it uses the default difficulty.
-Numbers are per room and never reused. /edit replaces difficulty, prompt and
-suggestion together; /once remains unchanged. /set is available to everyone
-by default; managing a challenge requires its setter or staff. /void takes the
+always uses the default difficulty; `#n=` explicitly answers a room challenge.
+A comment starts at the first whitespace-surrounded `#`, preserving references
+such as `#12` and all later comment text.
+
+Numbers are per room and never reused. `/edit`, `/difficulty` and `/suggest`
+change only the prompt, difficulty and suggested approach respectively; the
+other fields and prior attempt records remain unchanged. `/once` marks an open
+challenge as one attempt per character. `/new` is available to everyone by
+default; managing a challenge requires its setter or staff. `/void` takes the
 unique **attempt id shown in /history**, because multiple characters may each
-have an "attempt 1". It retains the record, stops it counting toward /once,
+have an "attempt 1". It retains the record, stops it counting toward `/once`,
 and announces the decision. A retry keeps its increasing attempt number.
+Each command accepts at most one switch, including unambiguous prefixes.
 
 Room lines hide ratings and dice. The tester sees their ratings privately;
 only staff /review sees the complete ledger, noise, resolver and ruleset digest.

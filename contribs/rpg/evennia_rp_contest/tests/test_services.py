@@ -9,14 +9,21 @@ from django.utils import timezone
 
 from evennia_rp_contest import expiry, services, signals
 from evennia_rp_contest.models import Challenge, CheckRecord
-from evennia_rp_contest.parsing import ContestError, parse_challenge, parse_test
+from evennia_rp_contest.parsing import ChallengeRequest, ContestError, parse_challenge, parse_test
 
 from .base import ContestTest
 
 
 class ServiceTests(ContestTest):
-    def open(self, text="Mid=brawn/climbing~Climb", **kwargs):
-        return services.open_challenge(self.char2, parse_challenge(text, **kwargs))
+    def open(self, text=None, **kwargs):
+        req = (
+            parse_challenge(text, **kwargs)
+            if text
+            else ChallengeRequest(
+                "Mid", "Climb", "brawn", "climbing", once=kwargs.get("once", False)
+            )
+        )
+        return services.open_challenge(self.char2, req)
 
     def test_every_band_and_audit(self):
         cases = (("Low", "awful"), ("Mid", "good"), ("High", "great"))
@@ -39,24 +46,19 @@ class ServiceTests(ContestTest):
         self.char2.location = self.room2
         self.assertEqual(self.open().number, 1)
 
-    def test_automatic_binding_and_prompt_only(self):
+    def test_explicit_binding_and_prompt_only(self):
         suggested = self.open()
         record = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         self.assertEqual(record.challenge, suggested)
         self.assertFalse(record.alternative)
+        plain = self.open("High=Cross the chasm")
         record = services.perform_test(
-            self.char2, parse_test("brains/fire"), roller=self.scripted(0)
-        )
-        self.assertIsNone(record.challenge)
-        plain = self.open("High~Cross the chasm")
-        record = services.perform_test(
-            self.char2, parse_test("brains/fire"), roller=self.scripted(0)
+            self.char2, parse_test("#2=brains/fire"), roller=self.scripted(0)
         )
         self.assertEqual(record.challenge, plain)
         self.assertFalse(record.alternative)
-        # Both now match; ambiguity uses ad-hoc default.
         record = services.perform_test(
             self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
         )
@@ -75,23 +77,25 @@ class ServiceTests(ContestTest):
     def test_once_void_and_retry_keep_history(self):
         challenge = self.open(once=True)
         first = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         with self.assertRaisesRegex(ContestError, "only one"):
-            services.perform_test(self.char2, parse_test("brawn/climbing"), roller=self.scripted(0))
+            services.perform_test(
+                self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
+            )
         services.void_attempt(self.char2, challenge, first.pk, reason="Agreed OOC")
         first.refresh_from_db()
         self.assertTrue(first.voided)
         second = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         self.assertEqual(second.attempt_no, 2)
         self.assertEqual(CheckRecord.objects.count(), 2)
 
     def test_unauthorized_management_and_cross_room_lookup(self):
-        challenge = services.open_challenge(self.char1, parse_challenge("Mid~Prompt"))
+        challenge = services.open_challenge(self.char1, parse_challenge("Mid=Prompt"))
         for operation in (
-            lambda: services.edit_challenge(self.char2, challenge, parse_challenge("High~Changed")),
+            lambda: services.edit_challenge(self.char2, challenge, parse_challenge("High=Changed")),
             lambda: services.close_challenge(challenge, caller=self.char2),
             lambda: services.set_once(self.char2, challenge),
             lambda: services.void_attempt(self.char2, challenge, 1),
@@ -110,9 +114,11 @@ class ServiceTests(ContestTest):
     def test_edit_preserves_previous_record_and_once(self):
         challenge = self.open(once=True)
         record = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
-        services.edit_challenge(self.char1, challenge, parse_challenge("High=brains/fire~Changed"))
+        services.edit_challenge(
+            self.char1, challenge, ChallengeRequest("High", "Changed", "brains", "fire")
+        )
         record.refresh_from_db()
         self.assertEqual(record.difficulty, "Mid")
         self.assertEqual(challenge.difficulty, "High")
@@ -124,7 +130,9 @@ class ServiceTests(ContestTest):
         before = challenge.last_activity
         self.char2.attributes.add("contest_test_stats", {})
         with self.assertRaises(ContestError):
-            services.perform_test(self.char2, parse_test("brawn/climbing"), roller=self.scripted(0))
+            services.perform_test(
+                self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
+            )
         challenge.refresh_from_db()
         self.assertEqual(challenge.last_activity, before)
         self.assertFalse(CheckRecord.objects.exists())
@@ -140,7 +148,7 @@ class ServiceTests(ContestTest):
         try:
             with self.assertRaisesRegex(RuntimeError, "listener failed"):
                 services.perform_test(
-                    self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+                    self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
                 )
         finally:
             signals.check_recorded.disconnect(fail)
@@ -164,7 +172,7 @@ class ServiceTests(ContestTest):
         challenge = self.open()
         old = timezone.now() - timedelta(hours=2)
         Challenge.objects.filter(pk=challenge.pk).update(last_activity=old)
-        services.perform_test(self.char2, parse_test("brawn/climbing"), roller=self.scripted(0))
+        services.perform_test(self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0))
         challenge.refresh_from_db()
         self.assertGreater(challenge.last_activity, old)
         future = timezone.now() + timedelta(hours=4)
@@ -188,10 +196,10 @@ class ServiceTests(ContestTest):
     def test_void_id_disambiguates_different_actors_first_attempts(self):
         challenge = self.open()
         first = services.perform_test(
-            self.char1, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char1, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         second = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         self.assertEqual((first.attempt_no, second.attempt_no), (1, 1))
         services.void_attempt(self.char2, challenge, second.pk)
@@ -213,7 +221,7 @@ class ServiceTests(ContestTest):
     def test_deleted_character_and_room_keep_audit(self):
         challenge = self.open()
         record = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         name = self.char2.key
         self.char2.delete()

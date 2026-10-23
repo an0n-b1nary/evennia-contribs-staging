@@ -420,7 +420,7 @@ carries one command family and one brass plaque naming its commands:
 | Lore Archive | `-lore` | `+lore`, `+investigate`, `+hint`, `+share`, `+forget` |
 | Help Desk | `-jobs`, `-boards`, `-xp` | `+bb`, `+jobs`, `+request`, `+bug`, `+issue`, `+discuss`, `+xp` |
 | Drafting Room | `-maps`, `-regions` | `+map`, `+region`, `@dig`, `@tunnel` |
-| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-equipment`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+chargen`, `+gear`, `+wear`, `+remove`, `+worn`, `+outfit` |
+| Proving Grounds | `-rp-rules`, `-rp-chargen`, `-rp-equipment`, `-rp-contest` | `+sheet`, `+stats`, `+pips`, `+abilities`, `+spend`, `+upgrade`, `+lock`, `+unlock`, `+test`, `+challenge`, `+chargen`, `+gear`, `+wear`, `+remove`, `+worn`, `+outfit` |
 
 ### RP checks in the Proving Grounds
 
@@ -442,8 +442,8 @@ starting sheet sets every stat to B (14 allocation points), then finalizes:
 +spend/ability Proficiency/Athletics
 +upgrade Proficiency/Athletics
 +sheet
-+test/list
-+test #2=Agility/Athletics~I leap across.
++challenge
++test #2=Agility/Athletics # I leap across.
 ```
 
 Domains suggest an approach in their descriptions; any stat/tag pairing is
@@ -457,9 +457,9 @@ and no chargen sheet; puppet it to exercise the adapter fallback.
 Challenge #1 suggests Presence/Performance at A; #2 is the prompt-only B
 challenge “Cross the chasm.” Choose a different approach with
 `+test #1=Intellect/Deception`; the result marks it as an alternative. Anyone can
-set a challenge, including `+test/set/once B~Cross the chasm`. Its setter or
+set a challenge, including `+challenge/new B=Cross the chasm` then `+challenge/once #n`. Its setter or
 staff can edit, void attempts, and close it. Room messages and public scene
-logs show outcomes; grades stay private and only staff `+test/review` sees
+logs show outcomes; grades stay private and only staff `+challenge/review` sees
 dice and the resolution ledger.
 
 IC poses and checks lock pips and the ability loadout. `+unlock` announces

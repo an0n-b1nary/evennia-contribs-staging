@@ -1,5 +1,20 @@
 # Changelog — evennia-rp-contest
 
+## 0.2.0
+
+### Breaking
+
+- Move challenge management and history from `+test` to `+challenge`; register
+  `CmdChallenge` alongside `CmdTest` (or use `ContestCmdSet`).
+- Create with `/new difficulty=prompt`; edit prompt, difficulty and suggestion
+  separately with `/edit`, `/difficulty` and `/suggest`. Mark `/once` separately.
+- Use `/void #challenge.attempt # reason` with the history record ID.
+- Test comments follow ` # `; tilde comments and the old `+test` switches are
+  refused. Unnumbered tests are free checks using the default difficulty;
+  answering a challenge requires `#n=`.
+- `parse_challenge` now parses `difficulty=prompt`; construct `ChallengeRequest`
+  directly for service-level requests with a suggestion.
+
 ## 0.1.5 — 2026-10-20
 
 - Add the staff-only `contest-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

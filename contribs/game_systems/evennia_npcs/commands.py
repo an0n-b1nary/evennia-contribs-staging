@@ -317,6 +317,24 @@ def contest_command():
     return CmdNPCTest
 
 
+@lru_cache(maxsize=1)
+def challenge_command():
+    """Keep challenge management on the player side of virtual portrayal."""
+    from evennia_rp_contest.commands import CmdChallenge
+
+    class CmdNPCChallenge(CmdChallenge):
+        def func(self):
+            try:
+                npc, _ = svc.controlled(self.caller)
+                if npc is not None:
+                    raise svc.NPCError("Release NPC portrayal to manage or review challenges.")
+                return super().func()
+            except svc.NPCError as exc:
+                self.msg(str(exc))
+
+    return CmdNPCChallenge
+
+
 class NPCCmdSet(CmdSet):
     key = "NPCCmdSet"
 
@@ -329,6 +347,7 @@ class NPCCmdSet(CmdSet):
         self.add(CmdNPCIC)
         if apps.is_installed("evennia_rp_contest"):
             self.add(contest_command())
+            self.add(challenge_command())
 
 
 class CmdNPCIC(CmdIC):

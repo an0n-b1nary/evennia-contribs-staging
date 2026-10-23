@@ -7,9 +7,9 @@ from unittest.mock import patch
 from django.test import override_settings
 
 from evennia_rp_contest import services
-from evennia_rp_contest.commands import CmdTest, ContestCmdSet
+from evennia_rp_contest.commands import CmdChallenge, CmdTest, ContestCmdSet
 from evennia_rp_contest.models import Challenge, CheckRecord
-from evennia_rp_contest.parsing import parse_challenge, parse_test
+from evennia_rp_contest.parsing import ChallengeRequest, parse_challenge, parse_test
 from evennia_rp_rules.dice import ScriptedRoller
 from evennia_rp_rules.modifiers import ScoreBonus
 from evennia_rp_rules.subjects import DictStatSource
@@ -27,56 +27,58 @@ def hidden_adapter(obj):
 class CommandTests(ContestCommandTest):
     def test_player_sets_plain_and_suggested_challenges(self):
         self.call(
-            CmdTest(),
-            "/set Mid~Cross the chasm",
+            CmdChallenge(),
+            "/new Mid=Cross the chasm",
             "Char2 sets challenge #1 (Mid): Cross the chasm",
             caller=self.char2,
         )
-        self.call(
-            CmdTest(),
-            "/set/once High=brawn/climbing~Climb",
-            "Char2 sets challenge #2 (High) (once): Climb",
-            caller=self.char2,
-        )
+        self.call(CmdChallenge(), "/new High=Climb", caller=self.char2)
+        self.call(CmdChallenge(), "/suggest #2=brawn/climbing", caller=self.char2)
+        self.call(CmdChallenge(), "/once #2", caller=self.char2)
         self.assertEqual(Challenge.objects.count(), 2)
-        self.call(CmdTest(), "/list", "Open challenges:", caller=self.char2)
+        self.call(CmdChallenge(), "", "Open challenges:", caller=self.char2)
 
     def test_edit_void_close_once_and_history(self):
-        challenge = services.open_challenge(self.char2, parse_challenge("Mid=brawn/climbing~Climb"))
+        challenge = services.open_challenge(
+            self.char2, ChallengeRequest("Mid", "Climb", "brawn", "climbing")
+        )
         record = services.perform_test(
-            self.char2, parse_test("brawn/climbing"), roller=self.scripted(0)
+            self.char2, parse_test("#1=brawn/climbing"), roller=self.scripted(0)
         )
         self.call(
-            CmdTest(),
-            "/edit #1=High=brains/fire~Read flames",
-            "Char2 edits challenge #1 (High): Read flames",
+            CmdChallenge(),
+            "/edit #1=Read flames",
+            "Char2 edits challenge #1 (Mid): Read flames",
             caller=self.char2,
         )
         self.call(
-            CmdTest(), "/once #1", "Char2 marks once challenge #1 (High) (once)", caller=self.char2
+            CmdChallenge(),
+            "/once #1",
+            "Char2 marks once challenge #1 (Mid) (once)",
+            caller=self.char2,
         )
         self.call(
-            CmdTest(),
-            f"/void #1/{record.pk}~Agreed",
+            CmdChallenge(),
+            f"/void #1.{record.pk} # Agreed",
             f"Char2 voids attempt {record.pk} on #1. Agreed",
             caller=self.char2,
         )
-        self.call(CmdTest(), "/history #1", f"Attempt {record.pk}:", caller=self.char2)
-        output = self.call(CmdTest(), "/history #1", caller=self.char2)
+        self.call(CmdChallenge(), "/history #1", f"Attempt {record.pk}:", caller=self.char2)
+        output = self.call(CmdChallenge(), "/history #1", caller=self.char2)
         self.assertIn("[VOID: Agreed]", output)
-        output = self.call(CmdTest(), "/review #1", caller=self.char1)
+        output = self.call(CmdChallenge(), "/review #1", caller=self.char1)
         self.assertIn("[VOID: Agreed]", output)
         self.assertIn('"resolver"', output)
-        self.call(CmdTest(), "/close #1", "Char2 closes challenge #1", caller=self.char2)
+        self.call(CmdChallenge(), "/close #1", "Char2 closes challenge #1", caller=self.char2)
         challenge.refresh_from_db()
         self.assertEqual(challenge.status, "closed")
 
     def test_setter_and_staff_only_management(self):
-        challenge = services.open_challenge(self.char1, parse_challenge("Mid~Prompt"))
-        record = services.perform_test(self.char2, parse_test("brawn"), roller=self.scripted(0))
-        for text in ("/edit #1=High~Changed", f"/void #1/{record.pk}", "/close #1", "/once #1"):
-            self.call(CmdTest(), text, "Only the setter or staff", caller=self.char2)
-        self.call(CmdTest(), "/review", "Only staff", caller=self.char2)
+        challenge = services.open_challenge(self.char1, parse_challenge("Mid=Prompt"))
+        record = services.perform_test(self.char2, parse_test("#1=brawn"), roller=self.scripted(0))
+        for text in ("/edit #1=Changed", f"/void #1.{record.pk}", "/close #1", "/once #1"):
+            self.call(CmdChallenge(), text, "Only the setter or staff", caller=self.char2)
+        self.call(CmdChallenge(), "/review", "Only staff", caller=self.char2)
         challenge.refresh_from_db()
         self.assertEqual(challenge.description, "Prompt")
 
@@ -92,9 +94,9 @@ class CommandTests(ContestCommandTest):
         self.assertNotIn("Mid", room_line)
         self.assertNotRegex(room_line, r"\d")
         self.assertIn("secret", str(record.detail))
-        history = self.call(CmdTest(), "/history", caller=self.char2)
+        history = self.call(CmdChallenge(), "/history", caller=self.char2)
         self.assertNotIn("secret", history)
-        review = self.call(CmdTest(), "/review", caller=self.char1)
+        review = self.call(CmdChallenge(), "/review", caller=self.char1)
         self.assertIn("secret", review)
         self.assertIn('"roll"', review)
 
@@ -102,7 +104,7 @@ class CommandTests(ContestCommandTest):
         comment = "{braces} $You() |r"
         with patch.object(self.char1, "msg") as witness, patch.object(self.char2, "msg") as tester:
             services.perform_test(
-                self.char2, parse_test(f"brawn~{comment}"), roller=self.scripted(0)
+                self.char2, parse_test(f"brawn # {comment}"), roller=self.scripted(0)
             )
         message = witness.call_args.kwargs["text"]
         self.assertIn(comment, message[0])
@@ -114,13 +116,13 @@ class CommandTests(ContestCommandTest):
     def test_prompt_name_and_void_reason_are_mapping_values(self):
         self.char2.key = "{actor} $You() |r"
         with patch.object(self.char1, "msg") as witness:
-            services.open_challenge(self.char2, parse_challenge("Mid~{prompt} $You() |r"))
+            services.open_challenge(self.char2, parse_challenge("Mid={prompt} $You() |r"))
         message = witness.call_args.kwargs["text"][0]
         self.assertIn(self.char2.key, message)
         self.assertIn("{prompt} $You() |r", message)
 
     def test_retry_and_alternative_are_announced(self):
-        services.open_challenge(self.char2, parse_challenge("Mid=brawn/climbing~Climb"))
+        services.open_challenge(self.char2, ChallengeRequest("Mid", "Climb", "brawn", "climbing"))
         with patch.object(self.char1, "msg") as witness:
             services.perform_test(self.char2, parse_test("#1=brains/fire"), roller=self.scripted(0))
             services.perform_test(self.char2, parse_test("#1=brains/fire"), roller=self.scripted(0))
@@ -133,11 +135,11 @@ class CommandTests(ContestCommandTest):
 
     def test_empty_usage_and_bad_switch_combination(self):
         self.call(CmdTest(), "", "Usage: +test", caller=self.char2)
-        self.call(CmdTest(), "/edit", "Usage: +test/edit", caller=self.char2)
-        self.call(CmdTest(), "/void #1", "Usage: +test/void", caller=self.char2)
-        self.call(CmdTest(), "/set/close Mid~Prompt", "Use one switch", caller=self.char2)
-        self.call(CmdTest(), "/history", "No tests", caller=self.char2)
-        self.call(CmdTest(), "/list", "No open", caller=self.char2)
+        self.call(CmdChallenge(), "/edit", "Usage: +challenge/edit", caller=self.char2)
+        self.call(CmdChallenge(), "/void #1", "Usage: +challenge/void", caller=self.char2)
+        self.call(CmdChallenge(), "/new/close Mid=Prompt", "Use one switch", caller=self.char2)
+        self.call(CmdChallenge(), "/history", "No tests", caller=self.char2)
+        self.call(CmdChallenge(), "", "No open", caller=self.char2)
 
     def test_cmdset(self):
         self.assertTrue(any(cmd.key == "+test" for cmd in ContestCmdSet().commands))

@@ -195,7 +195,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "CmdMoves",
         ):
             self.add(command)
-        for command in _optional_commands("evennia_rp_contest", "CmdTest"):
+        for command in _optional_commands("evennia_rp_contest", "CmdTest", "CmdChallenge"):
             self.add(command)
         for command in _optional_commands(
             "evennia_rp_equipment", "CmdGear", "CmdWear", "CmdRemove", "CmdWorn", "CmdOutfit"

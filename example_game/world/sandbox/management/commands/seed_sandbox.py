@@ -836,11 +836,11 @@ class Command(BaseCommand):
                     abilities.grant(author, ability, tag)
                 counts["rp_builds"] += 1
         if apps.is_installed("evennia_rp_contest"):
-            from evennia_rp_contest.parsing import parse_challenge
+            from evennia_rp_contest.parsing import ChallengeRequest
             from evennia_rp_contest.services import open_challenge
 
-            for text in content.RP_CHALLENGES:
-                open_challenge(authors[0], parse_challenge(text))
+            for spec in content.RP_CHALLENGES:
+                open_challenge(authors[0], ChallengeRequest(**spec))
                 counts["rp_challenges"] += 1
         if apps.is_installed("evennia_rp_equipment"):
             counts["rp_gear"] = self._create_rp_gear(room, authors)

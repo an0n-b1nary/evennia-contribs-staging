@@ -960,7 +960,9 @@ class Suite:
 
     def scene_check(self):
         self.command("alice", "+scene/open Live Telnet laboratory", "opened|created|Scene #")
-        self.command("alice", "+test/set A=Presence/Performance~Hold the audience", "challenge #1")
+        self.command("alice", "+challenge/Ne A=Hold the audience", "challenge #1")
+        self.command("alice", "+challenge/Su #1=Presence/Performance", "edits challenge")
+        self.command("alice", "+challenge", "suggested: presence/performance")
         before = self.state()
         result = self.command("alice", "+test #1=Presence/Performance", "Narrow Success")
         public = self.observer(result)
@@ -981,8 +983,11 @@ class Suite:
         assert before["earn_count"] == state["earn_count"], "A check earned XP"
 
     def challenges(self):
-        self.command("alice", "+test Presence/Performance", "on #1")
-        self.command("bob", "+test/set B~Cross the chasm", "challenge #2")
+        self.command("alice", "+test Presence/Performance # A free check at #12", "tests Presence")
+        assert self.state()["checks"][-1]["challenge_id"] is None
+        assert self.state()["checks"][-1]["comment"] == "A free check at #12"
+        self.command("alice", "+test #1=Presence/Performance", "on #1")
+        self.command("bob", "+challenge/new B=Cross the chasm", "challenge #2")
         self.command("alice", "+test #2=Intellect/Ritual", "on #2")
         assert not self.state()["checks"][-1]["alternative"]
         self.command("alice", "+test #1=Agility/Blades", "alternative approach")
@@ -990,30 +995,55 @@ class Suite:
         assert record["tag"] == "blades" and record["alternative"]
         assert "Combat Focus" in str(record["detail"]), record
         self.command("alice", "+test #1=Agility/Blades", "attempt 4")
-        # An exact suggested approach binds; multiple matching suggestions are ambiguous.
-        self.command("bob", "+test/set B=Presence/Performance~A second audience", "challenge #3")
+        # Free checks stay free even when an open suggestion matches.
+        self.command("bob", "+challenge/new B=A second audience", "challenge #3")
+        self.command("bob", "+challenge/suggest #3=Presence/Performance", "edits challenge")
         self.command("alice", "+test Presence/Performance", "tests Presence")
         assert self.state()["checks"][-1]["challenge_id"] is None
         self.command("alice", "+test #3=Presence/Performance", "on #3")
 
     def management(self):
-        self.command("bob", "+test/set/once B=Intellect~One careful attempt", "challenge #4")
+        before = self.state()
+        self.command("bob", "+test/set/once B=Intellect~Retired", "one switch")
+        self.command("bob", "+test/set B~Retired", "Unknown or ambiguous")
+        self.command("bob", "+challenge/new/once B=Retired", "one switch")
+        self.command("bob", "+challenge/new B~Retired", "Usage:")
+        assert before["challenges"] == self.state()["challenges"]
+        self.command("bob", "+challenge/new B=One careful attempt", "challenge #4")
+        self.command("bob", "+challenge/suggest #4=Intellect", "edits challenge")
+        self.command("bob", "+challenge/once #4", "once")
         self.command("alice", "+test #4=Intellect", "on #4")
         record = self.state()["checks"][-1]
         self.command("alice", "+test #4=Intellect", "only one attempt")
         assert self.state()["checks"][-1]["id"] == record["id"]
-        self.command("alice", "+test/edit #4=A=Intellect~Not authorized", "setter or staff")
-        self.command("alice", f"+test/void #4/{record['id']}~Not authorized", "setter or staff")
-        self.command("bob", "+test/edit #4=A=Intellect~Edited attempt", "edits challenge")
-        self.command("bob", f"+test/void #4/{record['id']}~Retry permitted", "void")
+        self.command("alice", "+challenge/edit #4=Not authorized", "setter or staff")
+        self.command(
+            "alice", f"+challenge/void #4.{record['id']} # Not authorized", "setter or staff"
+        )
+        self.command("bob", "+challenge/edit #4=Edited attempt", "edits challenge")
+        self.command("bob", "+challenge/Di #4=A", "edits challenge")
+        challenge = next(row for row in self.state()["challenges"] if row["number"] == 4)
+        assert challenge["description"] == "Edited attempt" and challenge["difficulty"] == "A"
+        assert challenge["stat_key"] == "intellect" and challenge["once"]
+        before = self.state()
+        self.command("bob", f"+challenge/void #4/{record['id']}~Retired", "Usage:")
+        self.command("alice", "+test/unknown Intellect", "Unknown or ambiguous")
+        self.command("alice", "+test Intellect~Retired", "Unknown stat")
+        assert before["checks"] == self.state()["checks"]
+        self.command("bob", f"+challenge/Vo #4.{record['id']} # Retry permitted", "void")
         self.command("alice", "+test #4=Intellect", "attempt 2")
         state = self.state()
         assert next(row for row in state["checks"] if row["id"] == record["id"])["voided_at"]
         assert state["checks"][-1]["attempt_no"] == 2
-        self.command("staff", "+test/once #3", "once")
-        self.command("alice", "+test/history #4", f"Attempt {record['id']}")
-        self.command("alice", "+test/review", "Only staff")
-        self.command("staff", "+test/review #4", '"resolution"|"roll"')
+        self.command("staff", "+challenge/once #3", "once")
+        self.command("alice", "+challenge/history #4", f"Attempt {record['id']}")
+        self.command("alice", "+challenge/review", "Only staff")
+        self.command("staff", "+challenge/review #4", '"resolution"|"roll"')
+        before = self.state()["checks"]
+        self.command("alice", "+challenge/close #3", "setter or staff")
+        self.command("bob", "+challenge/Cl #3", "closes challenge")
+        self.command("alice", "+test #3=Presence/Performance", "closed")
+        assert self.state()["checks"] == before
         self.command("alice", "+sheet", "Presence")
         self.command("bob", "+sheet pt-alice", "only see your own")
         self.command("staff", "+sheet pt-alice", "Presence")
@@ -1021,7 +1051,7 @@ class Suite:
     def adversarial(self):
         payload = "{actor} $You() |rCOLOR|n braces {unknown} <script>literal</script>"
         result = self.command(
-            "alice", f"+test #2=Intellect~{payload}", r"\{actor\}.*\$You\(\).*COLOR.*\{unknown\}"
+            "alice", f"+test #2=Intellect # {payload}", r"\{actor\}.*\$You\(\).*COLOR.*\{unknown\}"
         )
         assert "{actor}" in self.observer(result) and "$You()" in self.observer(result)
         assert self.state()["checks"][-1]["comment"] == payload
@@ -1041,8 +1071,8 @@ class Suite:
                 row["character_id"] == actor_id and row["status"] == "active"
                 for row in state["sessions"]
             )
-        self.command("alice", "+test/set C~Alice session challenge", "challenge #5")
-        self.command("bob", "+test/set C~Bob session challenge", "challenge #6")
+        self.command("alice", "+challenge/new C=Alice session challenge", "challenge #5")
+        self.command("bob", "+challenge/new C=Bob session challenge", "challenge #6")
         self.command("alice", "+activity/end", "ended|Ending")
         state = self.state()
         assert not state["actors"]["alice"]["locked"]

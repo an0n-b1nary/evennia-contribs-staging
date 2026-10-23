@@ -338,7 +338,7 @@ PIPS = {"budget": 10, "cap": 5, "weakness_cap": 5}
 LOADOUT_BUDGET = 100
 
 # P4: difficulty used when `+test` names no challenge, and whether a challenge
-# may carry pips (`+test/set A+=...`, `B--`) for finer storyteller control.
+# may carry pips (`+challenge/new A+=...`, `B--`) for finer storyteller control.
 DEFAULT_DIFFICULTY = "C"
 DIFFICULTY_ALLOWS_PIPS = True
 

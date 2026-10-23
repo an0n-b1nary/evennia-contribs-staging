@@ -11,9 +11,9 @@ Staff inspect disputed tests without exposing a character's private numbers or e
 
 ## Tasks and commands
 
-- **The room, not every test in the game:** `+test/review [#challenge]` shows recent records in your current room, optionally limited to one challenge, with their full stored breakdown. `+test/history` is the public account of those outcomes. Move to the appropriate room before reviewing a report.
-- **Correct a challenge:** staff or its setter can `+test/edit #challenge=<difficulty>[=<stat>[/<tag>]]~<prompt>`, toggle `/once #challenge` or `/close #challenge`. Changes affect the challenge; they do not reroll earlier results. Suggested approaches guide play rather than forbidding alternatives.
-- **Void an attempt:** `+test/void #challenge/<attempt id>~<reason>` marks a mistaken attempt void. Use the attempt ID from history, not its retry count. The attempt remains visible, but no longer blocks a once-only challenge.
+- **The room, not every test in the game:** `+challenge/review [#challenge]` shows recent records in your current room, optionally limited to one challenge, with their full stored breakdown. `+challenge/history` is the public account of those outcomes. Move to the appropriate room before reviewing a report.
+- **Correct a challenge:** staff or its setter can `+challenge/edit #challenge=<prompt>`, change `/difficulty #challenge=<difficulty>` or `/suggest #challenge=<stat>[/<tag>]`, mark `/once #challenge` or `/close #challenge`. Changes affect the challenge; they do not reroll earlier results. Suggested approaches guide play rather than forbidding alternatives.
+- **Void an attempt:** `+challenge/void #challenge.<attempt id> # <reason>` marks a mistaken attempt void. Use the attempt ID from history, not its retry count. The attempt remains visible, but no longer blocks a once-only challenge.
 
 ## What's safe to change
 

@@ -99,7 +99,8 @@ def run_browser(session, timeout=30):
             assert "B ++" in own and "B ++" not in other
             command("+scene/open Live browser laboratory", "opened|created|Scene #")
             command("+scene/privacy public", "Public")
-            command("+test/set A=Presence/Performance~Browser audience", "Browser audience")
+            command("+challenge/new A=Browser audience", "Browser audience")
+            command("+challenge/suggest #1=Presence/Performance", "edits challenge")
             own, other = command("+test #1=Presence/Performance", "Narrow Success")
             assert "Narrow Success" in other
             for private in ("B ++", "55.2", '"roll"', "actor_score"):
