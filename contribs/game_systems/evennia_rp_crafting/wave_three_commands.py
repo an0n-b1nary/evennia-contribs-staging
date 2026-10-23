@@ -103,11 +103,12 @@ class CmdModify(CraftCommand):
             raise CraftingError("That Modifier service is unavailable; services require Economy.")
         if switch == "new" and implementation.kind == "undo":
             raise CraftingError("Start an undo draft with +modify/undo customer/target = niche.")
-        customer = self.caller.search(customer_name)
+        customer = self.caller.search(customer_name, use_dbref=True)
         if customer is None:
             return
         target = self.caller.search(
             target_name,
+            use_dbref=True,
             candidates=[
                 customer,
                 *customer.contents,

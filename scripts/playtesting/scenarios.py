@@ -513,7 +513,9 @@ class Suite:
         self.command("staff", f"+economy/credit #{bob_id}=30 # Modifier drafts", "Purse updated")
         self.unlock("enchanting", 3 * (active + 1), "ember", "Unlocked Enchanter")
         before = self.state()
-        self.command("alice", f"+modify/new {bob}/{bob}=enchanting/modifier_mark", "Service draft")
+        self.command(
+            "alice", f"+modify/new #{bob_id}/#{bob_id}=enchanting/modifier_mark", "Service draft"
+        )
         self.command("alice", "+modify/line A silver mark; gold = silver.", "Service draft")
         self.command("alice", "+modify/resources 2 ember", "Service draft")
         self.command("alice", "+modify/resources 1 ember", "Service draft")

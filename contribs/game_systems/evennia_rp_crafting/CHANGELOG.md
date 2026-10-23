@@ -12,6 +12,7 @@
   discards the draft; `/cancel <service number>` still cancels a service offer.
 
 ### Changed
+- Draft customer and target addresses accept names or dbrefs for ordinary players.
 - Resource selections replace one key at a time; `/unresource` removes a key.
   Draft edits and previews reserve and spend nothing. Failed offers retain the
   draft; successful offers clear it and still require the customer's acceptance.

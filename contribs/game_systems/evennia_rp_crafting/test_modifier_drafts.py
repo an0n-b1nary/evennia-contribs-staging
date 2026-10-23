@@ -117,6 +117,20 @@ class ModifierDraftTests(WaveThreeFixture, EvenniaCommandTest):
                 self.assertEqual(self.draft(), saved)
         self.call(CmdModify(), "/unresource missing", "That resource is not selected")
 
+    def test_player_can_address_customer_and_target_by_dbref(self):
+        self.account.is_superuser = False
+        self.account.save(update_fields=["is_superuser"])
+        self.account.permissions.clear()
+        self.char1.permissions.clear()
+        self.assertFalse(self.char1.permissions.check("Builder"))
+        self.call(
+            CmdModify(),
+            f"/new #{self.char2.pk}/#{self.item.pk}=layers/modifier_aura",
+            "Service draft",
+        )
+        self.assertEqual(self.draft()["customer_id"], self.char2.pk)
+        self.assertEqual(self.draft()["target_id"], self.item.pk)
+
     def test_invalid_field_edits_preserve_draft(self):
         self.ready()
         saved = self.draft()
