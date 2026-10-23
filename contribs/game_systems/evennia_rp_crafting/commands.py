@@ -26,22 +26,6 @@ from .wave_three_commands import CmdPet as CmdPet
 DRAFT_KEY = "rp_crafting_draft"
 
 
-def resource_spec(value):
-    result = {}
-    try:
-        for part in value.split(","):
-            key, amount = part.strip().rsplit(":", 1)
-            key, amount = key.strip(), int(amount)
-            if not key or not conf.positive(amount) or key in result:
-                raise ValueError
-            result[key] = amount
-    except ValueError:
-        raise CraftingError(
-            "Select resources as key:quantity, key:quantity, without repeats."
-        ) from None
-    return result
-
-
 def costs_text(cost):
     parts = [f"{quantity} {key}" for key, quantity in cost["resources"].items()]
     if cost["money"]:

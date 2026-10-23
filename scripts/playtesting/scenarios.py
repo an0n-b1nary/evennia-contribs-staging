@@ -495,6 +495,104 @@ class Suite:
         self.command("bob", "+pattern/accept live-syntax", "learn Live syntax")
         self.command("alice", "+scene/close", "closed")
 
+    def modifier_drafts(self):
+        state = self.state()
+        alice_id = state["actors"]["alice"]["id"]
+        bob_id = state["actors"]["bob"]["id"]
+        bob = self.session.host.credentials["bob"]["name"]
+        # Earlier EVENT checks have finished with cooking. Retire that niche
+        # through the player command so this case also works after all five
+        # Workshop slots have been filled by the preceding scenarios.
+        if any(
+            row["workshop__character_id"] == alice_id
+            and row["niche__key"] == "cooking"
+            and row["abandoned_at"] is None
+            for row in state["crafting_niches"]
+        ):
+            self.command("alice", "+workshop/abandon cooking", "not refunded")
+            state = self.state()
+        active = sum(
+            row["workshop__character_id"] == alice_id and row["abandoned_at"] is None
+            for row in state["crafting_niches"]
+        )
+        self.command(
+            "staff", f"+resources/grant #{alice_id}=20 ember # Modifier drafts", "Resources updated"
+        )
+        self.command(
+            "staff", f"+economy/credit #{alice_id}=1000 # Modifier drafts", "Purse updated"
+        )
+        self.command("staff", f"+economy/credit #{bob_id}=30 # Modifier drafts", "Purse updated")
+        self.unlock("enchanting", 3 * (active + 1), "ember", "Unlocked Enchanter")
+        before = self.state()
+        self.command(
+            "alice", f"+modify/new #{bob_id}/#{bob_id}=enchanting/modifier_mark", "Service draft"
+        )
+        self.command("alice", "+modify/line A silver mark; gold = silver.", "Service draft")
+        self.command("alice", "+modify/resources 2 ember", "Service draft")
+        self.command("alice", "+modify/resources 1 ember", "Service draft")
+        self.command("alice", "+modify/unresource ember", "Service draft saved")
+        self.command("alice", "+modify/proof", "Maker resources: none")
+        self.command("alice", "+modify/resources 1 ember", "Service draft")
+        self.command("alice", "+modify/price 3", "Service draft saved")
+        self.command("alice", "+modify/price -1", "nonnegative whole-number")
+        self.command("alice", "+modify/resources ember:1", "Select one resource")
+        self.command("alice", "+modify/offer/nope", "one switch")
+        self.command(
+            "alice",
+            f"+modify/offer {bob}/{bob}=enchanting/modifier_mark ; old ; ember:1 ; 3",
+            "Usage:",
+        )
+        self.session.disconnect("alice")
+        self.session.connect("alice")
+        self.session.host.reload()
+        listing = self.command(
+            "alice", "+modify", f"Your recent services:.*Service draft: {bob}.*modify/proof"
+        )
+        assert "A silver mark; gold = silver." not in listing["output"]
+        self.command(
+            "alice", "+modify/proof", "Service draft.*A silver mark; gold = silver.*commission: 3"
+        )
+        after = self.state()
+        for field in (
+            "resource_holdings",
+            "economy_purses",
+            "modification_offers",
+            "modification_layers",
+        ):
+            assert after[field] == before[field], field
+        self.command("staff", "+runtime RP_CRAFTING_FROZEN=true", "True")
+        try:
+            self.command("alice", "+modify/offer", "Crafting is paused")
+        finally:
+            self.command("staff", "+runtime/reset RP_CRAFTING_FROZEN", "False")
+        self.command("alice", "+modify", "Service draft")
+        result = self.command("alice", "+modify/offer", "service #")
+        assert "A silver mark; gold = silver." in self.observer(result)
+        row = self.state()["modification_offers"][-1]
+        assert row["configuration"] == {
+            "line": "A silver mark; gold = silver.",
+            "layer_id": None,
+        }, row
+        assert row["resources"] == {"ember": 1} and row["commission"] == 3, row
+        self.command("alice", "+modify/offer", "Start a service draft")
+        self.command("bob", f"+modify/accept {row['id']}", "completed")
+        layer = self.state()["modification_layers"][-1]
+        assert layer["text"] == row["configuration"]["line"] and layer["target_id"] == bob_id
+        self.command("bob", f"+modify/hide {layer['id']}", "hidden")
+        self.command("bob", f"+modify/show {layer['id']}", "visible")
+        self.command("alice", f"+modify/undo {bob}/{bob}=enchanting", "Service draft")
+        self.command("alice", "+modify/resources 1 ember", "Service draft")
+        self.command("alice", "+modify/offer", "Undoing needs one selected layer")
+        self.command("alice", f"+modify/replace {layer['id']}", "Service draft")
+        self.command("alice", "+modify/price 0", "Service draft")
+        self.command("alice", "+modify/offer", "service #")
+        undo = self.state()["modification_offers"][-1]
+        self.command("bob", f"+modify/accept {undo['id']}", "completed")
+        assert self.state()["modification_layers"][-1]["removed_by_id"] == undo["id"]
+        self.command("alice", f"+modify/new {bob}/{bob}=enchanting/modifier_mark", "Service draft")
+        self.command("alice", "+modify/cancel", "Service draft discarded")
+        assert "Service draft:" not in self.command("alice", "+modify")["output"]
+
     def lore(self):
         alice = self.session.host.credentials["alice"]["name"]
         bob = self.session.host.credentials["bob"]["name"]
@@ -1151,6 +1249,9 @@ def run_rp(session, smoke=False):
     )
     cases.append(
         ("Crafting field syntax, journal revisions and Pattern teaching", suite.crafting_syntax)
+    )
+    cases.append(
+        ("Modifier drafts, reconnect, exact consent and paid layer removal", suite.modifier_drafts)
     )
     cases.append(
         ("Plots companion, thread privacy, flattened links and arc XP", suite.plots_syntax)

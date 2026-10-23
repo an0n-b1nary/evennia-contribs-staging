@@ -274,6 +274,52 @@ class ModifierCommandSeams(WaveThreeFixture, EvenniaCommandTest):
     character_typeclass = Character
     room_typeclass = Room
 
+    def test_registered_draft_commands_commit_exact_service_on_host_objects(self):
+        from commands.default_cmdsets import CharacterCmdSet
+        from evennia_economy.services import balance
+        from evennia_rp_crafting.models import ModificationOffer
+
+        def command():
+            return next(cmd for cmd in CharacterCmdSet().commands if cmd.key == "+modify")
+
+        item = create_object(Object, key="a host heirloom", location=self.char2)
+        item.db.desc = "Original host prose."
+        before = (balance(self.char1), balance(self.char2), self.held("spark"))
+        self.call(
+            command(), f"/new #{self.char2.pk}/#{item.pk}=layers/modifier_aura", "Service draft"
+        )
+        self.call(command(), "/line A shimmer; gold = silver.", "Service draft")
+        self.call(command(), "/resources 1 spark", "Service draft")
+        self.call(command(), "/price 20", "Service draft")
+        listing = self.call(command(), "")
+        self.assertIn("Your recent services:", listing)
+        self.assertIn("Service draft: a host heirloom.", listing)
+        self.assertNotIn("A shimmer; gold = silver.", listing)
+        proof = self.call(command(), "/proof")
+        self.assertIn("A shimmer; gold = silver.", proof)
+        self.assertNotIn("Your recent services:", proof)
+        self.call(command(), "/offer/accept", "Use one switch")
+        self.call(
+            command(),
+            f"/offer #{self.char2.pk}/#{item.pk}=layers/modifier_aura ; old ; spark:1 ; 20",
+            "Usage:",
+        )
+        self.assertFalse(ModificationOffer.objects.exists())
+        self.assertEqual((balance(self.char1), balance(self.char2), self.held("spark")), before)
+        self.call(command(), "/offer", "service #")
+        row = ModificationOffer.objects.get()
+        self.assertEqual((balance(self.char1), balance(self.char2), self.held("spark")), before)
+        self.call(command(), f"/accept {row.pk}", "Service #", caller=self.char2)
+        self.assertEqual(item.db.desc, "Original host prose.")
+        self.assertIn("A shimmer; gold = silver.", item.return_appearance(self.char1))
+        self.assertEqual(
+            ModificationLayer.objects.get(service=row).text, "A shimmer; gold = silver."
+        )
+        self.assertEqual(
+            (balance(self.char1), balance(self.char2), self.held("spark")),
+            (before[0] + 20, before[1] - 20, before[2] - 1),
+        )
+
     def test_economy_cancellation_is_visible_and_can_be_closed_locally(self):
         from evennia_economy.exchange import cancel_offer
         from evennia_economy.models import Offer

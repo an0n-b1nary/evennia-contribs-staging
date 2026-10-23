@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.10.2 — 2026-10-23
+
+### Changed
+- Accept Crafting 0.12 in the optional crafting dependency range. Tome crafting
+  uses the unchanged crafting service API.
+
 ## 0.10.1 — 2026-10-22
 
 ### Documentation

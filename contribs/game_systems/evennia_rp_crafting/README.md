@@ -575,13 +575,33 @@ in the quote and revalidated on acceptance. Self services require explicit
 acceptance and zero commission, but still consume materials and the craft fee.
 
 ```text
-+modify/offer Mira/a cloak = weaving/modifier_dye ; The fabric is a deep red. ; timber:1 ; 30
++modify/new Mira/a cloak=weaving/modifier_dye
++modify/line The fabric is a deep red.
++modify/resources 1 timber
++modify/price 30
++modify/proof
++modify/offer
 +modify/accept 1
 +modify/layers a cloak
 +modify/hide 1
 +modify/show 1
-+modify/undo Mira/a cloak = enchanting ; 1 ; ember:1 ; 20
++modify/undo Mira/a cloak=enchanting
++modify/replace 1
++modify/resources 1 ember
++modify/price 20
++modify/offer
 ```
+
+Drafts persist on the maker across reconnects. Set one field per command with
+bare values. `/resources <quantity> <key>` replaces that resource's selection;
+`/unresource <key>` removes it. `/price` defaults to zero, and `/replace` with no
+number clears a layer selection. `+modify/proof` shows the full draft. Bare
+`+modify` lists recent services and adds a short reminder naming your draft
+target, when one exists. Successful draft edits give a short saved acknowledgement.
+`/offer` revalidates all terms and clears the draft only after
+creating an offer; failures leave it editable. `/cancel` alone discards your
+draft. Starting `/new` or `/undo` replaces your current draft, never an offer.
+Drafts reserve and spend nothing. The former packed offer/undo forms are refused.
 
 Service numbers and layer numbers are separate. Accept/cancel the returned
 service number with `+modify/accept` or `/cancel`; its underlying Economy offer
@@ -593,7 +613,7 @@ after Economy has cancelled or expired its offer; completed services cannot
 be cancelled. Repeated cancellation preserves the original cancellation time.
 Aura, dye and
 engraving have one active layer per kind; replacements explicitly name it as
-the fifth offer term. Marks can coexist. Undo targets one existing layer with
+`+modify/replace <layer number>` before offering. Marks can coexist. Undo targets one existing layer with
 the current owner's consent. Base prose, original aura lines, requirements
 and unrelated layers remain intact. Replacement/undo retain removed layers
 and their service/maker history. Hiding is a free OOC visibility toggle.

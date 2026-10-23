@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.12.0 — 2026-10-23
+
+### Breaking
+- `+modify/new customer/target=niche/modifier` starts a persistent service draft.
+  Set `/line`, `/resources <quantity> <key>`, `/price` and optional `/replace`
+  separately, then `/offer`. The old packed offer and undo forms are refused.
+- `+modify/undo customer/target=niche` starts a removal draft; select the layer
+  with `/replace`, select resources and price, then `/offer` as usual.
+- `+modify/proof` shows the full draft. Bare `+modify` lists recent services
+  with a short reminder naming the draft target. Draft edits give brief saved
+  acknowledgements. `/cancel` alone discards the draft; `/cancel <service number>`
+  still cancels a service offer.
+
+### Changed
+- Draft customer and target addresses accept names or dbrefs for ordinary players.
+- Resource selections replace one key at a time; `/unresource` removes a key.
+  Draft edits and previews reserve and spend nothing. Failed offers retain the
+  draft; successful offers clear it and still require the customer's acceptance.
+- Existing ownership, co-location, exact-consent snapshots, fees, atomic payment,
+  layer history, self-service and reveal rules continue to apply.
+
 ## 0.11.1 — 2026-10-22
 
 ### Changed

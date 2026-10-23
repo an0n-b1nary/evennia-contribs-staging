@@ -1830,11 +1830,18 @@ aura; a sample clockwork bird stays in the market and has an Activatable bow.
 Its owner can use `+pet/follow`, `/stay`, `/trick` and `/pose`. Pick it up
 before gifting/selling it; ownership changes with ordinary handoffs and sales.
 
-`+modify/offer customer/target = niche/modifier ; prose ; resource:quantity ; commission`
-proposes a service; `+modify/accept number` consents and commits materials,
-payment and the layer change once. `/layers target` lists layer numbers;
-`/hide` and `/show` are free OOC toggles. `/undo customer/target = niche ; layer ; resources ; commission`
-offers selected-layer removal. Base prose, equipment requirements and maker
+`+modify/new customer/target=niche/modifier` starts a persistent service draft.
+Set `/line <prose>`, `/resources <quantity> <key>` (one key at a time),
+`/price <commission>` and optional `/replace <layer number>`, then `/offer`.
+`+modify/proof` shows the full draft. Bare `+modify` lists recent services and
+adds a short reminder naming your draft target. Draft edits give brief saved
+acknowledgements. `/cancel` alone discards the draft, while `/cancel <number>`
+cancels an offer.
+`+modify/accept <number>` consents and commits materials, payment and the layer
+change once. `/layers <target>` lists layer numbers; `/hide` and `/show` are free
+OOC toggles. `/undo customer/target=niche` starts a removal draft: select the
+layer with `/replace`, set resources and price, then `/offer`.
+Base prose, equipment requirements and maker
 history are preserved. Services require Economy; quiet Companions remain
 usable with optional partners absent.
 
