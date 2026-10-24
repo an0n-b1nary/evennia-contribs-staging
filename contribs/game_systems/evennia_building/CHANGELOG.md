@@ -10,6 +10,7 @@
 - Replace typed guards and agreement wording with actor-bound, expiring previews
   and confirmation tokens. Use separate terrain/region commands and persistent
   room plans instead of structured command-line fields.
+- Preserve literal punctuation, including equals signs, in room descriptions.
 - Generated doors use destination names with direction aliases. Entrances gain
   `in`; departures follow anchor names with `out`, `o`, `outside`. Custom names
   remain fixed. Review warns about geometry and automatic rename clashes.

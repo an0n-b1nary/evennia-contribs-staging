@@ -93,11 +93,12 @@ class BuildingCommand(MuxCommand):
         ObjectDB.objects.filter(pk=self.caller.pk).update(db_key=F("db_key"))
         self.run()
 
-    def bare(self):
-        """Read one target-less value, refusing the old leading equals form."""
-        if self.rhs is not None:
+    def bare(self, *, prose=False):
+        """Read a target-less value, preserving literal punctuation in prose fields."""
+        value = self.args.strip() if prose else self.lhs.strip()
+        if value.startswith("=") or (not prose and self.rhs is not None):
             raise ValidationError(f"Use {self.key}/{self.switch} <value>, without '='.")
-        return self.lhs.strip()
+        return value
 
     def empty(self):
         """Refuse arguments on an action that takes none."""
@@ -251,7 +252,7 @@ class CmdBuild(BuildingCommand):
         if switch == "room":
             services.enter(actor, obj, room=support.draft_room(obj, self.bare()))
         elif switch in {"name", "desc", "title", "purpose"}:
-            value = self.bare()
+            value = self.bare(prose=switch != "purpose")
             if switch in {"name", "desc"}:
                 kwargs = {"name" if switch == "name" else "description": value}
                 services.edit_project(
@@ -750,7 +751,7 @@ class CmdProperty(BuildingCommand):
             raise ValidationError("Stand in the property you want to manage.")
         obj = record.property
         if switch in {"name", "desc"}:
-            kwargs = {"name" if switch == "name" else "description": self.bare()}
+            kwargs = {"name" if switch == "name" else "description": self.bare(prose=True)}
             services.edit_property_room(actor, actor.location, **kwargs)
         elif switch in {"lock", "unlock"}:
             self.empty()
@@ -940,7 +941,7 @@ class CmdFrontier(BuildingCommand):
             obj = services.new_project(actor, self.bare(), kind="frontier")
             actor.msg(f"Frontier project {obj.pk} created. Use +build/enter {obj.pk}.")
         elif switch in {"desc", "mood"}:
-            kwargs = {"description" if switch == "desc" else "mood": self.bare()}
+            kwargs = {"description" if switch == "desc" else "mood": self.bare(prose=True)}
             frontier.edit_room(actor, actor.location, **kwargs)
             actor.msg("Frontier room updated.")
         elif switch == "relinquish":

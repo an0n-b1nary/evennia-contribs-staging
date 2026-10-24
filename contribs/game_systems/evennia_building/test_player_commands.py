@@ -353,6 +353,14 @@ class PlayerCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.assertNotEqual(services.fingerprint(exit), services.fingerprint({**exit, "id": 4}))
 
+    def test_description_text_preserves_equals_semicolons_and_other_literal_punctuation(self):
+        text = "A sign reads x = y; {literal}: a | b ~ c # a note."
+        self.command(CmdBuild, "/desc " + text)
+        self.assertEqual(self.entry.room.db.desc, text)
+        self.approve()
+        self.command(CmdProperty, "/desc " + text)
+        self.assertEqual(self.entry.room.db.desc, text)
+
     def test_frontier_mixed_interior_ownership_and_steward_journey(self):
         from . import frontier
         from .models import Frontier
