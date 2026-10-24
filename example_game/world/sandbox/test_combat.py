@@ -117,6 +117,7 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         services.control(first, "relock")
         self.assertNotIn("ready-guard", fight_moves())
 
+    @skipUnless(apps.is_installed("evennia_rp_equipment"), "Equipment partner absent")
     def test_combat_correction_covers_real_abilities_pips_signatures_and_gear(self):
         from evennia_rp_chargen import abilities, locks, moves
         from evennia_rp_chargen import services as chargen

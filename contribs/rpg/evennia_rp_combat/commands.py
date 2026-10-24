@@ -46,6 +46,7 @@ class CmdCombat(CombatCommand):
     """
 
     key = "+combat"
+    literal_switches = ("setup",)
     switch_options = (
         "setup",
         "join",
@@ -395,6 +396,7 @@ class CmdCombatStory(CombatCommand):
     """
 
     key = "+combatstory"
+    literal_switches = ("pause", "resume", "end", "shelve", "imbalance")
     locks = "cmd:all()"
     help_category = "Combat"
 

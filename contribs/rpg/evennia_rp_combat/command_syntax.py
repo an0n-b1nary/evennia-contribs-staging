@@ -49,6 +49,7 @@ class CombatCommand(SingleSwitchMixin, MuxCommand):
 
     locks = "cmd:all()"
     help_category = "Combat"
+    literal_switches = ()
 
     def at_pre_cmd(self):
         try:
@@ -61,7 +62,8 @@ class CombatCommand(SingleSwitchMixin, MuxCommand):
     def func(self):
         try:
             self.subject = controlled_subject(self.caller)
-            if any(separator in self.args for separator in (";", "~", "|")):
+            literal = len(self.switches) == 1 and self.switches[0] in self.literal_switches
+            if not literal and any(separator in self.args for separator in (";", "~", "|")):
                 raise CombatError("Use one field or action per command. See help " + self.key + ".")
             self.run()
         except (CombatError, ValueError, TypeError, LookupError) as exc:

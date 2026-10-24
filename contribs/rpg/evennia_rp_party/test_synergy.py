@@ -539,13 +539,13 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         services.surge(self.char1, [self.char2])
 
     def test_improvised_draft_and_armed_surge_reserve_in_one_transaction(self):
-        for args in ("/new Improvised", "/wording First, then", "/finish"):
+        for args in ("/new Improvised", "/wording First; then", "/finish"):
             self.call(CmdImprov(), args, "Improvised")
         self.call(CmdSurge(), "", "Surge armed.")
         self.call(CmdImprov(), f"/subtle {self.char2.key}", "1.1")
         state = combat.state_for(self.char1)
         exchange = state["exchanges"]["1.1"]
-        self.assertEqual(exchange["move"]["wording"], "First, then")
+        self.assertEqual(exchange["move"]["wording"], "First; then")
         self.assertEqual(exchange["bet"], "subtle")
         self.assertEqual(partners.modifiers(exchange, self.char2.pk).surge, "25")
         self.assertEqual(synergy.held(state, self.key), 100)

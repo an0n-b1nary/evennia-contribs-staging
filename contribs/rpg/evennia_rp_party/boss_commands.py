@@ -42,6 +42,7 @@ class CmdBossCheck(CombatCommand):
     """
 
     key = "+bosscheck"
+    literal_switches = ("requirement", "hint")
     switch_options = (
         "new",
         "type",

@@ -34,6 +34,7 @@ class CmdImprov(CombatCommand):
     """
 
     key = "+improv"
+    literal_switches = ("new", "wording")
     switch_options = ("new", *FIELDS, "finish", "cancel", "reaching", "penetrating", "subtle")
 
     def run(self):

@@ -80,7 +80,8 @@ class CmdMoves(SingleSwitchMixin, MuxCommand):
     def run(self):
         if not runtime.get("RP_CHARGEN_MOVES_REVEALED"):
             raise ChargenError("Signature Moves are not available yet.")
-        if any(c in self.args for c in (";", "~", "|")):
+        literal = len(self.switches) == 1 and self.switches[0] in ("new", "name", "wording")
+        if not literal and any(c in self.args for c in (";", "~", "|")):
             raise ChargenError("Set one draft field per command. See help +moves.")
         attrs = self.caller.attributes
         draft = deserialize(attrs.get(DRAFT, category=CATEGORY, default={}))

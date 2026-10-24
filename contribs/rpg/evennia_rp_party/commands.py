@@ -33,6 +33,7 @@ class CmdParty(CombatCommand):
     """
 
     key = "+party"
+    literal_switches = ("chat",)
     switch_options = (
         "create",
         "join",
