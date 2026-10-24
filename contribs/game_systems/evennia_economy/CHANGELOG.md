@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-10-24
+
+- Update the optional shop integration range for Building 0.4.
+
 ## [0.4.0] - 2026-10-22
 
 - Breaking: credit and debit notes follow ` # ` after the amount; comma-separated notes are refused. Guard Economy and Shop switches before parsing, retain unique prefixes, and list Shop help forms separately. Allow Resources 0.3 in the optional extra.

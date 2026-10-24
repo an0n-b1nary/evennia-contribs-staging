@@ -1602,10 +1602,11 @@ command and Social's room-permission seam under the actual partners.
 
 ### Reviewed interiors
 
-Building 0.3 is installed after Links, with the sandbox reveal switch enabled.
+Building 0.4 is installed after Links, with the sandbox reveal switch enabled.
 `BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
 `DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
-and traversal checks run. `CmdBuild` is registered in the character command set.
+and traversal checks run. `CmdBuild`, `CmdCollab`, `CmdProperty`, `CmdConsent`, `CmdPassage` and
+`CmdFrontier` are registered in the character command set.
 The **My Building** page mounts `/building/` and the read-only API mounts
 `/api/v1/building/`. The host composes Building's three-way visibility answer
 with its existing private-preview rules for Maps and Regions.
@@ -1619,7 +1620,10 @@ review loop. **Demo Building Reviewer** has the Builder permission for review.
 These characters are generic demo objects, not additional login accounts.
 Building content survives sandbox reset so proposals and ownership stay stable.
 
-Use `help +build` or `/guide/building/` for authoring and property commands.
+Use `help +build` or `/guide/building/` for authoring and `help +property`
+for live home management. Edits use the current room; candidate agreements
+and submissions use preview tokens. Generated doors follow destination names
+with direction aliases; `out`, `o`, `outside` always trigger the departure.
 Staff can inspect the projects immediately. To test ordinary permissions, add
 the homeowner and resident to separate nonstaff test accounts' playable rosters,
 then select them in the web account menu. The homeowner can inspect the draft

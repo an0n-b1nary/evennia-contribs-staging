@@ -1,6 +1,6 @@
 # evennia-building
 
-Version 0.3.4 supplies reviewed private homes, public frontier and mixed
+Version 0.4.0 supplies reviewed private homes, public frontier and mixed
 settlements. Shared authors draft together under the lead's quotas; every
 contributor acknowledges the exact candidate and content reuse terms. Each
 proposed home owner accepts their own boundary. Staff approve the entire frozen
@@ -21,7 +21,8 @@ BUILDING_REVEALED = False
 BUILDING_SAFE_ROOM = "#2"
 ```
 
-Migrate before use. Register `CmdBuild` in the character command set. Compose
+Migrate before use. Register `CmdBuild`, `CmdCollab`, `CmdProperty`, `CmdConsent`,
+`CmdPassage` and `CmdFrontier` in the character command set. Compose
 `BuildingRoomMixin` before DefaultRoom and `BuildingExitMixin` before DefaultExit
 in the host typeclasses. Keep cooperative `super()` calls. The room mixin guards
 managed-room deletion; the exit mixin rechecks access at traversal. Entry locks
@@ -59,7 +60,7 @@ restrict residents and guests; ownership remains authoritative. Residents get
 no editing rights and install only with explicit permission. Invitations require
 acceptance and specify entry and map scopes. Account alts inherit no grants.
 Revocation never ejects occupants; each generated inner room retains an outward
-door to its parent and the entrance retains `outside`.
+door to its parent and the departure retains `out`, `o` and `outside` as aliases.
 
 With Jobs installed, add its domain-owned form after your host registry:
 
@@ -92,13 +93,13 @@ Use `policy.set_policy(actor, room, policy)` or `+build/policy` for audited
 staff changes; `/policy/region` manages region defaults. Drafts deny generic
 describe/configure actions: Building services alone version their content and
 preserve isolation. Live descriptions use `edit_property_room` or
-`+build/property/desc <room>=<text>` and are audited.
+`+property/desc <text>` from inside the room and are audited.
 
 Environment inherits the anchor's terrain and active primary region at
 promotion, without copying its teleport or control permissions. To request a
 different environment use `request_environment` or
-`+build/environment <project>={"terrain": ["urban"], "region": 12}`.
-Omit a key to inherit it, or submit `{}` to reset the request. The request is
+`+build/terrain urban` and `+build/region <region>` from inside the draft.
+Use `+build/inherit terrain` or `+build/inherit region` to restore that field's inheritance. The request is
 frozen in the exact submission. Staff must explicitly approve that revision
 with `approve_environment` or `/environment/approve` before ordinary review
 can promote it, including review through Jobs. Removed/archived requested
@@ -183,7 +184,7 @@ GLOBAL_SCRIPTS = {
 ```
 
 Upgrading 0.1 preserves migrations, objects, ownership, reviews and snapshots.
-Existing top-level pending submissions keep their fingerprint. New apartment
+The 0.4 door migration updates stored exit labels, fingerprints and Jobs bindings by identity. New apartment
 proposals require consent; an old self-owned internal proposal must be withdrawn
 and resubmitted with its passage receipt before approval.
 
@@ -236,7 +237,7 @@ Maps' `frontier` overlay carries public provenance and approval metadata.
 
 Upgrade 0.2 with normal migrations. Historical migrations, ordinary interior
 snapshot shape and the stable `building_interior` request form identifier are
-preserved; existing pending interior/apartment candidates remain reviewable.
+preserved; the 0.4 data migration upgrades stored exit references and their fingerprints.
 
 ## Fixture consumers
 
@@ -262,3 +263,29 @@ only to pages this contrib or its required dependencies ship. With
 evennia-guides installed they appear on its web guide; without it they're
 ignored. To restate one for your game, add a page with the same key to
 `GUIDES_DIRS`.
+
+## Player command break in 0.4
+
+Player Building is split into `+build`, `+collab`, `+property`, `+consent`,
+`+passage` and `+frontier`. Draft edits infer the project from the room where
+the character stands. Submit, discard, withdrawal and agreement actions preview
+the candidate and issue actor-bound, expiring confirmation tokens. Version,
+fingerprint, owner and wording checks remain in the transactional services.
+The old player forms are refused. Staff operations remain under their existing
+`+build` forms until the staff portion of #177.
+
+`+build/dig north=Kitchen` places a neighbouring room with destination-named
+doors and direction aliases. Explicit coordinates and custom names use a durable
+room plan: `/dig <name>`, `/x`, `/y`, `/floor`, `/doorname`, `/back`, `/finish`.
+`/direction` chooses a neighbouring cell and its aliases. `/cancel` drops a plan.
+`+build/room <room>` moves between draft spaces, including settlement interiors.
+
+Automatic door names follow their destination's renames; custom names remain
+fixed. Entrances gain `in`, and departures are named after the anchor with
+`out`, `o`, `outside`. Rename clashes keep the old label and appear in review
+warnings. Route and lifecycle checks retain exit IDs, endpoints, aliases and
+locks while ignoring automatic label changes. The one-way 0.4 data migration
+renames existing defaults and updates stored candidates, agreements, archives
+and linked Jobs fingerprints. It preserves object identities and migration
+history. Direction aliases and names work without Maps; tagged display belongs
+to Maps' optional exit-tag mixin.

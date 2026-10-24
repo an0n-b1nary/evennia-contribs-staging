@@ -16,7 +16,7 @@ from evennia.objects.models import ObjectDB
 
 from evennia_links.characters import web_character
 
-from . import attachments, collaboration, frontier_lifecycle, lifecycle, services
+from . import attachments, collaboration, doors, frontier_lifecycle, lifecycle, services
 from .access import is_staff, require_revealed
 from .models import (
     AttachmentAgreement,
@@ -99,8 +99,12 @@ class ActionForm(forms.Form):
         widget=forms.Textarea,
         label="Name, description, purpose, review outcome or allowed character numbers",
     )
-    door = forms.CharField(required=False, max_length=100, initial="inside")
-    back = forms.CharField(required=False, max_length=100, initial="out")
+    door = forms.CharField(
+        required=False, max_length=100, label="Door name (blank: destination name)"
+    )
+    back = forms.CharField(
+        required=False, max_length=100, label="Return name (blank: destination name)"
+    )
     floor = forms.IntegerField(required=False, initial=0)
     x = forms.IntegerField(required=False, initial=0)
     y = forms.IntegerField(required=False, initial=0)
@@ -195,6 +199,8 @@ class ActionForm(forms.Form):
                 "maps",
                 "value",
                 "passage",
+                "door",
+                "back",
                 "include_children",
             }:
                 field.required = True
@@ -397,8 +403,8 @@ def project_detail(request, pk):
                     project,
                     project.rooms.get(pk=values["room"]),
                     values["value"],
-                    door=values["door"],
-                    back=values["back"],
+                    door=values["door"] or None,
+                    back=values["back"] or None,
                     floor=values["floor"],
                     x=values["x"],
                     y=values["y"],
@@ -470,6 +476,7 @@ def project_detail(request, pk):
             "rooms": rooms,
             "previews": preview_links([row.room for row in rooms if row.room], actor),
             "submissions": project.submissions.all(),
+            "door_warnings": doors.warnings(project),
             "audit": project.audit.all(),
             "form": form,
             "acknowledgement": getattr(
@@ -673,6 +680,7 @@ def property_detail(request, pk):
             "residents": property.residents.select_related("character") if manager else (),
             "invitations": property.invitations.select_related("character") if manager else (),
             "audit": property.audit.all() if manager else (),
+            "door_warnings": doors.name_warnings(rooms) if manager else (),
         },
     )
 

@@ -304,22 +304,20 @@ class Suite:
         assert len(awards) == 1 and awards[0]["quantity"] == 2, awards
         self.session.connect("alice")
 
-        self.command("alice", "+build/new interior=Live Supply Shop", "created")
-        project = self.state()["building_projects"][-1]
-        self.command("alice", f"+build/purpose {project['id']}=shop", "updated|Done|purpose")
         anchor = self.state()["actors"]["alice"]["room"]
+        self.command("alice", "+build/new Live Supply Shop", "created")
+        project = self.state()["building_projects"][-1]
+        self.command("alice", f"+build/enter {project['id']}")
+        self.command("alice", "+build/purpose shop", "Done")
         self.command(
             "alice",
-            f"+build/attach {project['id']} {anchor}=live supply shop",
+            f"+build/attach #{anchor}=live supply shop",
             "attached|Done|updated",
         )
-        project = self.state()["building_projects"][-1]
-        self.command(
-            "alice",
-            f"+build/submit {project['id']} {project['version']}="
-            + self.state()["build_acknowledgement"],
-            "Submission|submitted",
-        )
+        preview = self.command("alice", "+build/submit", "Confirm within")
+        token = re.search(r"\+build/submit ([.\w-]+:[\w-]+:[\w-]+)", preview["output"]).group(1)
+        self.command("alice", f"+build/submit {token}", "Submission.*frozen")
+        self.command("alice", "+build/leave")
         submission = self.state()["building_submissions"][-1]
         self.command(
             "staff",

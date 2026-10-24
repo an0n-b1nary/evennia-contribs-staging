@@ -224,7 +224,7 @@ def validate(project, candidate):
         if (
             not receipt
             or receipt.actor_id != actor_id
-            or receipt.candidate != candidate
+            or fingerprint(receipt.candidate) != fingerprint(candidate)
             or receipt.wording != wording(role)
         ):
             raise ValidationError(

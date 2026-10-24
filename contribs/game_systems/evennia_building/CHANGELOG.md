@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — 2026-10-24
+
+### Breaking
+
+- Split player commands into `+build`, `+collab`, `+property`, `+consent`,
+  `+passage` and `+frontier`; refuse old player forms. Draft and live-room
+  edits use the character's current room. Staff forms remain for the next wave.
+- Replace typed guards and agreement wording with actor-bound, expiring previews
+  and confirmation tokens. Use separate terrain/region commands and persistent
+  room plans instead of structured command-line fields.
+- Generated doors use destination names with direction aliases. Entrances gain
+  `in`; departures follow anchor names with `out`, `o`, `outside`. Custom names
+  remain fixed. Review warns about geometry and automatic rename clashes.
+- Migrate existing generated defaults and stored exit references, fingerprints,
+  archive data and linked Jobs bindings. Automatic renames preserve agreed
+  passage and restoration through stable exit identity.
+
 ## 0.3.4 — 2026-10-20
 
 - Add the staff-only `building-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

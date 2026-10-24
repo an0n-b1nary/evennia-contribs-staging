@@ -6,9 +6,15 @@ class BuildingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
+        from evennia.server.signals import SIGNAL_TYPED_OBJECT_POST_RENAME
+
+        from .doors import follow_renames
         from .runtime import register
 
         register()
+        SIGNAL_TYPED_OBJECT_POST_RENAME.connect(
+            follow_renames, dispatch_uid="building.destination_names", weak=False
+        )
         if apps.is_installed("evennia_maps"):
             from evennia_maps.signals import collect_tile_overlays
 

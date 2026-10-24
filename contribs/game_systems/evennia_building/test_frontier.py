@@ -420,7 +420,7 @@ class TestFrontier(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(result.connections.count(), 4)
         self.assertTrue(
             ObjectDB.objects.filter(
-                db_location=street.room, db_destination=self.room2, db_key="east"
+                db_location=street.room, db_destination=self.room2, db_key=self.room2.key
             ).exists()
         )
 
@@ -464,11 +464,8 @@ class TestFrontier(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(response.status_code, 302)
         self.project.refresh_from_db()
         self.assertEqual(self.project.connections, [])
-        self.call(
-            CmdBuild(),
-            f"/connect/remove {self.project.pk} {street.pk} {target_id}=east",
-            caller=self.char2,
-        )
+        self.char2.location = street.room
+        self.call(CmdBuild(), "/disconnect east", caller=self.char2)
 
     def test_geometry_and_cross_space_escape_are_refused(self):
         wrong = services.dig(
@@ -890,38 +887,37 @@ class TestFrontier(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(result.connections.filter(replacement=True).count(), 2)
         self.assertTrue(
             ObjectDB.objects.filter(
-                db_location=self.room1, db_destination=self.room2, db_key="northeast"
+                db_location=self.room1, db_destination=self.room2, db_key=self.room2.key
             ).exists()
         )
         frontier_lifecycle.restore(self.char1, result, reason="Restore original road too")
         self.assertTrue(can_enter(self.outsider, self.entry.room))
 
     def test_command_collaboration_candidate_and_steward_adapters(self):
-        from .commands import CmdBuild
+        from .commands import CmdCollab, CmdFrontier
 
+        services.enter(self.char2, self.project)
         self.call(
-            CmdBuild(),
-            f"/collaborator/add {self.project.pk} {self.collaborator.pk}",
+            CmdCollab(),
+            f"/add #{self.collaborator.pk}",
             caller=self.char2,
         )
         invitation = self.project.contributors.get()
-        self.call(CmdBuild(), f"/collaborator/accept {invitation.pk}", caller=self.collaborator)
+        self.call(CmdCollab(), f"/accept {invitation.pk}", caller=self.collaborator)
         self.project.refresh_from_db()
-        shown = self.call(CmdBuild(), f"/ack/show {self.project.pk}", caller=self.collaborator)
-        self.assertIn(services.fingerprint(services.snapshot(self.project)), shown)
+        shown = self.call(CmdCollab(), f"/candidate {self.project.pk}", caller=self.collaborator)
+        self.assertIn(self.project.name, shown)
         self.acknowledge_all()
         result = self.approve()
         self.call(
-            CmdBuild(),
-            f"/frontier/desc {self.entry.room_id}=Maintained through commands.",
+            CmdFrontier(),
+            "/desc Maintained through commands.",
             caller=self.char2,
         )
         self.assertEqual(
             services._read_attr(self.entry.room, "desc"), "Maintained through commands."
         )
-        self.call(
-            CmdBuild(),
-            f"/frontier/steward {self.entry.room_id} {self.char2.pk} 0=Relinquished",
-            caller=self.char2,
-        )
+        preview = self.call(CmdFrontier(), "/relinquish # Relinquished", caller=self.char2)
+        token = preview.split("+frontier/relinquish ")[-1].split()[0]
+        self.call(CmdFrontier(), f"/relinquish {token} # Relinquished", caller=self.char2)
         self.assertIsNone(result.rooms.get().steward_id)

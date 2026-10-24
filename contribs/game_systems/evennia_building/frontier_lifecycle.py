@@ -129,7 +129,9 @@ def _replacement(actor, frontier, proposal, removed):
         if a.plane_id != b.plane_id and not (a.plane.zstack and a.plane.zstack == b.plane.zstack):
             raise ValidationError("A replacement cannot jump between unrelated stacks.")
     for start, end, label in ((source, target, name), (target, source, reverse(name))):
-        exit = _exit(start, end, label, outward=True)
+        from .doors import aliases_for
+
+        exit = _exit(start, end, outward=True, aliases=aliases_for(label))
         FrontierConnection.objects.create(
             frontier=frontier, exit=exit, object_id=exit.pk, data=_exit_data(exit), replacement=True
         )
@@ -257,7 +259,8 @@ def transaction_frontier_changed(frontier, actor, signals):
 @atomic_objects
 def restore(actor, frontier, *, reason):
     from . import signals
-    from .frontier import _free, direction, offsets, public_room
+    from .doors import declared, equivalent
+    from .frontier import _free, direction, public_room
     from .services import _exit_data, _text, audit
 
     begin_write()
@@ -289,14 +292,15 @@ def restore(actor, frontier, *, reason):
         raise ValidationError("Restoring the frontier would exceed the hard door limit.")
     for data in saved["exits"]:
         exit = ObjectDB.objects.filter(pk=data["id"]).first()
-        if not exit or _exit_data(exit) != {**data, "source": None}:
+        if not exit or not equivalent(_exit_data(exit), {**data, "source": None}):
             raise ValidationError("A preserved route changed; staff repair is required.")
         for endpoint in (data["source"], data["target"]):
             if endpoint not in room_ids:
                 public_room(ObjectDB.objects.filter(pk=endpoint).first())
         source = ObjectDB.objects.get(pk=data["source"])
-        if data["name"].casefold() in offsets():
-            _free(source, data["name"])
+        label = declared(exit)
+        if label:
+            _free(source, label)
             if apps.is_installed("evennia_maps"):
                 from evennia_maps.models import RoomTile
 
@@ -304,7 +308,7 @@ def restore(actor, frontier, *, reason):
                     RoomTile.objects.select_related("plane").filter(room_id=pk).first()
                     for pk in (data["source"], data["target"])
                 )
-                offset = direction(data["name"])
+                offset = direction(label)
                 if (
                     not a
                     or not b

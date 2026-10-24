@@ -4,8 +4,7 @@
 # its contrib's lines; the sweep fails on an entry that matches nothing.
 # Add a line only for a deliberate, reviewed exception, never to land new syntax.
 
-evennia_building json +build
-evennia_building pipe +build
+# Remaining Building exceptions are staff-only; player commands have no exceptions.
 evennia_building positional-chain +build
 evennia_building semicolon +build
 evennia_building semicolon-parse +build
