@@ -6,7 +6,6 @@
 
 - Combat, Party and Boss Check commands follow current NPC puppet state and identify the portrayal. Full puppet cmdsets include installed combat/Party commands.
 
-
 ## 0.2.1
 
 - Register the standalone `+challenge` command and retain the existing refusal to manage challenges during virtual NPC portrayal.

@@ -385,8 +385,9 @@ they're ignored. To restate one for your game, add a page with the same key to
 
 `+moves` owns free revisioned Signature authoring independently of combat.
 Enable `RP_CHARGEN_MOVES_REVEALED` to expose the command in `ChargenCmdSet`.
-Use `/create name=JSON`, `/edit key=JSON`, `/equip key`, `/unequip key` and
-`/archive key`. Defaults permit 100 library entries and 10 equipped moves
+Author through a private draft (see "Signature drafts and combat locks"
+below); `/equip key`, `/unequip key` and `/archive key` act on saved library
+keys. Defaults permit 100 library entries and 10 equipped moves
 (`RP_CHARGEN_MOVE_LIBRARY_LIMIT`, `RP_CHARGEN_MOVE_EQUIPPED_LIMIT`). Equipped
 edits obey scene locks and `SIGNATURE` build-change guards. Unequipped
 library authoring does not change a combat snapshot. Keys are never reused.
@@ -416,9 +417,7 @@ server reload clears it. The reply names the ability being changed.
 `+chargen/revoke <character>=<ability>[/<tag>]` removes without a refund;
 `+chargen/refund <character>=<ability>[/<tag>]` removes and refunds recorded payments.
 Ability commands accept one switch (including unique prefixes) and use `/`
-between ability and tag. Colon and equals-tag forms are refused. Signature Move
-authoring will receive its draft flow with the combat command changes.
-
+between ability and tag. Colon and equals-tag forms are refused.
 
 ## Signature drafts and combat locks
 

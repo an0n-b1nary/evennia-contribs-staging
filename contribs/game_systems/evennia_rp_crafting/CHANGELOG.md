@@ -6,7 +6,6 @@
 
 - Build-lock refusals name the combat correction commands while combat owns the lock.
 
-
 ## 0.12.0 — 2026-10-23
 
 ### Breaking
