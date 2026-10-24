@@ -7,6 +7,7 @@ only its explicitly supplied disposable game's test settings.
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
 from importlib.util import find_spec
@@ -36,8 +37,8 @@ def main(argv=None):
     game = args.game_dir.resolve()
     if not (game / "server/conf/settings.py").is_file():
         parser.error("Supply an initialized disposable game directory")
-    launcher = str(Path(sys.executable).with_name("evennia"))
-    if not Path(launcher).is_file():
+    launcher = shutil.which("evennia")
+    if launcher is None:
         parser.error("evennia is not on PATH")
     (game / "server/conf/combat_test_settings.py").write_text(
         "from server.conf.settings import *\n"
