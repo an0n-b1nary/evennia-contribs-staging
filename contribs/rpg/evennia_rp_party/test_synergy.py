@@ -491,6 +491,18 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         with self.assertRaisesRegex(CombatError, "superseded"):
             services.surge(self.char1, [self.char2], operation_id="surge-retry")
 
+    def test_formation_is_case_insensitive_and_names_the_cover_commands(self):
+        from .commands import CmdParty
+
+        self.call(CmdParty(), "/formation Back", "Party formation: back.")
+        fight = combat.open_fight(self.char1.location)
+        summary = fight.entries.latest("sequence").summary
+        self.assertIn("+party/coveron or +party/coveroff", summary)
+        self.assertNotIn("back=on", summary)
+        self.call(CmdParty(), "/coveron", "Party formation: back.")
+        state = combat.state_for(self.char1)
+        self.assertTrue(rules.member(state, self.char1.pk)["cover"])
+
     def test_frozen_pause_other_pc_and_auto_act_do_not_spend(self):
         before = combat.state_for(self.char1)
         for settings in ({"RP_PARTY_FROZEN": True}, {"RP_PARTY_REVEALED": False}):

@@ -61,7 +61,7 @@ def change(
                 permission = "on" if rules.member(state, subject.pk).get("cover") else "off"
                 combat.notice(
                     state,
-                    f"Back-row Cover is {permission}; use +party/formation back=on or =off to choose. It permits same-party Front members to take an unaccepted attack.",
+                    f"Back-row Cover is {permission}; use +party/coveron or +party/coveroff to choose. It permits same-party Front members to take an unaccepted attack.",
                 )
         elif operation == "rename":
             rules.rename(state, subject.pk, combat.plain(argument, 61))

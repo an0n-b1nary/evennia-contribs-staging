@@ -76,6 +76,8 @@ class CmdParty(CombatCommand):
                 )
             return
         cover = None
+        if op == "formation":
+            text = text.lower()
         if op in ("coveron", "coveroff"):
             cover = op == "coveron"
             text = rules.position(combat.state_for(self.caller), str(self.subject.pk))
