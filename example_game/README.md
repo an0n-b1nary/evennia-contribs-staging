@@ -1657,11 +1657,11 @@ seeding. `world.ruleset.COMBAT_ABILITIES` holds neutral demonstration entries
 for every combat 0.2 Ability and two Flaws (Telegraph, Off-Balance), seeded
 only when combat is installed; `RP_RULES_EFFECT_KINDS` registers
 `combat_rule` beside `combat_bonus`. Revive an incapacitated ally with a Heal
-Assist they accept, then `+combat/recover`. `+combat/join side` explicitly accepts. See `/guide/combat/` and
+Assist they accept, then `+pass`. `+combat/join side` explicitly accepts. See `/guide/combat/` and
 `help +combat`; `+combatstory` is available to ordinary players, and its
 changes to another player's character wait for that player's
 `+combat/accept`. Use the Market's permitted NPC templates with
-`/template blueprint=side,boss,cap` for an attributed practice opponent. NPC
+`/template blueprint/boss=side` for an attributed practice opponent. NPC
 stat blocks include all combat roles. `+combatstory/shelve` sets a fight aside
 so the room and everyone's sheets are free; `/unshelve number` brings it back.
 
@@ -1691,21 +1691,21 @@ party on the practice side; no character is enrolled automatically. Join
 the fight with `+combat/join practice`, inspect `+party`, then join the
 displayed party identity. Another party or unpartied participation is valid.
 
-Members choose Front, Back or Flex. Use `+party/formation back=on` to permit
-Cover, then a same-party Front can `+party/cover defender=token,resist` or
+Members choose Front, Back or Flex. Use `+party/formation back`, then `+party/coveron` to permit
+Cover, then a same-party Front can `+cover/resist defender=token` or
 preview with `/coverodds`. Cover and ordinary combat use the same frozen
 packet inputs. Rally/Rattle entries are independent per supporter; Encore
 spreads Spirit without spreading healing or revival. `+party/chat message`
 is transient OOC delivery to connected members in the room, without Scene
-entries, poses or RP credit. Authorized NPCs use `/as NPC=...`.
+entries, poses or RP credit. After `+npc/puppet`, the ordinary commands act as the NPC and identify the portrayal.
 
 The settings block exposes provisional coefficients for host calibration.
 Completed exchanges, hostile damage and outgoing Empower earn shared
-Synergy. `+party/surge enemy=balanced` spends 100 to boost one packet's
-primary output by 25%; `+party/surgepress` selects a later Burst hit. Support
+Synergy. `+surge`, then `+attack enemy=balanced`, spends 100 to boost one packet's
+primary output by 25%; `+surge`, then `+press`, selects a later Burst hit. Support
 and multi-target options are documented in the Party guide. Reservations,
 refunds and once-per-personal-turn use share combat's transaction and journal.
-Auto-Act never spends. Party 0.2 adds manual `+bosscheck`: an authorized
+Auto-Act spends no Synergy unless you explicitly armed +surge. Party 0.2 adds manual `+bosscheck`: an authorized
 Boss Mode x2+ controller can issue Tank, DPS, Support, Pressure, Special or
 Contest challenges to one or several named opposing Parties. Preview then
 explicitly resolve, acknowledging pacing warnings with a public reason.

@@ -42,7 +42,8 @@ class CmdNPC(SingleSwitchMixin, MuxCommand):
 
     Templates are open to play; unique NPCs need owner permission and can
     only appear once. Virtual portrayal redirects pose, say, emit, semipose
-    and +test while keeping you on your character. Movement or revocation
+    and +test while keeping you on your character. Installed combat, Party
+    and Boss Check commands follow the same puppet state. Movement or revocation
     ends it. Full puppeting requires a host opt-in. All NPC portrayal names
     the responsible player. /unpuppet and /despawn work while frozen/hidden.
     """
@@ -396,3 +397,11 @@ class NPCFullCmdSet(NPCCmdSet):
         self.add(CmdLook)
         self.add(CmdInventory)
         self.add(CmdHelp)
+        if apps.is_installed("evennia_rp_combat"):
+            from evennia_rp_combat.commands import CombatCmdSet
+
+            self.add(CombatCmdSet)
+        if apps.is_installed("evennia_rp_party"):
+            from evennia_rp_party.commands import PartyCmdSet
+
+            self.add(PartyCmdSet)

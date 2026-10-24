@@ -98,14 +98,14 @@ class TestEncounterEffects(SimpleTestCase):
         effects.stagger(self.state, 1, 30, "recovery")
         row["recovering"] = True
         row["pose"] = False
-        engine.recover(self.state, 1)
+        engine.pass_action(self.state, 1)
         self.assertTrue(row["turn_skip"]["pending"])
         self.assertEqual(row["actions_spent"], 2)
         self.attack()
         self.assertEqual(row["turns"], 2)
         row["recovering"] = True
         row["pose"] = False
-        engine.recover(self.state, 1)
+        engine.pass_action(self.state, 1)
         self.assertIsNone(row["turn_skip"])
 
     def test_damage_and_resist_effects_are_idempotent_and_zero_targets_ineligible(self):
@@ -133,6 +133,6 @@ class TestEncounterEffects(SimpleTestCase):
         before = deepcopy(old)
         upgraded = upgrade(old)
         self.assertEqual(old, before)
-        self.assertEqual(upgraded["schema"], 4)
+        self.assertEqual(upgraded["schema"], 5)
         self.assertEqual(upgraded["participants"]["1"]["build"], old["participants"]["1"]["build"])
         self.assertEqual(upgrade(upgraded), upgraded)

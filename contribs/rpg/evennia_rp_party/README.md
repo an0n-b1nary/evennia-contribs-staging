@@ -1,7 +1,7 @@
 # evennia-rp-party
 
-Optional tactical parties within a combat side. Preview release **0.2.4**;
-Python 3.12+ and Evennia 6.0+. Combat 0.2.5+ is required for atomic resource
+Optional tactical parties within a combat side. Preview release **0.3.0**;
+Python 3.12+ and Evennia 6.0+. Combat 0.3.0+ is required for atomic resource
 reservations and public transition notices. No new models, migrations or typeclass mixins.
 
 ## Install
@@ -22,7 +22,7 @@ Merge this entry into any existing registry. Combat must also be revealed.
 Commands and player enrollment do not require a persistent Group, owner or
 formal role. Parties do not change sides, assessment denominators, personal
 turns, build locks or existing consent. See `help +party` and the included
-Party guide. `+party/.../as NPC=...` follows combat's NPC controller permissions.
+Party guide. After `+npc/puppet`, ordinary Party and Boss Check commands act as the NPC and identify the portrayal.
 
 ## First release
 
@@ -58,7 +58,7 @@ Dispirit Rattles the opponent's party. Different supporters stack. Ordinary
 Spirit output before resource caps qualifies; positive effective healing
 also qualifies once. No rider on a failed/zero-effect/canceled operation.
 
-Entries expire on the source's next completed exchange/recovery, replaced
+Entries expire on the source's next completed exchange or pass, replaced
 by a newly earned entry afterward. A finished source's final entry expires
 after the affected party's next completed exchange. Fade suppresses it and
 does not restart clocks. Sources and affected parties must be available.
@@ -87,7 +87,7 @@ A Burst earns one completion award, with damage awards per hit and at most
 one Empower award. Successful Overpower counterdamage rewards the actual
 victim's party. Attributed hostile Poison on an ordinary own action also
 earns on actual loss. Recovery, accepted reactions alone, cancellations,
-self-costs, OOC corrections, joining and retries earn nothing. Recovery's
+self-costs, OOC corrections, joining and retries earn nothing. Passing's
 Poison tick earns nothing. Helpful healing/revival is not itself damage gain.
 
 The cap is `100 × min(counted members, 5)`. Joining grants nothing and
@@ -97,18 +97,14 @@ If everybody becomes unavailable, the retained balance freezes. Returning
 clamps before spending; dissolution discards the balance. Exact fractions
 are retained, so small hits do not lose their quarter-point awards.
 
-`+party/surge enemy=balanced` spends 100 to add 25 percentage points to one
-packet's primary output. The first named target is the default; a Boss can
-use `+party/surge enemy,other=balanced;target=other`. Select support with
-`+party/surge ally=assist`, a named Heal with `;action=assist`, or
-`+party/surge enemy=dispirit`. `;action=spell` selects Spell. Attack options
-`rps=...`, `domain=...`, `burst`, `empower`, `public` and revival `waive`
-follow ordinary combat legality. `/as NPC=targets;move;options` directs a
-permitted NPC. `+party/surgepress [empower]` buys the next hit of an open
-Burst; ordinary `+combat/press` never carries the previous hit's Surge.
-Use `+party/surge/improv names=JSON[;options]` for an improvised move,
-including a Heal; JSON wording may contain semicolons. Example:
-`+party/surge/improv ally={"action":"assist","effects":["heal"]};empower`.
+Arm `+surge` before an ordinary `+attack`, `+spell`, `+assist`, `+dispirit`,
+`+improv` or `+press`. It spends 100 Synergy to add 25 percentage points to one
+packet's primary output. `+surge target` selects one of the declared targets;
+without a target it boosts the first. `+surge/off` disarms it. Cancellation
+refunds its reservation and preserves the armed flag; passing preserves it
+without spending. An executed hit or support packet consumes it. Other armed
+modifiers can apply to the same action. After `+npc/puppet`, ordinary commands
+act as the NPC and identify that portrayal.
 
 Surge and Party Damage Boost add in one damage bucket after ordinary attack
 Empower's Power/Accuracy tiers; Surge grants no Accuracy. Support Empower
@@ -135,7 +131,7 @@ remain future work.
 
 ## Manual Boss Checks
 
-`+bosscheck Parties=type;difficulty=balanced` offers a narrative challenge
+`+bosscheck/new Parties`, `/type tank`, `/difficulty balanced`, then `/finish` offers a narrative challenge
 to named opposing Parties (IDs or exact names separated by commas). Types
 are Tank, DPS, Support, Pressure, Special and optionally Contest. A Boss
 Mode x2+ character issues between its exchanges without spending an action
@@ -163,12 +159,13 @@ ones; `+combat/journal` keeps each issue, cancellation and result.
 Use `/preview id` to inspect the current requirement, roster/progress,
 potential damage and resolution token, then `/resolve id=token` to commit.
 Changes invalidate the preview. Uneven/incomplete progress, missing Contest
-responses and unreachable/already-met requirements warn; `;ack=public reason`
+responses and unreachable/already-met requirements warn; a trailing ` # public reason` on resolution
 acknowledges warnings. Accepted unresolved exchanges cannot be bypassed.
-Tank draws occur only on commitment. Special needs `;requirement=...;hint=...`
-when issued and explicit `;pass` or `;fail` on preview and resolve. The
+Tank draws occur only on commitment. Special drafts need `/requirement text` and `/hint text`. Choose the verdict
+with `/preview id=pass` or `/preview id=fail`, then `/resolve id=token`.
+The token binds that verdict; a changed verdict requires another preview. The
 controller interprets roleplay generously; nobody's prose is machine-scored.
-Special resolution requires `;ack=public explanation` for that judgment.
+Special resolution requires a trailing ` # public explanation` for that judgment.
 
 Tank distributes declared damage across the current Front, with automatic
 ordinary Resist (physical, Accuracy/Spirit zero, no domain/element/RPS).
@@ -191,8 +188,8 @@ damage feeds normal assessment, Transcendence and hostile-damage Synergy,
 but Check Backlash never satisfies another DPS Check.
 
 Install `evennia-rp-party[contest]` and add `evennia_rp_contest` to the host's
-apps for Contest Checks. Declare `;approaches=stat,stat[/tag][;roll=rating]`.
-`/roll id=stat[/tag]` is one free, bound response; `/allow id=member;stat[/tag]`
+apps for Contest Checks. Set `/approaches stat,stat/tag` and `/rollrating rating` on the draft.
+`/roll id=stat[/tag]` is one free, bound response; `/allow id/member=stat[/tag]`
 allows the boss to approve an alternative **before** rolling. Individual
 failures take damage even if the quota is met; meeting it grants group
 Backlash/Stagger, with no second party-wide failure wave. Missing responses

@@ -12,7 +12,7 @@ from fractions import Fraction as F
 
 from . import arithmetic as math
 from . import partners
-from .data import Build, CombatError, Move, ReactionView
+from .data import TIERS, Build, CombatError, Move, ReactionView
 from .modifiers import bonus as passive
 from .modifiers import move_cost, rps_shift, rules
 from .state import SCHEMA
@@ -92,9 +92,7 @@ def active(state, ident):
     if row["status"] != "active" or row["hp"] <= 0 or row.get("return_required"):
         raise CombatError("That participant is Faded, withdrawn or incapacitated.")
     if row.get("recovering"):
-        raise CombatError(
-            f"{row['name']} is recovering: they take +combat/recover before anything else."
-        )
+        raise CombatError(f"{row['name']} is recovering: they take +pass before anything else.")
     if row["correction"]:
         raise CombatError("Relock the corrected build before combat progress.")
     if row.get("absent"):
@@ -178,6 +176,7 @@ def join(state, ident, name, side, build, *, turn_limit=4, boss=1, auto=False, n
         "turn_skip": None,
         "partner_subjects": {},
         "actions_spent": 0,
+        "armed": {},
     }
     state["participants"][key] = row
     return row
@@ -399,6 +398,12 @@ def declaration(
     progress(state)
     domain_effects = domain_effects or {}
     actor = active(state, ident)
+    used = action_flags(actor, move, bet, state=state, targets=targets)
+    burst = burst or bool(used.get("burst"))
+    empower = empower or bool(used.get("empower"))
+    public = public or bool(used.get("callshot"))
+    waive = waive or bool(used.get("waive"))
+    partner_requests = surge_request(used, targets, partner_requests)
     if actor["incoming"]:
         raise CombatError("Resolve or cancel every incoming attack before acting.")
     if actor["outgoing"] or actor["pose"]:
@@ -472,6 +477,7 @@ def declaration(
         "canceled": [],
         "draw": draw,
         "bet": bet,
+        "armed": used,
         "burst": burst,
         "hit": 1,
         "empower": empower,
@@ -567,37 +573,42 @@ def retract(state, ident):
     cancel(state, exchange["targets"][0], f"{exchange['id']}:{exchange['hit']}")
 
 
-def recover(state, ident):
-    """The revived participant's one action of recovery.
-
-    It advances the condition clock once, ticking Poison and expiring
-    conditions as any own action would, and spends one action of the
-    personal allowance. It grants no Reserves, Spirit, Transcendence or
-    Resist recovery, and has no outgoing packet.
-    """
+def pass_action(state, ident):
+    """Spend one action, advancing conditions without an exchange or rewards."""
     progress(state)
     row = participant(state, ident)
-    if not row.get("recovering"):
-        raise CombatError("Only a revived participant takes a recovery action.")
-    if row["status"] != "active" or row["hp"] <= 0:
+    if row["status"] != "active" or row["hp"] <= 0 or row.get("return_required"):
         raise CombatError("That participant is Faded, withdrawn or incapacitated.")
     if row["correction"] or row.get("absent"):
-        raise CombatError("Relock your build and be present before recovering.")
+        raise CombatError("Relock your build and be present before passing.")
+    if row["incoming"]:
+        raise CombatError("Resolve or cancel every incoming attack before acting.")
     if row["outgoing"] or row["pose"]:
         raise CombatError(
             "Finish your outgoing exchange and acknowledge its RP with +combat/posed."
         )
-    if row["turns"] >= row["turn_limit"]:
-        raise CombatError(
-            "Your personal Turn Limit is exhausted, so you cannot recover in this fight."
-        )
+    if row["turns"] >= row["turn_limit"] or row["actions_left"] <= 0:
+        raise CombatError("Your personal Turn Limit is exhausted.")
     from .effects import consume_skip, initiating_executed
 
+    opening(state)
     initiating_executed(row)
     row["recovering"] = False
+    row["pressure"] = math.clamp(
+        0,
+        30,
+        row["pressure"]
+        - math.rounded(math.rule("pressure_recovery"))
+        - math.rounded(
+            passive(Build.from_dict(row["build"]), "exchange_end", "pressure_recovery", "pass")
+        ),
+    )
     row["clock"] += 1
     if value(row, "poisoned"):
-        harm(row, value(row, "poisoned"))
+        # Passing grants no resources, including damage-taken rewards.
+        row["hp"] = max(0, row["hp"] - value(row, "poisoned"))
+        if row["hp"] == 0:
+            row["return_required"] = True
     row["conditions"] = {k: v for k, v in row["conditions"].items() if v["expires"] > row["clock"]}
     row["actions_left"] -= 1
     row["actions_spent"] += 1
@@ -605,9 +616,44 @@ def recover(state, ident):
         row["turns"] += 1
         row["actions_left"] = row["allowance"]
         consume_skip(row)
-    row["pose"] = not row["auto"]
-    partners.emit(state, partners.Event("recovery", row["id"], "", 0))
+    row["pose"] = True
+    partners.emit(state, partners.Event("pass", row["id"], "", 0))
     settle(state)
+
+
+def consume_armed(row, used):
+    """Consume only flags frozen for an executed packet, preserving later edits."""
+    armed = row.setdefault("armed", {})
+    for key, value in used.items():
+        if armed.get(key) == value:
+            armed.pop(key, None)
+
+
+def action_flags(row, move, bet, *, state, targets):
+    """Choose eligible flags; ineligible modifiers remain armed."""
+    armed = available_armed(state, row)
+    eligible = {"empower", "surge"}
+    if move.action in ("attack", "spell"):
+        if len(targets) == 1:
+            eligible.add("burst")
+        if bet:
+            eligible.add("callshot")
+    if (
+        move.action == "assist"
+        and "heal" in move.effects
+        and any(revivable(participant(state, t)) for t in targets)
+    ):
+        eligible.add("waive")
+    return {key: value for key, value in armed.items() if key in eligible}
+
+
+def surge_request(used, targets, requests):
+    if "surge" not in used:
+        return requests
+    target = used["surge"] or str(targets[0])
+    if target not in [str(t) for t in targets]:
+        raise CombatError("The armed Surge target must be one of this action's targets.")
+    return {**(requests or {}), "party": {"kind": "surge", "target": target}}
 
 
 def get_exchange(state, token):
@@ -635,6 +681,22 @@ def reaction(
         raise CombatError("No unaccepted incoming reaction matches that token.")
     if exchange.get("revival"):
         raise CombatError("That is a revival offer: +combat/accept or /decline it.")
+    used = {
+        key: value
+        for key, value in available_armed(state, defender).items()
+        if kind == "overpower" and key in ("counter", "empower")
+    }
+    empower = empower or bool(used.get("empower"))
+    if "counter" in used:
+        key = used["counter"]
+        if key in TIERS:
+            counter = Move(key=key, name=key.title(), power=TIERS[key][0], accuracy=TIERS[key][1])
+        else:
+            counter = next(
+                (m for m in Build.from_dict(defender["build"]).moves if m.key == key), None
+            )
+            if counter is None:
+                raise CombatError("The armed counter is not in your frozen loadout.")
     counter = counter or Move()
     if kind not in partners.reactions(exchange, defender["id"]):
         raise CombatError("Choose an available reaction; intercepted packets cannot be Evaded.")
@@ -652,7 +714,7 @@ def reaction(
     )
     domain_effect = (domain_effects or {}).get(chosen_domain, "")
     if domain_effect == "read":
-        raise CombatError("Use +combat/read before selecting your reaction.")
+        raise CombatError("Use +react/read before selecting your reaction.")
     if chosen_domain and defender["id"] in exchange.get("readers", ()):
         raise CombatError("Read already used this reaction's domain effect.")
     if chosen_domain and (
@@ -700,6 +762,7 @@ def reaction(
         defender["conditions"].pop("op_penalty", None)
     exchange["reactions"][defender["id"]] = {
         "kind": kind,
+        "armed": used,
         "counter": counter.as_dict(),
         "empower": empower,
         "domain_effect": domain_effect,
@@ -895,6 +958,8 @@ def resolve_exchange(state, exchange):
         initiating_executed(actor)
         defender = participant(state, target_id)
         choice = exchange["reactions"][target_id]
+        consume_armed(actor, exchange.get("armed", {}))
+        consume_armed(defender, choice.get("armed", {}))
         defense_build = Build.from_dict(defender["build"])
         frozen_defender = {"conditions": choice["conditions"]}
         counter = Move.from_dict(choice["counter"])
@@ -1295,6 +1360,7 @@ def support_exchange(state, exchange, *, allowed=None):
     actor = participant(state, exchange["actor"])
     actor_build = Build.from_dict(actor["build"])
     move = Move.from_dict(exchange["move"])
+    consume_armed(actor, exchange.get("armed", {}))
     for target_id in exchange["targets"]:
         target = participant(state, target_id)
         packet = partners.modifiers(exchange, target_id)
@@ -1413,6 +1479,13 @@ def press(state, ident, draw, *, stop=False, empower=False, partner_requests=Non
         finish_exchange(state, exchange)
         return
     active(state, ident)
+    used = {
+        key: value
+        for key, value in available_armed(state, actor).items()
+        if key in ("empower", "surge")
+    }
+    empower = empower or bool(used.get("empower"))
+    partner_requests = surge_request(used, exchange["targets"], partner_requests)
     if actor["incoming"]:
         raise CombatError("Clear incoming reactions before pressing the Burst.")
     move = Move.from_dict(exchange["move"])
@@ -1437,6 +1510,7 @@ def press(state, ident, draw, *, stop=False, empower=False, partner_requests=Non
     if empower:
         actor["transcendence"] -= 100
     exchange["empower"] = empower
+    exchange["armed"] = used
     exchange["hit"] += 1
     exchange.update(
         phase="waiting",
@@ -1648,3 +1722,15 @@ def reduce_cap(state, ident, limit):
     if type(limit) is not int or not max(1, row["turns"]) <= limit <= row["turn_limit"]:
         raise CombatError("Choose a reduced cap no lower than turns already used.")
     row["turn_limit"] = limit
+
+
+def available_armed(state, row):
+    """Keep a committed modifier reserved for its first pending packet only."""
+    reserved = set()
+    for exchange in state["exchanges"].values():
+        if exchange["phase"] != "waiting":
+            continue
+        if exchange["actor"] == row["id"]:
+            reserved.update(exchange.get("armed", {}))
+        reserved.update(exchange.get("reactions", {}).get(row["id"], {}).get("armed", {}))
+    return {k: v for k, v in row.get("armed", {}).items() if k not in reserved}

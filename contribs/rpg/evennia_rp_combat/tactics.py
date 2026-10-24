@@ -69,13 +69,17 @@ def validate(values):
     if "preferred_moves" in values and (
         not isinstance(values["preferred_moves"], list)
         or len(values["preferred_moves"]) > 10
-        or any(type(v) is not str or len(v) > 64 for v in values["preferred_moves"])
+        or any(
+            type(v) is not str or not v or len(v) > 64 or slugify(v) != v
+            for v in values["preferred_moves"]
+        )
+        or len(set(values["preferred_moves"])) != len(values["preferred_moves"])
     ):
         raise CombatError("Preferred moves must be a list of at most ten move keys.")
 
 
 @transaction.atomic
-def save(character, name, **values):
+def save(character, name, *, select=True, **values):
     from evennia.objects.models import ObjectDB
 
     from .models import Tactics
@@ -92,9 +96,63 @@ def save(character, name, **values):
     if not Tactics.objects.filter(character=character, key=key).exists() and Tactics.objects.filter(
         character=character
     ).count() >= conf.get("RP_COMBAT_TACTICS_LIMIT"):
-        raise CombatError("Your Tactics library is full; edit an existing preset.")
-    Tactics.objects.filter(character=character, active=True).update(active=False)
-    row, _ = Tactics.objects.update_or_create(
-        character=character, key=key, defaults={"name": name, "active": True, **values}
-    )
+        raise CombatError("Your Tactics library is full; delete or edit an existing preset.")
+    if select:
+        Tactics.objects.filter(character=character, active=True).update(active=False)
+    defaults = {"name": name, **values}
+    if select:
+        defaults["active"] = True
+    row, _ = Tactics.objects.update_or_create(character=character, key=key, defaults=defaults)
     return row
+
+
+@transaction.atomic
+def use(character, name):
+    """Select one owned preset without rewriting it or enabling Auto-Resolve."""
+    from evennia.objects.models import ObjectDB
+
+    from .models import Tactics
+
+    if not runtime.get("RP_COMBAT_TACTICS_REVEALED"):
+        raise CombatError("Tactics are not available yet.")
+    ObjectDB.objects.select_for_update().get(pk=character.pk)
+    row = Tactics.objects.filter(character=character, key=slugify(name)).first()
+    if row is None:
+        raise CombatError("No such preset in your Tactics library.")
+    Tactics.objects.filter(character=character, active=True).update(active=False)
+    row.active = True
+    row.save(update_fields=["active"])
+    return row
+
+
+@transaction.atomic
+def delete(character, name):
+    """Delete one owned preset; removing the active preset restores defaults."""
+    from evennia.objects.models import ObjectDB
+
+    from .models import Tactics
+
+    if not runtime.get("RP_COMBAT_TACTICS_REVEALED"):
+        raise CombatError("Tactics are not available yet.")
+    ObjectDB.objects.select_for_update().get(pk=character.pk)
+    row = Tactics.objects.filter(character=character, key=slugify(name)).first()
+    if row is None:
+        raise CombatError("No such preset in your Tactics library.")
+    row.delete()
+
+
+def set_field(character, name, field, text):
+    """Parse one field; map entries use like key/weight items separated by commas."""
+    text = text.strip()
+    if field == "preferred_moves":
+        value = [part.strip() for part in text.split(",") if part.strip()]
+    elif field == "action_weights":
+        value = {}
+        for part in text.split(","):
+            key, sep, weight = part.strip().partition("/")
+            if not sep or key in value:
+                raise CombatError("Use distinct action/weight entries separated by commas.")
+            value[key] = int(weight)
+    else:
+        value = text
+    return save(character, name, select=False, **{field: value})

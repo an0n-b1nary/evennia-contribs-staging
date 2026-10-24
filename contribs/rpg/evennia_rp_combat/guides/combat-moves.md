@@ -8,10 +8,10 @@ summary: How hard to hit, which reaction to choose, hidden bets, and the resourc
 ---
 Every exchange in a [[combat|fight]] is an attack and an answer to it. This page covers the choices on each side, and the resources that pay for the special ones.
 
-- `+combat/attack <opponent>=<tier>` attacks with a standard tier, and `+combat/spell` casts the same way.
-- `+combat/react <token>=evade|resist|overpower` answers an attack aimed at you.
+- `+attack <opponent>=<tier>` attacks with a standard tier, and `+spell` casts the same way.
+- `+react/resist <token>` (or Evade/Overpower) answers an attack aimed at you.
 - `+combat/odds <token>` estimates how each reaction would go.
-- `+combat/improv <opponent>=<fields>` improvises a one-off move.
+- `+improv <opponent>=<fields>` improvises a one-off move.
 
 ## Attacking
 
@@ -25,7 +25,7 @@ Each attack on you arrives with a token, shown in `+combat`. Answer it with one 
 
 - **Evade** avoids the hit entirely, or turns it into a glancing blow.
 - **Resist** takes the hit and reduces it.
-- **Overpower** answers with a counterattack, trading damage for damage. Add a tier to choose how hard: `+combat/react <token>=overpower,heavy`.
+- **Overpower** answers with a counterattack, trading damage for damage. Add a tier to choose how hard: `+counter heavy`, then `+react/overpower <token>`.
 
 `+combat/odds` shows a neutral estimate. It counts only what you can see, never the attacker's hidden bet.
 
@@ -35,20 +35,20 @@ Each successful Resist adds pressure, and pressure makes your next Resist less e
 
 ## Hidden bets
 
-An attacker can secretly bet that the attack is **reaching**, **penetrating** or **subtle**: add `;rps=reaching` when attacking. Each bet favours one reaction and works against another, so a good guess pays off and a bad one costs. The defender doesn't see the bet. With the right ability equipped, `+combat/read` spends something to read an attack before you choose. Another ability lets an attacker announce the bet with `;public`, making it bite harder. The defender sees it and still chooses freely.
+An attacker can secretly bet that the attack is **reaching**, **penetrating** or **subtle**: use `+attack/reaching` or `+spell/reaching`. Each bet favours one reaction and works against another, so a good guess pays off and a bad one costs. The defender doesn't see the bet. With the right ability equipped, `+react/read` spends something to read an attack before you choose. Another ability lets an attacker announce the bet by arming `+callshot` first, making it bite harder. The defender sees it and still chooses freely.
 
 ## Resources
 
 - **Reserves** pay for special moves and their effects. Standard attacks refill them.
 - **Spirit** makes your attacks more or less effective. An assist raises an ally's, and a dispirit lowers an opponent's.
-- **Transcendence** builds as you act and as you take real damage. When it's full, add `;empower` to improve one action.
-- **Burst:** add `;burst` to start a chain of a few hits, pressed one at a time with `+combat/press`, or ended with `+combat/stop`. A Burst stakes Spirit up front and leaves you exposed, and it can break against Evade or Overpower.
+- **Transcendence** builds as you act and as you take real damage. When it's full, arm `+empower` before the action to improve one action.
+- **Burst:** arm `+burst` before attacking to start a chain of a few hits, pressed one at a time with `+press`, or ended with `+stop`. A Burst stakes Spirit up front and leaves you exposed, and it can break against Evade or Overpower.
 
 ## Stances and effects
 
 A stance is an effect on a move that prepares your next reaction of the matching kind: Evade, Resist or Overpower. It costs some Accuracy and a little more Reserve. The bonus is largest when your attack beats the target's defence, and much smaller when they defend. An unused stance expires after your next action. Different stances can be ready at once.
 
-If your game gives domains effects in a fight, add `;domain=<key>` to use one. You get one domain effect per exchange.
+If your game gives domains effects in a fight, append `/<domain>` to the move value to use one. You get one domain effect per exchange.
 
 ## Abilities
 

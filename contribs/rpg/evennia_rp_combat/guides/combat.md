@@ -11,8 +11,8 @@ Combat gives a fight in your RP a shared set of rules, so everyone can see what 
 
 - `+combat` shows the fight: everyone's Vitality and turns, attacks waiting on you, and your own resources.
 - `+combat/join <side>` joins a fight on a side. Anyone can start one with `+combat/setup`.
-- `+combat/attack <opponent>=<move>` attacks. `+combat/assist <ally>` and `+combat/dispirit <opponent>` help or unsettle.
-- `+combat/react <token>=<reaction>` answers an attack aimed at you.
+- `+attack <opponent>=<move>` attacks. `+assist <ally>` and `+dispirit <opponent>` help or unsettle.
+- `+react/<reaction> <token>` answers an attack aimed at you.
 - `+combat/fade` steps out of the fight, keeping your place.
 
 ## Joining
@@ -35,7 +35,7 @@ Before your own next action, answer every attack waiting on you. You can react w
 
 At 0 Vitality you're incapacitated. You can't act or react, and attacks you hadn't answered yet are voided, with their cost refunded to the attacker.
 
-An ally can revive you with a healing assist. The offer waits in `+combat` until you `+combat/accept` or `+combat/decline` it. `+combat/revive accept` accepts allies' revivals automatically. Once revived, `+combat/recover` spends one action getting back up, and nobody can target you until you do. Some healers can spare you that. Poison and other conditions keep running, so a weak revival can be undone.
+An ally can revive you with a healing assist. The offer waits in `+combat` until you `+combat/accept` or `+combat/decline` it. `+combat/revive accept` accepts allies' revivals automatically. Once revived, `+pass` spends one action getting back up, and nobody can target you until you do. Some healers can spare you that. Poison and other conditions keep running, so a weak revival can be undone.
 
 ## Stepping out
 

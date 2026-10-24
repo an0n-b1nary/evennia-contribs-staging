@@ -1,6 +1,6 @@
 # evennia-rp-combat
 
-> **Preview (0.2.4, Pre-Alpha).** Pin an exact commit. Initial coefficients
+> **Preview (0.3.0, Pre-Alpha).** Pin an exact commit. Initial coefficients
 > are a playtesting baseline; no human balance result is claimed.
 
 Consent-based room combat for Evennia 6.x: personal turns, queued reactions,
@@ -23,7 +23,7 @@ seven stat keys. Generic `DictStatSource`/`StatSource` inputs work without
 chargen. A custom dotted `RP_COMBAT_SOURCE` may return an immutable
 `evennia_rp_combat.data.Build` (or None to use the normal adapter).
 
-Chargen 0.4 supplies playable sheets, equipped Abilities/Edge and revisioned
+Chargen 0.6 supplies playable sheets, equipped Abilities/Edge and revisioned
 Signatures. Configure `RP_CHARGEN_MOVE_VALIDATOR` to
 `evennia_rp_combat.integrations.validate_move` when combat is installed.
 Its free authoring library remains usable without combat. NPCs use blueprint
@@ -37,9 +37,9 @@ Absent partners are checked through the app registry before importing them.
 +combat/setup practice
 +combat/join one
 +combat/join two                  (the second player)
-+combat/attack opponent=balanced;rps=reaching
++attack/reaching opponent=balanced
 +combat/odds 2.1:1                (use the actual incoming token)
-+combat/react 2.1:1=resist
++react/resist 2.1:1
 +combat/posed
 +combat/act
 ```
@@ -98,21 +98,21 @@ cannot act or accept a new reaction, and every attack they hadn't answered is
 voided with a refund (a voided Burst opener refunds its ante; a later hit
 ends the chain as a stop). Accepted reactions still resolve.
 
-An ally may revive them with a Heal (`+combat/assist name=move`, one
+An ally may revive them with a Heal (`+assist name=move`, one
 incapacitated target). The offer waits in their queue until they
 `+combat/accept` or `/decline` it; `+combat/revive accept` accepts allies'
 revivals automatically, and `+combat/retract` withdraws an unaccepted offer.
 Unresolved offers refund the healer. A Heal that restores nothing doesn't
 revive. Revival is earned healing in the assessment, with the usual costs and
-taper. The revived participant then takes `+combat/recover`: one action from
+taper. The revived participant then takes `+pass`: one action from
 their allowance that ticks Poison and expires conditions once, with no
 action rewards. Until then they can neither act nor be targeted. Medicine's
-Treat on the reviving Heal may instead waive recovery (`;domain=medicine;waive`),
+Treat on the reviving Heal may instead waive recovery (arm `+waive`, then use `+assist ally=move/medicine`),
 without cleansing. Someone revived after using their whole Turn Limit gets the
 healing but cannot recover or act again, and is told so before accepting.
 
 A withdrawn character, or anyone the table agrees to bring back OOC, returns
-only after a visible `+combatstory/requestreturn name=Vitality;reason` and
+only after a visible `+combatstory/requestreturn name=Vitality # reason` and
 their own `+combat/accept` (or `/decline`). That restored Vitality adds
 exposure, so it never erases a side's earlier loss; turns, resources,
 conditions and the frozen build are retained. A Faded participant at 0 may
@@ -127,20 +127,19 @@ rejoins with `+combat/join` and anyone resumes.
 
 ## Automation and storytelling
 
-`+tactics/save name=JSON` creates/selects a private preset. Defensive
-`appetite` (cautious/balanced/bold) minimizes neutral expected loss with a
-counter/reserve tradeoff. Independent `rps_appetite` makes uniform random
-bets 0/35/75 percent of eligible Auto-Acts. Policies see own build and public
-incoming facts or eligible public target Vitality, never hidden opponent
-stats, reaction commitments, RPS bets or draws.
+`+tactics/set Careful/appetite=cautious` edits a private preset without
+selecting it. `+tactics/use Careful` selects it; `+tactics/delete Careful`
+frees its slot. Deleting the active preset restores Balanced defaults.
+Preferred moves are comma-separated keys; weights are like `standard/70,special/30`.
+These operations preserve Auto-Resolve and already committed reactions.
 
 `+combat/auto on` explicitly enables incoming Auto-Resolve. `+combat/act`
 explicitly requests one outgoing exchange, useful for accessibility as well
 as NPCs. Neither enables a scheduler or creates RP poses. Auto-Act never
 selects Burst or Empower. `front_first` falls back to random without Party.
 
-`+combat` acts only as your own character (or, with `/npc`, the NPC you
-control). `+combatstory` is the storyteller's toolbox, open to every player
+`+combat` and the dedicated action commands act as your currently
+controlled character or NPC after `+npc/puppet`. Every response identifies the NPC. `+combatstory` is the storyteller's toolbox, open to every player
 and publicly attributed. Anyone may pause at any time. A storyteller change
 to another player's character (Vitality, Spirit, conditions, a reduced
 Turn Limit, a return) is a numbered request that player sees in `+combat` and
@@ -148,9 +147,9 @@ answers with `+combat/accept n` or `/decline n`; changes to NPCs you may
 direct apply at once. `/end` needs every present, active player character's
 agreement (the proposer's is implied); one decline withdraws it. A pause for
 reconciliation after staff rollback is resumed by staff. NPC ownership and
-control permissions still apply. `/template blueprint=side,boss,cap` attaches a
+control permissions still apply. `/template blueprint/boss=side` attaches a
 reusable template; `/act npc,npc` runs at most one action per permitted NPC in
-stable order. Ordinary `/npc` combat switches address the controlled NPC,
+stable order. Ordinary combat commands address the currently controlled NPC,
 leaving the controller's PC separate. Boss Checks and Party formation/cover
 are not implemented in 0.1; nonempty Boss Check schedules are refused.
 
@@ -208,7 +207,7 @@ add up and are clamped again. Rules that change a defender's chances or
 mitigation (`deflect`, `stoneskin`, `finesse`, `desperate_counter`) apply
 inside `arithmetic.resolve`, so odds previews and Auto-Resolve use exactly
 what resolution does. The engine applies `rps` (by bet, or every bet; negative
-values make a Flaw), `calling_the_shot` (the `;public` option; only a public
+values make a Flaw), `calling_the_shot` (the armed `+callshot` flag; only a public
 bet ever reaches a reaction view), `tactician`, `measured_tempo`, `explosive`,
 `flowing_guard`, `braced_support`, `taunting_opener`, `bait` and
 `blood_price`. Charges return when a Burst never opens. Names, coefficients
@@ -257,3 +256,40 @@ game with closed stdin. Confirm a positive `Ran N tests` line. The reference
 seams are `world.sandbox.test_combat`; standalone absence profiles are
 covered by `scripts/ci_run_combat_tests.py`. See
 [MIGRATION_NOTES.md](MIGRATION_NOTES.md) before upgrading a populated game.
+
+
+## Actions, modifiers and corrections
+
+Use `+attack[/reaching] targets=move[/domain]`, `+spell`, `+assist`, `+dispirit`,
+`+react/resist token`, `+press`, `+stop` and `+pass`. Unique switch prefixes work.
+`+react/read token=domain` buys Read before choosing a reaction.
+Arm `+empower`, `+burst`, `+callshot`, `+counter move`, `+waive` or `+surge`
+before an eligible action; `/off` disarms each. Status lists your armed flags.
+Passing and cancellation preserve them; an executed eligible packet consumes them.
+Surge requires Party. An unavailable optional partner never imports into independent combat.
+
+`+pass` requires clear incoming/outgoing exchanges, a clear pose obligation and
+remaining personal allowance. It advances the condition clock once, ticks Poison,
+expires stances/conditions, recovers Resist pressure and owes a pose. It also
+clears revived participants' recovery requirement. It grants no resources or
+exchange rewards. Staggered's skipped turn adds no clock tick or reward.
+`+combat/mine` lists your retained open/shelved fights across rooms, including Fade,
+with their IDs and rooms. Withdrawn/history-only rows and ended fights are excluded.
+
+Author an improvised move with `+improv/new Name`, then one field per command
+(`/action`, `/power`, `/accuracy`, `/effects`, `/element`, `/wording`, `/assist_stat`),
+then `/finish`. Declare it with `+improv[/reaching] targets[=domain]`.
+Signature libraries use the optional chargen partner's `+moves` draft flow.
+
+Joining locks the combat build automatically and quietly. Pips, equipped Abilities,
+Flaws, ratings, equipped Signature Moves and dependent worn gear share the lock.
+Clear pending exchanges, `+combat/unlock`, make the correction, then explicitly
+`+combat/relock`. Progress remains blocked until validation succeeds. Automatic
+poses, scene TTL expiry and ordinary scene locks cannot end a combat correction.
+Manual unlock/relock announce only that the build was unlocked/relocked, never
+which choices changed. The table supplies consent; no approval vote is added.
+
+Before joining, `+combat/cap number` sets your personal Turn Limit (1..20).
+After joining it may only reduce the retained limit. `+combat/join side=3`
+chooses Boss Mode x3 without stacking options. For an NPC with a custom cap,
+spawn it, `+npc/puppet`, set the cap, then join with the ordinary commands.

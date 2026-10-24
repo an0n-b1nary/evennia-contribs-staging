@@ -10,14 +10,14 @@ summary: Designing your own moves, your library, and the loadout you equip.
 A **Signature** is a move you design yourself: an attack, a spell, a way of helping an ally or of shaking an opponent. You keep your Signatures in a library and equip the ones you want ready. They cost nothing, and staff don't approve them. If your game has combat, it uses the moves you've equipped.
 
 - `+moves` shows your library and which moves are equipped.
-- `+moves/create <name>=<fields>` designs a new move.
-- `+moves/edit <key>=<fields>` changes one.
+- `+moves/new <name>` starts a draft.
+- `+moves/edit <key>` starts a revision draft.
 - `+moves/equip <key>` and `+moves/unequip <key>` change what's equipped.
 - `+moves/archive <key>` retires a move.
 
 ## Designing a move
 
-A move's fields are written as JSON, for example `+moves/create Ready Guard={"power":1,"accuracy":1,"effects":["resist_stance"]}`. `help +moves` lists the fields.
+Set one field at a time: `+moves/power 1`, `+moves/accuracy 1`, `+moves/effects resist_stance`, then `+moves/finish`. Use `/action`, `/wording`, `/element`, `/domain` and `/assist_stat` as needed. Empty effect/domain fields clear them. `/cancel` discards your draft. Failed validation preserves it; stale revisions cannot overwrite newer edits. `help +moves` lists the fields.
 
 - **Action:** attack, spell, assist or dispirit. Attack is the default.
 - **Power and Accuracy:** an attack or spell shares a fixed budget between them, so a harder hit is a less certain one. Assist and Dispirit don't use them.

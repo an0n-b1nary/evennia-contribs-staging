@@ -229,7 +229,7 @@ class CmdLock(_ChargenCommand):
         if build is None or build.is_draft:
             self.msg("Only a finalized sheet locks.")
             return
-        if not locks.lock(self.caller):
+        if self.run(locks.lock, self.caller) is False:
             self.msg(f"Your {conf.locked_things()} are already locked.")
 
 
@@ -248,7 +248,7 @@ class CmdUnlock(_ChargenCommand):
     key = "+unlock"
 
     def func(self):
-        if not locks.unlock(self.caller):
+        if self.run(locks.unlock, self.caller) is False:
             self.msg(f"Your {conf.locked_things()} aren't locked.")
 
 

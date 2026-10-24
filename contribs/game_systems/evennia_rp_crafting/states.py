@@ -137,7 +137,7 @@ def select(actor, item, key):
         from evennia_rp_chargen import locks
 
         if locks.frozen(actor):
-            raise CraftingError(locks.locked_message())
+            raise CraftingError(locks.locked_message(actor))
     key = name(key)
     if key not in data["variants"]:
         raise CraftingError("Choose one of this item's named states.")

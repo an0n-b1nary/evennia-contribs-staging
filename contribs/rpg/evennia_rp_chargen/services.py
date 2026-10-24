@@ -133,7 +133,7 @@ def _check_pips_changeable(character) -> None:
     if build is None:
         raise ChargenError("You don't have a character sheet yet. Start one with +stats.")
     if not build.is_draft and locks.scope_locked(character, conf.PIPS):
-        raise ChargenError(locks.locked_message())
+        raise ChargenError(locks.locked_message(character))
 
 
 def _change_pips(character, stat_text: str, **pips) -> Rating:

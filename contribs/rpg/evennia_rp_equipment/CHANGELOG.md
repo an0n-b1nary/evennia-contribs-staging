@@ -1,5 +1,12 @@
 # Changelog — evennia-rp-equipment
 
+## 0.3.1
+
+### Changed
+
+- Build-lock refusals name the combat correction commands while combat owns the lock.
+
+
 All notable changes to `evennia-rp-equipment` will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
