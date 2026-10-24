@@ -540,8 +540,27 @@ class TestBossCoordinator(EvenniaCommandTest):
             combat.join(self.char2, "heroes")
             self.party = services.change(self.char2, "create", "Heroes")
 
+    def test_special_draft_verdict_is_bound_to_preview_and_stale_state_is_refused(self):
+        for args in ("/new Heroes", "/type special"):
+            self.call(CmdBossCheck(), args, "Boss Check draft saved.")
+        self.call(CmdBossCheck(), "/finish", "Special Checks need")
+        for args in ("/requirement Break the seal", "/hint Strike the stone"):
+            self.call(CmdBossCheck(), args, "Boss Check draft saved.")
+        self.call(CmdBossCheck(), "/finish", "Boss Checks issued: 1.c1.")
+        self.call(CmdBossCheck(), "/preview 1.c1=pass", "Check 1.c1")
+        previews = self.char1.attributes.get("boss_check_previews", category="rp_party")
+        token = previews["1.c1"]["token"]
+        self.call(CmdBossCheck(), f"/resolve 1.c1={token}", "Acknowledge")
+        self.call(CmdBossCheck(), "/preview 1.c1=fail", "Check 1.c1")
+        self.call(CmdBossCheck(), f"/resolve 1.c1={token} # The stone broke", "Preview first")
+        token = self.char1.attributes.get("boss_check_previews", category="rp_party")["1.c1"][
+            "token"
+        ]
+        self.call(CmdBossCheck(), f"/resolve 1.c1={token} # The stone held", "Check 1.c1: failed.")
+
     def test_commands_register_and_no_dice_in_status_or_preview(self):
-        self.call(CmdBossCheck(), "Heroes=tank", "Boss Checks issued: 1.c1.")
+        self.call(CmdBossCheck(), "/new Heroes", "Boss Check draft saved.")
+        self.call(CmdBossCheck(), "/finish", "Boss Checks issued: 1.c1.")
         self.call(CmdBossCheck(), "/preview 1.c1", "Check 1.c1")
         rendered = services.render(self.char1)
         self.assertIn("+bosscheck/withdraw", rendered)

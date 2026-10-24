@@ -73,7 +73,7 @@ def transition(state, event):
                 "points": str(partners.number(conf.get("RP_PARTY_SUPPORT_POINTS"))),
                 "exchange": event.exchange_id,
             }
-    elif event.kind in ("exchange_end", "recovery"):
+    elif event.kind in ("exchange_end", "pass"):
         affected = rules.party_id(state, event.actor_id)
         data["support"] = {
             source: entry

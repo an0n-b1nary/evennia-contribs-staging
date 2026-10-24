@@ -109,12 +109,12 @@ Callbacks must use `event.kind` explicitly:
 - `cancel`: an unaccepted target packet has been canceled.
 - `exchange_end`: the actor's personal clock and allowance have advanced
   once, including exactly once for a Burst.
-- `recovery`: the recovery action advanced its actor's allowance and clock;
+- `pass`: the pass action advanced its actor's allowance and clock;
   no attack or support executed and no action reward is implied.
 - `hostile_damage`: attributed Poison suffered on an ordinary own exchange
   or real encounter-effect damage,
   with source actor, actual victim/loss and pre-damage participation. A
-  recovery Poison tick emits no resource-reward event. Source-less or self
+  pass Poison tick emits no resource-reward event. Source-less or self
   Poison is not attributed hostile damage. The partner still checks sides.
 - `state_changed`: before the coordinator journals any operation, including
   maintenance, shelving and rollback; use for saved-state reconciliation.
@@ -137,7 +137,8 @@ registered provider key to finite JSON options. Each request names `target`
 as one of that hit's declared participant IDs. An empty target selects the
 sole target of a single-target hit; it is invalid on multi-target actions.
 The owning provider validates its remaining options. Auto-Act and ordinary
-commands pass no requests and never choose partner spending.
+commands never choose partner spending themselves; an explicitly armed Surge
+is applied by the engine on its next eligible action.
 
 Before freezing modifiers or automatically resolving, combat calls
 `reserve(detached_state, declaration, detached_request)`. It returns its
@@ -232,7 +233,7 @@ The host owns authorization, consent, queue checks and the Fight transaction.
 `effects.stagger` adds a nonstacking next-full-personal-turn skip and reaction
 penalty. A partial current turn finishes; a fresh boundary consumes the skip
 without ticking exchange clocks or producing rewards. The penalty expires
-only on an executed initiating action after that boundary (including recovery),
+only on an executed initiating action after that boundary (including passing),
 never a canceled declaration, and persists at the final cap. These are generic
 primitives; Party owns challenge types, thresholds, targeting and resolution.
 

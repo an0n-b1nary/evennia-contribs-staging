@@ -19,7 +19,7 @@ from evennia_rp_rules.testing import RulesetTestMixin
 
 from . import arithmetic as math
 from . import engine, policies, services
-from .commands import CmdCombat, CmdCombatStory, CmdTactics
+from .commands import CmdCombat, CmdCombatStory, CmdPass, CmdTactics
 from .data import TIERS, ActionView, Build, CombatError, Move, ReactionView
 from .modifiers import CombatEffect, CombatRule, EffectSpecError, move_cost
 
@@ -793,12 +793,12 @@ class TestRevival(SimpleTestCase):
         with self.assertRaisesRegex(CombatError, "recover"):
             engine.declaration(state, 2, [3], Move(), 50)
         resources = {k: ally[k] for k in ("reserves", "spirit", "transcendence", "pressure")}
-        engine.recover(state, 3)
+        engine.pass_action(state, 3)
         self.assertFalse(ally["recovering"])
         self.assertEqual((ally["clock"], ally["turns"], ally["pose"]), (1, 1, True))
         self.assertEqual({k: ally[k] for k in resources}, resources)
-        with self.assertRaisesRegex(CombatError, "Only a revived"):
-            engine.recover(state, 3)
+        with self.assertRaisesRegex(CombatError, "acknowledge"):
+            engine.pass_action(state, 3)
 
     def test_declining_or_retracting_refunds_and_leaves_them_down(self):
         state, ally, healer = self.party()
@@ -847,14 +847,14 @@ class TestRevival(SimpleTestCase):
         engine.condition(ally, "poisoned", 3, 2)
         engine.accept_revival(state, 3, self.offer(state))
         revived = ally["hp"]
-        engine.recover(state, 3)
+        engine.pass_action(state, 3)
         self.assertEqual(ally["hp"], revived - 3)
         self.assertEqual(ally["conditions"]["poisoned"]["expires"], 2)
         # Strong enough Poison undoes a weak revival.
         state, ally, _healer = self.party()
         engine.condition(ally, "poisoned", 90, 2)
         engine.accept_revival(state, 3, self.offer(state))
-        engine.recover(state, 3)
+        engine.pass_action(state, 3)
         self.assertEqual(
             (ally["hp"], ally["return_required"], ally["recovering"]), (0, True, False)
         )
@@ -862,14 +862,14 @@ class TestRevival(SimpleTestCase):
     def test_recovery_spends_one_action_and_needs_a_turn_left(self):
         state, ally, _healer = self.party(boss=3)
         engine.accept_revival(state, 3, self.offer(state))
-        engine.recover(state, 3)
+        engine.pass_action(state, 3)
         self.assertEqual((ally["actions_left"], ally["turns"]), (2, 0))
         state, ally, _healer = self.party()
         ally["turns"] = ally["turn_limit"]
         engine.accept_revival(state, 3, self.offer(state))
         self.assertGreater(ally["hp"], 0)
         with self.assertRaisesRegex(CombatError, "Turn Limit is exhausted"):
-            engine.recover(state, 3)
+            engine.pass_action(state, 3)
 
     def test_medicine_chooses_between_treating_and_waiving_recovery(self):
         for waive in (True, False):
@@ -905,7 +905,7 @@ class TestRevival(SimpleTestCase):
         self.assertFalse(engine.participating(ally))
         engine.accept_revival(state, 3, token)
         self.assertFalse(engine.participating(ally))
-        engine.recover(state, 3)
+        engine.pass_action(state, 3)
         self.assertTrue(engine.participating(ally))
 
     def test_fights_saved_by_0_1_resolve_without_the_new_fields(self):
@@ -1680,8 +1680,8 @@ class TestCoordinator(EvenniaCommandTest):
         self.call(CmdCombat(), "", "Combat: active.")
         self.call(
             CmdTactics(),
-            '/save Careful={"appetite":"cautious","rps_appetite":"bold"}',
-            "Active Tactics: Careful.",
+            "/set Careful/appetite=cautious",
+            "Tactics saved.",
         )
         self.call(CmdCombat(), "/act", "1.1")
         state = services.state_for(self.char1)
@@ -1759,7 +1759,7 @@ class TestCoordinator(EvenniaCommandTest):
 
     def test_storyteller_commands_do_not_require_staff_or_force_caps(self):
         with patch("evennia_rp_combat.services.staff", return_value=False):
-            self.call(CmdCombatStory(), f"/requestcap {self.char2.key}=2;short scene", "")
+            self.call(CmdCombatStory(), f"/requestcap {self.char2.key}=2 # short scene", "")
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         self.assertEqual((row["turn_limit"], row["requests"][0]["kind"]), (4, "cap"))
         services.control(self.char2, "accept")
@@ -1795,7 +1795,9 @@ class TestCoordinator(EvenniaCommandTest):
         with self.assertRaises(CombatError):
             services.control(self.char2, "accept")
         with patch("evennia_rp_combat.services.staff", return_value=False):
-            self.call(CmdCombatStory(), f"/requestreturn {self.char2.key}=25;agreed correction", "")
+            self.call(
+                CmdCombatStory(), f"/requestreturn {self.char2.key}=25 # agreed correction", ""
+            )
         row = services.state_for(self.char2)["participants"][str(self.char2.pk)]
         self.assertEqual((row["status"], row["hp"]), ("withdrawn", 0))
         self.assertEqual((row["requests"][0]["kind"], row["requests"][0]["value"]), ("return", 25))
@@ -1851,10 +1853,10 @@ class TestCoordinator(EvenniaCommandTest):
         revived = row()
         self.assertTrue(revived["hp"] > 0 and revived["recovering"])
         self.assertIn("you are recovering", services.render(ally).lower())
-        self.call(CmdCombat(), "/recover", "", caller=ally)
+        self.call(CmdPass(), "", "", caller=ally)
         self.assertFalse(row()["recovering"])
         journal = services.journal(self.char1)
-        self.assertIn("recovery action", journal)
+        self.assertIn("passes", journal)
 
     def test_ignore_removal_is_explicit_account_wide_and_mutual(self):
         if not apps.is_installed("evennia_social"):
@@ -2050,3 +2052,30 @@ class TestNPCWithoutSheets(RulesetTestMixin, EvenniaCommandTest):
             maintain(services.open_fight(self.char1.location), now=time.time())
         row = services.state_for(self.char1)["participants"][str(npc.pk)]
         self.assertEqual((row["status"], bool(row["outgoing"])), ("active", True))
+
+    def test_ordinary_commands_follow_puppet_state_and_attribute_feedback(self):
+        from evennia_npcs import services as npcs
+
+        from .commands import CmdAction, CmdPass
+
+        self.char2.location = self.char1.location
+        blueprint = npcs.create_blueprint(
+            self.char1, "Puppet", "template", stat_block={key: "B" for key in self.ruleset.stats}
+        )
+        npc = npcs.control(self.char1, npcs.spawn(self.char1, blueprint))
+        services.setup(self.char1)
+        with patch("evennia_rp_combat.services.snapshot", return_value=build()):
+            services.join(self.char2, "opposition")
+        self.call(CmdCombat(), "/join practice", "")
+        self.call(CmdCombat(), "/mine", "[As Puppet")
+        self.call(CmdPass(), "", "")
+        state = services.state_for(self.char1)
+        self.assertEqual(engine.participant(state, npc.pk)["clock"], 1)
+        self.assertNotIn(str(self.char1.pk), state["participants"])
+        self.call(CmdCombat(), "/posed", "")
+        self.call(CmdAction(), f"{self.char2.key}=balanced", "[As Puppet")
+        self.assertEqual(
+            next(iter(services.state_for(self.char1)["exchanges"].values()))["actor"], str(npc.pk)
+        )
+        with override_settings(NPCS_FROZEN=True):
+            self.call(CmdCombat(), "/mine", "NPC activity is paused")

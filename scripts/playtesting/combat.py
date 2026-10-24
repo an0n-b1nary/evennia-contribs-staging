@@ -9,11 +9,11 @@ class CombatSuite(Suite):
     def consent_and_cancellation(self):
         self.command("alice", "+combat/setup Live combat acceptance", "set up combat")
         self.command("alice", "+combat/join one", "joined side one")
-        self.command("alice", "+combat/attack pt-bob=balanced", "invite|invitation")
+        self.command("alice", "+attack pt-bob=balanced", "invite|invitation")
         self.command("bob", "+combat/refuse", "refus|declin")
         self.command("bob", "+combat", "Vitality")
         self.command("bob", "+combat/join two", "joined side two")
-        self.command("alice", "+combat/attack pt-bob=balanced;rps=subtle")
+        self.command("alice", "+attack/subtle pt-bob=balanced")
         queue = self.command("bob", "+combat")["output"]
         token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
         self.command("bob", "+combat/odds " + token, "neutral RPS estimates")
@@ -21,29 +21,29 @@ class CombatSuite(Suite):
         self.command("alice", "+combat", "turns 0/4")
 
     def reaction_build_lock_and_reload(self):
-        self.command("alice", "+combat/attack pt-bob=heavy;rps=penetrating")
+        self.command("alice", "+attack/penetrating pt-bob=heavy")
         queue = self.command("bob", "+combat")["output"]
         token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
         self.session.host.reload()
         self.command("bob", "+combat", re.escape(token))
-        self.command("bob", "+combat/react " + token + "=resist", "resist")
+        self.command("bob", "+react/resist " + token, "resist")
         self.command("bob", "+combat/cancel " + token, "unaccepted|stale|match")
         self.command("alice", "+combat/result " + token.split(":")[0], "penetrating")
         self.command("alice", "+unlock", "unlock|already|aren't locked")
         self.command("alice", "+pips/set strength=1", "combat build is frozen")
-        self.command("alice", "+combat/unlock Agreed correction", "unlock")
-        self.command("alice", "+unlock")
+        self.command("alice", "+combat/unlock", "unlock")
         self.command("alice", "+pips/set strength=1", "Strength")
-        self.command("alice", "+combat/relock Agreed correction", "relock")
+        self.command("alice", "+combat/relock", "relock")
         self.command("alice", "+combat/posed", "posed")
         self.command("bob", "+combat/posed", "posed")
 
     def automation_storytelling_and_fade(self):
         self.command("bob", "+combat/auto on", "auto on")
-        self.command("alice", '+tactics/save Accessible={"rps_appetite":"bold"}', "Active Tactics")
+        self.command("alice", "+tactics/set Accessible/rps_appetite=bold", "Tactics saved")
+        self.command("alice", "+tactics/use Accessible", "Active Tactics")
         self.command("alice", "+combat/act", "Auto-Act")
         self.command("alice", "+combat", "turns 2/4")
-        self.command("bob", "+combatstory/requestcap pt-alice=3;OOC agreement", "requestcap")
+        self.command("bob", "+combatstory/requestcap pt-alice=3 # OOC agreement", "requestcap")
         self.command("alice", "+combat/accept", "accepted request")
         self.command("alice", "+combat/fade", "fade")
         self.command("alice", "+combat/join one", "joined")
@@ -60,11 +60,15 @@ class CombatSuite(Suite):
         self.command("bob", "+combat/join two", "joined")
         self.command("bob", "+combat/withdraw", "withdraw")
         self.command("bob", "+combat/join two", "request your return")
-        self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
+        self.command(
+            "alice", "+combatstory/requestreturn pt-bob=25 # Agreed return", "requestreturn"
+        )
         self.command("bob", "+combat", "return you to the fight at 25 Vitality")
         self.command("bob", "+combat/decline", "declined request")
         self.command("bob", "+combat/accept", "no pending storyteller requests")
-        self.command("alice", "+combatstory/requestreturn pt-bob=25;Agreed return", "requestreturn")
+        self.command(
+            "alice", "+combatstory/requestreturn pt-bob=25 # Agreed return", "requestreturn"
+        )
         self.command("bob", "+combat/accept", "accepted request")
         self.command("bob", "+combat", "25/100 Vitality; turns 0/4")
         self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
@@ -80,7 +84,6 @@ class CombatSuite(Suite):
             "resolve",
             "agility",
         )
-        mend = '{"key":"mend","name":"Mend","action":"assist","effects":["heal"]}'
         self.command("alice", "+npc/create Sparring Post =template", "Created NPC blueprint")
         for stat in stats:
             self.command("alice", f"+npc/stat Sparring Post/{stat}=B", "updated")
@@ -88,18 +91,20 @@ class CombatSuite(Suite):
         self.command("alice", "+combat/join one", "joined")
         self.command("bob", "+combat/join one", "joined")
         self.command("alice", "+combatstory/template Sparring Post=two", "Sparring Post")
-        self.command("bob", "+combatstory/vitality pt-alice=0;Agreed knockdown", "vitality")
+        self.command("bob", "+combatstory/vitality pt-alice=0 # Agreed knockdown", "vitality")
         self.command("alice", "+combat/accept", "accepted request")
         self.command("alice", "+combat/act", "incapacitated")
-        self.command("bob", "+combat/improv pt-alice=" + mend, r"\d+\.\d+")
+        for step in ("/new Mend", "/action assist", "/power 0", "/effects heal", "/finish"):
+            self.command("bob", "+improv" + step, "Improvised")
+        self.command("bob", "+improv pt-alice", r"\d+\.\d+")
         self.command("alice", "+combat", "Revival offer")
         self.command("alice", "+combat/decline", "declined .*revival")
         self.command("alice", "+combat", "0/100 Vitality")
         self.command("alice", "+combat/revive accept", "revive accept")
-        self.command("bob", "+combat/improv pt-alice=" + mend, r"\d+\.\d+")
+        self.command("bob", "+improv pt-alice", r"\d+\.\d+")
         self.command("alice", "+combat", "You are recovering")
-        self.command("alice", "+combat/attack Sparring Post=balanced", "recover")
-        self.command("alice", "+combat/recover", "recovery action")
+        self.command("alice", "+attack Sparring Post=balanced", "recover")
+        self.command("alice", "+pass", "passes")
         self.command("alice", "+combat/posed", "posed")
         self.command("bob", "+combat/posed", "posed")
         self.command("alice", "+combatstory/end Agreed outcome", "Ending needs agreement")
@@ -116,16 +121,17 @@ class CombatSuite(Suite):
         self.command("alice", "+party/invite pt-bob", "Party invite")
         self.command("bob", "+party/accept", "Party accept")
         self.command("alice", "+party/formation front", "Party formation")
-        self.command("bob", "+party/formation back=on", "Party formation")
+        self.command("bob", "+party/formation back", "Party formation")
+        self.command("bob", "+party/coveron", "Party formation")
         self.command("bob", "+combat/auto on", "auto on")
         self.command("alice", "+npc/puppet #" + npc_id, "Now portraying")
-        self.command("alice", "+combat/attack/npc pt-bob=balanced")
+        self.command("alice", "+attack pt-bob=balanced")
         queue = self.command("bob", "+combat")["output"]
         token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
-        self.command("alice", "+party/coverodds pt-bob=" + token, "neutral RPS estimates")
-        self.command("alice", "+party/cover pt-bob=" + token + ",resist", "Covered")
         self.command("alice", "+npc/unpuppet", "released")
-        self.command("bob", "+combat/assist pt-alice", r"[0-9]+\.[0-9]+")
+        self.command("alice", "+party/coverodds pt-bob=" + token, "neutral RPS estimates")
+        self.command("alice", "+cover/resist pt-bob=" + token, "Covered")
+        self.command("bob", "+assist pt-alice", r"[0-9]+\.[0-9]+")
         self.command("alice", "+party", "boost [1-9]")
         chat = self.command("bob", "+party/chat Ready for the next exchange", "Party OOC")
         assert "Ready for the next exchange" in self.observer(chat, actor="alice")
@@ -141,7 +147,7 @@ class CombatSuite(Suite):
         self.command("alice", "+combatstory/end Next rehearsal", "Ending needs agreement")
         self.command("bob", "+combat/accept", "accepted request")
         self.command("alice", "+combat/setup Synergy rehearsal", "set up combat")
-        self.command("alice", "+combat/join one=3,4", "joined")
+        self.command("alice", "+combat/join one=3", "joined")
         self.command("bob", "+combat/join one", "joined")
         self.command("alice", "+npc/create Synergy Post=template", "Created NPC blueprint")
         stats = (
@@ -162,27 +168,32 @@ class CombatSuite(Suite):
         self.command("bob", "+party/accept", "Party accept")
         # Ten ordinary exchanges fund the pool without a fixture resource grant.
         for _ in range(10):
-            self.command("alice", "+combat/assist pt-bob", r"[0-9]+\.[0-9]+")
+            self.command("alice", "+assist pt-bob", r"[0-9]+\.[0-9]+")
             self.command("alice", "+combat/posed", "posed")
         self.command("alice", "+party", "Synergy 100 available")
-        self.command("alice", "+party/surge Synergy Post=balanced", "reserved 100 Synergy")
+        self.command("alice", "+surge", "Surge armed")
+        self.command("alice", "+attack Synergy Post=balanced", "reserved 100 Synergy")
         self.command("alice", "+npc/puppet #" + npc_id, "Now portraying")
-        queue = self.command("alice", "+combat/npc")["output"]
+        queue = self.command("alice", "+combat")["output"]
         token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
         self.session.host.reload()
         self.command("alice", "+party", "100 reserved")
-        self.command("alice", "+combat/cancel/npc " + token, "refunded 100")
+        self.command("alice", "+combat/cancel " + token, "refunded 100")
         self.command("alice", "+party", "Synergy 100 available")
-        self.command("alice", "+party/surge Synergy Post=balanced", "reserved 100 Synergy")
-        queue = self.command("alice", "+combat/npc")["output"]
+        self.command("alice", "+npc/unpuppet", "released")
+        self.command("alice", "+surge", "Surge armed")
+        self.command("alice", "+attack Synergy Post=balanced", "reserved 100 Synergy")
+        self.command("alice", "+npc/puppet #" + npc_id, "Now portraying")
+        queue = self.command("alice", "+combat")["output"]
         token = re.search(r"Incoming ([0-9.]+:[0-9]+):", queue).group(1)
-        self.command("alice", "+combat/react/npc " + token + "=resist", "resist")
+        self.command("alice", "+react/resist " + token, "resist")
         self.command("alice", "+party", "Synergy 10 available")
         self.command("alice", "+npc/unpuppet", "released")
         self.command("alice", "+combat/posed", "posed")
+        self.command("alice", "+surge", "Surge armed")
         self.command(
             "alice",
-            "+party/surge Synergy Post=balanced",
+            "+attack Synergy Post=balanced",
             "already reserved or used this personal turn",
         )
 

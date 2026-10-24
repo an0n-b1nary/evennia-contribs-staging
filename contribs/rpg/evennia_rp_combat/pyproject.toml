@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-combat"
-version = "0.2.6"
+version = "0.3.0"
 description = "Consent-based RP combat with durable tactics, bounded exchanges and host-defined stat sources."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -13,8 +13,8 @@ requires-python = ">=3.12"
 dependencies = ["evennia>=6.0", "evennia-links>=0.5", "evennia-rp-rules>=0.1,<0.2"]
 
 [project.optional-dependencies]
-chargen = ["evennia-rp-chargen>=0.4,<0.6"]
-npcs = ["evennia-npcs>=0.1,<0.3"]
+chargen = ["evennia-rp-chargen>=0.6,<0.7"]
+npcs = ["evennia-npcs>=0.3,<0.4"]
 scenes = ["evennia-scenes>=0.3"]
 posing = ["evennia-posing>=0.1"]
 guides = ["evennia-guides>=0.1"]

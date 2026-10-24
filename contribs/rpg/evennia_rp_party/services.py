@@ -137,7 +137,11 @@ def cover(
             and not engine.blocks(row, exchange["domain"], "pinpoint")
             else "0"
         )
-        chosen = combat.choose_move(row, counter) if kind == "overpower" else None
+        chosen = (
+            combat.choose_move(row, engine.available_armed(state, row).get("counter", counter))
+            if kind == "overpower"
+            else None
+        )
         if preview:
             view = engine.interception_view(
                 state, token, original.pk, subject.pk, reaction_penalty=penalty

@@ -38,7 +38,9 @@ def atomic_requests(operation):
 
     @wraps(operation)
     def apply(state, *args, **kwargs):
-        if kwargs.get("partner_requests") is None or kwargs["partner_requests"] == {}:
+        requested = kwargs.get("partner_requests") is not None and kwargs["partner_requests"] != {}
+        armed_surge = any("surge" in row.get("armed", {}) for row in state["participants"].values())
+        if not requested and not armed_surge:
             return operation(state, *args, **kwargs)
         candidate = deepcopy(state)
         result = operation(candidate, *args, **kwargs)
@@ -141,6 +143,7 @@ class Event:
 
     ``packet`` follows actual damage/support, ``exchange_end`` follows the
     personal clock, and ``cancel`` identifies an unexecuted target packet.
+    ``pass`` advances a personal clock without exchange rewards.
     Never use an accepted reaction as an action/reward event.
     """
 
@@ -313,7 +316,8 @@ def install(state, key, result):
 def reserve(state, exchange, requests=None):
     """Explicit host requests, before frozen modifiers or automatic execution.
 
-    Each request names one declared target. Auto-Act passes no requests.
+    Each request names one declared target. Only an explicitly armed modifier
+    can add a request to Auto-Act.
     The owning provider validates its remaining JSON options and resource
     rules. Failure rolls back with the declaration in the coordinator.
     """

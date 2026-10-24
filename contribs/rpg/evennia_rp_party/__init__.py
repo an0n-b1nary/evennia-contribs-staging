@@ -2,4 +2,4 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Optional fight-scoped tactical parties; importing this module loads no models."""
 
-__version__ = "0.2.5"
+__version__ = "0.3.0"

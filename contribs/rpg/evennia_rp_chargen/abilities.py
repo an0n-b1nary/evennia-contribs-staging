@@ -143,7 +143,7 @@ def loadout_budget() -> int | None:
 def _check_unlocked(character) -> None:
     build = ensure_build(character)
     if not build.is_draft and locks.scope_locked(character, conf.LOADOUT):
-        raise ChargenError(locks.locked_message())
+        raise ChargenError(locks.locked_message(character))
 
 
 def _change(character, kind, copy=None, **fields) -> guards.BuildChange:
