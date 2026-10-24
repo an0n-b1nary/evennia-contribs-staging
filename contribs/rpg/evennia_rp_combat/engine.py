@@ -616,7 +616,7 @@ def pass_action(state, ident):
         row["turns"] += 1
         row["actions_left"] = row["allowance"]
         consume_skip(row)
-    row["pose"] = True
+    row["pose"] = not row["auto"]
     partners.emit(state, partners.Event("pass", row["id"], "", 0))
     settle(state)
 

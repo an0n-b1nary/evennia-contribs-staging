@@ -39,6 +39,15 @@ class TestPass(SimpleTestCase):
         self.assertFalse(state["exchanges"])
         self.assertEqual(row["armed"], flags)
 
+    def test_auto_participant_passes_without_owing_a_pose(self):
+        state = duel()
+        row = engine.participant(state, 1)
+        row.update(auto=True, recovering=True)
+        engine.pass_action(state, 1)
+        self.assertFalse(row["pose"])
+        engine.pass_action(state, 1)
+        self.assertEqual(row["clock"], 2)
+
     def test_pass_requires_clear_queues_and_pose(self):
         for kind in ("incoming", "outgoing", "pose"):
             state = duel()
@@ -140,6 +149,12 @@ class TestCommandFlows(EvenniaCommandTest):
     def test_old_actions_and_unknown_or_stacked_switches_are_refused(self):
         for text in ("/attack Char=balanced", "/recover", "/npc", "/act/npc", "/act/unknown"):
             self.call(CmdCombat(), text, "Use one known switch.")
+        self.assertFalse(services.state_for(self.char1)["exchanges"])
+
+    def test_unknown_target_reports_only_the_failed_search(self):
+        output = self.call(CmdAction(), "Nobody=balanced", "Could not find 'Nobody'.")
+        self.assertNotIn("Name at least one target", output)
+        self.call(CmdAction(), "=balanced", "Name at least one target.")
         self.assertFalse(services.state_for(self.char1)["exchanges"])
 
     def test_unique_rps_prefix_declares_and_pass_is_a_separate_action(self):

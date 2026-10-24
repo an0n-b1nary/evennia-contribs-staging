@@ -125,7 +125,7 @@ class CmdCombat(CombatCommand):
                 actor,
                 op,
                 subject=subject,
-                argument=int(self.args) if op == "cap" else self.args.strip(),
+                argument=self.args.strip(),
             )
 
 
@@ -148,8 +148,10 @@ class CmdAction(CombatCommand):
 
     def run(self):
         targets = [self.caller.search(name.strip()) for name in self.lhs.split(",") if name.strip()]
-        if not targets or any(target is None for target in targets):
+        if not targets:
             raise CombatError("Name at least one target.")
+        if any(target is None for target in targets):
+            return
         move, _, domain = (
             self.rhs or (self.action if self.action in ("assist", "dispirit") else "balanced")
         ).partition("/")
