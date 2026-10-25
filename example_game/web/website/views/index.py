@@ -371,35 +371,64 @@ def _guide_start_url():
     return _url("evennia_guides:guide-page", page.key)
 
 
-def _without_dark(accounts):
-    """Recently connected accounts, minus staff whose characters have gone dark."""
-    if not apps.is_installed("evennia_social"):
-        return accounts
-    from evennia_social.presence import is_publicly_listed
+def _recently_connected(request):
+    """Recently connected players, as the character each account last played.
 
-    return [
-        account
-        for account in accounts
-        if all(is_publicly_listed(character) for character in account.characters.all())
-    ]
+    Evennia's own list is of accounts, and an account's username is its login
+    name. Only the last-played character is shown, so the list never ties an
+    account's characters together. Guests, dark staff and characters the visitor
+    may not view are left out, as in `who` and on the character list; staff
+    accounts are left out too unless SANDBOX_HOMEPAGE_LIST_STAFF is set.
+    """
+    from django.conf import settings
+    from evennia.accounts.models import AccountDB
+
+    from evennia_links.guests import is_guest
+
+    if apps.is_installed("evennia_social"):
+        from evennia_social.presence import is_publicly_listed
+    else:
+
+        def is_publicly_listed(character):
+            return not is_guest(character)
+
+    list_staff = getattr(settings, "SANDBOX_HOMEPAGE_LIST_STAFF", False)
+    rows = []
+    for account in AccountDB.objects.get_recently_connected_accounts():
+        if not list_staff and (
+            account.is_staff or account.locks.check_lockstring(account, "perm(Builder)")
+        ):
+            continue
+        character = account.db._last_puppet
+        if (
+            character is None
+            or character not in account.characters.all()
+            or not is_publicly_listed(character)
+            or not character.access(request.user, "view")
+        ):
+            continue
+        rows.append({"character": character, "last_login": account.last_login})
+        if len(rows) == WIDGET_LIMIT:
+            break
+    return rows
 
 
 class SandboxIndexView(EvenniaIndexView):
     """Evennia's index view, with this sandbox's widgets added to the context.
 
-    Subclassed rather than replaced so the stock context (account counts,
-    recently-connected list) stays available to the template - the
-    recently-connected widget is kept, because a sandbox that looks inhabited is
-    more useful to a playtester than one that looks empty.
+    Subclassed rather than replaced so the stock context (account counts) stays
+    available to the template. The recently-connected widget is kept, because a
+    sandbox that looks inhabited is more useful to a playtester than one that
+    looks empty, but it lists characters rather than the stock accounts.
     """
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
             {
-                "accounts_connected_recent": _without_dark(
-                    context.get("accounts_connected_recent") or []
-                ),
+                # Replaces the stock account list, so no template can show it.
+                "accounts_connected_recent": None,
+                "recently_connected": _recently_connected(self.request),
                 "live_scenes": _live_scenes(),
                 "scene_archive_url": _url("evennia_scenes:scene-list"),
                 "upcoming_events": _upcoming_events(),
