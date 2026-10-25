@@ -2,13 +2,14 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Reference game seam: presence (evennia_social 0.4) across commands and the home page."""
 
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.apps import apps
 from django.test import override_settings
 from django.urls import include, path
 from django.utils import timezone
-from evennia.utils.create import create_account, create_object
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
@@ -30,7 +31,7 @@ class TestPresenceCommandsMounted(EvenniaTest):
 
 @override_settings(ROOT_URLCONF=__name__)
 class TestRecentlyConnected(EvenniaTest):
-    """The home page lists characters, never login names, staff or guests (#91)."""
+    """The home page lists characters played lately, never accounts (#91)."""
 
     character_typeclass = Character
     room_typeclass = Room
@@ -38,12 +39,9 @@ class TestRecentlyConnected(EvenniaTest):
     def setUp(self):
         super().setUp()
         now = timezone.now()
-        # self.account is a Developer; self.account2 is an ordinary player.
-        for account, character in ((self.account, self.char1), (self.account2, self.char2)):
-            account.characters.add(character)
-            account.db._last_puppet = character
-            account.last_login = now
-            account.save()
+        # char1 is a Developer's; char2 an ordinary player's, seen more recently.
+        self.char1.attributes.add("sandbox_last_seen", now - timedelta(hours=2))
+        self.char2.attributes.add("sandbox_last_seen", now - timedelta(hours=1))
 
     def listed(self):
         response = self.client.get("/")
@@ -52,59 +50,41 @@ class TestRecentlyConnected(EvenniaTest):
         names = [entry["character"].key for entry in response.context["recently_connected"]]
         return names, response.content.decode()
 
-    def test_player_is_listed_by_last_played_character_name(self):
+    def test_every_character_played_lately_newest_first(self):
         alt = create_object(Character, key="Quiet Alt", location=self.room1)
         self.account2.characters.add(alt)
+        alt.attributes.add("sandbox_last_seen", timezone.now())
         names, html = self.listed()
-        self.assertEqual(names, [self.char2.key])
+        self.assertEqual(names, ["Quiet Alt", self.char2.key, self.char1.key])
         self.assertIn(f">{self.char2.key}</a>", html)
+        self.assertNotRegex(html, rf"\b{self.account.username}\b")
         self.assertNotIn(self.account2.username, html)
-        self.assertNotIn("Quiet Alt", html)  # other characters stay unlinked
 
-    def test_staff_are_left_out_unless_the_game_lists_them(self):
-        from evennia_social import presence
-
-        self.assertNotIn(self.char1.key, self.listed()[0])
-        with override_settings(SANDBOX_HOMEPAGE_LIST_STAFF=True):
-            self.assertIn(self.char1.key, self.listed()[0])
-            presence.set_visibility(self.char1, presence.DARK)
-            self.assertNotIn(self.char1.key, self.listed()[0])
-
-    def test_unfindable_is_listed_as_in_who(self):
+    def test_unlisted_characters_are_left_out(self):
         from evennia_social import presence
 
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        self.assertIn(self.char2.key, self.listed()[0])  # unfindable hides location only
-
-    def test_accounts_without_a_played_character_are_left_out(self):
-        self.account2.db._last_puppet = None
+        presence.set_visibility(self.char1, presence.DARK)
         self.assertEqual(self.listed()[0], [])
-        self.account2.db._last_puppet = self.char2
-        self.account2.characters.remove(self.char2)
+
+    def test_characters_not_seen_lately_are_left_out(self):
+        self.char1.attributes.add("sandbox_last_seen", timezone.now() - timedelta(days=8))
+        self.char2.attributes.remove("sandbox_last_seen")
         self.assertEqual(self.listed()[0], [])
 
     def test_characters_the_visitor_may_not_view_are_left_out(self):
         self.char2.locks.add("view:false()")
-        self.assertEqual(self.listed()[0], [])
+        self.assertEqual(self.listed()[0], [self.char1.key])
 
     def test_guests_are_left_out_with_or_without_social(self):
-        from typeclasses.accounts import Guest
-
-        guest = create_account(
-            "Visitor", None, "test-password", typeclass=Guest, permissions=["Guests"]
-        )
         visitor = create_object(Character, key="Wanderer", location=self.room1)
         visitor.tags.add("character", category="guest")
-        guest.characters.add(visitor)
-        guest.db._last_puppet = visitor
-        guest.last_login = timezone.now()
-        guest.save()
-        self.assertEqual(self.listed()[0], [self.char2.key])
+        visitor.attributes.add("sandbox_last_seen", timezone.now())
+        expected = [self.char2.key, self.char1.key]
+        self.assertEqual(self.listed()[0], expected)
         installed = apps.is_installed
         with patch(
             "web.website.views.index.apps.is_installed",
             side_effect=lambda label: label != "evennia_social" and installed(label),
         ):
-            self.assertEqual(self.listed()[0], [self.char2.key])
-            with override_settings(SANDBOX_HOMEPAGE_LIST_STAFF=True):
-                self.assertCountEqual(self.listed()[0], [self.char1.key, self.char2.key])
+            self.assertEqual(self.listed()[0], expected)

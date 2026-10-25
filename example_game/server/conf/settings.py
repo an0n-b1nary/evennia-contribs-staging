@@ -699,11 +699,6 @@ PLOTS_BOARDS_APP_LABEL = "evennia_boards"
 # authoring, not for HTTP staff chrome.
 EVENNIA_WEB_STAFF_LOCK = "cmd:perm(Builder)"
 
-# The home page's Recently Connected card names the character each account last
-# played. Staff accounts (Builder or higher) are left out unless this is True;
-# dark staff, guests and login names never appear.
-SANDBOX_HOMEPAGE_LIST_STAFF = False
-
 # base.html includes _menu.html on every render, including on pages rendered by
 # contrib views this game does not own. A context processor is the only seam
 # that reaches all of them; see web/website/context_processors.py for why this

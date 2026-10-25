@@ -40,6 +40,8 @@ from evennia.web.website.views.index import EvenniaIndexView
 ACTIVITY_WINDOW_DAYS = 30
 ACTIVITY_LIMIT = 10
 WIDGET_LIMIT = 5
+# Evennia's own recently-connected window.
+RECENTLY_CONNECTED_DAYS = 7
 
 # Contribs with no web surface at all. Listed on the systems widget so the
 # inventory is honest about the whole install rather than only the linkable part
@@ -372,42 +374,43 @@ def _guide_start_url():
 
 
 def _recently_connected(request):
-    """Recently connected players, as the character each account last played.
+    """Characters played lately, newest first. Accounts never appear here.
 
-    Evennia's own list is of accounts, and an account's username is its login
-    name. Only the last-played character is shown, so the list never ties an
-    account's characters together. Guests, dark staff and characters the visitor
-    may not view are left out, as in `who` and on the character list; staff
-    accounts are left out too unless SANDBOX_HOMEPAGE_LIST_STAFF is set.
+    `sandbox_last_seen` is written whenever a character is puppeted or
+    unpuppeted (typeclasses/characters.py). Every such character is a
+    candidate, alts and staff included: anyone who would rather not be listed
+    uses +unfindable. Unlisted characters, guests and characters the visitor
+    may not view are left out, as in `who` and on the character list.
     """
-    from django.conf import settings
-    from evennia.accounts.models import AccountDB
+    from evennia.objects.models import ObjectDB
 
     from evennia_links.guests import is_guest
 
     if apps.is_installed("evennia_social"):
+        from evennia_social.identity import staff_run_marker
         from evennia_social.presence import is_publicly_listed
     else:
 
         def is_publicly_listed(character):
             return not is_guest(character)
 
-    list_staff = getattr(settings, "SANDBOX_HOMEPAGE_LIST_STAFF", False)
+        def staff_run_marker(character):
+            return ""
+
+    since = timezone.now() - timedelta(days=RECENTLY_CONNECTED_DAYS)
+    seen = []
+    for character in ObjectDB.objects.get_by_attribute(key="sandbox_last_seen"):
+        when = character.attributes.get("sandbox_last_seen")
+        if when and when >= since:
+            seen.append((when, character))
+    seen.sort(key=lambda pair: pair[0], reverse=True)
     rows = []
-    for account in AccountDB.objects.get_recently_connected_accounts():
-        if not list_staff and (
-            account.is_staff or account.locks.check_lockstring(account, "perm(Builder)")
-        ):
+    for when, character in seen:
+        if not is_publicly_listed(character) or not character.access(request.user, "view"):
             continue
-        character = account.db._last_puppet
-        if (
-            character is None
-            or character not in account.characters.all()
-            or not is_publicly_listed(character)
-            or not character.access(request.user, "view")
-        ):
-            continue
-        rows.append({"character": character, "last_login": account.last_login})
+        rows.append(
+            {"character": character, "last_seen": when, "marker": staff_run_marker(character)}
+        )
         if len(rows) == WIDGET_LIMIT:
             break
     return rows
