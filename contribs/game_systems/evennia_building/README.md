@@ -90,7 +90,7 @@ warn. Links runtime controls default to 2 open projects, 15 total draft rooms,
 6 attachment doors (warning, optionally hard) and the reveal switch off.
 
 Use `policy.set_policy(actor, room, policy)` or `+buildadmin/policy` for audited
-staff changes; `/policy/region` manages region defaults. Drafts deny generic
+staff changes; `+buildadmin/region` manages region defaults. Drafts deny generic
 describe/configure actions: Building services alone version their content and
 preserve isolation. Live descriptions use `edit_property_room` or
 `+property/desc <text>` from inside the room and are audited.

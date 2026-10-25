@@ -301,6 +301,25 @@ class StaffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         change.refresh_from_db()
         self.assertEqual(change.state, "applied")
 
+    def test_draft_messages_match_their_effect(self):
+        self.assertIn("no staff draft", self.command("/cancel"))
+        self.assertIn("live frontier", self.command(f"/steward #{self.room1.pk}=none # Not public"))
+        self.assertFalse(self.char1.attributes.has(DRAFT_KEY))
+        parent = self.approve()
+        child = self.apartment(parent)
+        agreement = child.attachment
+        self.command(
+            f"/passage {agreement.pk}="
+            + ",".join(f"#{pk}" for pk in agreement.route["rooms"])
+            + " # Reaffirm this passage"
+        )
+        output = self.confirm("/finish")
+        self.assertIn("proposed", output)
+        self.assertNotIn("applied", output)
+        self.command(f"/archive {parent.pk} # Temporary retirement")
+        self.command("/children yes")
+        self.assertIn("; 1 room.", self.command("/draft"))
+
     def test_steward_assignment_binds_current_steward_and_preview_is_pure(self):
         area = self.public_frontier()
         record = area.rooms.get()

@@ -119,7 +119,9 @@ def _start(command):
         if not value:
             raise ValidationError("Use +buildadmin/steward <room>=<character or none> # <reason>.")
         room = support.world_room(actor, target)
-        record = FrontierRoom.objects.get(room=room, frontier__state="live")
+        record = FrontierRoom.objects.filter(room=room, frontier__state="live").first()
+        if not record:
+            raise ValidationError("Choose a room in a live frontier area.")
         recipient = None if value.casefold() == "none" else support.character(actor, value).pk
         plan.update(
             target=record.pk,
@@ -253,6 +255,10 @@ def _plan_state(plan):
     }
 
 
+def _count(items, noun):
+    return f"{len(items)} {noun}{'' if len(items) == 1 else 's'}"
+
+
 def _summary(plan, current):
     """Explain choices and affected owners without printing internal guard fields."""
     lines = [f"{plan['kind'].title()} plan. Reason: {plan['reason'] or 'not yet set'}"]
@@ -266,7 +272,7 @@ def _summary(plan, current):
             .first()
         )
         lines.append(
-            f"Property {property['id']}: {property['name']}; owner {owner or 'missing'} (#{property['owner_id']}); {property['state']}; {len(property['rooms'])} rooms."
+            f"Property {property['id']}: {property['name']}; owner {owner or 'missing'} (#{property['owner_id']}); {property['state']}; {_count(property['rooms'], 'room')}."
         )
     if plan["kind"] == "transfer":
         lines.append(
@@ -284,7 +290,7 @@ def _summary(plan, current):
     if plan["kind"] == "retire":
         for item in current["frontiers"]:
             lines.append(
-                f"Frontier {item['id']}: {item['name']}; {len(item['rooms'])} public rooms."
+                f"Frontier {item['id']}: {item['name']}; {_count(item['rooms'], 'public room')}."
             )
         for row in plan["replacements"]:
             lines.append(
@@ -367,11 +373,13 @@ def _finish(command):
         change = attachments.propose_passage(
             actor, AttachmentAgreement.objects.get(pk=target), plan["route"], reason=plan["reason"]
         )
+    actor.attributes.remove(DRAFT_KEY)
+    if kind == "passage":
         actor.msg(
             f"Passage change {change.pk} proposed. Both owners can inspect +passage {change.pk}."
         )
-    actor.attributes.remove(DRAFT_KEY)
-    actor.msg(f"{kind.title()} plan applied.")
+    else:
+        actor.msg(f"{kind.title()} plan applied.")
 
 
 def _review(command):
@@ -557,6 +565,8 @@ def run_staff(command):
         _finish(command)
     elif action == "cancel":
         command.empty()
+        if not actor.attributes.has(DRAFT_KEY):
+            raise ValidationError("You have no staff draft to cancel.")
         actor.attributes.remove(DRAFT_KEY)
         actor.msg("Staff draft cancelled.")
     elif action in {"approve", "changes", "decline", "environment", "geometry"}:
