@@ -45,6 +45,8 @@ every watcher — treat it as an incident alarm, not as cover.
   the contribs' hard `[project] dependencies` on siblings, so declare every
   hard sibling dependency there — an undeclared one registers in path order
   and escapes the check that refuses to exclude a partner something requires
+- `scripts/ci_profile.py` — runs one CI partner profile's runner in a fresh
+  venv and game of its own; copy a step's command from `ci.yml` to reproduce it
 - `.pre-commit-config.yaml` — anonymity guards + ruff; repo-root
   `pyproject.toml` holds the shared ruff config
 

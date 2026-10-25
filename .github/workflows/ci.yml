@@ -13,12 +13,20 @@ on:
 
 # Partner jobs don't run `evennia migrate`: creating the test database applies
 # every installed app's migrations, and no partner runner uses the game's own
-# database. A pip download cache was tried and saved nothing measurable (#170):
-# installing, not downloading, is the cost.
+# database. Installing, not downloading, is the setup cost (#170), so jobs
+# install with uv. scripts/ci_profile.py gives each partner profile a fresh venv
+# of its own, so a family's short profiles run as steps of one job, each with
+# its excluded partners physically absent (#147). Long profiles stay a matrix.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned to the Evennia version the source project runs on. Bump
+  # deliberately, in lockstep with the source project's runtime.
+  # scripts/ci_profile.py defaults to the same pin.
+  EVENNIA_REQUIREMENT: evennia==6.0.0
 
 jobs:
   lint:
@@ -54,9 +62,10 @@ jobs:
         run: python scripts/test_anonymity_push_guard.py
       - name: Issue publication guard tests
         run: python scripts/test_file_issue.py
-      - name: Contrib installer, partner runner and job selection tests
+      - name: Contrib installer, profile, partner runner and job selection tests
         run: |
           python scripts/test_ci_install_contribs.py
+          python scripts/test_ci_profile.py
           python scripts/test_ci_run_partner_tests.py
           python scripts/test_ci_scope.py
 
@@ -98,10 +107,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Install Evennia
-        # Pinned to the Evennia version the source project runs on.
-        # Bump deliberately, in lockstep with the source project's runtime.
-        run: pip install evennia==6.0.0
+        run: uv pip install --system "$EVENNIA_REQUIREMENT"
       # The lint job installs no Django, so the pre-commit copy of this hook
       # skips there. Run it here, where Django exists, and require it.
       - name: Django template sweep
@@ -136,66 +146,61 @@ jobs:
     if: contains(fromJSON(needs.scope.outputs.jobs), 'lore-items-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
-          - profile: no-crafting
-            excludes: "--exclude evennia-rp-crafting"
-            absent: "--absent evennia_rp_crafting"
-          - profile: no-lore
-            excludes: "--exclude evennia-lore"
-            absent: "--absent evennia_lore"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install pinned Evennia
-        run: pip install evennia==6.0.0
-      - name: Initialize throwaway game
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Lore and crafted-item seams with verified partner absence
-        run: python scripts/ci_run_lore_item_tests.py ci_game/lore_items ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: all-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_lore_item_tests.py {game}/lore_items
+      - name: no-crafting
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-crafting --
+          python scripts/ci_run_lore_item_tests.py {game}/lore_items --absent evennia_rp_crafting
+      - name: no-lore
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-lore --
+          python scripts/ci_run_lore_item_tests.py {game}/lore_items --absent evennia_lore
 
   calendar-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'calendar-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: calendar-present
-            args: "--calendar present"
-            excludes: ""
-          - profile: calendar-absent
-            args: "--calendar absent"
-            excludes: "--exclude evennia-calendar"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize throwaway game directory
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners in dependency order
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Fresh-process partner seams and host-configured maps suite
-        run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: calendar-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_partner_tests.py {game} --calendar present
+      - name: calendar-absent
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-calendar --
+          python scripts/ci_run_partner_tests.py {game} --calendar absent
 
   building-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'building-partners')
     runs-on: ubuntu-latest
+    # Seven profiles of about two minutes each: run in sequence they would
+    # take longer than the sandbox and live-playtest chain, so they stay a
+    # matrix, one fresh environment per cell.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -227,98 +232,102 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize throwaway game directory
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners in dependency order
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Building suite and partner seams with verified absence
-        run: python scripts/ci_run_partner_tests.py ci_game ${{ matrix.args }}
+        run: >-
+          python scripts/ci_profile.py ${{ matrix.excludes }} --
+          python scripts/ci_run_partner_tests.py {game} ${{ matrix.args }}
 
   resources-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'resources-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
-          - profile: no-maps
-            excludes: "--exclude evennia-maps"
-            absent: "--absent evennia_maps"
-          - profile: no-plots
-            excludes: "--exclude evennia-plots"
-            absent: "--absent evennia_plots"
-          - profile: no-social
-            excludes: "--exclude evennia-social"
-            absent: "--absent evennia_social"
-          - profile: no-tracker
-            excludes: "--exclude evennia-rptracker"
-            absent: "--absent evennia_rptracker"
-          - profile: no-economy
-            excludes: "--exclude evennia-economy"
-            absent: "--absent evennia_economy"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize disposable host
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected contribs in dependency order
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Resources suite and real partner seams
-        run: python scripts/ci_run_resources_tests.py ci_game ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: all-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_resources_tests.py {game}
+      - name: no-maps
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-maps --
+          python scripts/ci_run_resources_tests.py {game} --absent evennia_maps
+      - name: no-plots
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-plots --
+          python scripts/ci_run_resources_tests.py {game} --absent evennia_plots
+      - name: no-social
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-social --
+          python scripts/ci_run_resources_tests.py {game} --absent evennia_social
+      - name: no-tracker
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rptracker --
+          python scripts/ci_run_resources_tests.py {game} --absent evennia_rptracker
+      - name: no-economy
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-economy --
+          python scripts/ci_run_resources_tests.py {game} --absent evennia_economy
 
   economy-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'economy-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
-          - profile: no-resources
-            excludes: "--exclude evennia-rp-resources --exclude evennia-rp-crafting"
-            absent: "--absent evennia_rp_resources"
-          - profile: no-jobs
-            excludes: "--exclude evennia-jobs --exclude evennia-moderation"
-            absent: "--absent evennia_jobs"
-          - profile: no-building
-            excludes: "--exclude evennia-building"
-            absent: "--absent evennia_building"
-          - profile: no-equipment
-            excludes: "--exclude evennia-rp-equipment"
-            absent: "--absent evennia_rp_equipment"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize disposable host
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected contribs in dependency order
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Economy suite and real partner seams
-        run: python scripts/ci_run_economy_tests.py ci_game ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: all-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_economy_tests.py {game}
+      - name: no-resources
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-resources --exclude evennia-rp-crafting --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_rp_resources
+      - name: no-jobs
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-jobs --exclude evennia-moderation --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_jobs
+      - name: no-building
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-building --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_building
+      - name: no-equipment
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-equipment --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_rp_equipment
 
   crafting-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'crafting-partners')
     runs-on: ubuntu-latest
+    # About six minutes of tests per profile, so each stays its own job.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -347,52 +356,52 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize dependency installation host
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Crafting suite and reference seams with verified partner absence
-        run: python scripts/ci_run_crafting_tests.py ci_game/crafting_sandbox ${{ matrix.absent }}
+        run: >-
+          python scripts/ci_profile.py ${{ matrix.excludes }} --
+          python scripts/ci_run_crafting_tests.py {game}/crafting_sandbox ${{ matrix.absent }}
 
   rp-contest-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'rp-contest-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
-          - profile: no-scenes
-            excludes: "--exclude evennia-scenes"
-            absent: "--absent evennia_scenes"
-          - profile: no-tracker
-            excludes: "--exclude evennia-rptracker"
-            absent: "--absent evennia_rptracker"
-          - profile: no-chargen
-            excludes: "--exclude evennia-rp-chargen --exclude evennia-rp-equipment"
-            absent: "--absent evennia_rp_chargen"
-          - profile: kernel-only
-            excludes: "--exclude evennia-scenes --exclude evennia-rptracker --exclude evennia-rp-chargen --exclude evennia-rp-equipment"
-            absent: "--absent evennia_scenes --absent evennia_rptracker --absent evennia_rp_chargen"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize disposable game
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Contest seams with verified partner absence
-        run: python scripts/ci_run_rp_contest_tests.py ci_game ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: all-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_rp_contest_tests.py {game}
+      - name: no-scenes
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-scenes --
+          python scripts/ci_run_rp_contest_tests.py {game} --absent evennia_scenes
+      - name: no-tracker
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rptracker --
+          python scripts/ci_run_rp_contest_tests.py {game} --absent evennia_rptracker
+      - name: no-chargen
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-chargen --exclude evennia-rp-equipment --
+          python scripts/ci_run_rp_contest_tests.py {game} --absent evennia_rp_chargen
+      - name: kernel-only
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-scenes --exclude evennia-rptracker --exclude evennia-rp-chargen --exclude evennia-rp-equipment --
+          python scripts/ci_run_rp_contest_tests.py {game} --absent evennia_scenes --absent evennia_rptracker --absent evennia_rp_chargen
 
   sandbox:
     needs: scope
@@ -405,55 +414,57 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize dependency installation host
-        run: evennia --init ci_game < /dev/null
-      - name: Install every contrib
-        run: python scripts/ci_install_contribs.py ci_game
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Sandbox gate
-        run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox
 
   rp-sandbox:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'rp-sandbox')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: no-scenes
-            excludes: "--exclude evennia-scenes"
-            absent: "--absent evennia_scenes"
-          - profile: no-tracker
-            excludes: "--exclude evennia-rptracker"
-            absent: "--absent evennia_rptracker"
-          - profile: no-xp
-            excludes: "--exclude evennia-xp"
-            absent: "--absent evennia_xp"
-          - profile: no-chargen
-            excludes: "--exclude evennia-rp-chargen --exclude evennia-rp-equipment"
-            absent: "--absent evennia_rp_chargen --absent evennia_rp_equipment"
-          - profile: no-equipment
-            excludes: "--exclude evennia-rp-equipment"
-            absent: "--absent evennia_rp_equipment"
-          - profile: no-contest
-            excludes: "--exclude evennia-rp-contest"
-            absent: "--absent evennia_rp_contest"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize dependency installation host
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected partners
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: Sandbox gate with verified partner absence
-        run: python scripts/ci_run_rp_sandbox_tests.py ci_game/rp_sandbox ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: no-scenes
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-scenes --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_scenes
+      - name: no-tracker
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rptracker --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_rptracker
+      - name: no-xp
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-xp --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_xp
+      - name: no-chargen
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-chargen --exclude evennia-rp-equipment --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_rp_chargen --absent evennia_rp_equipment
+      - name: no-equipment
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-equipment --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_rp_equipment
+      - name: no-contest
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-contest --
+          python scripts/ci_run_rp_sandbox_tests.py {game}/rp_sandbox --absent evennia_rp_contest
 
   crafting-independent:
     needs: scope
@@ -465,53 +476,55 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install only hard partners
-        run: |
-          pip install evennia==6.0.0
-          pip install -e contribs/base_systems/evennia_links
-          pip install -e contribs/game_systems/evennia_rp_resources
-          pip install -e contribs/game_systems/evennia_rp_crafting
-          evennia --init ci_game < /dev/null
-      - name: Crafting with verified absence of every optional partner
-        run: python scripts/ci_run_crafting_core_tests.py ci_game
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: Crafting with only its hard partners, every optional one verified absent
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_rp_resources
+          --package contribs/game_systems/evennia_rp_crafting --
+          python scripts/ci_run_crafting_core_tests.py {game}
 
   npc-partners:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'npc-partners')
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: all-present
-            excludes: ""
-            absent: ""
-          - profile: no-scenes
-            excludes: "--exclude evennia-scenes"
-            absent: "--absent evennia_scenes"
-          - profile: no-plots
-            excludes: "--exclude evennia-plots"
-            absent: "--absent evennia_plots"
-          - profile: no-contest
-            excludes: "--exclude evennia-rp-contest"
-            absent: "--absent evennia_rp_contest"
-          - profile: independent
-            excludes: "--exclude evennia-scenes --exclude evennia-plots --exclude evennia-rp-contest --exclude evennia-posing --exclude evennia-social --exclude evennia-rptracker --exclude evennia-xp --exclude evennia-rp-chargen --exclude evennia-rp-equipment"
-            absent: "--absent evennia_scenes --absent evennia_plots --absent evennia_rp_contest --absent evennia_posing --absent evennia_rptracker --absent evennia_xp --absent evennia_rp_chargen"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Evennia in a fresh environment
-        run: pip install evennia==6.0.0
-      - name: Initialize disposable host
-        run: evennia --init ci_game < /dev/null
-      - name: Install selected contribs in dependency order
-        run: python scripts/ci_install_contribs.py ci_game ${{ matrix.excludes }}
-      - name: NPC suite and verified partner seams
-        run: python scripts/ci_run_npc_tests.py ci_game ${{ matrix.absent }}
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: all-present
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_npc_tests.py {game}
+      - name: no-scenes
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-scenes --
+          python scripts/ci_run_npc_tests.py {game} --absent evennia_scenes
+      - name: no-plots
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-plots --
+          python scripts/ci_run_npc_tests.py {game} --absent evennia_plots
+      - name: no-contest
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-contest --
+          python scripts/ci_run_npc_tests.py {game} --absent evennia_rp_contest
+      - name: independent
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-scenes --exclude evennia-plots --exclude evennia-rp-contest --exclude evennia-posing --exclude evennia-social --exclude evennia-rptracker --exclude evennia-xp --exclude evennia-rp-chargen --exclude evennia-rp-equipment --
+          python scripts/ci_run_npc_tests.py {game} --absent evennia_scenes --absent evennia_plots --absent evennia_rp_contest --absent evennia_posing --absent evennia_rptracker --absent evennia_xp --absent evennia_rp_chargen
 
   live-playtest:
     needs: [scope, sandbox]
@@ -527,8 +540,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Install runtime and live driver
-        run: pip install evennia==6.0.0 psutil==7.1.0 playwright==1.62.0
+        run: uv pip install --system "$EVENNIA_REQUIREMENT" psutil==7.1.0 playwright==1.62.0
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Install all contribs in dependency order
@@ -560,34 +576,52 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'moderation-partners')
     runs-on: ubuntu-latest
+    # Only hard dependencies and the selected communication partners; the
+    # runner registers the apps and adds file-backed admissions races.
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: core
-            packages: ""
-            absent: "--absent evennia_posing --absent evennia_social --absent evennia_boards --absent evennia_rptracker --absent evennia_npcs --absent evennia_rp_party"
-          - profile: social
-            packages: "contribs/game_systems/evennia_posing contribs/game_systems/evennia_social"
-            absent: "--absent evennia_boards --absent evennia_rptracker --absent evennia_npcs --absent evennia_rp_party"
-          - profile: communications
-            packages: "contribs/game_systems/evennia_posing contribs/game_systems/evennia_social contribs/game_systems/evennia_boards contribs/game_systems/evennia_rptracker"
-            absent: "--absent evennia_npcs --absent evennia_rp_party"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install only hard dependencies and selected communication partners
-        run: |
-          pip install evennia==6.0.0
-          for package in contribs/base_systems/evennia_links contribs/game_systems/evennia_jobs contribs/game_systems/evennia_moderation ${{ matrix.packages }}; do
-            pip install -e "$package"
-          done
-          evennia --init ci_game < /dev/null
-      - name: Verified partner absence and file-backed admissions races
-        run: python scripts/ci_run_moderation_tests.py ci_game ${{ matrix.absent }} < /dev/null
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: core
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_jobs
+          --package contribs/game_systems/evennia_moderation --
+          python scripts/ci_run_moderation_tests.py {game}
+          --absent evennia_posing --absent evennia_social --absent evennia_boards
+          --absent evennia_rptracker --absent evennia_npcs --absent evennia_rp_party
+      - name: social
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_jobs
+          --package contribs/game_systems/evennia_moderation
+          --package contribs/game_systems/evennia_posing
+          --package contribs/game_systems/evennia_social --
+          python scripts/ci_run_moderation_tests.py {game}
+          --absent evennia_boards --absent evennia_rptracker --absent evennia_npcs
+          --absent evennia_rp_party
+      - name: communications
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_jobs
+          --package contribs/game_systems/evennia_moderation
+          --package contribs/game_systems/evennia_posing
+          --package contribs/game_systems/evennia_social
+          --package contribs/game_systems/evennia_boards
+          --package contribs/game_systems/evennia_rptracker --
+          python scripts/ci_run_moderation_tests.py {game}
+          --absent evennia_npcs --absent evennia_rp_party
 
   combat-independent:
     needs: scope
@@ -599,12 +633,13 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Install combat with only its hard partners
         run: |
-          pip install evennia==6.0.0
-          pip install -e contribs/base_systems/evennia_links
-          pip install -e contribs/rpg/evennia_rp_rules
-          pip install -e contribs/rpg/evennia_rp_combat
+          uv pip install --system "$EVENNIA_REQUIREMENT" -e contribs/base_systems/evennia_links \
+            -e contribs/rpg/evennia_rp_rules -e contribs/rpg/evennia_rp_combat
           evennia --init ci_game < /dev/null
           printf "\nINSTALLED_APPS += ['evennia_links', 'evennia_rp_rules', 'evennia_rp_combat']\n" >> ci_game/server/conf/settings.py
       - name: Independent combat with verified physical absence
@@ -615,7 +650,7 @@ jobs:
           --absent evennia_social --absent evennia_accessibility
       - name: Add real NPCs without sheets, Scenes or posing
         run: |
-          pip install -e contribs/game_systems/evennia_npcs
+          uv pip install --system -e contribs/game_systems/evennia_npcs
           printf "\nINSTALLED_APPS += ['evennia_npcs']\n" >> ci_game/server/conf/settings.py
           python scripts/ci_run_combat_tests.py ci_game --absent evennia_rp_chargen --absent evennia_scenes --absent evennia_posing --absent evennia_social --absent evennia_accessibility
 
@@ -631,7 +666,7 @@ jobs:
           python-version: "3.12"
       - name: Install hard partners and packaged combat/Party
         run: |
-          pip install evennia==6.0.0
+          pip install "$EVENNIA_REQUIREMENT"
           pip install -e contribs/base_systems/evennia_links
           pip install -e contribs/rpg/evennia_rp_rules
           pip wheel --no-deps -w wheels contribs/rpg/evennia_rp_combat

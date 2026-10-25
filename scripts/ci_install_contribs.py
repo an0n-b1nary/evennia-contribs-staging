@@ -12,7 +12,9 @@ One `pip install -e ... -e ...` call resolves the whole selection at once, so a
 sibling requirement is met by its local path rather than fetched from PyPI. The
 contribs' build requirements are installed first and the builds skip pip's
 per-package isolated build environment, which made installing every contrib
-take several times longer.
+take several times longer. Installation goes through uv when it's on PATH, as
+it is in CI, and through pip otherwise: on CI runners the time goes into
+installing packages, which uv does several times faster than pip.
 
 Optional dependencies (`[project.optional-dependencies]`) are deliberately not
 ordering edges: optional partners are wired through gated `AppConfig.ready()`
@@ -34,6 +36,7 @@ import argparse
 import heapq
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -181,6 +184,18 @@ def select_contribs(contribs: list[Contrib], exclude: tuple[str, ...] = ()) -> l
     return install_order(selected)
 
 
+def pip_install_command(python: str = sys.executable) -> list[str]:
+    """Return the command that installs packages into `python`'s environment.
+
+    uv when it's on PATH, pip otherwise. uv needs the interpreter named, since
+    a venv it creates has no pip of its own.
+    """
+    uv = shutil.which("uv")
+    if uv:
+        return [uv, "pip", "install", "--python", python]
+    return [python, "-m", "pip", "install"]
+
+
 def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
     """Install each contrib and append its app label to the game's settings.
 
@@ -207,7 +222,7 @@ def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
         print("No contribs to install yet.")
         return 0
 
-    pip = [sys.executable, "-m", "pip", "install"]
+    pip = pip_install_command()
     build_requires = sorted({req for contrib in contribs for req in contrib.build_requires})
     subprocess.run([*pip, *build_requires], check=True, stdin=subprocess.DEVNULL)
     editables = [arg for contrib in contribs for arg in ("-e", str(contrib.path))]
