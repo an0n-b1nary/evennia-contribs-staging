@@ -54,10 +54,24 @@ class BuildingCommand(MuxCommand):
     help_category = "Building"
 
     def parse(self):
-        """Keep the unfiltered switch list for strict, unique-prefix validation."""
-        raw = self.args.strip()
-        self.requested = raw.split(None, 1)[0][1:].split("/") if raw.startswith("/") else []
-        super().parse()
+        """Keep the unfiltered switch list for strict, unique-prefix validation.
+
+        MuxCommand's own matching would announce ambiguous or ignored switches,
+        including staff-only names, before ``func`` refuses them.
+        """
+        # Match MuxCommand: switches start immediately after the command key.
+        raw = self.args
+        self.requested = (
+            [value.lower() for value in raw.split(None, 1)[0][1:].split("/")]
+            if raw.startswith("/") and len(raw.strip()) > 1
+            else []
+        )
+        options, self.switch_options = self.switch_options, None
+        try:
+            super().parse()
+        finally:
+            self.switch_options = options
+        self.switches = self.requested
 
     def func(self):
         """Report domain errors without dropping malformed syntax into another action."""
@@ -71,20 +85,24 @@ class BuildingCommand(MuxCommand):
                 return LegacyStaffBuild.func(self)
             if len(self.requested) > 1:
                 raise ValidationError(f"Use one switch at most. See help {self.key}.")
+            self.switch = ""
             for value in self.requested:
                 matches = [option for option in self.switch_options if option == value]
                 if not matches:
                     matches = [option for option in self.switch_options if option.startswith(value)]
                 if len(matches) != 1:
                     raise ValidationError(f"Choose one unambiguous switch. See help {self.key}.")
-            self.switch = self.switches[0] if self.switches else ""
+                self.switch = matches[0]
             self.execute()
         except (ValidationError, PermissionDenied, ObjectDoesNotExist, ValueError) as exc:
-            self.caller.msg(
-                " ".join(exc.messages)
-                if isinstance(exc, ValidationError)
-                else str(exc) or f"Choose an available target. See help {self.key}."
-            )
+            if isinstance(exc, ValidationError):
+                text = " ".join(exc.messages)
+            elif isinstance(exc, ObjectDoesNotExist):
+                # The default text names a model; never show players that.
+                text = ""
+            else:
+                text = str(exc)
+            self.caller.msg(text or f"Choose an available target. See help {self.key}.")
 
     @atomic_objects
     def execute(self):
@@ -198,21 +216,6 @@ class CmdBuild(BuildingCommand):
         "submit",
         "withdraw",
         "discard",
-        "review",
-        "geometry",
-        "environment",
-        "approve",
-        "transfer",
-        "policy",
-        "archive",
-        "children",
-        "restore",
-        "quiet",
-        "passage",
-        "propose",
-        "apply",
-        "frontier",
-        "steward",
     )
 
     def run(self):
@@ -253,6 +256,8 @@ class CmdBuild(BuildingCommand):
             services.enter(actor, obj, room=support.draft_room(obj, self.bare()))
         elif switch in {"name", "desc", "title", "purpose"}:
             value = self.bare(prose=switch != "purpose")
+            if switch == "purpose":
+                value = value.lower()
             if switch in {"name", "desc"}:
                 kwargs = {"name" if switch == "name" else "description": value}
                 services.edit_project(
@@ -325,6 +330,8 @@ class CmdBuild(BuildingCommand):
             else:
                 value = self.bare()
                 if switch in {"x", "y", "floor"}:
+                    if not value.removeprefix("-").isdecimal():
+                        raise ValidationError(f"Use +build/{switch} <whole number>.")
                     data[switch] = int(value)
                 elif switch == "direction":
                     dx, dy, dz, _ = frontier.direction(value)
@@ -386,6 +393,8 @@ class CmdBuild(BuildingCommand):
         elif switch in {"terrain", "region", "inherit"}:
             requested = dict(obj.requested_environment)
             value = self.bare()
+            if switch == "inherit":
+                value = value.lower()
             if switch == "terrain":
                 requested["terrain"] = [item.strip() for item in value.split(",") if item.strip()]
             elif switch == "region":
@@ -474,8 +483,10 @@ class CmdBuild(BuildingCommand):
         elif switch == "withdraw":
             value, reason = support.token_reason(self.bare())
             submission = obj.submissions.order_by("-revision").first()
-            if obj.owner_id != actor.pk or obj.state != "submitted" or not submission:
+            if obj.owner_id != actor.pk:
                 raise PermissionDenied("Only the owner may withdraw the current submission.")
+            if obj.state != "submitted" or not submission:
+                raise ValidationError("This project has no submission to withdraw.")
             state = {
                 "submission": submission.pk,
                 "revision": submission.revision,
@@ -507,7 +518,17 @@ class CmdBuild(BuildingCommand):
                 actor.msg("Draft discarded.")
         else:
             raise ValidationError("Unknown player Building action. See help +build.")
-        if switch not in {"submit", "withdraw", "discard", "check", "history"}:
+        # These actions already report their own outcome.
+        if switch not in {
+            "dig",
+            "door",
+            "interior",
+            "submit",
+            "withdraw",
+            "discard",
+            "check",
+            "history",
+        }:
             actor.msg("Done.")
 
     def created_room(self, room):
@@ -946,8 +967,10 @@ class CmdFrontier(BuildingCommand):
             actor.msg("Frontier room updated.")
         elif switch == "relinquish":
             value, reason = support.token_reason(self.bare())
-            record = FrontierRoom.objects.get(room_id=actor.db_location_id, frontier__state="live")
-            if record.steward_id != actor.pk:
+            record = FrontierRoom.objects.filter(
+                room_id=actor.db_location_id, frontier__state="live"
+            ).first()
+            if not record or record.steward_id != actor.pk:
                 raise PermissionDenied("Only this room's steward may relinquish it.")
             reason = services._text(reason, 10000)
             state = {

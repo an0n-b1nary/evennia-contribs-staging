@@ -7,6 +7,8 @@
 - Split player commands into `+build`, `+collab`, `+property`, `+consent`,
   `+passage` and `+frontier`; refuse old player forms. Draft and live-room
   edits use the character's current room. Staff forms remain for the next wave.
+  Switches match case-insensitively by unique player prefix and are refused
+  once, without naming staff actions.
 - Replace typed guards and agreement wording with actor-bound, expiring previews
   and confirmation tokens. Use separate terrain/region commands and persistent
   room plans instead of structured command-line fields.

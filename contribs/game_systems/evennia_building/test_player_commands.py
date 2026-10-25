@@ -135,6 +135,47 @@ class PlayerCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.command(CmdBuild, "/des A unique switch prefix works.")
         self.assertEqual(self.entry.room.db.desc, "A unique switch prefix works.")
 
+    def test_switch_refusals_are_single_and_never_name_staff_actions(self):
+        self.char2.permissions.clear()
+        self.char2.account.permissions.clear()
+        for args in ("/d Changed", "/bogus Changed", "/rev 1 1 approved=x"):
+            with self.subTest(args=args):
+                self.assertEqual(
+                    self.command(CmdBuild, args),
+                    "Choose one unambiguous switch. See help +build.",
+                )
+        # Staff-only names no longer make player prefixes ambiguous.
+        self.assertIn("The Bakery — interior", self.command(CmdBuild, "/ch"))
+        self.command(CmdBuild, "/DESC Switches ignore case.")
+        self.assertEqual(self.entry.room.db.desc, "Switches ignore case.")
+
+    def test_player_values_ignore_case_and_errors_stay_readable(self):
+        self.command(CmdBuild, "/purpose Shop")
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.purpose, "shop")
+        self.command(CmdBuild, "/terrain urban")
+        self.command(CmdBuild, "/inherit Terrain")
+        self.project.refresh_from_db()
+        self.assertNotIn("terrain", self.project.requested_environment)
+        self.assertEqual(
+            self.command(CmdBuild, "/dig Pantry"),
+            "Room plan started. Set /x, /y and /floor, or /direction, then +build/finish.",
+        )
+        self.assertEqual(self.command(CmdBuild, "/x east"), "Use +build/x <whole number>.")
+        self.command(CmdBuild, "/x -2")
+        self.assertEqual(self.char2.attributes.get("building_room_draft")["x"], -2)
+        self.assertEqual(
+            self.command(CmdBuild, "/withdraw"), "This project has no submission to withdraw."
+        )
+        self.assertEqual(
+            self.command(CmdCollab, "/accept 999"),
+            "Choose an available target. See help +collab.",
+        )
+        self.assertEqual(
+            self.command(CmdFrontier, "/relinquish # Moving on"),
+            "Only this room's steward may relinquish it.",
+        )
+
     def test_context_never_allows_editing_someone_elses_draft(self):
         self.char1.permissions.clear()
         self.char1.account.permissions.clear()
