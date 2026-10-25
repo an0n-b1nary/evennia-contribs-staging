@@ -37,6 +37,26 @@ class DBVocabulary:
         return match_spelling(self.tags(kind), text, kind or "tag")
 
 
+def spelling_conflicts(key: str, spellings) -> list[tuple[str, str]]:
+    """Other tags already using any of `spellings`, as (spelling, owner key) pairs.
+
+    All kinds share one namespace, as in the ruleset, so `+test` can always
+    resolve a full name. The ruleset checks its own seed; this checks rows.
+    """
+    wanted = {str(spelling).strip().casefold() for spelling in spellings if str(spelling).strip()}
+    return sorted(
+        (spelling, tag.key)
+        for tag in DBVocabulary()._all().values()
+        if tag.key != key
+        for spelling in {s.casefold() for s in tag.spellings()} & wanted
+    )
+
+
+def conflict_message(conflicts) -> str:
+    used = "; ".join(f"{spelling!r} is already used by {owner!r}" for spelling, owner in conflicts)
+    return f"Tag names are unique across kinds: {used}."
+
+
 def ensure_tag(tag: TagDef) -> TagDefinition:
     """The `TagDefinition` row for a vocabulary tag, created from the ruleset if needed."""
     row, _ = TagDefinition.all_objects.get_or_create(
@@ -51,4 +71,4 @@ def ensure_tag(tag: TagDef) -> TagDefinition:
     return row
 
 
-__all__ = ["DBVocabulary", "ensure_tag"]
+__all__ = ["DBVocabulary", "conflict_message", "ensure_tag", "spelling_conflicts"]

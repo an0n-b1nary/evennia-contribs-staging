@@ -162,6 +162,16 @@ class StaffAbilityCommandTests(ChargenCommandTest):
         self.call(
             CmdChargen(), "/tag Thunder=element", "Added the element tag Thunder", caller=self.char1
         )
+        TagDefinition.all_objects.update_or_create(
+            key="riddles", defaults={"name": "Puzzles", "aliases": ["enigmas"]}
+        )
+        self.call(
+            CmdChargen(),
+            "/tag Enigmas=element",
+            "Tag names are unique across kinds: 'enigmas' is already used by 'riddles'.",
+            caller=self.char1,
+        )
+        self.assertFalse(TagDefinition.objects.filter(key="enigmas").exists())
         self.assertEqual(TagDefinition.objects.get(key="thunder").kind, "element")
         # A new domain is immediately available to templates.
         abilities.acquire(self.char2, "domain expertise", "sea lore")

@@ -467,6 +467,12 @@ class CmdChargen(_ChargenCommand):
         if TagDefinition.all_objects.filter(key=key).exists():
             self.msg(f"A tag with key '{key}' already exists.")
             return
+        from evennia_rp_chargen.vocabulary import conflict_message, spelling_conflicts
+
+        conflicts = spelling_conflicts(key, [key, name])
+        if conflicts:
+            self.msg(conflict_message(conflicts))
+            return
         TagDefinition.objects.create(key=key, name=name, kind=kind)
         self.msg(f"Added the {kind} tag {name} ('{key}').")
 
