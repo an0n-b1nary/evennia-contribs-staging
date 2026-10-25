@@ -19,6 +19,7 @@ import downstream_runtime as runtime
 from downstream_failures import (
     GateFailure,
     Progress,
+    describe,
     known_test_ids,
     public_failure,
     test_diagnostics,
@@ -545,6 +546,20 @@ class FailureContractTests(unittest.TestCase):
         self.assertNotIn("elapsed_seconds", summary)
         self.assertNotIn("budget_seconds", summary)
         self.assertEqual(public_failure({"phase": [], "step": {}, "kind": []})["kind"], "error")
+
+    def test_budget_without_valid_elapsed_still_describes(self):
+        summary = public_failure(
+            {
+                "phase": "fresh",
+                "step": "integration",
+                "kind": "timeout",
+                "budget_seconds": 2700,
+                "elapsed_seconds": float("nan"),
+            }
+        )
+        self.assertEqual(
+            describe(summary), "fresh / integration: timeout (budget 2700s, step timeout)"
+        )
 
     def test_subtest_parameters_are_removed_and_errors_are_named(self):
         known = {"world.tests.Sample.test_ok"}

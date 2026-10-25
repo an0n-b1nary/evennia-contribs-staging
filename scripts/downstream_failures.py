@@ -145,7 +145,10 @@ def failure(phase, step, exc, elapsed, *, diagnostics=None, budget=None):
 def describe(value):
     text = f"{value['phase']} / {value['step']}: {value['kind']}"
     if "budget_seconds" in value:
-        text += f" (budget {value['budget_seconds']:g}s, elapsed {value['elapsed_seconds']:g}s"
+        # Each number is projected separately, so elapsed may be dropped alone.
+        text += f" (budget {value['budget_seconds']:g}s"
+        if "elapsed_seconds" in value:
+            text += f", elapsed {value['elapsed_seconds']:g}s"
         text += f", {value.get('timeout_scope', 'step')} timeout)"
     elif "exit_code" in value:
         text += f" (exit {value['exit_code']})"
