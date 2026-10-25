@@ -562,21 +562,22 @@ class TestInteriors(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(invitation.maps)
 
     def test_commands_edit_live_rooms_through_audited_service(self):
-        from .commands import CmdBuild
+        from .commands import CmdProperty
 
         property = self.approve()
+        self.char2.location = self.entry.room
         self.call(
-            CmdBuild(),
-            f"/property/desc {self.entry.room_id}=New live description",
+            CmdProperty(),
+            "/desc New live description",
             caller=self.char2,
         )
         self.assertEqual(self.entry.room.db.desc, "New live description")
         self.assertTrue(BuildAudit.objects.filter(property=property, action="room_edited").exists())
         self.assertFalse(self.char2.check_permstring("Builder"))
         invitation = services.invite(self.char2, property, self.char1)
-        pending = self.call(CmdBuild(), "/invite", caller=self.char1)
+        pending = self.call(CmdProperty(), "/invitations", caller=self.char1)
         self.assertIn(f"Invitation {invitation.pk}", pending)
-        summary = self.call(CmdBuild(), f"/property {property.pk}", caller=self.char2)
+        summary = self.call(CmdProperty(), str(property.pk), caller=self.char2)
         self.assertIn("room_edited", summary)
 
     def test_failed_room_edit_restores_cached_name_and_version(self):
@@ -595,7 +596,7 @@ class TestInteriors(EvenniaCommandTestMixin, EvenniaTest):
         self.project.refresh_from_db()
         self.assertEqual(self.project.version, version)
         self.assertEqual(self.entry.room.key, original)
-        with self.assertRaisesMessage(ValidationError, "reserves 'outside'"):
+        with self.assertRaisesMessage(ValidationError, "reserves"):
             services.dig(self.char2, self.project, self.entry, "Unusable room", door="outside", x=1)
         self.assertEqual(self.project.rooms.count(), 1)
 

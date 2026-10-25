@@ -173,23 +173,23 @@ def _make_room(project, *, name, parent=None, floor=0, x=0, y=0, part=None):
     return record
 
 
-def _exit(source, target, name, *, outward=False):
-    name = _text(name, 100)
-    exits = ObjectDB.objects.filter(db_location=source, db_destination__isnull=False)
-    if any(
-        name.casefold()
-        in {data["name"].casefold(), *(alias.casefold() for alias in data["aliases"])}
-        for exit in exits
-        for data in [_exit_data(exit)]
-    ):
-        raise ValidationError("That door name is already in use.")
-    return create_object(
+def _exit(source, target, name=None, *, outward=False, aliases=()):
+    from .doors import FOLLOW, check_names
+
+    following = name is None
+    name = _text(target.key if following else name, 255 if following else 100)
+    check_names(source, name, aliases)
+    exit = create_object(
         getattr(settings, "BASE_EXIT_TYPECLASS", "evennia.objects.objects.DefaultExit"),
         key=name,
         location=source,
         destination=target,
+        aliases=list(aliases),
         locks="traverse:all()" if outward else "traverse:building_entry()",
     )
+    if following:
+        exit.attributes.add(FOLLOW, True)
+    return exit
 
 
 def _exit_data(exit):
@@ -198,7 +198,7 @@ def _exit_data(exit):
         .values("db_key", "db_location_id", "db_destination_id", "db_lock_storage")
         .get()
     )
-    return {
+    data = {
         "id": exit.pk,
         "name": actual["db_key"],
         "source": actual["db_location_id"],
@@ -206,21 +206,43 @@ def _exit_data(exit):
         "locks": actual["db_lock_storage"],
         "aliases": sorted(exit.db_tags.filter(db_tagtype="alias").values_list("db_key", flat=True)),
     }
+    from .doors import FOLLOW
+
+    if exit.attributes.get(FOLLOW):
+        data["follows"] = actual["db_destination_id"]
+    return data
 
 
-def _door(project, source, target, name, *, outward=False):
+def _door(project, source, target, name=None, *, outward=False, aliases=()):
     if (
         source.project_id != project.pk
         or target.project_id != project.pk
         or source.part_id != target.part_id
     ):
         raise ValidationError("Internal doors must stay inside one draft space.")
-    if source.entry and _text(name, 100).casefold() == "outside":
-        raise ValidationError("The entrance room reserves 'outside' for departure after approval.")
-    exit = _exit(source.room, target.room, name, outward=outward)
+    _reserved_departure(project, source, name or target.room.key, aliases)
+    exit = _exit(source.room, target.room, name, outward=outward, aliases=aliases)
     return DraftDoor.objects.create(
         project=project, source=source, target=target, exit=exit, object_id=exit.pk, outward=outward
     )
+
+
+def _reserved_departure(project, source, name, aliases=()):
+    """Keep every departure trigger free in each proposed interior entry."""
+    if source.part_id:
+        anchor = source.part.anchor.room
+        entry = source.room_id == source.part.entry_id
+    else:
+        anchor, entry = project.anchor, source.entry and project.kind == "interior"
+    if entry and {value.casefold() for value in [name, *aliases]} & {
+        "out",
+        "o",
+        "outside",
+        *((anchor.key.casefold(),) if anchor else ()),
+    }:
+        raise ValidationError(
+            "The entry reserves the anchor name and out, o, outside for departure."
+        )
 
 
 @atomic_objects
@@ -248,12 +270,13 @@ def dig(
     source,
     name,
     *,
-    door="inside",
-    back="out",
+    door=None,
+    back=None,
     floor=0,
     x=0,
     y=0,
     expected_version=None,
+    direction=None,
 ):
     project = _project(
         project, actor, editable=True, expected_version=expected_version, author=True
@@ -268,8 +291,18 @@ def dig(
     room = _make_room(
         project, name=name, parent=source, floor=int(floor), x=int(x), y=int(y), part=source.part
     )
-    _door(project, source, room, door)
-    _door(project, room, source, back, outward=True)
+    from .doors import aliases_for
+    from .frontier import reverse
+
+    _door(project, source, room, door, aliases=aliases_for(direction) if direction else ())
+    _door(
+        project,
+        room,
+        source,
+        back,
+        outward=True,
+        aliases=aliases_for(reverse(direction)) if direction else (),
+    )
     audit(actor, "dug", project=project, room=room.object_id)
     from .collaboration import note_contribution
 
@@ -278,7 +311,7 @@ def dig(
 
 
 @atomic_objects
-def add_door(actor, project, source, target, name, *, expected_version=None):
+def add_door(actor, project, source, target, name=None, *, expected_version=None, aliases=()):
     project = _project(
         project, actor, editable=True, expected_version=expected_version, author=True
     )
@@ -287,12 +320,89 @@ def add_door(actor, project, source, target, name, *, expected_version=None):
     if source == target or not source.room_id or not target.room_id:
         raise ValidationError("Choose two existing rooms in this draft.")
     _touch(project)
-    result = _door(project, source, target, name)
+    result = _door(project, source, target, name, aliases=aliases)
     audit(actor, "door", project=project, door=result.object_id)
     from .collaboration import note_contribution
 
     note_contribution(actor, project)
     return result
+
+
+@atomic_objects
+def set_door_aliases(actor, project, door, aliases, *, expected_version=None):
+    """Edit one generated door's triggers without bypassing draft ownership."""
+    from .doors import aliases_for, check_names
+    from .frontier import offsets
+
+    project = _project(
+        project, actor, editable=True, expected_version=expected_version, author=True
+    )
+    door = project.doors.select_related("exit", "source__part__anchor__room").get(pk=door.pk)
+    if not door.exit:
+        raise ValidationError("That door is missing.")
+    aliases = sorted({_text(value, 100) for value in aliases})
+    for value in list(aliases):
+        if value.casefold() in offsets() or value.casefold() in {"in", "out", "o"}:
+            aliases.extend(aliases_for(value.casefold()))
+    aliases = sorted(set(aliases))
+    _reserved_departure(project, door.source, door.exit.key, aliases)
+    check_names(door.source.room, door.exit.key, aliases, exclude=door.exit_id)
+    _touch(project)
+    door.exit.aliases.clear()
+    door.exit.aliases.add(aliases)
+    door.exit.at_cmdset_get(force_init=True)
+    from .collaboration import note_contribution
+
+    note_contribution(actor, project)
+    audit(actor, "door_aliases", project=project, door=door.object_id, aliases=aliases)
+    return door
+
+
+@atomic_objects
+def set_entrance(actor, project, name, *, part=None, expected_version=None):
+    """Set one entrance label without a multi-field command."""
+    project = _project(project, actor, editable=True, expected_version=expected_version)
+    if part:
+        part = project.parts.get(pk=part.pk)
+        name = _text(name, 100)
+        from .doors import validate_name
+        from .frontier import offsets
+
+        validate_name(name)
+        if name.casefold() in offsets() or name.casefold() in {"in", "out", "o", "outside"}:
+            raise ValidationError("Choose a named, non-compass interior entrance.")
+        part.entrance_name = name
+        part.save(update_fields=["entrance_name"])
+        _touch(project)
+        audit(actor, "part_entrance", project=project, part=part.pk, name=name)
+        return part
+    if not project.anchor:
+        raise ValidationError("Choose the attachment room first with +build/attach.")
+    return attach(
+        actor,
+        project,
+        project.anchor,
+        name,
+        expected_version=project.version,
+        passage=project.passage,
+    )
+
+
+@atomic_objects
+def edit_part(actor, project, part, *, name=None, purpose=None, expected_version=None):
+    """Edit an interior boundary within a mixed frontier proposal."""
+    project = _project(project, actor, editable=True, expected_version=expected_version)
+    part = project.parts.get(pk=part.pk)
+    if name is not None:
+        part.name = _text(name)
+    if purpose is not None:
+        if purpose not in {"home", "shop"}:
+            raise ValidationError("Choose home or shop.")
+        part.purpose = purpose
+    part.save(update_fields=["name", "purpose"])
+    _touch(project)
+    audit(actor, "part_edited", project=project, part=part.pk, name=name, purpose=purpose)
+    return part
 
 
 @atomic_objects
@@ -380,7 +490,14 @@ def attach(actor, project, anchor, entrance_name, *, expected_version=None, pass
         return attach_frontier(actor, project, anchor, entrance_name)
     _touch(project)
     name = _text(entrance_name, 100)
+    from .doors import validate_name
+
+    validate_name(name)
     if name.casefold() in {
+        "in",
+        "out",
+        "o",
+        "outside",
         "n",
         "s",
         "e",
@@ -530,15 +647,10 @@ def check_project(project):
         )
     doors = list(project.doors.select_related("exit"))
     generated = {door.object_id for door in doors}
-    entry_id = next(room.room_id for room in rooms if room.entry)
-    if any(
-        data["source"] == entry_id
-        and "outside" in {data["name"].casefold(), *(alias.casefold() for alias in data["aliases"])}
-        for door in doors
-        if door.exit_id
-        for data in [_exit_data(door.exit)]
-    ):
-        raise ValidationError("The entrance room's 'outside' door name is reserved for departure.")
+    for door in doors:
+        if door.exit_id:
+            data = _exit_data(door.exit)
+            _reserved_departure(project, door.source, data["name"], data["aliases"])
     # Staff-created or redirected exits cannot escape the reviewed object set.
     if (
         set(
@@ -582,6 +694,9 @@ def check_project(project):
             route.add(current.pk)
             current = by_id[current.parent_id]
     report = {"policy": policy, "doors": len(exits) + 1, "warnings": warnings}
+    from .doors import warnings as door_warnings
+
+    warnings.extend(door_warnings(project))
     if project.kind == "frontier":
         from .frontier import check_frontier
 
@@ -678,8 +793,10 @@ def snapshot(project):
 
 
 def fingerprint(candidate):
+    from .doors import canonical
+
     return hashlib.sha256(
-        json.dumps(candidate, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(canonical(candidate), sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
 
@@ -869,8 +986,8 @@ def promote(submission, actor):
 
         return promote_frontier(submission, actor, project, candidate, terrain, region_id)
     entry = project.rooms.get(entry=True).room
-    entrance = _exit(anchor, entry, project.entrance_name)
-    departure = _exit(entry, anchor, "outside", outward=True)
+    entrance = _exit(anchor, entry, project.entrance_name, aliases=["in"])
+    departure = _exit(entry, anchor, outward=True, aliases=["out", "o", "outside"])
     property = Property.objects.create(
         owner=project.proposed_owner or project.owner,
         owner_name=(project.proposed_owner or project.owner).key,
@@ -1247,7 +1364,7 @@ def discard(actor, project, token):
 
 
 @atomic_objects
-def enter(actor, project):
+def enter(actor, project, *, room=None):
     require_revealed(actor)
     project = BuildProject.objects.get(pk=project.pk)
     from .collaboration import can_author
@@ -1263,7 +1380,7 @@ def enter(actor, project):
         ).exists()
     ):
         actor.db.building_return = actor.location.pk
-    destination = project.rooms.get(entry=True).room
+    destination = project.rooms.get(pk=room.pk).room if room else project.rooms.get(entry=True).room
     if not destination or not actor.move_to(destination, quiet=True, move_type="teleport"):
         raise ValidationError("Preview entry failed.")
 

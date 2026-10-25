@@ -101,7 +101,15 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         super().at_cmdset_creation()
         self.add(CmdTome)
         self.add(CmdLoreCraft)
-        for command in _optional_commands("evennia_building", "CmdBuild"):
+        for command in _optional_commands(
+            "evennia_building",
+            "CmdBuild",
+            "CmdCollab",
+            "CmdProperty",
+            "CmdConsent",
+            "CmdPassage",
+            "CmdFrontier",
+        ):
             self.add(command())
         for command in (CmdApply, CmdAdmissions, CmdSoftban, CmdMute, CmdNotes, CmdBan, CmdUnban):
             self.add(command)

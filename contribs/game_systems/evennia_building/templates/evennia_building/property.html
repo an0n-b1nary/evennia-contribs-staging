@@ -2,6 +2,7 @@
 {% block content %}
 <h1>{{ property.name }}</h1><p>Owner: {{ property.owner_name }}. {{ property.locked|yesno:"Locked,Unlocked" }}. {{ property.state }}.</p>
 <h2>Permitted rooms</h2><ul>{% for room in rooms %}<li>{{ room.key }}<p>{{ room.db.desc|linebreaksbr }}</p></li>{% endfor %}</ul>
+{% if door_warnings %}<h2>Door review warnings</h2><ul>{% for warning in door_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
 {% if manager %}<h2>Manage home</h2><p>Residents may enter; installation requires explicit permission. Invitations grant entry and maps after acceptance. Locking never prevents departure or moves occupants. Staff transfer clears grants unless retention is selected.</p>{% include 'evennia_building/action_choice.html' %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Apply action</button></form>{% endif %}
 <p><a href="{% url 'evennia_building:index' %}">Building</a></p>
 {% if manager %}

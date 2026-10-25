@@ -7,35 +7,42 @@ aliases: [frontier, settlements]
 summary: Proposing new public places, building them together, mixed settlements, and stewards.
 order: 51
 ---
-Players can grow the public world as well as their own [[building|homes]]: a new street, a square, a village with homes along it. A frontier project is drafted and reviewed like a home, and once approved its rooms belong to everyone.
+Players can grow the public world as well as their own [[building|homes]]: a street, square, or village with homes along it. A frontier project is drafted and reviewed like a home. Once approved, its public rooms belong to everyone.
 
-- `+build/new frontier=<name>` starts a frontier project.
-- `+build/collaborator/add <project> <character>` invites someone to build it with you.
-- `+build/interior <project> <street room> <owner>=<name>;<entrance>` adds someone's home to it.
-- `+build/frontier` lists public places that have grown this way.
+- `+frontier/new <name>` starts a frontier project.
+- `+build/enter <project>` enters it. Building commands use the room where you stand.
+- `+collab/add <character>` invites someone to help.
+- `+build/interior <name>` adds a home to the current proposed street.
+- `+frontier` lists approved public growth.
 
 ## Proposing a place
 
-Attach a frontier project to a public room with a compass direction, so it joins the map where it belongs. Its compass doors have to agree with where its rooms sit on the map. A frontier never connects to nearby rooms by itself: to join a draft room to an existing room, add `+build/connect <project> <draft room> <existing room>=<direction>` before review.
+Choose a public anchor and compass direction with `+build/attach <room>=<direction>`. `+build/dig north=The Square` adds a neighbouring street. Doors take destination names and direction aliases, so The Square is reached by its name, `north` or `n`. Room placement and declared directions must agree.
+
+Frontier rooms never connect to nearby existing rooms automatically. From the draft street, propose an additional connection with `+build/connect <existing room>=<direction>`. Remove one with `+build/disconnect <direction>`, even if its former target has disappeared. Approval creates destination-named exits in both directions with the appropriate direction aliases. `+build/check` shows the proposal and warnings.
 
 ## Building together
 
-The project's lead invites collaborators, and each one accepts. Collaborators can enter the draft, dig rooms and write their descriptions. The lead manages who's on the project, where it attaches, and submitting or discarding it. The whole project counts against the lead's building limits. Being in the same group as someone gives no building rights.
+The lead invites collaborators with `+collab/add`. Each collaborator lists invitations with `+collab` and accepts with `+collab/accept <invitation>`. They can enter, dig and describe draft rooms. The lead manages invitations, attachment, proposed ownership, submission, withdrawal and discard. All rooms count against the lead's limits. Group membership grants no rights.
+
+`+collab/remove <character>` removes a collaborator from the current project. Collaborators can leave with `+collab/leave <invitation>`. A removed or departed author's contribution still requires their agreement before promotion.
 
 ## Mixed settlements
 
-A settlement can include private homes along its public streets. The lead adds each one with `+build/interior`, naming its future owner.
+Standing in a proposed public street, use `+build/interior The Bakery`. Its initial proposed owner is the lead. The command prints its entry room reference; use `+build/room <room>` to enter that interior. Set its proposed owner with `+build/owner <character>`, its name with `/title`, its home or shop purpose with `/purpose`, and its entrance label with `/entrance`. Its rooms have independent local coordinates. `+build/room <street>` returns to the public draft.
 
-Before review, everyone agrees to exactly what's being proposed. `+build/ack/show <project>` shows it. Each collaborator acknowledges it as a contributor with `+build/ack/contributor`, and each future home owner accepts their own home with `+build/ack/ownership`. Any change to the project needs fresh agreement. An agreement can be withdrawn until staff approve, and a collaborator who leaves still keeps credit for what they wrote.
+Everyone agrees to the same exact candidate before review. `+collab/candidate <project>` shows it. Every collaborator previews their acknowledgement with `+collab/contributor <project>`. Every proposed home owner separately previews ownership with `+collab/ownership <project>`. Repeat each printed token command to agree. Tokens carry the version, fingerprint and wording; players do not type those fields.
 
-Staff approve the whole settlement at once. After that each home belongs to its owner, who manages it like any other home.
+Any change needs fresh agreement. `+collab/revoke <agreement>` withdraws an unconsumed acknowledgement. The lead uses `+build/submit` and its printed confirmation command once all required agreements are ready. Staff approve the whole project atomically. Each resulting home belongs to its owner, who manages it with `+property`.
 
 :::insight[Everyone agrees to the same thing]
-A shared project is only reviewed once every contributor and every future owner has agreed to the exact version in front of staff. Changing it asks everyone again, so nobody ends up committed to something they never saw.
+Changing a shared proposal asks everyone again. Nobody ends up committed to a different home or contribution from the one they reviewed.
 :::
 
 ## Stewards
 
-Each public room has a **steward**, at first the project's lead. A steward can describe the room with `+build/frontier/desc <room>=<text>` and set a temporary mood with `+build/frontier/mood`. A steward can't lock the room, let people in or keep them out, install things or change its settings. `+build/frontier/steward` lets a steward hand the room back to staff.
+Each public room has a **steward**, initially the project's lead. Standing in it, a steward uses `+frontier/desc <text>` and `+frontier/mood <text>` to maintain its description and temporary atmosphere. Stewardship grants no locking, admission, installation or general configuration rights.
 
-A quiet street may be flagged for staff to look at, but it's never taken away automatically. Who built a place shows in its room details and in the website's Frontier page, never as a byline in its description.
+`+frontier/relinquish # <reason>` previews giving up that room's stewardship. Repeat the printed token command to hand it back to staff. Only staff can assign a replacement steward. Quiet streets may be flagged for review, but inactivity never changes rights automatically.
+
+Room details and the website's Frontier page show who built a place; descriptions gain no attribution byline.

@@ -566,13 +566,16 @@ class TestApartments(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(can_enter(self.guest, self.hall.room))
 
     def test_command_consent_and_staff_lifecycle_adapters(self):
-        from .commands import CmdBuild
+        from .commands import CmdBuild, CmdConsent
 
-        self.call(CmdBuild(), f"/consent/request {self.project.pk}", caller=self.tenant)
+        services.enter(self.tenant, self.project)
+        self.call(CmdConsent(), "/request", caller=self.tenant)
         consent = self.project.consents.get()
-        shown = self.call(CmdBuild(), f"/consent/show {consent.pk}", caller=self.char2)
+        shown = self.call(CmdConsent(), str(consent.pk), caller=self.char2)
         self.assertIn("cannot lock", shown)
-        self.call(CmdBuild(), f"/consent/grant {consent.pk}={consent.wording}", caller=self.char2)
+        preview = self.call(CmdConsent(), f"/grant {consent.pk}", caller=self.char2)
+        token = preview.split(f"+consent/grant {consent.pk}=")[-1].split()[0]
+        self.call(CmdConsent(), f"/grant {consent.pk}={token}", caller=self.char2)
         child = self.approve(self.tenant, self.project)
         self.call(CmdBuild(), f"/archive {child.pk}=Temporary retirement", caller=self.char1)
         child.refresh_from_db()

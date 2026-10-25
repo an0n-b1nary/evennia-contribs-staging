@@ -7,6 +7,7 @@ from django.conf import settings
 from django.test import override_settings
 from django.urls import include, path
 from evennia.web.urls import urlpatterns as defaults
+from evennia_building import test_player_commands
 from evennia_building.test_apartments import TestApartments
 from evennia_building.test_frontier import TestFrontier
 from evennia_building.tests import TestInteriors
@@ -26,6 +27,11 @@ if apps.is_installed("evennia_regions"):
         path("api/v1/", include("evennia_regions.api.urls")),
     ]
 urlpatterns += defaults
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class PlayerCommandPartnerTests(test_player_commands.PlayerCommandTests):
+    """Run player journeys with each optional Building partner physically absent."""
 
 
 @override_settings(ROOT_URLCONF=__name__)

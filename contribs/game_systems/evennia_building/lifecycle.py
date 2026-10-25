@@ -156,7 +156,11 @@ def restore(actor, property, *, reason):
         raise ValidationError("The preserved entrance/departure needs repair.")
     actual = _exit_data(property.entrance)
     expected = {**saved["entrance"], "source": None}
-    if actual != expected or _exit_data(property.departure) != saved["departure"]:
+    from .doors import equivalent
+
+    if not equivalent(actual, expected) or not equivalent(
+        _exit_data(property.departure), saved["departure"]
+    ):
         raise ValidationError("The preserved connection changed; staff repair is required.")
     if (
         property.rooms.filter(room__isnull=True).exists()
@@ -193,7 +197,7 @@ def restore(actor, property, *, reason):
         if agreement.parent.state != "live":
             raise ValidationError("Restore the parent before its apartment.")
         route = route_snapshot(agreement.parent, agreement.route["rooms"], property.anchor_id)
-        if route != agreement.route:
+        if not equivalent(route, agreement.route):
             raise ValidationError(
                 "The passage changed; obtain fresh agreement to replacement passage."
             )

@@ -7,43 +7,56 @@ aliases: [homes, property]
 summary: Drafting a home, staff review, and deciding who can come in.
 order: 50
 ---
-You can build a home of your own: draft its rooms, send it to staff for review, and once it's approved, decide who can come in. Building costs nothing, and it never gives you general building powers. You can also build an apartment inside someone else's home, with their agreement, or help [[building-frontier|grow the public world]].
+You can build a home of your own: draft its rooms, send it to staff for review, and decide who can come in once it is approved. Building costs nothing and grants no general building powers. You can also build an apartment inside someone else's home, with their agreement, or help [[building-frontier|grow the public world]].
 
-- `+build/new interior=<name>` starts a project, and `+build/list` lists yours.
-- `+build/enter <project>` walks into your draft, and `+build/leave` takes you back out.
-- `+build/dig`, `+build/name` and `+build/desc` add and describe rooms.
-- `+build/check <project>` shows your rooms, the current version and any warnings.
-- `+build/submit <project> <version>=<acknowledgement>` sends it for review.
+- `+build/new The Bakery` starts an interior project. `+build` lists yours.
+- `+build/enter The Bakery` takes you into its draft. Edits use the project and room where you stand.
+- `+build/dig north=Kitchen` adds a neighbouring room and a door in each direction. `+build/room Kitchen` moves you there.
+- `+build/name <text>` and `+build/desc <text>` change the current room. `+build/title <text>` names the project.
+- `+build/attach Market Street=The Bakery` chooses the world room and entrance name.
+- `+build/check` shows the whole proposal and review warnings.
+- `+build/submit` previews the exact candidate and content reuse agreement. Repeat the printed command with its token to submit.
 
 The website's Building pages offer the same steps.
 
-## Drafting
+## Rooms and doors
 
-A draft starts as one room. `+build/dig` adds connected rooms or floors, and `+build/door` joins two rooms you've already made. `+build/attach <project> <room>=<entrance name>` chooses where in the world your front door will go. A project is a home unless you make it a shop with `+build/purpose <project>=shop`. Whether a shop can sell depends on your game.
+A draft starts as one room. Directional digging accepts compass names and abbreviations, including up and down. A new door is named after the room it leads to; its direction is an alias. The Kitchen door going north responds to `Kitchen`, `n` and `north`. Default names follow later destination renames. Custom names stay as you wrote them. Direction tags, when supplied by Maps, are display labels: do not copy `<N>` into a door name.
+
+To set explicit coordinates or custom door names, start a room plan with `+build/dig Quiet Study`. Set its fields one command at a time: `+build/x 2`, `+build/y 0`, `+build/floor 1`, `+build/doorname a narrow staircase`, and `+build/back the landing`. Coordinates initially match the source room; `+build/direction north` instead picks its neighbouring cell and direction aliases. Finish with `+build/finish`, or abandon the plan with `+build/cancel`. The plan survives a reconnect. If someone edits the project, cancel the stale plan and start again.
+
+`+build/door Kitchen` joins the current draft room to an existing draft room, using its destination name. `+build/door Kitchen=a serving hatch` sets a custom name. `+build/aliases Kitchen=n,north` sets a door's aliases; commas list aliases only. Door names and aliases must be unambiguous. The entry room reserves the world anchor's name and `out`, `o`, `outside` for its eventual departure.
+
+`+build/purpose shop` proposes a shop instead of a home. Whether it can sell depends on your game. `+build/terrain urban,garden` and `+build/region <region>` request environment changes for staff to approve. `+build/region none` requests no region; `+build/inherit terrain` or `+build/inherit region` restores inheritance for that field.
 
 ## Review
 
-`+build/check` shows the version number and the content reuse wording. Submit that exact version, with that wording as your acknowledgement. Submitting freezes the rooms, doors, descriptions and entrance exactly as they are. To change anything after that, withdraw the submission first.
+Submission previews show what you are agreeing to, followed by a confirmation token. Tokens expire and stop working when the candidate or terms change. You never type version numbers, fingerprints or agreement wording. Submitting freezes rooms, doors, descriptions and attachment exactly as shown. `+build/withdraw # <reason>` previews withdrawal; repeat the printed command to make the draft editable again.
 
-Staff approve it, ask for changes or decline it, with a reason. A decline keeps your draft and its history, and you can propose it again later. `+build/history` shows the whole record. To abandon a draft, `+build/discard` asks you to confirm with a token, then returns anyone inside to safety. A home that's live can't be discarded.
+Staff approve, ask for changes or decline, with a reason. A decline keeps the draft and its history, and you can propose it again. `+build/history` shows the record. `+build/discard` previews abandoning a draft; confirmation returns occupants and belongings to safety before removing its geometry. Live homes cannot be discarded.
 
 :::insight[What you submit is what's approved]
-Submitting freezes the exact version you checked, so nothing can change between your acknowledgement and staff's decision. If you want to change it, withdraw and submit again, so the review always matches the home.
+Staff review the exact candidate you acknowledged. Changes require withdrawal, a fresh preview and fresh agreements from everyone affected.
 :::
 
 ## Your home
 
-Approval keeps your rooms as they are, and adds an entrance from the world and an `outside` exit back. `+build/property` lists your homes.
+Approval adds your named entrance from the world with an `in` alias. The departure is named after its destination, such as Market Street, and responds to `out`, `o` and `outside`. `+property` lists the homes whose rooms you may inspect. Stand inside a property to manage it:
 
-- **Locking:** `+build/lock <property>` keeps out anyone you haven't let in. A lock never stops anyone leaving.
-- **Residents:** `+build/resident/add <property> <character>` makes someone a resident. Residents can enter locked common rooms. They can install things in the home, such as fixtures, only if you add them with `+build/resident/install`.
-- **Guests:** `+build/invite <property> <character>` invites someone, and they accept or decline with `+build/invite/accept` or `/decline`. An invitation can also let them see the floor plan.
-- **Private rooms:** `+build/override <room>=<characters>` limits one room, such as a bedroom, to the people you name. `+build/override/reset` goes back to the home's defaults.
+- **Descriptions:** `+property/name <text>` and `+property/desc <text>` change the current room.
+- **Locking:** `+property/lock` keeps out anyone you have not admitted. `+property/unlock` reopens it. A lock never prevents departure.
+- **Residents:** `+property/resident <character>` grants residence without installation rights. `+property/installer <character>` also permits installation. Using `/resident` again removes installation permission; `/unresident` removes residence.
+- **Guests:** `+property/invite <character>` invites someone with entry and map rights. `/entry` invites with entry only, and `/maps` with map access only. `/uninvite` revokes the invitation. The invited character uses `+property/invitations`, then `+property/accept <invitation>` or `/decline`.
+- **Private rooms:** `+property/override <characters>` restricts the current room to the comma-listed characters and its owner. An empty list means owner only. `+property/reset` restores normal access.
 
-Nobody you let in can edit, transfer or own your home, and being able to walk in never shows anyone the floor plan. Taking someone's access away never throws them out. A home that sits quiet for a long time may be flagged for staff to look at, but it's never taken from you automatically.
+Entry never grants floor-plan access. Residents and guests cannot edit, transfer or own the home. Revocation never ejects someone already inside. Quiet homes may be flagged for staff review but are never reclaimed automatically.
 
-## Apartments
+## Apartments and passage
 
-An apartment is a home inside someone else's, reached through their rooms. Choose the entrance and the rooms of theirs you'll pass through with `+build/attach`, then ask with `+build/consent/request <project>`. The other owner looks at exactly what you're proposing with `+build/consent/list` and `+build/consent/show`. They agree with `+build/consent/grant`, using the wording shown, or decline. They can withdraw their agreement until staff approve it. If you change the project afterwards, ask again.
+An apartment is an independent home inside another home. Choose its attachment with `+build/attach <room>=<entrance>`. Building uses the parent's outward tree as its passage route; `+build/route <rooms>` can select an explicit comma-listed route from the parent's entry to the attachment room. You need entry or preview rights to those rooms first.
 
-Once approved, the other owner can't lock the rooms you pass through against you, your residents or the guests you let in. That's all the agreement gives: you get no other rooms of theirs, and no right to edit or furnish anything. A guest needs an invitation that includes entry to pass through a locked home. An apartment can't have its own apartments inside it.
+While standing in your apartment draft, use `+consent/request`. The parent owner lists requests with `+consent`, inspects one with `+consent <request>`, and previews agreement with `+consent/grant <request>`. Repeating the printed token command grants consent. `/decline` refuses a pending request; `/revoke` withdraws a grant before promotion. Changing the project requires fresh consent.
+
+After approval, the parent cannot block the agreed passage against the apartment owner, its residents or its admitted entry guests. This grants no other parent rooms, floor plans, editing or installation rights. Apartments cannot have their own apartments.
+
+Staff may propose replacement passage. Each owner inspects it with `+passage <change>` and previews acceptance with `+passage/accept <change>`, then repeats the printed token command. Both current owners must agree before staff applies it. Renaming an automatically named door preserves passage and archive restoration: agreements identify the exit, its endpoints and its permissions.

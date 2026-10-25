@@ -51,7 +51,11 @@ def offsets():
 
 def direction(name, *, planar=False):
     value = offsets().get(name.strip().lower()) if isinstance(name, str) else None
-    if not value or (planar and (value[2] or value[3] != "planar")):
+    if (
+        not value
+        or value[3] not in {"planar", "vertical"}
+        or (planar and (value[2] or value[3] != "planar"))
+    ):
         raise ValidationError(
             "Choose a compass direction" + (" on the same floor." if planar else ".")
         )
@@ -163,7 +167,12 @@ def add_interior(
     _character(owner)
     _quota(project.owner)
     entrance_name = _text(entrance_name, 100)
-    if entrance_name.casefold() in offsets() or entrance_name.casefold() == "outside":
+    if entrance_name.casefold() in offsets() or entrance_name.casefold() in {
+        "in",
+        "out",
+        "o",
+        "outside",
+    }:
         raise ValidationError("Choose a named, non-compass interior entrance.")
     part = BuildPart.objects.create(
         project=project,
@@ -228,7 +237,12 @@ def check_frontier(project):
         if door.source.part_id != door.target.part_id:
             raise ValidationError("A draft door crosses independent spaces.")
         if not door.source.part_id:
-            offset = direction(_exit_data(door.exit)["name"])
+            from .doors import declared
+
+            label = declared(door.exit)
+            if not label:
+                raise ValidationError("A frontier street door needs a direction alias.")
+            offset = direction(label)
             if (door.target.x, door.target.y, door.target.floor) != (
                 door.source.x + offset[0],
                 door.source.y + offset[1],
@@ -481,7 +495,9 @@ def promote_frontier(submission, actor, project, candidate, terrain, region_id):
             (source, target, connection["direction"]),
             (target, source, reverse(connection["direction"])),
         ):
-            exit = _exit(start, end, name, outward=True)
+            from .doors import aliases_for
+
+            exit = _exit(start, end, outward=True, aliases=aliases_for(name))
             FrontierConnection.objects.create(
                 frontier=frontier, exit=exit, object_id=exit.pk, data=_exit_data(exit)
             )
@@ -494,8 +510,8 @@ def promote_frontier(submission, actor, project, candidate, terrain, region_id):
             owner_name=part.owner_name,
             name=part.name,
             anchor=anchor,
-            entrance=_exit(anchor, part.entry, part.entrance_name),
-            departure=_exit(part.entry, anchor, "outside", outward=True),
+            entrance=_exit(anchor, part.entry, part.entrance_name, aliases=["in"]),
+            departure=_exit(part.entry, anchor, outward=True, aliases=["out", "o", "outside"]),
             provenance={
                 "submission": submission.pk,
                 "fingerprint": submission.fingerprint,

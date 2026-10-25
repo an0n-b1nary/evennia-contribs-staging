@@ -11,6 +11,7 @@ from evennia.objects.models import ObjectDB
 from evennia_links.transactions import atomic_objects
 
 from .access import can_enter, is_staff, managed_access, ownership, require_revealed
+from .doors import equivalent
 from .models import AttachmentAgreement, AttachmentConsent, BuildProject, PassageChange, Property
 
 WORDING_VERSION = "1"
@@ -321,9 +322,9 @@ def route_valid(agreement, *, require_child_live=True):
             )
         ):
             return False
-        return (
-            route_snapshot(agreement.parent, agreement.route["rooms"], agreement.child.anchor_id)
-            == agreement.route
+        return equivalent(
+            route_snapshot(agreement.parent, agreement.route["rooms"], agreement.child.anchor_id),
+            agreement.route,
         )
     except (ValidationError, ObjectDB.DoesNotExist):
         return False
@@ -454,16 +455,16 @@ def _current_change(change):
     agreement = change.agreement
     if (
         change.state != "pending"
-        or agreement.route != change.previous_route
+        or not equivalent(agreement.route, change.previous_route)
         or agreement.parent.owner_id != change.parent_owner_id
         or agreement.child.owner_id != change.child_owner_id
         or not change.parent_owner_id
         or not change.child_owner_id
     ):
         raise ValidationError("The route or owners changed; propose replacement passage again.")
-    if (
-        route_snapshot(agreement.parent, change.route["rooms"], agreement.child.anchor_id)
-        != change.route
+    if not equivalent(
+        route_snapshot(agreement.parent, change.route["rooms"], agreement.child.anchor_id),
+        change.route,
     ):
         raise ValidationError("The proposed passage changed; obtain fresh agreement.")
 
