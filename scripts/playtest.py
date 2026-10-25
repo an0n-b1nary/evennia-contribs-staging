@@ -102,6 +102,10 @@ def run_host(args, profile):
                 from playtesting.combat import run_combat
 
                 results.extend(run_combat(session))
+            elif getattr(args, "suite", "rp") == "maps":
+                from playtesting.maps import run_maps
+
+                results.extend(run_maps(session, args.browser_timeout))
             else:
                 results.extend(run_rp(session, smoke=profile == "normal"))
             if args.browser and profile == "deterministic" and getattr(args, "suite", "rp") == "rp":
@@ -147,7 +151,9 @@ def run_host(args, profile):
                 "cases": results,
                 "case_count": len(results),
                 "passed_count": sum(result["passed"] for result in results),
-                "partial": args.mode == "interactive" or not args.browser or args.profile != "both",
+                "partial": args.mode == "interactive"
+                or not args.browser
+                or (args.profile != "both" and getattr(args, "suite", "rp") != "maps"),
             },
         )
         report = "# Live playtest\n\n" + "\n".join(
@@ -171,7 +177,7 @@ def main(argv=None):
         raise HostError("Playtests require assertions; do not run Python with -O.")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("run", "interactive"))
-    parser.add_argument("--suite", choices=("rp", "combat"), default="rp")
+    parser.add_argument("--suite", choices=("rp", "combat", "maps"), default="rp")
     parser.add_argument("--profile", choices=("both", "deterministic", "normal"))
     parser.add_argument("--browser", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--startup-timeout", type=float, default=180)
@@ -179,7 +185,11 @@ def main(argv=None):
     parser.add_argument("--browser-timeout", type=float, default=30)
     parser.add_argument("--shutdown-timeout", type=float, default=30)
     args = parser.parse_args(argv)
-    args.profile = args.profile or ("normal" if args.mode == "interactive" else "both")
+    # The map pass is a browser walk over seeded data; rolls never enter it.
+    default = "deterministic" if args.suite == "maps" else "both"
+    args.profile = args.profile or ("normal" if args.mode == "interactive" else default)
+    if args.suite == "maps" and (args.mode != "run" or not args.browser):
+        parser.error("the maps suite is a browser run")
     if args.mode == "interactive" and args.profile == "both":
         parser.error("interactive uses one persistent host; choose normal or deterministic")
     if any(

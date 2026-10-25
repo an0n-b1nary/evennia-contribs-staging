@@ -1349,19 +1349,21 @@ Three mechanisms, for three different needs:
    demo sheets, the dummy and two open challenges. A deployed full wipe
    uses `scripts/reset_to_golden.sh`; keep the generated admin credential
    from step 6 in your password manager.
-10. **The map renders, in a browser** — `/map/` lists four planes:
-    `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior` and
-    `Sandbox Scratch`. `/map/<pk>/` for the overworld draws eight tiles as an
+10. **The map renders, in a browser** — `/map/` lists five planes for a
+    player: `Sandbox Overworld`, `Sandbox Undercroft`, `Consulate Interior`,
+    `Sandbox Scratch` and `Frontier Demonstration`; staff also see the private
+    building previews. `/map/<pk>/` for the overworld draws eight tiles as an
     SVG plus grid (nine rooms, less the staff-only Warren), with the Archive
-    north of the Plaza, sprites on four of them and the plain fallback swatch
-    on the Causeway. The whole OOC wing is deliberately absent, and doubly so:
+    north of the Plaza, sprites from the four terrain swatches on seven of them
+    and the plain fallback swatch on the Causeway. The whole OOC wing is deliberately absent, and doubly so:
     its exits carry no direction aliases, and
     `MAPS_UNMAPPABLE_ROOM_TYPES = ("ooc",)` stops the auto-placer mapping those
     rooms even if somebody digs a real direction into one. `/map/<pk>/live/`
     loads Leaflet with the **base-layer control** offering Overworld and
     Undercroft — that control only appears because two planes share the
-    `overworld` zstack. This is the one step no test replaces: a static SVG
-    page and a client-side Leaflet render fail in different ways.
+    `overworld` zstack. A static SVG page and a client-side Leaflet render
+    fail in different ways; `scripts/playtest.py run --suite maps` drives
+    steps 10–12 in Chromium (see CONTRIBUTING), but look at its screenshots.
 11. **Overlays light up and link out** — on the live map, toggle the overlay
     controls: the Consulate Hall shows an active-scene pin and an upcoming
     event, the Archive shows the heaviest heat (three closed scenes against

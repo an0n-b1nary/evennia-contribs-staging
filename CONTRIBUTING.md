@@ -261,6 +261,22 @@ The established pattern:
 - Render the *empty* state as well as the populated one. It is what a fresh install
   shows first, and it is usually the branch that includes a partial.
 
+## Map browser acceptance
+
+Render tests prove the tile data reaches the page, not what Leaflet draws with it.
+`python scripts/playtest.py run --suite maps` starts a disposable, freshly seeded
+reference game and drives its map in Chromium as a player, staff and an anonymous
+visitor, all logged in through the real form. It checks cell geometry at the fitted
+view and both zoom limits, floors, the portal, each overlay control, room panels and
+their links, the keyboard room list, the narrow bottom sheet, privacy and presence.
+Measurements and screenshots land in the run's `evidence/maps/`; look at the
+screenshots as well as the pass/fail list. The page loads Leaflet from unpkg, so the
+run needs network access.
+
+The calendar-absent browser check needs its own environment. Prepare the game as in
+the absent-calendar recipe under CI, add playwright to that venv, then run
+`python scripts/map_calendar_absent.py ci_game`.
+
 ## Fast local test loop
 
 Run tests from a throwaway game set up like CI's (`evennia --init`,

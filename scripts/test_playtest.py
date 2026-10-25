@@ -11,13 +11,14 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import playtest
 from playtesting.client import Client, ClientError, Decoder, SocketTransport
 from playtesting.evidence import Evidence, plain
 from playtesting.host import Host, HostError, allocate_ports, poll_log
+from playtesting.maps import place_cells
 from playtesting.scenarios import Suite
 from twisted.conch.telnet import DO, IAC, WONT
 
@@ -430,6 +431,94 @@ class HostTests(unittest.TestCase):
         finally:
             process.terminate()
             process.wait(timeout=3)
+
+
+def tile(name, x, y, sprite="", portal=None):
+    return {"room_name": name, "x": x, "y": y, "sprite_url": sprite, "portal_plane_id": portal}
+
+
+def cell(kind, x, y, size=32, src=""):
+    return {"kind": kind, "x": x, "y": y, "w": size, "h": size, "src": src}
+
+
+class MapGeometryTests(unittest.TestCase):
+    """The live map's drawn-cell geometry check, on synthetic layouts."""
+
+    BOX = MappingProxyType({"x": 0, "y": 0, "width": 1000, "height": 1000})
+    TILES = (
+        tile("North", 0, 1, "/hills.png"),
+        tile("South", 0, 0, "/urban.png"),
+        tile("Portal", 1, 0, portal=3),
+        tile("Fallback", 1, 1),
+    )
+
+    def test_adjacent_north_up_grid_is_placed(self):
+        cells = [
+            cell("sprite", 100, 100, src="/hills.png"),
+            cell("sprite", 100, 132, src="/urban.png"),
+            cell("portal", 132, 132),
+            cell("blank", 132, 100),
+        ]
+        layout, by_room = place_cells(cells, self.BOX, self.TILES)
+        self.assertEqual(
+            layout["cells"],
+            {"North": [0, 0], "South": [0, 1], "Portal": [1, 1], "Fallback": [1, 0]},
+        )
+        self.assertEqual(by_room["Portal"]["kind"], "portal")
+
+    def test_south_drawn_above_north_fails(self):
+        cells = [
+            cell("sprite", 100, 132, src="/hills.png"),
+            cell("sprite", 100, 100, src="/urban.png"),
+            cell("portal", 132, 100),
+            cell("blank", 132, 132),
+        ]
+        with self.assertRaises(AssertionError):
+            place_cells(cells, self.BOX, self.TILES)
+
+    def test_cells_one_pixel_apart_fail(self):
+        # evennia-maps 0.3.0 placed 32-pixel tiles at raw grid coordinates.
+        cells = [
+            cell("sprite", 100, 99, src="/hills.png"),
+            cell("sprite", 100, 100, src="/urban.png"),
+            cell("portal", 101, 100),
+            cell("blank", 101, 99),
+        ]
+        with self.assertRaises(AssertionError):
+            place_cells(cells, self.BOX, self.TILES)
+
+    def test_clipped_paths_are_counted_but_not_measured(self):
+        box = {"x": 0, "y": 0, "width": 600, "height": 600}
+        cells = [
+            cell("sprite", 0, 0, 512, "/hills.png"),
+            cell("sprite", 0, 512, 512, "/urban.png"),
+            {"kind": "portal", "x": 0, "y": 0, "w": 0, "h": 0, "src": ""},
+            # Leaflet clips to the map plus 10% padding, so a cut path overhangs it.
+            {"kind": "blank", "x": 512, "y": 0, "w": 148, "h": 512, "src": ""},
+        ]
+        layout, by_room = place_cells(cells, box, self.TILES)
+        self.assertEqual(layout["unmeasured_clipped"], 2)
+        self.assertEqual(set(by_room), {"North", "South"})
+
+    def test_a_missing_cell_fails(self):
+        cells = [
+            cell("sprite", 100, 100, src="/hills.png"),
+            cell("sprite", 100, 132, src="/urban.png"),
+        ]
+        with self.assertRaises(AssertionError):
+            place_cells(cells, self.BOX, self.TILES)
+
+    def test_maps_suite_requires_a_browser_run(self):
+        for argv in (
+            ["run", "--suite", "maps", "--no-browser"],
+            ["interactive", "--suite", "maps"],
+        ):
+            with (
+                self.subTest(argv=argv),
+                patch("sys.stderr", io.StringIO()),
+                self.assertRaises(SystemExit),
+            ):
+                playtest.main(argv)
 
 
 if __name__ == "__main__":
