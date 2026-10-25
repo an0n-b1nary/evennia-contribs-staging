@@ -19,9 +19,8 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
 ]
-# No models, so no dependency on evennia-links. This contrib is a peer of
-# evennia-links at the foundational layer, not a consumer of it.
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.5"]
+# evennia-links supplies communication policy and strict command validation.
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13"]
 
 [project.optional-dependencies]
 # +pot renders a screen-reader-friendly plain list when this is installed

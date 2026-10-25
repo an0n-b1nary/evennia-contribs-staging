@@ -564,8 +564,9 @@ class TestCommands(AdmissionFixture, EvenniaCommandTest):
         from evennia_moderation.commands import CmdBan, CmdUnban
 
         ServerConfig.objects.conf("server_bans", [])
-        self.call(CmdBan(), self.account2.key + ": Incident", inputs=["yes"])
+        self.call(CmdBan(), self.account2.key + "=Incident: repeated spam", inputs=["yes"])
         self.assertEqual(ModerationAction.objects.filter(kind="ban").count(), 1)
+        self.assertEqual(ModerationAction.objects.get(kind="ban").reason, "Incident: repeated spam")
         self.call(CmdUnban(), "1", inputs=["yes"])
         self.assertEqual(ModerationAction.objects.filter(kind="lift").count(), 1)
 
@@ -573,12 +574,18 @@ class TestCommands(AdmissionFixture, EvenniaCommandTest):
         from evennia_moderation.commands import CmdBan, CmdUnban
         from evennia_moderation.policy import stock_banned
 
-        self.call(CmdBan(), "/ip 192.0.2.*: Incident", inputs=["yes"])
+        self.call(CmdBan(), "/ip 192.0.2.*=Incident", inputs=["yes"])
         self.assertTrue(stock_banned(address="192.0.2.77"))
         self.assertIsNotNone(connection_restriction(address="192.0.2.77"))
         self.call(CmdUnban(), "1", inputs=["yes"])
         self.assertFalse(stock_banned(address="192.0.2.77"))
         self.assertIsNone(connection_restriction(address="192.0.2.77"))
+
+    def test_old_colon_ban_form_is_refused_without_a_ban(self):
+        from evennia_moderation.commands import CmdBan
+
+        self.call(CmdBan(), self.account2.key + ": Incident", "Usage: ban <target>=<reason>")
+        self.assertFalse(ModerationAction.objects.exists())
 
     def test_ambiguous_character_name_is_refused_before_moderating(self):
         duplicate = create_object("evennia.objects.objects.DefaultCharacter", key=self.char2.key)

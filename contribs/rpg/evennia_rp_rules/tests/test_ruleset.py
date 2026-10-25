@@ -75,16 +75,26 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("unknown scale 'fate'", text)
         self.assertIn("E002", issue_ids(spec))
 
-    def test_tag_spellings_are_unique_per_kind_only(self):
+    def test_tag_spellings_are_unique_across_kinds(self):
         spec = fresh_test_ruleset()
         spec["tags"].append(
             {"key": "fire-domain", "name": "Fire"}
         )  # domain "Fire" beside element "Fire"
-        self.assertEqual(Ruleset.validate(spec), [])
+        self.assertIn("'fire-domain' spelling 'fire' is already used by 'fire'", messages(spec))
+        spec = fresh_test_ruleset()
         spec["tags"].append(
             {"key": "blaze", "name": "Blaze", "kind": "element", "aliases": ["fire"]}
         )
         self.assertIn("already used by 'fire'", messages(spec))
+
+    def test_tag_keys_names_and_aliases_share_a_namespace(self):
+        for field in ("key", "name", "aliases"):
+            with self.subTest(field=field):
+                spec = fresh_test_ruleset()
+                tag = {"key": "blaze", "name": "Blaze", "kind": "domain"}
+                tag[field] = ["fire"] if field == "aliases" else "fire"
+                spec["tags"].append(tag)
+                self.assertIn("fire", messages(spec))
 
     def test_several_scales_need_a_default_or_explicit_scales(self):
         spec = fresh_test_ruleset()

@@ -357,8 +357,8 @@ def _tags_from_spec(raw, issues: list[Issue]) -> dict[str, TagDef]:
             _spec.malformed(issues, f"{where}.key", f"duplicate tag {key!r}")
             continue
         tag = TagDef(key, name, kind, aliases, description)
-        # Spellings must be unique within a kind; a domain and an element may share a name.
-        _claim_spellings(tag, spellings, issues, where, "tag", namespace=kind)
+        # All kinds share one player-facing namespace: key, name and aliases.
+        _claim_spellings(tag, spellings, issues, where, "tag")
         tags[key] = tag
     return tags
 
@@ -369,7 +369,9 @@ def _claim_spellings(item, claimed: dict[str, str], issues, where, noun, namespa
         owner = claimed.get(slot)
         if owner is not None and owner != item.key:
             _spec.malformed(
-                issues, where, f"{noun} spelling {spelling!r} is already used by {owner!r}"
+                issues,
+                where,
+                f"{noun} {item.key!r} spelling {spelling!r} is already used by {owner!r}",
             )
         claimed[slot] = item.key
 

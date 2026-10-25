@@ -9,10 +9,11 @@ description. Permissions are decided by ``evennia_social.mood.can_set_mood``.
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.mood import MOOD_MAX_LENGTH, can_set_mood, clear_mood, set_mood
 
 
-class CmdMood(MuxCommand):
+class CmdMood(StrictSwitchMixin, MuxCommand):
     """
     View or set the mood of the room you're in.
 
@@ -28,6 +29,8 @@ class CmdMood(MuxCommand):
     running here, any active participant can too if the scene is public; in
     a private scene, only its host.
     """
+
+    switch_options = ("clear",)
 
     key = "+mood"
     aliases = []  # noqa: RUF012

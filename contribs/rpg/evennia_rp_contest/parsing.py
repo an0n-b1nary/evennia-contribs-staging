@@ -48,18 +48,6 @@ def find_tag(text):
     kind = conf.get("RP_CONTEST_TAG_KIND")
     kinds = [kind] if isinstance(kind, str) else kind
     candidates = [t for t in get_vocabulary().tags() if kinds is None or t.kind in kinds]
-    # An explicit kind:key disambiguates a cross-kind spelling collision.
-    if ":" in text:
-        selected, text = text.split(":", 1)
-        candidates = [t for t in candidates if t.kind.casefold() == selected.strip().casefold()]
-    needle = text.strip().casefold()
-    exact = [t for t in candidates if needle in {s.casefold() for s in t.spellings()}]
-    matches = exact or [
-        t for t in candidates if any(s.casefold().startswith(needle) for s in t.spellings())
-    ]
-    if len(matches) > 1:
-        choices = ", ".join(f"{t.kind}:{t.key} ({t.name})" for t in matches)
-        raise ContestError(f"Which tag did you mean? Choose {choices}.")
     try:
         return match_spelling(candidates, text, "tag")
     except LookupError as exc:

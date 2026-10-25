@@ -2,6 +2,10 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## [0.9.0] - 2026-10-25
 
 ### Breaking

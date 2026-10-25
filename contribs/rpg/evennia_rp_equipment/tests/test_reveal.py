@@ -26,6 +26,7 @@ class RevealTests(GearCommandTest):
             with self.subTest(command.key):
                 self.assertTrue(command.access(self.char2))
                 command.caller = self.char2
+                command.args = ""
                 self.assertFalse(command.at_pre_cmd())
 
     @override_settings(RP_EQUIPMENT_REVEALED=False)
@@ -35,6 +36,7 @@ class RevealTests(GearCommandTest):
                 self.assertFalse(command.access(self.char2))
                 self.assertTrue(command.access(self.char1))
                 command.caller = self.char2
+                command.args = ""
                 self.assertTrue(command.at_pre_cmd())
                 command.caller = self.char1
                 self.assertFalse(command.at_pre_cmd())

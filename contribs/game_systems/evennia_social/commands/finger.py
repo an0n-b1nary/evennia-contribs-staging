@@ -17,6 +17,7 @@ from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.social import is_staff
 
 # ---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ _MAX_FOLLOWED_THEMES = 20
 # ---------------------------------------------------------------------------
 
 
-class CmdFinger(MuxCommand):
+class CmdFinger(StrictSwitchMixin, MuxCommand):
     """
     View or edit a character's profile.
 
@@ -100,6 +101,8 @@ class CmdFinger(MuxCommand):
     Identity fields (gender, ancestry, homeland, role, pronouns) reset
     to "Unspecified" when cleared. Other fields are removed entirely.
     """
+
+    switch_options = ("set", "clear", "edit", "custom", "themes", "follow", "unfollow", "public")
 
     key = "+finger"
     aliases = ["+profile"]  # noqa: RUF012

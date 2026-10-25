@@ -12,12 +12,13 @@ from evennia.commands.default.general import CmdPose as DefaultPose
 from evennia.commands.default.general import CmdSay as DefaultSay
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 from . import services as svc
-from .command_syntax import SingleSwitchMixin
 from .models import NPCBlueprint, NPCPermissionRequest
 
 
-class CmdNPC(SingleSwitchMixin, MuxCommand):
+class CmdNPC(StrictSwitchMixin, MuxCommand):
     """Create, share and play NPCs. Names refer to blueprints, object #ids to spawns.
 
     Usage:
@@ -207,7 +208,7 @@ class CmdNPC(SingleSwitchMixin, MuxCommand):
             raise svc.NPCError("Unknown NPC switch. See help +npc.")
 
 
-class PortrayalMixin:
+class PortrayalMixin(StrictSwitchMixin):
     """Apply only to explicitly supported commands, never arbitrary execution."""
 
     npc_pose_type = "pose"
@@ -246,7 +247,7 @@ if apps.is_installed("evennia_posing"):
 else:
     BasePose = DefaultPose
 
-    class BaseEmit(MuxCommand):
+    class BaseEmit(StrictSwitchMixin, MuxCommand):
         key = "emit"
 
         def func(self):
@@ -351,7 +352,7 @@ class NPCCmdSet(CmdSet):
             self.add(challenge_command())
 
 
-class CmdNPCIC(CmdIC):
+class CmdNPCIC(StrictSwitchMixin, CmdIC):
     """Preserve the login character when an NPC puppet attempt is refused.
 
     Evennia's stock CmdIC stores its target as _last_puppet even when

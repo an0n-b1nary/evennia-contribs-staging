@@ -15,6 +15,7 @@ behind (see MIGRATION_NOTES.md).
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_links.rooms import can
 from evennia_social.social import is_staff
 from evennia_social.typeclasses import HANGOUT_TYPES
@@ -28,7 +29,7 @@ def _can_configure_room(character, room):
     return can(character, room, "configure") or is_staff(character)
 
 
-class CmdRoomConfig(MuxCommand):
+class CmdRoomConfig(StrictSwitchMixin, MuxCommand):
     """
     View or modify room configuration.
 

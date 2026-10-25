@@ -89,7 +89,7 @@ ensures one cleanup Script is running. See the
 five-UBI-week base cap, once-only starting stipends (plus a reveal stipend
 when a hidden economy is revealed), and atomic exchanges
 of money, carried items and resource counters. Demo authors start with 200 coins.
-Use `+balance`, `+offer character=5 coins for resource:grain:2`, and `+accept number`;
+Use `+balance`, `+offer character=5 coins for 2 grain`, and `+accept number`;
 `/secret` on either offer or acceptance suppresses the room announcement. Stock
 `give` is replaced so gifts enforce the same-account rule too; it stays available
 while the economy is hidden (items only) and for item gifts while frozen.

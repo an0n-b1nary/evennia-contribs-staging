@@ -31,6 +31,7 @@ Add to your CharacterCmdSet::
 from evennia.commands.default.general import CmdPose as DefaultCmdPose
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_posing.highlighting import format_pose_time
 
 
@@ -60,7 +61,7 @@ except ImportError:
 # =====================================================================
 
 
-class CmdPose(DefaultCmdPose):
+class CmdPose(StrictSwitchMixin, DefaultCmdPose):
     """
     Strike a pose.
 
@@ -98,7 +99,7 @@ class CmdPose(DefaultCmdPose):
         self.caller.record_pose(pose_text, pose_type="pose")
 
 
-class CmdEmit(MuxCommand):
+class CmdEmit(StrictSwitchMixin, MuxCommand):
     """
     Emit freeform text to the room.
 
@@ -133,7 +134,7 @@ class CmdEmit(MuxCommand):
         self.caller.record_pose(text, pose_type="emit")
 
 
-class CmdSemipose(MuxCommand):
+class CmdSemipose(StrictSwitchMixin, MuxCommand):
     """
     Pose with your name directly joined (no space).
 
@@ -178,7 +179,7 @@ class CmdSemipose(MuxCommand):
 # =====================================================================
 
 
-class CmdPot(MuxCommand):
+class CmdPot(StrictSwitchMixin, MuxCommand):
     """
     View the pose order tracker.
 
@@ -192,6 +193,8 @@ class CmdPot(MuxCommand):
     since last pose (longest wait first = whose turn it is). Posing
     resets your timer automatically.
     """
+
+    switch_options = ("obs", "afk", "ic")
 
     key = "+pot"
     aliases = []  # noqa: RUF012
@@ -290,7 +293,7 @@ class CmdPot(MuxCommand):
 # =====================================================================
 
 
-class CmdLastPose(MuxCommand):
+class CmdLastPose(StrictSwitchMixin, MuxCommand):
     """
     View recent poses in the room.
 
@@ -364,7 +367,7 @@ class CmdLastPose(MuxCommand):
 # =====================================================================
 
 
-class CmdPoseHeader(MuxCommand):
+class CmdPoseHeader(StrictSwitchMixin, MuxCommand):
     """
     Configure pose header display.
 
@@ -385,6 +388,8 @@ class CmdPoseHeader(MuxCommand):
         +poseheader/format |w[{name}]|n
         +poseheader/separator |x--- --- ---|n
     """
+
+    switch_options = ("on", "off", "format", "separator")
 
     key = "+poseheader"
     aliases = ["+ph"]  # noqa: RUF012
@@ -462,7 +467,7 @@ class CmdPoseHeader(MuxCommand):
 # =====================================================================
 
 
-class CmdHighlight(MuxCommand):
+class CmdHighlight(StrictSwitchMixin, MuxCommand):
     """
     Configure name highlighting in poses.
 
@@ -484,6 +489,8 @@ class CmdHighlight(MuxCommand):
         +highlight/self y          - Highlight your name in yellow
         +highlight/others g        - Highlight others in green
     """
+
+    switch_options = ("on", "off", "self", "others")
 
     key = "+highlight"
     aliases = ["+hl"]  # noqa: RUF012

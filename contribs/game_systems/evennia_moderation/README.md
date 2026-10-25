@@ -131,6 +131,9 @@ There is no waitlist.
 ## Moderation
 
 ```text
+ban <target>=<reason>
+ban/ip <address>=<reason>
+unban <number>
 +softban <account>=<reason>
 +softban/ip <address or CIDR>=<reason>
 +softban/duration <account>=<hours>

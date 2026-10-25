@@ -5,17 +5,19 @@
 from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin, whole_number
+
 from . import conf
 from .batch import holdings_cap, run_weekly_batch
 from .catalog import seed_catalog
-from .command_syntax import SingleSwitchMixin, split_comment
+from .command_syntax import split_comment
 from .gathering import LEAN_ATTRIBUTE, lean_description, pool, set_lean
 from .models import ResourceGrant, ResourceHolding
 from .services import ResourceError, grant, spend, total_held
 from .summary import gains_text, latest_receipt
 
 
-class _ResourceCommand(MuxCommand):
+class _ResourceCommand(StrictSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Resources"
 
@@ -29,6 +31,8 @@ class CmdGather(_ResourceCommand):
     Usage: +gather [resource or category], +gather/clear
     Choices persist. Only open terrain resources and the common pool are offered.
     """
+
+    switch_options = ("clear",)
 
     key = "+gather"
 
@@ -55,7 +59,7 @@ class CmdGather(_ResourceCommand):
             self.msg(str(exc))
 
 
-class CmdResources(SingleSwitchMixin, _ResourceCommand):
+class CmdResources(_ResourceCommand):
     """View holdings and recent accrual; staff can seed, grant, spend and audit.
 
     Usage:
@@ -112,7 +116,7 @@ class CmdResources(SingleSwitchMixin, _ResourceCommand):
                     raise ResourceError("Plots is not installed.")
                 plot = (
                     apps.get_model("evennia_plots", "PlotThread")
-                    .objects.filter(plot_number=int(self.lhs.strip().lstrip("#")))
+                    .objects.filter(plot_number=whole_number(self.lhs.strip().lstrip("#")))
                     .first()
                 )
                 if plot is None:
@@ -233,7 +237,7 @@ def quantity_resource(text):
     """Read one give-style quantity and resource key, without inline options."""
     try:
         amount, key = text.split()
-        return key, int(amount)
+        return key, whole_number(amount)
     except ValueError as exc:
         raise ResourceError(
             "Supply a whole quantity followed by a resource key, such as 2 timber."

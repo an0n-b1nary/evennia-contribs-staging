@@ -27,7 +27,7 @@ class AmbientTests(EvenniaCommandTest):
         self.assertFalse(mutes_ambient(self.char2))
 
     def test_unknown_switch_and_missing_registration_do_not_change_preference(self):
-        self.call(CmdAmbient(), "/oops", "Use +ambient")
+        self.call(CmdAmbient(), "/oops", "Unknown or ambiguous switch")
         self.account.options.options_dict.pop("mute_ambient_effects")
         self.call(CmdAmbient(), "/mute", "Ambient preferences aren't available")
         self.assertTrue(mutes_ambient(self.account))

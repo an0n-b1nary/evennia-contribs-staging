@@ -3,13 +3,29 @@
 import unittest
 from unittest.mock import patch
 
+from django.test import override_settings
 from evennia.scripts.taskhandler import TASK_HANDLER
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from .testing import TestRunner, _prepare_worker, discard_thread_work, isolate_tasks
 
 
+def syntax_test_lock(*args, **kwargs):
+    return True
+
+
 class TestTaskIsolation(EvenniaTestCase):
+    def test_lock_function_cache_follows_temporary_test_settings(self):
+        from evennia.locks import lockhandler
+
+        isolate_tasks()
+        with override_settings(LOCK_FUNC_MODULES=("evennia.locks.lockfuncs", __name__)):
+            self.assertIn("syntax_test_lock", lockhandler._LOCKFUNCS)
+            with override_settings(LOCK_FUNC_MODULES=("evennia.locks.lockfuncs",)):
+                self.assertNotIn("syntax_test_lock", lockhandler._LOCKFUNCS)
+            self.assertIn("syntax_test_lock", lockhandler._LOCKFUNCS)
+        self.assertNotIn("syntax_test_lock", lockhandler._LOCKFUNCS)
+
     def run_evennia_test(self, body):
         class Probe(EvenniaTest):
             def test_probe(probe):

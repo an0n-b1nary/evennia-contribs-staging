@@ -4,6 +4,8 @@
 
 from evennia import CmdSet
 
+from evennia_links.command_syntax import whole_number
+
 from . import conf, services
 from .behaviours import registry
 from .catalog import seed_catalog
@@ -338,7 +340,7 @@ class CmdCraft(_CraftCommand):
                 if implementation is None or "journal" not in implementation.fields:
                     raise CraftingError("Add a Readable verb first.")
                 value = bare_value(self)
-                normalized = validate({"journal": int(value)})
+                normalized = validate({"journal": whole_number(value)})
                 target = entry["configuration"] if entry else draft["configuration"]
                 target.clear()
                 target.update(normalized)
@@ -363,7 +365,7 @@ class CmdCraft(_CraftCommand):
                         raise CraftingError("Usage: +craft/page [title] = page text")
                     pages.append({"title": self.lhs.strip(), "text": self.rhs})
                 else:
-                    number = int(self.args.strip())
+                    number = whole_number(self.args.strip())
                     if not 1 <= number <= len(pages):
                         raise CraftingError("No such draft page.")
                     pages.pop(number - 1)
@@ -508,7 +510,7 @@ class CmdCraft(_CraftCommand):
             elif switch in ("unrequire", "unbeat"):
                 field = "beats" if switch == "unbeat" else "requirements"
                 values = list(draft["configuration"].get(field, []))
-                number = int(self.args.strip())
+                number = whole_number(self.args.strip())
                 if not 1 <= number <= len(values):
                     raise CraftingError("No such draft entry.")
                 values.pop(number - 1)
@@ -696,7 +698,7 @@ class CmdCrafting(_CraftCommand):
             self.msg(f"{definition.name}: {'archived' if definition.archived else 'active'}.")
         elif switch == "review":
             if self.args.strip():
-                row = CraftRecord.objects.filter(pk=int(self.args)).first()
+                row = CraftRecord.objects.filter(pk=whole_number(self.args)).first()
                 if row is None:
                     raise CraftingError("Unknown craft record.")
                 self.msg(

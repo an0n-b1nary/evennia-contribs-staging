@@ -13,6 +13,7 @@ from evennia.commands.default.account import CmdWho as DefaultCmdWho
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils import utils
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social import presence
 from evennia_social.identity import staff_run_marker
 from evennia_social.social import is_staff
@@ -30,7 +31,7 @@ _EXPLAIN = {
 }
 
 
-class CmdUnfindable(MuxCommand):
+class CmdUnfindable(StrictSwitchMixin, MuxCommand):
     """
     Choose whether others can find your character from afar.
 
@@ -69,7 +70,7 @@ class CmdUnfindable(MuxCommand):
         caller.msg(_EXPLAIN[choice])
 
 
-class CmdWho(DefaultCmdWho):
+class CmdWho(StrictSwitchMixin, DefaultCmdWho):
     """
     list who is currently online
 

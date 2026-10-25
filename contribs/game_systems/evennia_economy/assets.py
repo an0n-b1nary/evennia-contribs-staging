@@ -84,10 +84,10 @@ def normalize(spec):
 
 
 def parse_spec(character, text, *, items_only=False):
-    """Explicit prefixes avoid guessing: money:40, resource:grain:3, item:#12.
+    """Parse amounts such as `40 coins`, `3 grain`, and carried item names/dbrefs.
 
-    Ordinary `40 coins` and inventory names are also accepted. A host provider
-    may implement parse(text) -> (key, quantity) for its natural-language form.
+    A host provider may implement parse(text) -> (key, quantity) for its
+    natural-language form.
     With `items_only` (the economy is hidden from `character`), every piece is
     a carried item, so nothing hints at money or other asset kinds.
     """
@@ -100,46 +100,39 @@ def parse_spec(character, text, *, items_only=False):
         if items_only:
             result.append(_carried_item(character, piece))
             continue
-        if piece.startswith("money:"):
-            try:
-                result.append({"kind": "money", "key": "", "quantity": int(piece[6:])})
-            except ValueError:
-                raise EconomyError("Use money:<whole amount>.") from None
-            continue
-        if ":" in piece and not piece.startswith("item:"):
-            parts = piece.split(":")
-            if len(parts) != 3 or parts[0] not in available:
-                raise EconomyError("Unknown asset provider or invalid kind:key:quantity.")
-            try:
-                result.append({"kind": parts[0], "key": parts[1], "quantity": int(parts[2])})
-            except ValueError:
-                raise EconomyError("Asset quantity must be a whole number.") from None
-            continue
         nouns = getattr(settings, "RP_ECONOMY_CURRENCY", ("coin", "coins"))
         match = re.fullmatch(r"([0-9]+)\s+(.+)", piece)
         if match and match[2].casefold() in {str(n).casefold() for n in nouns}:
             result.append({"kind": "money", "key": "", "quantity": int(match[1])})
             continue
-        if not piece.startswith("item:"):
-            matches = [
-                (kind, provider.parse(piece))
-                for kind, provider in available.items()
-                if hasattr(provider, "parse")
-            ]
-            matches = [(kind, parsed) for kind, parsed in matches if parsed is not None]
-            if len(matches) > 1:
-                raise EconomyError("Ambiguous asset; use kind:key:quantity.")
-            if matches:
-                kind, (key, count) = matches[0]
-                result.append({"kind": kind, "key": key, "quantity": count})
-                continue
+        matches = [
+            (kind, provider.parse(piece))
+            for kind, provider in available.items()
+            if hasattr(provider, "parse")
+        ]
+        matches = [(kind, parsed) for kind, parsed in matches if parsed is not None]
+        if len(matches) > 1:
+            labels = [f"{kind} ({available[kind].describe(parsed[0])})" for kind, parsed in matches]
+            message = (
+                f"Ambiguous asset {piece!r}: matches {', '.join(labels)}. "
+                "These assets need distinct names; please ask staff to rename them."
+            )
+            logger.warning(message)
+            raise EconomyError(message)
+        if matches:
+            kind, (key, count) = matches[0]
+            result.append({"kind": kind, "key": key, "quantity": count})
+            continue
         result.append(_carried_item(character, piece))
     return normalize(result)
 
 
 def _carried_item(character, piece):
-    name = piece[5:] if piece.startswith("item:") else piece
+    name = piece
     objects = character.search(name, candidates=character.contents, quiet=True)
+    # Evennia's dbref lookup can bypass candidates (notably for staff).
+    # A reference must never select another character's item or room contents.
+    objects = [obj for obj in objects if getattr(obj, "location", None) == character]
     if len(objects) != 1:
         raise EconomyError(f"No unique carried item matches {name!r}.")
     return {"kind": "item", "key": str(objects[0].pk), "quantity": 1}
@@ -160,7 +153,7 @@ def describe(spec):
         elif kind in available:
             labels.append(f"{count} {available[kind].describe(key)}")
         else:
-            labels.append(f"{count} {kind}:{key} (unavailable)")
+            labels.append(f"{count} {key} ({kind} unavailable)")
     return ", ".join(labels) or "nothing"
 
 

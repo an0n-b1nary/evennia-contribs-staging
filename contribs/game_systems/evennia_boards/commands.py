@@ -21,6 +21,8 @@ from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 # Screenreader support — optional; falls back to always-False when
 # evennia-accessibility is not installed.
 try:
@@ -210,7 +212,7 @@ def _bb_quit(caller):
 # ---------------------------------------------------------------------------
 
 
-class CmdBoard(MuxCommand):
+class CmdBoard(StrictSwitchMixin, MuxCommand):
     """
     Read and manage bulletin boards.
 
@@ -231,6 +233,8 @@ class CmdBoard(MuxCommand):
     Subscribed boards notify you of new posts on login.
     IC boards (marked [IC]) hold narrative posts that may earn XP.
     """
+
+    switch_options = ("post", "reply", "edit", "subscribe", "unsubscribe", "archive")
 
     key = "+bb"
     aliases = ["+board"]  # noqa: RUF012

@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- **Breaking:** tag keys, names and aliases share one namespace across kinds. Reject collisions at ruleset load with both tags identified.
+
 ## [0.1.1] - 2026-10-10
 
 ### Added

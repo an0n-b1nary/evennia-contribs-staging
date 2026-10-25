@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## 0.5.0 — 2026-10-24
 
 ### Breaking

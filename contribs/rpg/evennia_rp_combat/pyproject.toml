@@ -10,7 +10,7 @@ readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]
 requires-python = ">=3.12"
-dependencies = ["evennia>=6.0", "evennia-links>=0.5", "evennia-rp-rules>=0.1,<0.2"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13", "evennia-rp-rules>=0.1,<0.2"]
 
 [project.optional-dependencies]
 chargen = ["evennia-rp-chargen>=0.6,<0.7"]

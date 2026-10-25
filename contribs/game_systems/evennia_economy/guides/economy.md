@@ -27,7 +27,7 @@ Money you've earned stays yours however long you're away. The cap slows income f
 
 ## Trading
 
-An offer can swap money, items and anything else your game lets you trade, in any mix: `+offer Mara=40 coins for item:#12`, or a carried item by name. Leave out `for <what you want>` to offer a gift. You both need to be in the same room, and the offer lapses if either of you leaves, or after a while if nobody accepts it. `+offer` lists your open offers, and either of you can call one off with `+offer/cancel <number>`.
+An offer can swap money, items and anything else your game lets you trade, in any mix: `+offer Mara=40 coins for #12`, or a carried item by name. Leave out `for <what you want>` to offer a gift. You both need to be in the same room, and the offer lapses if either of you leaves, or after a while if nobody accepts it. `+offer` lists your open offers, and either of you can call one off with `+offer/cancel <number>`.
 
 Nothing is set aside while an offer waits. When it's accepted, the game checks again that both of you still have what you promised, then moves everything together.
 

@@ -103,7 +103,7 @@ class TestCmdMood(SocialCommandTestCase):
         self.assertEqual(self.room1.room_mood, "")
 
     def test_unknown_switch(self):
-        self.call(CmdMood(), "/loud Thunder.", "Unknown switch: /loud.")
+        self.call(CmdMood(), "/loud Thunder.", "Unknown or ambiguous switch.")
 
     def test_ordinary_player_is_refused_without_a_scene(self):
         result = self.call(CmdMood(), "Mine now.", caller=self.char2)

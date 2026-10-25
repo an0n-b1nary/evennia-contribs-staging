@@ -37,7 +37,8 @@ from django.utils import timezone
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
-from evennia_plots.command_syntax import SingleSwitchMixin, split_comment
+from evennia_links.command_syntax import StrictSwitchMixin
+from evennia_plots.command_syntax import split_comment
 from evennia_plots.models import PlotArc
 from evennia_plots.permissions import can_manage_arc, is_plot_staff
 from evennia_plots.signals import arc_currency_changed, arc_type_changed
@@ -565,7 +566,7 @@ def _display_thread(thread, caller):
 # ---------------------------------------------------------------------------
 
 
-class CmdPlot(SingleSwitchMixin, MuxCommand):
+class CmdPlot(StrictSwitchMixin, MuxCommand):
     """
     Manage plots and their threads.
 
@@ -1506,7 +1507,7 @@ class CmdPlot(SingleSwitchMixin, MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdThread(SingleSwitchMixin, MuxCommand):
+class CmdThread(StrictSwitchMixin, MuxCommand):
     """
     Manage questions, problems and leads inside a plot.
 
@@ -1728,7 +1729,7 @@ class CmdThread(SingleSwitchMixin, MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdArc(SingleSwitchMixin, MuxCommand):
+class CmdArc(StrictSwitchMixin, MuxCommand):
     """
     Manage plot arcs (staff only).
 
@@ -2318,7 +2319,7 @@ class CmdArc(SingleSwitchMixin, MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdHook(SingleSwitchMixin, MuxCommand):
+class CmdHook(StrictSwitchMixin, MuxCommand):
     """
     Nudge a player toward a plot (staff only).
 

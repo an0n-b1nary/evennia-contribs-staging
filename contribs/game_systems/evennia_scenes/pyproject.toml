@@ -22,7 +22,7 @@ classifiers = [
 # Core: models + commands only.
 dependencies = [
     "evennia>=6.0",
-    "evennia-links>=0.8",
+    "evennia-links>=0.8.13",
 ]
 
 [project.optional-dependencies]

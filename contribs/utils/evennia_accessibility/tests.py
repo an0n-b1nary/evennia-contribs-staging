@@ -424,9 +424,8 @@ class TestCmdScreenreader(EvenniaCommandTest):
 
     def test_unknown_switch_error(self):
         result = self.call(CmdScreenreader(), "/foo", caller=self.char1)
-        self.assertIn("Unknown switch", result)
-        self.assertIn("/on", result)
-        self.assertIn("/off", result)
+        self.assertIn("Unknown or ambiguous switch", result)
+        self.assertIn("help +screenreader", result)
 
     def test_sr_alias_registered(self):
         self.assertIn("+sr", CmdScreenreader.aliases)

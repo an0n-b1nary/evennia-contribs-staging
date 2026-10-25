@@ -11,8 +11,10 @@ nothing generic to implement here.
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 
-class CmdRoulette(MuxCommand):
+
+class CmdRoulette(StrictSwitchMixin, MuxCommand):
     """
     Get a random scene idea suggestion.
 

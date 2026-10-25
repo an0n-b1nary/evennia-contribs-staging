@@ -4,12 +4,14 @@
 
 from evennia.commands.default.general import CmdLook as DefaultLook
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 from . import conf
 from .errors import CraftingError
 from .item_details import examine, local_items
 
 
-class CmdLook(DefaultLook):
+class CmdLook(StrictSwitchMixin, DefaultLook):
     """Look normally, or examine a named detail on a local crafted item.
 
     Usage:

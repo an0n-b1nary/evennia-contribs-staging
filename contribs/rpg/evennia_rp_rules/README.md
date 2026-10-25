@@ -287,6 +287,9 @@ catalog's `clean()`.
 
 ### Tag vocabulary
 
+Tag keys, names and aliases must be unique across all kinds, ignoring case.
+A collision is a load-time ruleset error naming both tags; use distinct names.
+
 The ruleset's `tags` are a seed. `get_vocabulary()` returns
 `RP_RULES_VOCABULARY()` if that's set; chargen's database vocabulary is one
 example, letting staff add a domain without a deploy. Otherwise it returns

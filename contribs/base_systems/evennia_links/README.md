@@ -587,3 +587,12 @@ them. Tasks that existed before a test started are left alone.
 The staff-only [`links-staff`](guides/links-staff.md) page covers staff tasks, command permissions, safe changes, privacy and review queues. It stays readable by guide staff before player systems are revealed.
 
 With [evennia-guides](../../utils/evennia_guides/README.md) installed, pages in `guides/` appear in its web guide; otherwise they are ignored. Hosts may replace a page with the same key in `GUIDES_DIRS`.
+
+### Command input validation
+
+Put `evennia_links.command_syntax.StrictSwitchMixin` before an Evennia command
+base, including stock command replacements, and declare `switch_options`.
+Unknown, ambiguous and stacked switches stop before parsing and lookups. Exact
+matches and unique prefixes are case-insensitive. Use an empty tuple for a
+command with no switches. `whole_number(value)` raises a readable `ValueError`
+for invalid numeric input; catch it at the command boundary as a refusal.

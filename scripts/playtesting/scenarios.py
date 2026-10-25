@@ -195,7 +195,7 @@ class Suite:
             "staff", f"+resources/grant #{bob_id}=3 grain # Live trade", "Resources updated"
         )
         before = self.state()
-        self.command("alice", f"+offer {bob_name}=5 coins for resource:grain:2", "Offer #")
+        self.command("alice", f"+offer {bob_name}=5 coins for 2 grain", "Offer #")
         offer_id = self.state()["economy_offers"][-1]["id"]
         result = self.command("bob", f"+accept {offer_id}", "accepted")
         assert "complete a trade" in self.observer(result, "staff")
@@ -258,7 +258,7 @@ class Suite:
         self.command("bob", "drop live market cloak", "drop")
         self.command("bob", "get live market cloak", "pick up|get")
         # Reserved resources return intact when the owner closes the stall.
-        self.command("alice", "+stall/list resource:grain:1=3", "Listing #")
+        self.command("alice", "+stall/list 1 grain=3", "Listing #")
         reserved = self.state()["economy_listings"][-1]["id"]
         self.session.host.reload()
         self.command("bob", "+browse", "Grain")
@@ -333,7 +333,7 @@ class Suite:
         store = next(row for row in self.state()["economy_stalls"] if row["kind"] == "shop")
         self.command("alice", "live supply shop")
         self.command("bob", "live supply shop")
-        self.command("alice", f"+shop/list {store['id']}/resource:grain:1=3", "Listing #")
+        self.command("alice", f"+shop/list {store['id']}/1 grain=3", "Listing #")
         listing = self.state()["economy_listings"][-1]
         self.command("alice", "outside", "Playtest.*laboratory")
         self.session.disconnect("alice")

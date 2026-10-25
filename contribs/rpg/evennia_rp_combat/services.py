@@ -1174,22 +1174,30 @@ def pending_request(row, argument):
 
 
 def pending_revival(state, row, argument):
-    offers = [
-        token
+    offers = {
+        token: engine.participant(state, state["exchanges"][token.split(":")[0]]["actor"])["name"]
         for token in row["incoming"]
         if state["exchanges"].get(token.split(":")[0], {}).get("revival")
-    ]
+    }
     if argument:
-        if argument not in offers:
-            raise CombatError("No revival offer matches that token.")
-        return argument
+        needle = str(argument).strip().casefold()
+        matches = [token for token, name in offers.items() if name.casefold() == needle] or [
+            token for token, name in offers.items() if name.casefold().startswith(needle)
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise CombatError("No revival offer matches that healer's name.")
+        raise CombatError("Name one healer: " + ", ".join(offers[token] for token in matches) + ".")
     if not offers:
         raise CombatError("You have no pending storyteller requests or revival offers.")
     if len(offers) > 1:
         raise CombatError(
-            "Several revival offers are pending; name one: " + ", ".join(offers) + "."
+            "Several revival offers are pending; name one healer: "
+            + ", ".join(offers.values())
+            + "."
         )
-    return offers[0]
+    return next(iter(offers))
 
 
 def withdraw_end_proposal(state):
@@ -1266,7 +1274,8 @@ def control(
         elif operation == "cap":
             engine.reduce_cap(state, subject.pk, argument)
         elif operation in ("accept", "decline") and (
-            ":" in str(argument or "") or (not argument and not row["requests"])
+            (argument and not str(argument).strip().isdecimal())
+            or (not argument and not row["requests"])
         ):
             token = pending_revival(state, row, argument)
             exchange = engine.get_exchange(state, token)
@@ -1819,8 +1828,8 @@ def render(actor, *, subject=None):
                     else "your Turn Limit is used up, so you won't act again in this fight"
                 )
                 lines.append(
-                    f"Revival offer {token} from {healer}: if the Heal restores Vitality, {after}. "
-                    f"+combat/accept {token} or /decline {token}."
+                    f"Revival offer from {healer}: if the Heal restores Vitality, {after}. "
+                    f"+combat/accept {healer} or /decline {healer}."
                 )
                 continue
             view = engine.reaction_view(state, own["id"], token)

@@ -9,6 +9,7 @@ from django.db.models import F, Q
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.objects.models import ObjectDB
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_links.transactions import atomic_objects
 
 from . import attachments, collaboration, frontier, services
@@ -26,7 +27,7 @@ from .models import (
 from .visibility import room_visibility
 
 
-class BuildingCommand(MuxCommand):
+class BuildingCommand(StrictSwitchMixin, MuxCommand):
     """Validate the original switches before MuxCommand can ignore a bad one."""
 
     locks = "cmd:all()"

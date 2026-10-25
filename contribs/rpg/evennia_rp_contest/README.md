@@ -83,7 +83,7 @@ Settings (defaults):
 | `RP_CONTEST_RPTRACKER_APP_LABEL` | `evennia_rptracker` |
 
 Tag lookup accepts keys, names, aliases and unique prefixes across the allowed
-kinds. Ambiguous spellings ask which tag was meant; `kind:key` selects one.
+kinds. Tag names are unique across kinds; an ambiguous prefix asks for a fuller name.
 Custom narration receives `record, result=...`; use `narration.emit` with a
 trusted template and a mapping for all player text.
 

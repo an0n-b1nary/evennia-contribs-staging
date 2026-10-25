@@ -32,6 +32,7 @@ from django.core import signing
 from django.db import IntegrityError, transaction
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_maps import layout, placement
 from evennia_maps.direction import resolve as resolve_direction
 from evennia_maps.models import MapPlane, RoomTile
@@ -68,7 +69,7 @@ def _explain_blocked(blocked):
     return f"held by {holder_label}, which this reflow does not move"
 
 
-class CmdMap(MuxCommand):
+class CmdMap(StrictSwitchMixin, MuxCommand):
     """
     View and manage the room map.
 

@@ -2,6 +2,10 @@
 
 All notable changes to `evennia-regions` will be documented here.
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## 0.5.3 — 2026-10-20
 
 - Add the staff-only `regions-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

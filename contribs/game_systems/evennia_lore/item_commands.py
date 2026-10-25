@@ -6,9 +6,9 @@ from django.apps import apps
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.dbserialize import deserialize
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_links.pagination import reading_target
 
-from .command_syntax import SingleSwitchMixin
 from .items import LoreItemError, create_tome, staff, validate_citations, validate_pages
 
 TOME_DRAFT = "lore_tome_draft"
@@ -23,7 +23,7 @@ def entry_id(actor, value):
     return entry.pk
 
 
-class ItemCommand(SingleSwitchMixin, MuxCommand):
+class ItemCommand(StrictSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Lore"
 

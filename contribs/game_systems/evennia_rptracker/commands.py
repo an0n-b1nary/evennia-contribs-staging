@@ -22,6 +22,7 @@ from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links import resolve_dotted
+from evennia_links.command_syntax import StrictSwitchMixin
 
 
 def _resolve_dotted(dotted_path):
@@ -97,7 +98,7 @@ def _format_session_row(session, show_char=False):
     )
 
 
-class CmdActivity(MuxCommand):
+class CmdActivity(StrictSwitchMixin, MuxCommand):
     """
     View your RP session activity and manually end sessions.
 
@@ -114,6 +115,8 @@ class CmdActivity(MuxCommand):
     session and records it as manually ended. Repeatedly ending and
     restarting sessions may be flagged for staff review.
     """
+
+    switch_options = ("endchannel", "end", "detail", "history")
 
     key = "+activity"
     aliases = []  # noqa: RUF012
@@ -296,7 +299,7 @@ class CmdActivity(MuxCommand):
         caller.msg("\n".join(lines))
 
 
-class CmdRPTrackerStaff(MuxCommand):
+class CmdRPTrackerStaff(StrictSwitchMixin, MuxCommand):
     """
     Review RP session activity for anti-gaming detection (staff).
 
@@ -308,6 +311,8 @@ class CmdRPTrackerStaff(MuxCommand):
     Flagged sessions are excluded from XP until reviewed. Flags are
     per-session — a player's other legitimate sessions are unaffected.
     """
+
+    switch_options = ("flag", "unflag")
 
     key = "+rptracker"
     aliases = []  # noqa: RUF012
@@ -433,7 +438,7 @@ class CmdRPTrackerStaff(MuxCommand):
         self.caller.msg("\n".join(lines))
 
 
-class CmdRPActivityReport(MuxCommand):
+class CmdRPActivityReport(StrictSwitchMixin, MuxCommand):
     """Staff aggregate activity.
 
     Usage:

@@ -26,9 +26,9 @@ from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.utils import inherits_from
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_rp_chargen import abilities, conf, locks, services
 from evennia_rp_chargen.catalog import split_ability_text
-from evennia_rp_chargen.command_syntax import SingleSwitchMixin
 from evennia_rp_chargen.models import (
     AbilityDefinition,
     CharacterAbility,
@@ -54,7 +54,7 @@ def _count(text: str, glyph: str) -> int | None:
     return None
 
 
-class _ChargenCommand(SingleSwitchMixin, MuxCommand):
+class _ChargenCommand(StrictSwitchMixin, MuxCommand):
     help_category = "Character"
     locks = "cmd:all()"
 

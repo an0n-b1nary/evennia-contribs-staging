@@ -1,5 +1,10 @@
 # Changelog — evennia-rp-contest
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- **Breaking:** resolve tags by unique names across configured kinds; remove kind-prefixed selection and offer full names for ambiguous prefixes.
+
 ## 0.2.0
 
 ### Breaking

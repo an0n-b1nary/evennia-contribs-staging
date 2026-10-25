@@ -380,7 +380,7 @@ class StallCommandTests(BaseEvenniaCommandTest):
         self.call(CmdStall(), "/claim Test stall", "Claimed stall")
         self.obj1.location = self.char1
         with self.captureOnCommitCallbacks(execute=True):
-            self.call(CmdStall(), f"/list item:#{self.obj1.pk}=10", "Listing #")
+            self.call(CmdStall(), f"/list #{self.obj1.pk}=10", "Listing #")
         listing = Listing.objects.get()
         self.call(CmdBrowse(), "", "Stall #")
         self.call(CmdMarket(), "Test", "#")
@@ -390,8 +390,8 @@ class StallCommandTests(BaseEvenniaCommandTest):
         self.call(CmdStall(), "/close", "Stall #")
 
     def test_bad_input_and_hidden_command_access(self):
-        self.call(CmdBuy(), "potato", "invalid literal")
-        self.call(CmdStall(), "/unknown", "Unknown stall switch")
+        self.call(CmdBuy(), "potato", "Give a whole number.")
+        self.call(CmdStall(), "/unknown", "Unknown or ambiguous switch")
         with override_settings(RP_ECONOMY_REVEALED=False):
             for command in (CmdStall(), CmdBrowse(), CmdBuy(), CmdMarket()):
                 self.assertFalse(command.access(self.char2))
@@ -402,5 +402,5 @@ class StallCommandTests(BaseEvenniaCommandTest):
             second = stalls.claim(self.char1, name="Second")
         self.obj1.location = self.char1
         with self.captureOnCommitCallbacks(execute=True):
-            self.call(CmdStall(), f"/list {second.pk}/item:#{self.obj1.pk}=10", "Listing #")
+            self.call(CmdStall(), f"/list {second.pk}/#{self.obj1.pk}=10", "Listing #")
         self.assertEqual(Listing.objects.get().storefront_id, second.pk)

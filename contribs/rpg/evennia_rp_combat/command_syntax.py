@@ -5,29 +5,11 @@
 from django.apps import apps
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
+from evennia_links.command_syntax import StrictSwitchMixin as SingleSwitchMixin  # noqa: F401
+
 from . import services
 from .data import CombatError
-
-
-class SingleSwitchMixin:
-    """Reject unknown or stacked switches before MuxCommand drops them."""
-
-    switch_options = ()
-
-    def at_pre_cmd(self):
-        if super().at_pre_cmd():
-            return True
-        raw = self.args.strip()
-        if not raw.startswith("/"):
-            return False
-        head = raw.split(maxsplit=1)[0][1:].lower()
-        matches = [s for s in self.switch_options if s == head] or [
-            s for s in self.switch_options if s.startswith(head)
-        ]
-        if "/" in head or len(matches) != 1:
-            self.msg(f"Use one known switch. See help {self.key}.")
-            return True
-        return False
 
 
 def controlled_subject(actor):
@@ -44,7 +26,7 @@ def controlled_subject(actor):
     return actor
 
 
-class CombatCommand(SingleSwitchMixin, MuxCommand):
+class CombatCommand(StrictSwitchMixin, MuxCommand):
     """Run ordinary commands against puppet state, keeping the player as caller."""
 
     locks = "cmd:all()"
@@ -52,12 +34,14 @@ class CombatCommand(SingleSwitchMixin, MuxCommand):
     literal_switches = ()
 
     def at_pre_cmd(self):
+        if super().at_pre_cmd():
+            return True
         try:
             self.subject = controlled_subject(self.caller)
         except CombatError as exc:
             self.msg(services.plain(exc, 500))
             return True
-        return super().at_pre_cmd()
+        return False
 
     def func(self):
         try:

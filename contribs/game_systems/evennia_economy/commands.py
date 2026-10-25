@@ -4,16 +4,18 @@ from django.db.models import Q
 from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin, whole_number
+
 from . import assets, conf
 from .batch import money_cap, run_stipends, run_weekly_batch
-from .command_syntax import SingleSwitchMixin, split_comment
+from .command_syntax import split_comment
 from .exchange import accept_offer, cancel_offer, create_offer, expire_offers, give
 from .models import LedgerEntry, Listing, Offer, ReviewFlag, Storefront
 from .reports import account_accrual, reconciliation
 from .services import EconomyError, balance, credit, debit
 
 
-class EconomyCommand(MuxCommand):
+class EconomyCommand(StrictSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Economy"
 
@@ -47,9 +49,11 @@ class CmdOffer(EconomyCommand):
     +offer[/secret] character = give [for want]
     +offer                       (list your sent and received offers)
     +offer/cancel <number>
-    Assets: 40 coins, resource:grain:3, item:#12, or a carried item's name.
+    Assets: 40 coins, 3 grain, #12, or a carried item's name.
     Nothing is reserved. Acceptance rechecks all stock and permissions.
     """
+
+    switch_options = ("secret", "cancel")
 
     key = "+offer"
 
@@ -57,7 +61,7 @@ class CmdOffer(EconomyCommand):
         if "cancel" in self.switches:
             if self.switches != ["cancel"]:
                 raise EconomyError("Use one offer switch.")
-            cancel_offer(self.caller, int(self.args.strip().lstrip("#")))
+            cancel_offer(self.caller, whole_number(self.args.strip().lstrip("#")))
             self.msg("Offer cancelled.")
             return
         if set(self.switches) - {"secret"}:
@@ -93,13 +97,17 @@ class CmdOffer(EconomyCommand):
 class CmdAccept(EconomyCommand):
     """Accept an offer addressed to you: +accept[/secret] <number>."""
 
+    switch_options = ("secret",)
+
     key = "+accept"
 
     def run(self):
         if set(self.switches) - {"secret"}:
             raise EconomyError("Usage: +accept[/secret] number")
         offer = accept_offer(
-            self.caller, int(self.args.strip().lstrip("#")), secret="secret" in self.switches
+            self.caller,
+            whole_number(self.args.strip().lstrip("#")),
+            secret="secret" in self.switches,
         )
         self.msg(f"Offer #{offer.pk} accepted.")
 
@@ -144,7 +152,7 @@ class CmdGive(EconomyCommand):
         target.msg(f"{self.caller.key} gives you {described}.")
 
 
-class CmdEconomy(SingleSwitchMixin, EconomyCommand):
+class CmdEconomy(EconomyCommand):
     """Staff economy reconciliation, adjustments and review queue.
 
     +economy                     (money/partner totals and per-account accrual)
@@ -193,7 +201,7 @@ class CmdEconomy(SingleSwitchMixin, EconomyCommand):
             if not separator or not target_text.strip() or not amount.strip():
                 raise EconomyError(usage)
             try:
-                amount = int(amount)
+                amount = whole_number(amount)
             except ValueError as exc:
                 raise EconomyError(usage) from exc
             target = self.caller.search(target_text.strip(), global_search=True)
@@ -224,7 +232,7 @@ class CmdEconomy(SingleSwitchMixin, EconomyCommand):
                 or "No review flags."
             )
         elif switch == "reviewed":
-            if not ReviewFlag.objects.filter(pk=int(self.args.strip().lstrip("#"))).update(
+            if not ReviewFlag.objects.filter(pk=whole_number(self.args.strip().lstrip("#"))).update(
                 reviewed=True
             ):
                 raise EconomyError("No such flag.")
@@ -247,6 +255,8 @@ class CmdStall(EconomyCommand):
     Listing reserves the stock. Buyers must visit, but you can be offline.
     Staff can close any stall remotely to return its stock, even while frozen.
     """
+
+    switch_options = ("claim", "name", "desc", "list", "unlist", "close")
 
     key = "+stall"
     store_kind = "stall"
@@ -277,10 +287,10 @@ class CmdStall(EconomyCommand):
             return
         if switch == "unlist":
             if not Listing.objects.filter(
-                pk=int(self.args.strip().lstrip("#")), storefront__kind=noun
+                pk=whole_number(self.args.strip().lstrip("#")), storefront__kind=noun
             ).exists():
                 raise EconomyError(f"No such {noun} listing.")
-            listing = stalls.unlist(self.caller, int(self.args.strip().lstrip("#")))
+            listing = stalls.unlist(self.caller, whole_number(self.args.strip().lstrip("#")))
             self.msg(f"Listing #{listing.pk} returned to your inventory.")
             return
         if switch not in ("name", "desc", "list", "close"):
@@ -297,13 +307,13 @@ class CmdStall(EconomyCommand):
             asset_text = self.lhs
             number, separator, stock = self.lhs.partition("/")
             if separator and number.strip().lstrip("#").isdecimal():
-                stores = stores.filter(pk=int(number.strip().lstrip("#")))
+                stores = stores.filter(pk=whole_number(number.strip().lstrip("#")))
                 asset_text = stock
         else:
             target = self.args.strip() if switch == "close" else self.lhs.strip()
             stores = Storefront.objects.filter(status="open", kind=self.store_kind)
             if target:
-                stores = stores.filter(pk=int(target.lstrip("#")))
+                stores = stores.filter(pk=whole_number(target.lstrip("#")))
             else:
                 stores = stores.filter(owner=self.caller, room_id=stalls.place(self.caller))
         choices = list(stores[:2])
@@ -317,7 +327,7 @@ class CmdStall(EconomyCommand):
                 self.caller,
                 store.pk,
                 assets.parse_spec(self.caller, asset_text),
-                int(self.rhs.strip()),
+                whole_number(self.rhs.strip()),
             )
             self.msg(
                 f"Listing #{listing.pk}: {assets.describe(listing.assets)} for {conf.currency(listing.price)}."
@@ -334,7 +344,7 @@ class CmdStall(EconomyCommand):
             self.msg(f"{noun.title()} updated.")
 
 
-class CmdShop(SingleSwitchMixin, CmdStall):
+class CmdShop(CmdStall):
     """Manage an approved property shop.
 
     +shop
@@ -355,10 +365,10 @@ class CmdShop(SingleSwitchMixin, CmdStall):
         from . import shops
 
         if self.switches == ["reconcile"]:
-            store = shops.reconcile(self.caller, int(self.args.strip().lstrip("#")))
+            store = shops.reconcile(self.caller, whole_number(self.args.strip().lstrip("#")))
             self.msg(f"Shop #{store.pk}: {store.name}.")
         elif self.switches == ["reopen"]:
-            store = shops.reopen(self.caller, int(self.args.strip().lstrip("#")))
+            store = shops.reopen(self.caller, whole_number(self.args.strip().lstrip("#")))
             self.msg(f"Shop #{store.pk} reopened.")
         elif self.switches == ["claim"]:
             raise EconomyError("Submit a shop build for staff approval with +build.")
@@ -370,6 +380,7 @@ class CmdBrowse(EconomyCommand):
     """Browse nearby stalls: +browse [stall number]. Discovery is also global via +market."""
 
     key = "+browse"
+    switch_options = ("system",)
 
     def run(self):
         from . import stalls
@@ -390,7 +401,7 @@ class CmdBrowse(EconomyCommand):
 
         stores = stalls.directory(self.caller, room=stalls.place(self.caller))
         if self.args.strip():
-            number = int(self.args.strip().lstrip("#"))
+            number = whole_number(self.args.strip().lstrip("#"))
             stores = [(s, rows) for s, rows in stores if s.pk == number]
         lines = []
         for store, listings in stores:
@@ -410,6 +421,7 @@ class CmdBuy(EconomyCommand):
     """Buy a reserved listing in this room: +buy listing number."""
 
     key = "+buy"
+    switch_options = ("system",)
 
     def run(self):
         from .stalls import buy
@@ -420,12 +432,12 @@ class CmdBuy(EconomyCommand):
             amount = (self.rhs or "").strip()
             if not amount.isdigit():
                 raise EconomyError("Usage: +buy/system resource=quantity")
-            total = buy_system(self.caller, self.lhs.strip(), int(amount))
+            total = buy_system(self.caller, self.lhs.strip(), whole_number(amount))
             self.msg(f"Bought {amount} {self.lhs.strip()} for {conf.currency(total)}.")
             return
         if self.switches:
             raise EconomyError("Usage: +buy listing number")
-        listing = buy(self.caller, int(self.args.strip().lstrip("#")))
+        listing = buy(self.caller, whole_number(self.args.strip().lstrip("#")))
         self.msg(
             f"Bought listing #{listing.pk}: {assets.describe(listing.assets)} for {conf.currency(listing.price)}."
         )

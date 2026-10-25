@@ -22,8 +22,8 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_lore import layers
-from evennia_lore.command_syntax import SingleSwitchMixin
 from evennia_lore.item_commands import CmdLoreCraft as CmdLoreCraft
 from evennia_lore.item_commands import CmdReadTome as CmdReadTome
 from evennia_lore.item_commands import CmdTome as CmdTome
@@ -210,7 +210,7 @@ def _get_model(label_setting_key, model_name, default_label):
 # ---------------------------------------------------------------------------
 
 
-class CmdLore(SingleSwitchMixin, EditingMixin, MuxCommand):
+class CmdLore(StrictSwitchMixin, EditingMixin, MuxCommand):
     """
     View and manage the lore compendium.
 
@@ -1145,7 +1145,7 @@ def _lore_submit_save(caller, content):
 # ---------------------------------------------------------------------------
 
 
-class CmdInvestigate(MuxCommand):
+class CmdInvestigate(StrictSwitchMixin, MuxCommand):
     """
     Declare a lore investigation focus (lean).
 
@@ -1161,6 +1161,8 @@ class CmdInvestigate(MuxCommand):
     Sets a persistent preference tilting your passive lore acquisition toward
     entries matching the specified topic.
     """
+
+    switch_options = ("theme", "tag", "region", "entry", "plot", "clear")
 
     key = "+investigate"
     aliases = ["+inv"]  # noqa: RUF012
@@ -1284,7 +1286,7 @@ class CmdInvestigate(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdShare(SingleSwitchMixin, MuxCommand):
+class CmdShare(StrictSwitchMixin, MuxCommand):
     """
     Share a lore entry with another character.
 
@@ -1366,7 +1368,7 @@ class CmdShare(SingleSwitchMixin, MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdHint(MuxCommand):
+class CmdHint(StrictSwitchMixin, MuxCommand):
     """
     Reveal hints for restricted lore in your current location.
 
@@ -1442,7 +1444,7 @@ class CmdHint(MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdForget(MuxCommand):
+class CmdForget(StrictSwitchMixin, MuxCommand):
     """
     Remove a lore entry from your compendium.
 

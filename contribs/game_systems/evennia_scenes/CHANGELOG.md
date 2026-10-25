@@ -1,5 +1,9 @@
 # Changelog — evennia-scenes
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## 0.8.4 — 2026-10-20
 
 - Add the staff-only `scenes-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

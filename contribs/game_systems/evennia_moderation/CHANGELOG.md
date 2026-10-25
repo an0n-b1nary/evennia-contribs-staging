@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- **Breaking:** use `ban <target>=<reason>`; reasons may contain colons. Keep invalid admissions numbers readable.
+
 ## [0.2.0] - 2026-10-21
 
 ### Breaking
