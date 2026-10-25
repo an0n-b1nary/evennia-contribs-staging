@@ -9,12 +9,43 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from evennia_lore import test_lean
 from evennia_lore.models import LoreEntry, LoreNotice, PlotLoreLink
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
 from world.sandbox import content
 from world.sandbox.seeding import SeededSandboxMixin
+
+
+@override_settings(ROOT_URLCONF="web.urls")
+class LoreLeanSeams(test_lean.TestLoreLeanPersistence):
+    """Exercise persistent leans through the real character and mounted lore pages."""
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_plot_lean_survives_cache_eviction(self):
+        from evennia_lore.commands import CmdInvestigate
+        from evennia_plots.models import PlotThread
+
+        plot = PlotThread.create_thread(name="The Codex", creator=self.char1)
+        PlotLoreLink.objects.create(entry=self.entry, thread_id=plot.pk)
+        self.call(CmdInvestigate(), f"/plot #{plot.plot_number}", caller=self.char2)
+        self._reload_character()
+        self._assert_lean("plot", plot.plot_number, 2)
+
+    def test_region_lean_survives_cache_eviction(self):
+        from evennia_lore.commands import CmdInvestigate
+        from evennia_lore.models import LoreRegionLink
+
+        from evennia_regions.models import Region
+
+        region = Region.objects.create(name="The Archive")
+        LoreRegionLink.objects.create(entry=self.entry, region_id=region.pk)
+        self.call(CmdInvestigate(), "/region The Archive", caller=self.char2)
+        self._reload_character()
+        self._assert_lean("region", region.name, 2)
 
 
 class LoreReviewSeams(EvenniaTest):

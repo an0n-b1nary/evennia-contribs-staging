@@ -192,6 +192,12 @@ proportionally:
 An entry with weight 0 is excluded. The lean multiplier doubles the weight for entries
 matching the character's `+investigate` lean.
 
+Commands and the web lean form store the preference in the character's persistent
+Evennia Attributes, `character.db.lore_lean_type` and `character.db.lore_lean_value`.
+No typeclass mixin is required. A character without these Attributes has no lean;
+setting or clearing one survives cache eviction and server restarts. Preferences
+set before 0.10.3 were only in memory and must be set again after upgrading.
+
 ### Session context provider
 
 Cross-domain context (room_id / region_id / thread_ids for a session) is supplied by a

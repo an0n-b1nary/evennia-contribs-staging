@@ -422,8 +422,8 @@ class TestBuildPool(EvenniaTest):
         entry = _make_entry("Tag Lean Entry", author=self.char1)
         tag = _make_tag("History", is_major=False)
         entry.tags.add(tag)
-        self.char1.lore_lean_type = "tag"
-        self.char1.lore_lean_value = "History"
+        self.char1.db.lore_lean_type = "tag"
+        self.char1.db.lore_lean_value = "History"
         session = self._session()
         pool = _build_pool(self.char1, session)
         # base weight = 1 (minor tag), multiplied by 2 = 2
@@ -474,8 +474,8 @@ class TestPlotLean(EvenniaTest):
         from evennia_rptracker.models import RPSession
 
         self.linked.tags.add(_make_tag("History"))
-        self.char1.lore_lean_type = "plot"
-        self.char1.lore_lean_value = self.plot.plot_number
+        self.char1.db.lore_lean_type = "plot"
+        self.char1.db.lore_lean_value = self.plot.plot_number
         session = RPSession.objects.create(
             character=self.char1,
             character_name=self.char1.key,
@@ -665,22 +665,22 @@ class TestCmdForget(EvenniaCommandTest):
 
 class TestCmdInvestigate(EvenniaCommandTest):
     def test_clear_lean(self):
-        self.char1.lore_lean_type = "tag"
-        self.char1.lore_lean_value = "Magic"
+        self.char1.db.lore_lean_type = "tag"
+        self.char1.db.lore_lean_value = "Magic"
         self.call(CmdInvestigate(), "/clear", caller=self.char1)
-        self.assertIsNone(self.char1.lore_lean_type)
+        self.assertIsNone(self.char1.db.lore_lean_type)
 
     def test_tag_lean_sets_attributes(self):
         _make_tag("Alchemy")
         self.call(CmdInvestigate(), "/tag Alchemy", caller=self.char1)
-        self.assertEqual(self.char1.lore_lean_type, "tag")
-        self.assertEqual(self.char1.lore_lean_value, "Alchemy")
+        self.assertEqual(self.char1.db.lore_lean_type, "tag")
+        self.assertEqual(self.char1.db.lore_lean_value, "Alchemy")
 
     def test_entry_lean_sets_number(self):
         entry = _make_entry("The Codex", author=self.char1)
         self.call(CmdInvestigate(), f"/entry #{entry.entry_number}", caller=self.char1)
-        self.assertEqual(self.char1.lore_lean_type, "entry")
-        self.assertEqual(self.char1.lore_lean_value, entry.entry_number)
+        self.assertEqual(self.char1.db.lore_lean_type, "entry")
+        self.assertEqual(self.char1.db.lore_lean_value, entry.entry_number)
 
 
 # ---------------------------------------------------------------------------

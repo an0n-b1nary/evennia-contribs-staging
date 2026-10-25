@@ -19,7 +19,7 @@ Algorithm:
     excluded from the draw.
 3.  Apply the lean multiplier: multiply an entry's weight by
     settings.LORE_PASSIVE_LEAN_MULTIPLIER when the entry matches the
-    character's lore lean (lore_lean_type / lore_lean_value).
+    character's saved lore lean (db.lore_lean_type / db.lore_lean_value).
 4.  Enforce the weekly ceiling: if the character has already acquired
     settings.LORE_PASSIVE_WEEKLY_CEILING entries via PASSIVE source this
     week, return None immediately.
@@ -173,8 +173,8 @@ def _build_pool(character, session):
             LoreRegionLink.objects.filter(region_id=region_id).values_list("entry_id", flat=True)
         )
 
-    lean_type = getattr(character, "lore_lean_type", None)
-    lean_value = getattr(character, "lore_lean_value", None)
+    lean_type = character.db.lore_lean_type
+    lean_value = character.db.lore_lean_value
     lean_mult = getattr(settings, "LORE_PASSIVE_LEAN_MULTIPLIER", Decimal("2.0"))
 
     pool = []
