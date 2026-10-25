@@ -2,6 +2,16 @@
 
 All notable changes to `evennia_social` are documented here.
 
+## [0.9.0] - 2026-10-25
+
+### Breaking
+
+- Unfindable now means unlisted. `+unfindable on` leaves a character out of
+  `who` and every other remote list (`is_listed`, `is_publicly_listed`), not
+  only `+where`, venue counts and maps. Anyone in the same room still sees
+  them, and staff see everyone. `dark` hides the same things and is marked
+  `(dark)` for other staff.
+
 ## [0.8.0] - 2026-10-21
 
 ### Breaking

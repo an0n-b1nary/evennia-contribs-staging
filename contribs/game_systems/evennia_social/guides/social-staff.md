@@ -10,7 +10,7 @@ Social is how players find each other and get together. Staff see more of it tha
 ## Tasks and commands
 
 - **Seeing who's where:** `+where` and the live map show staff every connected character, including unfindable ones, with a marker. `+finger <character>` adds a staff section with the account behind the character and its sessions.
-- **Going dark:** `+unfindable dark` hides a staff character from `+where`, the map and `who`. Players can be unfindable but can't go dark. Anyone in the same room still sees you.
+- **Being unlisted:** `+unfindable on` leaves you out of `who`, `+where` and the map, as it does for players. `+unfindable dark` hides the same things and marks you (dark) rather than (unfindable) for other staff. Anyone in the same room still sees you.
 - **Travel:** `@tel <room>` takes staff anywhere, including private and secret rooms. `@tel <object>=<room>` moves a character or an object, which only staff can do.
 - **Staff rooms:** rooms whose type is "staff" are left out of players' `+where`, `+hangouts`, `+summon`, `+join` and `+home`.
 - **Rooms:** `+roomconfig/hangout <type>` lists a room under `+hangouts`, and `+roomconfig/smell` and `/sound` set its sensory lines. `+roomconfig/unhangout` removes the hangout designation. Staff can configure any room; players only rooms they own.

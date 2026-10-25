@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Presence: +unfindable, staff dark, and the surfaces that honour them.
+Presence: +unfindable (unlisted), staff dark, and the surfaces that honour them.
 
 EvenniaTest defaults: char1 is Developer (staff), char2 is not. Both start
 in room1.
@@ -26,10 +26,12 @@ class TestPresenceRules(SocialTestCase):
         self.assertTrue(presence.is_findable(self.char2))
         self.assertTrue(presence.is_listed(self.char2))
 
-    def test_unfindable_hides_location_but_not_online_status(self):
+    def test_unfindable_is_unlisted(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
         self.assertFalse(presence.is_publicly_findable(self.char2))
-        self.assertTrue(presence.is_publicly_listed(self.char2))
+        self.assertFalse(presence.is_publicly_listed(self.char2))
+        self.assertTrue(presence.is_listed(self.char2, self.char1))  # staff viewer
+        self.assertFalse(presence.is_listed(self.char2))  # no viewer to see through
 
     def test_findable_again_clears_the_attribute(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
@@ -151,10 +153,15 @@ class TestCmdWho(SocialTestCase):
         self.assertNotRegex(shown, rf"\b{re.escape(self.account.key)}\b")
         self.assertIn("One unique account logged in", shown)
 
-    def test_unfindable_still_listed(self):
+    def test_unfindable_left_out_for_players(self):
         presence.set_visibility(self.char1, presence.UNFINDABLE)
         self.char2.location = self.room2
-        self.assertRegex(self._who(self.char2), rf"\b{re.escape(self.account.key)}\b")
+        self.assertNotRegex(self._who(self.char2), rf"\b{re.escape(self.account.key)}\b")
+
+    def test_same_room_reveals_unfindable(self):
+        presence.set_visibility(self.char1, presence.UNFINDABLE)
+        shown = self._who(self.char2)  # both in room1
+        self.assertRegex(shown, rf"\b{re.escape(self.account.key)}\b")
 
     def test_same_room_reveals_dark_staff(self):
         presence.set_visibility(self.char1, presence.DARK)

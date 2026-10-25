@@ -7,11 +7,12 @@ Each character has one visibility, stored in its ``presence_visibility``
 Attribute (``SocialCharacterMixin.presence_visibility``):
 
 - ``findable`` (default): shown wherever presence is shown.
-- ``unfindable``: hidden from every *remote* presence surface (``+where``,
-  ``+hangouts`` counts, a web map's who's-here), but still listed as online
-  in ``who``. Any player may choose it.
-- ``dark``: also hidden from ``who``. Staff only; a stored ``dark`` on a
-  character that is no longer staff reads as ``unfindable``.
+- ``unfindable``: unlisted. Hidden from every *remote* presence surface:
+  ``who``, ``+where``, ``+hangouts`` counts, a web map's who's-here and the
+  public web. Any player may choose it.
+- ``dark``: staff only, and hides what ``unfindable`` hides; staff see it
+  marked ``(dark)``. A stored ``dark`` on a character that is no longer staff
+  reads as ``unfindable``.
 
 Being in the same room always reveals a character: presence is privacy from
 people who aren't there, not invisibility. Staff see through both settings,
@@ -81,7 +82,7 @@ def is_findable(character, viewer=None):
 
 def is_listed(character, viewer=None):
     """Whether ``viewer`` may see that ``character`` is online at all."""
-    return visibility(character) != DARK or _sees_through(character, viewer)
+    return visibility(character) == FINDABLE or _sees_through(character, viewer)
 
 
 def is_publicly_findable(character):
@@ -95,7 +96,7 @@ def is_publicly_listed(character):
 
     if is_guest(character):
         return False
-    return visibility(character) != DARK
+    return visibility(character) == FINDABLE
 
 
 def staff_marker(character):
