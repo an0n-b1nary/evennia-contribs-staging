@@ -382,9 +382,9 @@ TELEPORT_MODE = "visited"
 # Networking — shifted port block
 ######################################################################
 
-# This droplet already runs a separate, unrelated Evennia game on the
-# default ports (4000-4006). Every port below is shifted by +100 so the two
-# games never collide. AMP_PORT is the easy one to forget — it's "internal"
+# Every port below is shifted by +100 from Evennia's defaults (4000-4006),
+# so the sandbox can share a host with another Evennia game without a
+# collision. AMP_PORT is the easy one to forget — it's "internal"
 # but still binds a real TCP port on the same host.
 TELNET_PORTS = [4100]
 WEBSERVER_PORTS = [(4101, 4105)]
