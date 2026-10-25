@@ -314,8 +314,8 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
 
             self.add(CmdICChannel)
 
-        # Presence (evennia_social): replaces Evennia's who, leaving staff who
-        # have gone dark out of it for players. +unfindable is in-character.
+        # Presence (evennia_social): replaces Evennia's who, leaving unfindable
+        # characters out of it for players. +unfindable is in-character.
         self.add(CmdWho)
 
         if apps.is_installed("evennia_npcs"):
