@@ -66,7 +66,7 @@ def _check_unfrozen(character) -> None:
     from evennia_rp_chargen import locks
 
     if locks.frozen(character):
-        raise GearError(locks.locked_message())
+        raise GearError(locks.locked_message(character))
 
 
 # ---------------------------------------------------------------------------

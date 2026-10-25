@@ -26,7 +26,7 @@ Running a fight gives you the opposition, not anyone else's character. Every cha
 
 ## NPCs
 
-`+combatstory/enrollnpc <name>=<side>` brings in an NPC you're allowed to direct, and `+combatstory/template <blueprint>=<side>` brings in one from a template. `+combatstory/act <names>` takes one action for each NPC you name, and `+combatstory/auto <name>=on` lets an NPC react on its own. To act as an NPC yourself, add `/npc` to a `+combat` command. Your own character stays separate. Nothing here can enrol another player's character.
+`+combatstory/enrollnpc <name>=<side>` brings in an NPC you're allowed to direct, and `+combatstory/template <blueprint>=<side>` brings in one from a template. `+combatstory/act <names>` takes one action for each NPC you name, and `+combatstory/auto <name>=on` lets an NPC react on its own. To act as an NPC yourself, use `+npc/puppet` and then the ordinary commands. Your own character stays separate. Nothing here can enrol another player's character.
 
 ## Ending and shelving
 

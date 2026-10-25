@@ -222,7 +222,7 @@ class TestPartyRules(SimpleTestCase):
         source = state["participants"]["2"]
         source.update(recovering=True, pose=False)
         resources = source["reserves"], source["transcendence"], source["spirit"]
-        engine.recover(state, 2)
+        engine.pass_action(state, 2)
         self.assertNotIn("2", rules.data(state)["support"])
         self.assertEqual((source["reserves"], source["transcendence"], source["spirit"]), resources)
 

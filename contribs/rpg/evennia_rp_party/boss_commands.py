@@ -1,169 +1,173 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Manual narrative Boss Checks; players control pacing and participation."""
+"""Persistent Boss Check drafts and verdict-bound confirmation previews."""
 
-from evennia.commands.default.muxcommand import MuxCommand
+from evennia.utils.dbserialize import deserialize
 from evennia_rp_combat import services as combat
+from evennia_rp_combat.command_syntax import CombatCommand
 from evennia_rp_combat.data import CombatError
 
 from . import boss_services as services
 
-
-def options(text):
-    parts = [part.strip() for part in text.split(";")]
-    values = {}
-    for part in parts[1:]:
-        key, sep, value = part.partition("=")
-        if not key or key in values:
-            raise CombatError("Give each Check option once.")
-        if not sep and key not in ("pass", "fail"):
-            raise CombatError("Check options use key=value.")
-        values[key] = value if sep else True
-    return parts[0], values
+DRAFT = "boss_check_draft"
+PREVIEWS = "boss_check_previews"
+CATEGORY = "rp_party"
+FIELDS = ("type", "difficulty", "value", "requirement", "hint", "approaches", "roll")
 
 
-def verdict(values):
-    if "pass" in values and "fail" in values:
-        raise CombatError("Choose pass or fail, not both.")
-    if "pass" in values:
-        values.pop("pass")
-        return True
-    if "fail" in values:
-        values.pop("fail")
-        return False
-    return None
+class CmdBossCheck(CombatCommand):
+    """Offer manual Party challenges through a draft, then resolve a preview token.
 
+    +bosscheck                         Inspect status and your draft
+    +bosscheck/new <parties>            Begin a draft for comma-separated Parties
+    +bosscheck/type <type>              Tank, DPS, Support, Pressure, Special, Contest
+    +bosscheck/difficulty <difficulty>  Easy, Balanced or Hard
+    +bosscheck/value <value>            Override the type's threshold
+    +bosscheck/requirement <text>       Special requirement
+    +bosscheck/hint <text>              Special hint
+    +bosscheck/approaches <stats>       Comma-separated stat or stat/tag approaches
+    +bosscheck/rollrating <rating>      Contest difficulty rating
+    +bosscheck/finish                   Validate and issue the draft
+    +bosscheck/discard                  Discard your unissued draft
+    +bosscheck/preview <id>[=pass]       Preview consequences (pass/fail for Special)
+    +bosscheck/resolve <id>=<token> # <reason>
+    +bosscheck/withdraw <id> # <reason>  Cancel only your participation
+    +bosscheck/cancel <id> # <reason>    Cancel your Party's pending Check
+    +bosscheck/roll <id>=<stat>[/<tag>]  One free bound Contest response
+    +bosscheck/allow <id>/<member>=<stat>[/<tag>]
 
-class CmdBossCheck(MuxCommand):
-    """Offer a fair dramatic challenge to one or more opposing Parties.
-
-    +bosscheck                         Inspect Check status
-    +bosscheck parties=type[;difficulty=balanced][;value=...]
-    +bosscheck parties=special;requirement=...;hint=...
-    +bosscheck parties=contest;approaches=stat,stat[/tag][;roll=rating]
-    +bosscheck/preview id[;pass|fail]    Preview current consequences/token
-    +bosscheck/resolve id=token[;pass|fail][;ack=public reason]
-    +bosscheck/withdraw id[=reason]     Cancel only your participation
-    +bosscheck/cancel id[=reason]       Cancel your Party's pending Check
-    +bosscheck/roll id=stat[/tag]       One free bound Contest response
-    +bosscheck/allow id=member;stat     Boss approves an approach before rolling
-
-    Types: Tank, DPS, Support, Pressure, Special, Contest.
-    Difficulty: easy, balanced (default), hard. Value overrides the per-member
-    Tank/DPS amount, Support percentage, Pressure Spirit threshold, or Contest
-    success fraction. Special needs explicit pass/fail on preview and resolve,
-    with ack=public explanation when resolving.
-    Boss Mode x2+ and clear boss queues are required to issue. One Check per
-    Party can be pending; one boss may challenge multiple Parties at once.
-    Issuance/response rolls spend no actions. No automatic resolution.
-    Add /as NPC=... to direct an NPC you are permitted to control.
-    Pending cancellation is free; committed consequences require staff recovery.
+    Boss Mode x2+ and clear queues are required to issue. No actions are
+    spent by issuance or response rolls. Pending cancellation is free.
+    Preview binds the Special verdict into its token; changes require a new preview.
     """
 
     key = "+bosscheck"
-    locks = "cmd:all()"
-    help_category = "Combat"
+    literal_switches = ("requirement", "hint")
+    switch_options = (
+        "new",
+        "type",
+        "difficulty",
+        "value",
+        "requirement",
+        "hint",
+        "approaches",
+        "rollrating",
+        "finish",
+        "discard",
+        "preview",
+        "resolve",
+        "withdraw",
+        "cancel",
+        "roll",
+        "allow",
+    )
 
-    def func(self):
-        try:
-            switches = [switch for switch in self.switches if switch != "as"]
-            if len(switches) > 1:
-                raise CombatError("Choose one Boss Check operation.")
-            operation = switches[0] if switches else "issue"
-            subject = self.caller
-            text = self.args.strip()
-            if "as" in self.switches:
-                name, sep, text = text.partition("=")
-                if not sep:
-                    raise CombatError("Use /as NPC=Check arguments.")
-                subject = self.caller.search(name.strip())
-                if subject is None:
-                    return
-            if not text and operation in ("issue", "status"):
-                from .services import render
+    def run(self):
+        actor, subject = self.caller, self.subject
+        op = self.switches[0] if self.switches else ""
+        from .services import require
 
-                self.msg(render(self.caller, subject=subject))
-                return
-            if operation in ("cancel", "withdraw"):
-                ident, _, reason = text.partition("=")
-                result = services.cancel(
-                    self.caller,
-                    ident.strip(),
-                    subject=subject,
-                    individual=operation == "withdraw",
-                    reason=reason,
+        require(actor, progress=op not in ("", "preview", "discard", "cancel", "withdraw"))
+        attrs = subject.attributes
+        draft = deserialize(attrs.get(DRAFT, category=CATEGORY, default={}))
+        if not op:
+            if self.args.strip():
+                raise CombatError("Start a draft with +bosscheck/new <parties>.")
+            from .services import render
+
+            self.msg(render(actor, subject=subject))
+            if draft:
+                self.msg(
+                    f"Boss Check draft: {draft['type']} ({draft['difficulty']}) for {', '.join(draft['parties'])}. Use +bosscheck/finish to issue."
                 )
-            elif operation == "preview":
-                ident, values = options(text)
-                chosen = verdict(values)
-                if values:
-                    raise CombatError("Preview accepts only pass/fail for Special.")
-                view = services.preview(self.caller, ident, subject=subject, verdict=chosen)
-                self.msg("\n".join(combat.plain(line, 1000) for line in view["lines"]))
-                return
-            elif operation == "resolve":
-                ident, sep, rest = text.partition("=")
-                if not sep:
-                    raise CombatError("Preview first, then /resolve id=token[;ack=reason].")
-                token, values = options(rest)
-                chosen = verdict(values)
-                acknowledgment = values.pop("ack", "")
-                if values:
-                    raise CombatError("Resolve accepts pass/fail and ack only.")
-                result = services.resolve(
-                    self.caller,
-                    ident.strip(),
-                    token,
-                    subject=subject,
-                    verdict=chosen,
-                    acknowledgment=acknowledgment,
-                )
-                self.msg(f"Check {ident.strip()}: {'passed' if result['passed'] else 'failed'}.")
-                return
-            elif operation == "roll":
-                ident, sep, name = text.partition("=")
-                if not sep:
-                    raise CombatError("Use /roll id=declared stat[/tag].")
-                result = services.roll(self.caller, ident.strip(), name.strip(), subject=subject)
-                self.msg(f"Contest response: {'pass' if result['success'] else 'fail'}.")
-                return
-            elif operation == "allow":
-                ident, sep, rest = text.partition("=")
-                name, separator, approach = rest.partition(";")
-                if not sep or not separator:
-                    raise CombatError("Use /allow id=member;stat[/tag].")
-                member = self.caller.search(name.strip())
-                if member is None:
-                    return
+            return
+        if op == "new":
+            if draft:
+                raise CombatError("Finish or discard your current Boss Check draft first.")
+            parties = [p.strip() for p in self.args.split(",") if p.strip()]
+            if not parties:
+                raise CombatError("Name at least one Party.")
+            draft = {"parties": parties, "type": "tank", "difficulty": "balanced"}
+        elif op == "discard":
+            attrs.remove(DRAFT, category=CATEGORY)
+            self.msg("Boss Check draft discarded.")
+            return
+        elif op in (*FIELDS, "rollrating") and op != "roll":
+            if not draft:
+                raise CombatError("Start with +bosscheck/new <parties>.")
+            draft["roll" if op == "rollrating" else op] = self.args.strip()
+        elif op == "finish":
+            if not draft:
+                raise CombatError("Start with +bosscheck/new <parties>.")
+            result = services.issue(
+                actor,
+                list(draft["parties"]),
+                draft["type"].lower(),
+                subject=subject,
+                difficulty=draft["difficulty"].lower(),
+                options={k: draft[k] for k in ("value", "requirement", "hint") if k in draft},
+                approaches=tuple(
+                    p.strip() for p in draft.get("approaches", "").split(",") if p.strip()
+                ),
+                roll_difficulty=draft.get("roll"),
+            )
+            attrs.remove(DRAFT, category=CATEGORY)
+            self.msg(f"Boss Checks issued: {', '.join(result)}.")
+            return
+        elif op == "preview":
+            verdict = None
+            if self.rhs is not None:
+                if self.rhs.strip().lower() not in ("pass", "fail"):
+                    raise CombatError("Choose pass or fail for a Special preview.")
+                verdict = self.rhs.strip().lower() == "pass"
+            ident = self.lhs.strip()
+            view = services.preview(actor, ident, subject=subject, verdict=verdict)
+            previews = dict(attrs.get(PREVIEWS, category=CATEGORY, default={}))
+            previews[ident] = {"token": view["token"], "verdict": verdict}
+            attrs.add(PREVIEWS, previews, category=CATEGORY)
+            self.msg("\n".join(combat.plain(line, 1000) for line in view["lines"]))
+            return
+        elif op == "resolve":
+            ident = self.lhs.strip()
+            token, _, reason = (self.rhs or "").partition(" # ")
+            saved = attrs.get(PREVIEWS, category=CATEGORY, default={}).get(ident)
+            if not saved or saved["token"] != token:
+                raise CombatError("Preview first, then resolve with the current token.")
+            result = services.resolve(
+                actor,
+                ident,
+                token,
+                subject=subject,
+                verdict=saved["verdict"],
+                acknowledgment=reason,
+            )
+            self.msg(f"Check {ident}: {'passed' if result['passed'] else 'failed'}.")
+            return
+        elif op in ("cancel", "withdraw"):
+            ident, _, reason = self.args.partition(" # ")
+            result = services.cancel(
+                actor, ident.strip(), subject=subject, individual=op == "withdraw", reason=reason
+            )
+            self.msg(f"Boss Check {op}: {result}.")
+            return
+        elif op == "roll":
+            result = services.roll(
+                actor, self.lhs.strip(), (self.rhs or "").strip(), subject=subject
+            )
+            self.msg(f"Contest response: {'pass' if result['success'] else 'fail'}.")
+            return
+        elif op == "allow":
+            ident, sep, name = self.lhs.partition("/")
+            if not sep or not self.rhs:
+                raise CombatError("Use +bosscheck/allow <id>/<member>=<stat>.")
+            member = actor.search(name.strip())
+            if member:
                 result = services.allow(
-                    self.caller, ident.strip(), member, approach.strip(), subject=subject
+                    actor, ident.strip(), member, self.rhs.strip(), subject=subject
                 )
-            elif operation == "issue":
-                names, sep, rest = text.partition("=")
-                if not sep:
-                    raise CombatError("Use +bosscheck Party identities=type[;options].")
-                kind, values = options(rest)
-                difficulty = values.pop("difficulty", "balanced").lower()
-                approaches = tuple(
-                    value.strip()
-                    for value in values.pop("approaches", "").split(",")
-                    if value.strip()
-                )
-                roll = values.pop("roll", None)
-                result = services.issue(
-                    self.caller,
-                    [name.strip() for name in names.split(",")],
-                    kind.lower(),
-                    subject=subject,
-                    difficulty=difficulty,
-                    options=values,
-                    approaches=approaches,
-                    roll_difficulty=roll,
-                )
-                self.msg(f"Boss Checks issued: {', '.join(result)}.")
-                return
-            else:
-                raise CombatError("See help +bosscheck for manual Check operations.")
-            self.msg(f"Boss Check {operation}: {result}.")
-        except (CombatError, ValueError, LookupError) as exc:
-            self.msg(combat.plain(exc, 500))
+                self.msg(f"Boss Check allow: {result}.")
+            return
+        else:
+            raise CombatError("See help +bosscheck.")
+        attrs.add(DRAFT, draft, category=CATEGORY)
+        self.msg("Boss Check draft saved. Use +bosscheck/finish to issue.")

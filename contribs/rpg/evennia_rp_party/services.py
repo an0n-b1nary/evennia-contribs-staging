@@ -61,7 +61,7 @@ def change(
                 permission = "on" if rules.member(state, subject.pk).get("cover") else "off"
                 combat.notice(
                     state,
-                    f"Back-row Cover is {permission}; use +party/formation back=on or =off to choose. It permits same-party Front members to take an unaccepted attack.",
+                    f"Back-row Cover is {permission}; use +party/coveron or +party/coveroff to choose. It permits same-party Front members to take an unaccepted attack.",
                 )
         elif operation == "rename":
             rules.rename(state, subject.pk, combat.plain(argument, 61))
@@ -137,7 +137,11 @@ def cover(
             and not engine.blocks(row, exchange["domain"], "pinpoint")
             else "0"
         )
-        chosen = combat.choose_move(row, counter) if kind == "overpower" else None
+        chosen = (
+            combat.choose_move(row, engine.available_armed(state, row).get("counter", counter))
+            if kind == "overpower"
+            else None
+        )
         if preview:
             view = engine.interception_view(
                 state, token, original.pk, subject.pk, reaction_penalty=penalty

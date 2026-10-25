@@ -9,8 +9,9 @@ summary: How a party builds Synergy, and spending it on one boosted action.
 A [[party]] builds **Synergy** as its members fight, and any member can spend it on a **Team Surge**: one action with a boost to its main effect.
 
 - `+party` shows the party's Synergy, what's reserved, and whether you've used your Surge this turn.
-- `+party/surge <target>=<move>` makes an attack, spell, assist or dispirit as a Surge.
-- `+party/surgepress` makes the next hit of your Burst a Surge.
+- `+surge [<target>]` arms Team Surge for your next eligible action.
+- `+surge/off` disarms it.
+- Use an ordinary action or `+press` to spend it; `+pass` preserves it.
 
 ## Building Synergy
 
@@ -18,7 +19,7 @@ A party earns Synergy when its members finish exchanges, take real damage from o
 
 ## Surging
 
-A Surge uses the same options as an ordinary action, with `;action=spell` or `;action=assist` to change the action. On an attack with several targets, `;target=<name>` picks which one is boosted. For an improvised move, use `+party/surge/improv`.
+Arm any other modifiers separately, then use `+attack`, `+spell`, `+assist`, `+dispirit` or a prepared `+improv`. For several targets, `+surge <name>` selects which one is boosted; without a name, the first is boosted.
 
 A Surge boosts damage, or the Spirit and healing from support. It doesn't add accuracy, reserves, an extra action or an extra target. Each character can Surge once per personal turn.
 

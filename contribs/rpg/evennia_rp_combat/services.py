@@ -621,7 +621,13 @@ def join(actor, side="", *, subject=None, boss=1, turn_limit=None, batch=False, 
         if retained is None:
             raise
         build = None  # A rejoin restores this fight's build; the sheet may be mid-edit.
-    cap = conf.get("RP_COMBAT_TURN_LIMIT") if turn_limit is None else turn_limit
+    cap = (
+        subject.attributes.get(
+            "join_cap", category="rp_combat", default=conf.get("RP_COMBAT_TURN_LIMIT")
+        )
+        if turn_limit is None
+        else turn_limit
+    )
     name = (
         f"{plain(subject.key)} (NPC, directed by {identity(actor)})"
         if batch and record
@@ -648,6 +654,7 @@ def join(actor, side="", *, subject=None, boss=1, turn_limit=None, batch=False, 
         row["last_activity"] = time.time()
         state["invitations"].pop(str(subject.pk), None)
         if existing is None:
+            subject.attributes.remove("join_cap", category="rp_combat")
             row["partner_subjects"] = partners.subject_snapshots(
                 subject, stats=record.blueprint.stat_block if record else None
             )
@@ -819,6 +826,7 @@ def declare(
                 raise CombatError("Every target must be in this room.")
         row = engine.participant(state, subject.pk)
         move = choose_move(row, key, action=action, improvised=improvised)
+        require_armed_partners(actor, state, row)
         ex_id = engine.declaration(
             state,
             subject.pk,
@@ -869,7 +877,8 @@ def react(
             raise CombatError("The attacker has left. Cancel this unaccepted incoming attack.")
         interaction(subject, attacker)
         row = engine.participant(state, subject.pk)
-        chosen = choose_move(row, counter) if kind == "overpower" else None
+        counter_key = engine.available_armed(state, row).get("counter", counter)
+        chosen = choose_move(row, counter_key) if kind == "overpower" else None
         engine.reaction(
             state,
             subject.pk,
@@ -968,9 +977,10 @@ def auto_act(actor, *, subject=None, rng=None, operation_id=None):
 
     def operation(state):
         if engine.participant(state, subject.pk).get("recovering"):
-            engine.recover(state, subject.pk)
+            engine.pass_action(state, subject.pk)
             return "recovered"
         row = engine.active(state, subject.pk)
+        require_armed_partners(actor, state, row)
         public = []
         for p in state["participants"].values():
             if (
@@ -1236,6 +1246,7 @@ def control(
             )
         elif operation in ("press", "stop"):
             if operation == "press":
+                require_armed_partners(actor, state, row)
                 exchange = state["exchanges"].get(row["outgoing"])
                 if exchange:
                     for target_id in exchange["targets"]:
@@ -1282,9 +1293,9 @@ def control(
         elif operation == "retract":
             engine.retract(state, subject.pk)
             notice(state, f"{row['name']} withdrew an unaccepted revival offer.")
-        elif operation == "recover":
-            engine.recover(state, subject.pk)
-            notice(state, f"{row['name']} takes their recovery action and is back in the fight.")
+        elif operation == "pass":
+            engine.pass_action(state, subject.pk)
+            notice(state, f"{row['name']} passes, spending one action and owing a pose.")
         elif operation in ("accept", "decline"):
             request = pending_request(row, argument)
             row["requests"].remove(request)
@@ -1305,7 +1316,11 @@ def control(
 
     return execute(
         actor,
-        f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}"
+        (
+            f"{identity(subject)} {'unlocked' if operation == 'unlock' else 'relocked'} their combat build."
+            if operation in ("unlock", "relock")
+            else f"{identity(subject)} used {plain(operation)} {plain(argument or '')}. {plain(reason)}"
+        )
         + requested(partner_requests),
         change,
         progressing=not cleanup,
@@ -1725,7 +1740,7 @@ def render_outcomes(state, exchange, start=0):
                 )
             )
     if exchange["phase"] == "press":
-        lines.append("Burst remains open: actor may +combat/press or +combat/stop.")
+        lines.append("Burst remains open: actor may +press or +stop.")
     return "\n".join(lines)
 
 
@@ -1773,9 +1788,11 @@ def render(actor, *, subject=None):
             f"build {'unlocked for correction' if own['correction'] else 'frozen'}; "
             f"revival from allies: {'accepted automatically' if own.get('revive') == 'accept' else 'ask me'}."
         )
+        flags = own.get("armed", {})
+        lines.append("Armed modifiers: " + (", ".join(sorted(flags)) or "none") + ".")
         if own.get("recovering"):
             lines.append(
-                "You are recovering: +combat/recover spends one action and returns you to the fight."
+                "You are recovering: +pass spends one action and returns you to the fight."
                 if own["turns"] < own["turn_limit"]
                 else "You were revived, but your personal Turn Limit is used up: you cannot recover or act again in this fight."
             )
@@ -1900,3 +1917,84 @@ def describe_odds(view, token):
             + ("Standard balanced counter." if reaction == "overpower" else "")
         )
     return "\n".join(lines)
+
+
+ARMED_FLAGS = ("empower", "burst", "callshot", "counter", "waive", "surge")
+
+
+def arm(actor, flag, value=True, *, subject=None, off=False):
+    """Persist a modifier under the fight lock; spending waits for an action."""
+    if flag not in ARMED_FLAGS:
+        raise CombatError("Unknown armed modifier.")
+    subject = subject or actor
+    authorize(actor, subject, cleanup=off)
+
+    def change(state):
+        row = engine.participant(state, subject.pk)
+        if not off:
+            engine.active(state, subject.pk)
+        armed = row.setdefault("armed", {})
+        if off:
+            armed.pop(flag, None)
+        else:
+            if flag == "surge":
+                require_party_spending(actor)
+            if flag == "counter":
+                move = choose_move(row, value)
+                if move.action not in ("attack", "spell"):
+                    raise CombatError("A counter must be Attack or Spell.")
+            armed[flag] = value
+        return flag
+
+    # Modifier values are private; public history records only arm/disarm.
+    return execute(
+        actor,
+        f"{identity(subject)} {'disarmed' if off else 'armed'} {flag}",
+        change,
+        progressing=not off,
+        subject=subject,
+    )
+
+
+def mine(actor, *, subject=None):
+    """Discover retained membership across rooms, including Faded/shelved rows."""
+    require(actor)
+    subject = subject or actor
+    authorize(actor, subject, cleanup=True)
+    lines = []
+    for fight in _fights().objects.filter(status__in=("open", "shelved")).select_related("room"):
+        state = load(fight)
+        row = state["participants"].get(str(subject.pk))
+        if state["ended"] or not row or row["status"] == "withdrawn":
+            continue
+        room = plain(fight.room.key) if fight.room else "room unavailable"
+        lines.append(f"#{fight.pk}: {fight.status}; {row['status']}; {room}.")
+    return "\n".join(lines) or "You have no open or shelved fights."
+
+
+def require_party_spending(actor):
+    """Keep optional Party reveal/freeze gates on explicitly armed spending."""
+    if not apps.is_installed("evennia_rp_party") or "party" not in partners.registered():
+        raise CombatError("Team Surge requires the Party partner.")
+    from evennia_rp_party.services import require as require_party
+
+    require_party(actor, progress=True)
+
+
+def require_armed_partners(actor, state, row):
+    if "surge" in engine.available_armed(state, row):
+        require_party_spending(actor)
+
+
+def prepare_cap(actor, limit, *, subject=None):
+    """Choose a personal Turn Limit before enrollment; enrolled caps only reduce."""
+    subject = subject or actor
+    require(actor, progress=True)
+    authorize(actor, subject)
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise CombatError("Personal Turn Limit must be 1..20.")
+    state = state_for(actor)
+    if str(subject.pk) in state["participants"]:
+        return control(actor, "cap", argument=limit, subject=subject)
+    subject.attributes.add("join_cap", limit, category="rp_combat")
+    return limit

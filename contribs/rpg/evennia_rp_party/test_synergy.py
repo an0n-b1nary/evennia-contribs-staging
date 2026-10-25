@@ -10,10 +10,11 @@ from django.test import SimpleTestCase, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest
 from evennia_rp_combat import engine, partners
 from evennia_rp_combat import services as combat
+from evennia_rp_combat.commands import CmdAction, CmdSurge
 from evennia_rp_combat.data import CombatError, Move
+from evennia_rp_combat.improv_commands import CmdImprov
 
 from . import checks, rules, services, synergy
-from .commands import CmdParty
 from .tests import REGISTRY, build, declare, teams
 
 
@@ -135,7 +136,7 @@ class TestSynergy(SimpleTestCase):
             engine.condition(actor, "poisoned", 3, 2, source)
             if recovery:
                 actor["recovering"] = True
-                engine.recover(state, 1)
+                engine.pass_action(state, 1)
             else:
                 token = declare(state, move=Move(kind="improvised", power=1, effects=("strain",)))
                 engine.reaction(state, 4, token, "resist")
@@ -316,7 +317,7 @@ class TestSynergy(SimpleTestCase):
                 engine.accept_revival(state, 2, token)
                 self.assertEqual(state["participants"]["2"]["hp"], 19)
                 self.assertEqual(synergy.pool(state, first), 110)
-                engine.recover(state, 2)
+                engine.pass_action(state, 2)
                 self.assertEqual(synergy.pool(state, first), 110)
             else:
                 engine.cancel(state, 2, token)
@@ -468,7 +469,8 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         combat.execute(self.char1, "fixture balance", lambda state: fund(state, self.key, 100))
 
     def test_commands_reserve_refund_retry_and_public_journal_announcements(self):
-        self.call(CmdParty(), f"/surge {self.char2.key}=balanced", "1.1")
+        self.call(CmdSurge(), "", "Surge armed.")
+        self.call(CmdAction(), f"{self.char2.key}=balanced", "1.1")
         fight = combat.open_fight(self.char1.location)
         entry = fight.entries.latest("sequence")
         self.assertIn("reserved 100 Synergy", entry.summary)
@@ -489,6 +491,18 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         with self.assertRaisesRegex(CombatError, "superseded"):
             services.surge(self.char1, [self.char2], operation_id="surge-retry")
 
+    def test_formation_is_case_insensitive_and_names_the_cover_commands(self):
+        from .commands import CmdParty
+
+        self.call(CmdParty(), "/formation Back", "Party formation: back.")
+        fight = combat.open_fight(self.char1.location)
+        summary = fight.entries.latest("sequence").summary
+        self.assertIn("+party/coveron or +party/coveroff", summary)
+        self.assertNotIn("back=on", summary)
+        self.call(CmdParty(), "/coveron", "Party formation: back.")
+        state = combat.state_for(self.char1)
+        self.assertTrue(rules.member(state, self.char1.pk)["cover"])
+
     def test_frozen_pause_other_pc_and_auto_act_do_not_spend(self):
         before = combat.state_for(self.char1)
         for settings in ({"RP_PARTY_FROZEN": True}, {"RP_PARTY_REVEALED": False}):
@@ -508,6 +522,19 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         with self.assertRaisesRegex(CombatError, "paused"):
             services.surge(self.char1, [self.char2])
 
+    def test_armed_surge_cannot_bypass_later_freeze_or_reveal_changes(self):
+        combat.arm(self.char1, "surge", "")
+        before = combat.state_for(self.char1)
+        for settings in ({"RP_PARTY_FROZEN": True}, {"RP_PARTY_REVEALED": False}):
+            with override_settings(**settings), self.assertRaises(CombatError):
+                combat.declare(self.char1, [self.char2])
+            self.assertEqual(combat.state_for(self.char1), before)
+        with override_settings(RP_PARTY_FROZEN=True):
+            combat.arm(self.char1, "surge", off=True)
+        self.assertEqual(
+            engine.participant(combat.state_for(self.char1), self.char1.pk)["armed"], {}
+        )
+
     def test_shelving_cancels_pending_surge_and_retains_refund_for_rejoin(self):
         ex = services.surge(self.char1, [self.char2])
         fight = combat.open_fight(self.char1.location)
@@ -523,18 +550,35 @@ class TestSynergyCoordinator(EvenniaCommandTest):
         combat.storyteller(self.char1, "resume", reason="ready after rejoining")
         services.surge(self.char1, [self.char2])
 
-    def test_improvised_command_keeps_json_wording_and_parses_separate_options(self):
-        self.call(
-            CmdParty(),
-            f'/surge/improv {self.char2.key}={{"power":1,"wording":"First; then"}};rps=subtle',
-            "1.1",
-        )
+    def test_improvised_draft_and_armed_surge_reserve_in_one_transaction(self):
+        for args in ("/new Improvised", "/wording First; then", "/finish"):
+            self.call(CmdImprov(), args, "Improvised")
+        self.call(CmdSurge(), "", "Surge armed.")
+        self.call(CmdImprov(), f"/subtle {self.char2.key}", "1.1")
         state = combat.state_for(self.char1)
         exchange = state["exchanges"]["1.1"]
         self.assertEqual(exchange["move"]["wording"], "First; then")
         self.assertEqual(exchange["bet"], "subtle")
         self.assertEqual(partners.modifiers(exchange, self.char2.pk).surge, "25")
         self.assertEqual(synergy.held(state, self.key), 100)
+
+    def test_armed_surge_survives_pass_cancel_and_spends_on_resolution(self):
+        combat.arm(self.char1, "surge", "")
+        combat.control(self.char1, "pass")
+        state = combat.state_for(self.char1)
+        self.assertEqual(synergy.pool(state, self.key), 100)
+        self.assertEqual(engine.participant(state, self.char1.pk)["armed"], {"surge": ""})
+        combat.control(self.char1, "posed")
+        ex = combat.declare(self.char1, [self.char2])
+        combat.control(self.char2, "cancel", argument=f"{ex}:1")
+        state = combat.state_for(self.char1)
+        self.assertEqual(synergy.pool(state, self.key), 100)
+        self.assertEqual(engine.participant(state, self.char1.pk)["armed"], {"surge": ""})
+        ex = combat.declare(self.char1, [self.char2])
+        combat.react(self.char2, f"{ex}:1", "resist")
+        state = combat.state_for(self.char1)
+        self.assertEqual(engine.participant(state, self.char1.pk)["armed"], {})
+        self.assertEqual(synergy.pool(state, self.key), 10)
 
     def test_populated_schema_one_upgrade_preserves_builds_and_old_checkpoint(self):
         fight = combat.open_fight(self.char1.location)

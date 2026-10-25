@@ -66,7 +66,23 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         self.assertTrue(Tactics.objects.filter(character=self.samples[0], active=True).exists())
         cmdset = CharacterCmdSet(self.char1)
         keys = {cmd.key for cmd in cmdset.commands}
-        self.assertTrue({"+combat", "+combatstory", "+tactics", "+moves"} <= keys)
+        self.assertTrue(
+            {
+                "+combat",
+                "+combatstory",
+                "+tactics",
+                "+moves",
+                "+attack",
+                "+spell",
+                "+pass",
+                "+react",
+                "+surge",
+                "+cover",
+                "+improv",
+                "+bosscheck",
+            }
+            <= keys
+        )
 
     def test_active_sheets_freeze_and_fade_releases_without_changing_the_fight(self):
         from evennia_rp_chargen import locks, moves
@@ -83,7 +99,8 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         services.setup(first)
         services.join(first, "one")
         services.join(second, "two")
-        locks.unlock(first)
+        with self.assertRaisesRegex(ChargenError, "combat build correction"):
+            locks.unlock(first)
         with self.assertRaisesRegex(ChargenError, "combat build is frozen"):
             chargen.set_edge(first, "strength", 1)
         # Fading releases the real sheet (e.g. for another fight) ...
@@ -96,9 +113,47 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
             moves.equip(first, "ready-guard")
         # An announced correction adopts the current sheet.
         services.control(first, "unlock")
-        locks.unlock(first)
+        locks.note_ic_action(first)
         services.control(first, "relock")
         self.assertNotIn("ready-guard", fight_moves())
+
+    @skipUnless(apps.is_installed("evennia_rp_equipment"), "Equipment partner absent")
+    def test_combat_correction_covers_real_abilities_pips_signatures_and_gear(self):
+        from evennia_rp_chargen import abilities, locks, moves
+        from evennia_rp_chargen import services as chargen
+        from evennia_rp_chargen.services import ChargenError
+        from evennia_rp_combat import services
+        from evennia_rp_equipment import services as gear
+        from evennia_rp_equipment.services import GearError
+
+        first, second = self.samples
+        services.setup(first)
+        services.join(first, "one")
+        services.join(second, "two")
+        for change in (
+            lambda: chargen.set_edge(first, "strength", 1),
+            lambda: abilities.unequip(first, "calling-the-shot"),
+            lambda: moves.equip(first, "ready-guard", equipped=False),
+            lambda: gear._check_unfrozen(first),
+        ):
+            with self.assertRaises((ChargenError, GearError)):
+                change()
+        with (
+            patch("evennia_rp_combat.services.emit") as announce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            services.control(first, "unlock", reason="private arsenal choice")
+        text = str(announce.call_args_list)
+        self.assertIn("unlocked their combat build", text)
+        self.assertNotIn("private arsenal", text)
+        locks.note_ic_action(first)
+        chargen.set_edge(first, "strength", 1)
+        abilities.unequip(first, "calling-the-shot")
+        moves.equip(first, "ready-guard", equipped=False)
+        gear._check_unfrozen(first)
+        services.control(first, "relock")
+        with self.assertRaises(ChargenError):
+            abilities.equip(first, "calling-the-shot")
 
     def test_combat_abilities_validate_freeze_and_call_a_public_shot(self):
         from evennia_rp_chargen.catalog import definition_problems

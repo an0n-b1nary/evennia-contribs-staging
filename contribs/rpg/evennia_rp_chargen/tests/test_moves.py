@@ -58,12 +58,59 @@ class TestSignatureLibrary(ChargenCommandTest):
         self.assertFalse(moves.library(self.char1).exists())
 
     def test_commands_and_runtime_gate(self):
-        self.call(
-            CmdMoves(),
-            '/create Ready={"power":1,"accuracy":1,"effects":["evade_stance"]}',
-            "Ready: create complete.",
-        )
+        for text in ("/new Ready", "/power 1", "/accuracy 1", "/effects evade_stance"):
+            self.call(CmdMoves(), text, "Signature draft: Ready.")
+        self.call(CmdMoves(), "/finish", "Ready: saved.")
         self.call(CmdMoves(), "/equip ready", "Ready: equip complete.")
         self.call(CmdMoves(), "", "Ready (ready, revision 1):")
         with override_settings(RP_CHARGEN_MOVES_REVEALED=False):
             self.call(CmdMoves(), "", "Signature Moves are not available yet.")
+
+    def test_draft_validation_failure_and_stale_revision_keep_saved_move(self):
+        self.call(CmdMoves(), "/new Ready", "Signature draft: Ready.")
+        self.call(CmdMoves(), "/accuracy 1", "Signature draft: Ready.")
+        self.call(CmdMoves(), "/finish", "Authored Power and Accuracy must total 2")
+        self.assertFalse(moves.library(self.char1).exists())
+        self.call(CmdMoves(), "/power 1", "Signature draft: Ready.")
+        self.call(CmdMoves(), "/wording First; then wait.", "Signature draft: Ready.")
+        self.call(CmdMoves(), "/finish", "Ready: saved.")
+        self.assertEqual(moves.find(self.char1, "ready").wording, "First; then wait.")
+        self.call(CmdMoves(), "/edit ready", "Signature draft: Ready.")
+        moves.edit(self.char1, "ready", wording="Newer revision")
+        self.call(CmdMoves(), "/finish", "That Signature changed")
+        self.assertEqual(moves.find(self.char1, "ready").wording, "Newer revision")
+        self.call(CmdMoves(), "/create Old={}", "Unknown or ambiguous switch.")
+
+    @override_settings(RP_COMBAT_REVEALED=True, RP_COMBAT_PARTNERS={})
+    def test_real_pips_and_equipped_signatures_share_combat_correction_lock(self):
+        from django.apps import apps
+
+        if not apps.is_installed("evennia_rp_combat"):
+            self.skipTest("optional combat partner absent")
+        from evennia_rp_combat import services as combat
+        from evennia_rp_combat.tests import build
+
+        from evennia_rp_chargen import locks, services
+
+        self.make_sheet(self.char1)
+        row = moves.create(self.char1, "Ready")
+        moves.equip(self.char1, row.key)
+        with patch("evennia_rp_combat.services.snapshot", return_value=build()):
+            combat.setup(self.char1)
+            combat.join(self.char1, "one")
+            for change in (
+                lambda: services.set_edge(self.char1, "brawn", 1),
+                lambda: moves.equip(self.char1, row.key, equipped=False),
+                lambda: moves.edit(self.char1, row.key, wording="Changed"),
+            ):
+                with self.assertRaises(ChargenError):
+                    change()
+            locks.release(self.char1, locks.IDLE)
+            self.assertTrue(locks.scope_locked(self.char1, "pips"))
+            combat.control(self.char1, "unlock")
+            locks.note_ic_action(self.char1)
+            services.set_edge(self.char1, "brawn", 1)
+            moves.edit(self.char1, row.key, wording="Corrected")
+            combat.control(self.char1, "relock")
+            with self.assertRaises(ChargenError):
+                moves.equip(self.char1, row.key, equipped=False)

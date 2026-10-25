@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## 0.6.0
+
+### Breaking
+
+- Signature Moves use persistent single-field drafts instead of command-line objects. Finishing validates the complete definition and rejects stale revisions. Combat build locks cover pips, Abilities and equipped Signatures; corrections require explicit combat relock.
+
 ## [0.5.0] - 2026-10-22
 
 ### Breaking

@@ -100,6 +100,9 @@ def _expired(state: LockState, now: datetime) -> bool:
 
 def state(character) -> LockState:
     """The character's lock, releasing it first if the idle TTL has passed."""
+    combat = character.attributes.get("build_lock", category="rp_combat")
+    if combat:
+        return LockState(locked=not combat.get("correction", False), reason="combat")
     current = _load(character)
     if _expired(current, timezone.now()):
         release(character, IDLE)
@@ -113,6 +116,9 @@ def is_locked(character) -> bool:
 
 def scope_locked(character, scope: str) -> bool:
     """Whether changes in `scope` ("pips", "loadout") are frozen right now."""
+    combat = character.attributes.get("build_lock", category="rp_combat")
+    if combat:
+        return not combat.get("correction", False)
     return scope in conf.lock_scopes() and is_locked(character)
 
 
@@ -123,11 +129,19 @@ def frozen(character) -> bool:
     they can't change at any moment when pips or loadout can't. Draft sheets
     never freeze.
     """
+    combat = character.attributes.get("build_lock", category="rp_combat")
+    if combat:
+        return not combat.get("correction", False)
     return bool(conf.lock_scopes()) and is_locked(character) and _has_lockable_build(character)
 
 
-def locked_message() -> str:
-    """The refusal for a change the lock forbids, naming what it freezes."""
+def locked_message(character=None) -> str:
+    """Give the correction command for the lock that currently owns the build."""
+    if character is not None and character.attributes.get("build_lock", category="rp_combat"):
+        return (
+            "Your combat build is frozen. Clear pending exchanges, then use "
+            "+combat/unlock for an announced correction and +combat/relock when finished."
+        )
     return (
         f"Your {conf.locked_things()} are locked for the scene. "
         "Use +unlock first; the room is told."
@@ -149,6 +163,15 @@ def lock(character, *, reason: str = MANUAL, announce: bool | None = None) -> bo
 
     `announce` defaults to True for manual locks and False for automatic ones.
     """
+    combat = character.attributes.get("build_lock", category="rp_combat")
+    if combat:
+        if reason == MANUAL:
+            from evennia_rp_chargen.services import ChargenError
+
+            raise ChargenError(
+                "Use +combat/relock to validate and lock your corrected combat build."
+            )
+        return False
     now = timezone.now()
     current = state(character)
     if current.locked:
@@ -170,6 +193,12 @@ def lock(character, *, reason: str = MANUAL, announce: bool | None = None) -> bo
 
 def unlock(character) -> bool:
     """Unlock by hand, announced to the room. Returns False if it wasn't locked."""
+    if character.attributes.get("build_lock", category="rp_combat"):
+        from evennia_rp_chargen.services import ChargenError
+
+        raise ChargenError(
+            "Use +combat/unlock for a combat build correction; clear pending exchanges first."
+        )
     if not state(character).locked:
         return False
     _save(character, LockState())
@@ -184,6 +213,11 @@ def unlock(character) -> bool:
 
 def release(character, reason: str) -> bool:
     """Release without an announcement (session end, idle TTL). Tells the character."""
+    if character.attributes.get("build_lock", category="rp_combat"):
+        # Retire the underlying scene lock quietly; the combat marker still owns
+        # the effective lock until correction or the fight releases it.
+        _save(character, LockState())
+        return False
     if not _load(character).locked:
         return False
     _save(character, LockState())

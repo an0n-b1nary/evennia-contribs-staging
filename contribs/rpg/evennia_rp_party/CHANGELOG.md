@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 0.3.0
+
+### Breaking
+
+- Cover is a dedicated command. Team Surge arms the next eligible ordinary action. Boss Checks use persistent drafts and verdict-bound preview tokens; use trailing public reasons. Commands honor NPC puppet state.
+
 ## 0.2.5
 
 - Require `evennia-rp-contest>=0.2,<0.3` for the optional `contest` extra. Bound boss-check behavior is unchanged.

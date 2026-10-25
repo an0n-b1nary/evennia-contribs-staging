@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-rp-equipment"
-version = "0.3.0"
+version = "0.3.1"
 description = "Wearable gear for Evennia RP games: worn lines, and requirements on the wearer's build that grant nothing."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -27,7 +27,7 @@ dependencies = [
     "evennia>=6.0",
     "evennia-links>=0.8.4",
     "evennia-rp-rules>=0.1,<0.2",
-    "evennia-rp-chargen>=0.5,<0.6",
+    "evennia-rp-chargen>=0.6,<0.7",
 ]
 
 [project.optional-dependencies]

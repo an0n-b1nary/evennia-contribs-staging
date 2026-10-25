@@ -12,7 +12,7 @@ A side in a [[combat|fight]] says who is on whose team. A **Party** is a smaller
 - `+party` shows your party: its members, Formation, boosts and Synergy.
 - `+party/create <name>` starts a party, and `+party/join <party>` joins one.
 - `+party/formation front|back|flex` chooses where you stand.
-- `+party/cover <defender>=<token>,<reaction>` takes a hit for a teammate.
+- `+cover/resist <defender>=<token>` (or Overpower) takes a hit for a teammate.
 - `+party/chat <message>` talks privately with your party, out of character.
 
 ## Getting together
@@ -33,7 +33,7 @@ Any member can rename, spend or propose, and nobody can be moved or removed by s
 
 A downed, recovering or unavailable Front member can't protect anyone.
 
-**Cover** lets a Front member take a hit meant for a Back teammate. It's off until the Back member allows it with `+party/formation back=on`, and `back=off` withdraws it. With it on, attacks on you wait for a Front teammate to decide before your automatic reactions answer them. A coverer takes the hit and reacts at once with Resist or Overpower, but can't Evade. If the hit opens a Burst, the rest of the chain targets the coverer. `+party/coverodds` estimates it first.
+**Cover** lets a Front member take a hit meant for a Back teammate. It's off until the Back member allows it with `+party/formation back`, then `+party/coveron`, and `+party/coveroff` withdraws it. With it on, attacks on you wait for a Front teammate to decide before your automatic reactions answer them. A coverer takes the hit and reacts at once with Resist or Overpower, but can't Evade. If the hit opens a Burst, the rest of the chain targets the coverer. `+party/coverodds` estimates it first.
 
 ## Making support count
 

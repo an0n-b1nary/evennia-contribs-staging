@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 0.3.0
+
+### Breaking
+
+- Dedicated action commands and persistent armed modifiers replace combined action switches. Pass replaces recovery, recovers Resist pressure without exchange rewards, and preserves modifiers. Tactics field edits, selection and deletion are separate. Cross-room fight discovery and shared explicit build corrections honor NPC puppet state.
+
 ## [0.2.6] - 2026-10-22
 
 ### Changed

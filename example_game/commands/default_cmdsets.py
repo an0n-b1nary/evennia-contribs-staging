@@ -252,7 +252,13 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
             "evennia_rp_combat", "CmdCombat", "CmdCombatStory", "CmdTactics"
         ):
             self.add(command)
-        for command in _optional_commands("evennia_rp_party", "CmdParty"):
+        if apps.is_installed("evennia_rp_combat"):
+            from evennia_rp_combat.commands import ACTION_COMMANDS
+            from evennia_rp_combat.improv_commands import CmdImprov
+
+            for command in (*ACTION_COMMANDS, CmdImprov):
+                self.add(command())
+        for command in _optional_commands("evennia_rp_party", "CmdParty", "CmdCover"):
             self.add(command)
         if apps.is_installed("evennia_rp_party"):
             from evennia_rp_party.boss_commands import CmdBossCheck

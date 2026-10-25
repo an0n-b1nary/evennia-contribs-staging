@@ -16,6 +16,7 @@ from pathlib import Path
 from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
 
 PARTNERS = (
+    "evennia_rp_party",
     "evennia_rp_chargen",
     "evennia_npcs",
     "evennia_scenes",

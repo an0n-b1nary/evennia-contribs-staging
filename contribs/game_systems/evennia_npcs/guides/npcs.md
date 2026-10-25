@@ -41,3 +41,9 @@ An NPC never speaks anonymously. Whoever plays it is named, so a supporting char
 ## How it connects
 
 Despawning keeps an NPC's history. Playing NPCs earns no extra RP rewards. A private scene still needs an invitation for your own character, whatever NPC you bring.
+
+
+With Combat and Party installed, ordinary actions, `+combat`, `+party` and
+`+bosscheck` follow your current NPC portrayal. Messages identify the NPC
+and responsible player. Release portrayal before acting as your own character.
+Full puppeting also includes the installed combat and Party cmdsets.

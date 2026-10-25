@@ -144,10 +144,14 @@ def create(character, name, *, by=None, **definition):
 
 
 @transaction.atomic
-def edit(character, key, *, by=None, **changes):
+def edit(character, key, *, by=None, expected_revision=None, **changes):
     _gate()
     _lock_owner(character)
     row = find(character, key)
+    if expected_revision is not None and row.revision != expected_revision:
+        raise ChargenError(
+            "That Signature changed since you started the draft. Cancel and edit it again."
+        )
     allowed = {
         "name",
         "action",
@@ -178,7 +182,7 @@ def edit(character, key, *, by=None, **changes):
 
 def _guard(character, by):
     if locks.scope_locked(character, conf.LOADOUT):
-        raise ChargenError(locks.locked_message())
+        raise ChargenError(locks.locked_message(character))
     guards.check(guards.BuildChange(character, guards.SIGNATURE, by=by))
 
 
