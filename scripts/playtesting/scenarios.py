@@ -319,10 +319,16 @@ class Suite:
         self.command("alice", f"+build/submit {token}", "Submission.*frozen")
         self.command("alice", "+build/leave")
         submission = self.state()["building_submissions"][-1]
+        preview = self.command(
+            "staff", f"+buildadmin/approve {submission['id']} # Live review", "Confirm within"
+        )
+        token = re.search(
+            r"\+buildadmin/approve \d+=([.\w-]+:[\w-]+:[\w-]+)", preview["output"]
+        ).group(1)
         self.command(
             "staff",
-            f"+build/review {submission['id']} {submission['revision']} approved=Live review",
-            "approved|Done|Review",
+            f"+buildadmin/approve {submission['id']}={token} # Live review",
+            "approve recorded",
         )
         store = next(row for row in self.state()["economy_stalls"] if row["kind"] == "shop")
         self.command("alice", "live supply shop")

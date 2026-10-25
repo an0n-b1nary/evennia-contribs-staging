@@ -41,16 +41,17 @@ def resolve_policy(room):
 
 
 @transaction.atomic
-def set_policy(actor, target, policy, *, region=False):
+def set_policy(actor, target, policy, *, region=False, reason=""):
     """Staff policy management shared by commands and authenticated pages."""
     from .access import is_staff, require_revealed
-    from .services import audit
+    from .services import _text, audit
 
     require_revealed(actor)
     if not is_staff(actor):
         raise PermissionDenied("Only staff can set building policy.")
     if policy not in POLICIES | {"reset"}:
         raise ValidationError("Choose open, residential, commercial, closed or reset.")
+    reason = _text(reason, 10000) if reason else ""
     if region:
         if not apps.is_installed("evennia_regions"):
             raise ValidationError("Region policies are unavailable without Regions.")
@@ -73,4 +74,11 @@ def set_policy(actor, target, policy, *, region=False):
         target.tags.clear(category="build_policy")
         if policy != "reset":
             target.tags.add(policy, category="build_policy")
-    audit(actor, "policy_set", target=target.pk, region=region, policy=policy)
+    audit(
+        actor,
+        "policy_set",
+        target=target.pk,
+        region=region,
+        policy=policy,
+        **({"reason": reason} if reason else {}),
+    )

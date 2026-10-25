@@ -130,17 +130,20 @@ class ShopTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(self.obj1.location, self.char2)
         self.assertEqual(listing.status, "returned")
 
-    def test_transfer_command_reads_trailing_stock_choice(self):
-        from evennia_building.commands import CmdBuild
+    def test_transfer_command_uses_explicit_stock_draft_and_confirmation(self):
+        from evennia_building.commands import CmdBuildAdmin
 
         listing = self.listing()
         with self.captureOnCommitCallbacks(execute=True):
             self.call(
-                CmdBuild(),
-                f"/transfer {self.property.pk} {self.char2.pk} {self.char1.pk}"
-                "=Keeper left; new lease;return",
+                CmdBuildAdmin(),
+                f"/transfer {self.property.pk}=#{self.char1.pk} # Keeper left; new lease",
                 caller=self.char1,
             )
+            self.call(CmdBuildAdmin(), "/stock return", caller=self.char1)
+            preview = self.call(CmdBuildAdmin(), "/finish", caller=self.char1)
+            token = preview.split("+buildadmin/finish ")[-1].split()[0]
+            self.call(CmdBuildAdmin(), f"/finish {token}", caller=self.char1)
         listing.refresh_from_db()
         self.assertEqual(listing.status, "returned")
         self.assertEqual(self.obj1.location, self.char2)

@@ -306,9 +306,12 @@ Purchases use `+browse`, `+market` and `+buy`. Archive suspends discovery and
 sales while preserving reserved stock; restore makes the same shop available.
 Every operation rechecks live property ownership and access. Staff transfer
 requires an explicit merchandise choice:
-`+build/transfer <property> <old owner> <new owner>=reason;return` returns stock
-to the old owner; `;transfer` includes stock. The Building web form offers the
-same choices. Stock transfer rejects same-account recipients and respects
+`+buildadmin/transfer <property>=<new owner> # <reason>` starts a transfer draft.
+`+buildadmin/stock return` returns stock
+to the old owner; `+buildadmin/stock transfer` includes stock. The Building web form offers the
+same choices. `+buildadmin/finish` previews the full draft and prints its
+confirmation command; stock stays reserved until that confirmation succeeds.
+Stock transfer rejects same-account recipients and respects
 item transfer hooks. Failures roll back property and merchandise together.
 
 `shop_approval` and `shop_upkeep` are separate zero-default fee boundaries.

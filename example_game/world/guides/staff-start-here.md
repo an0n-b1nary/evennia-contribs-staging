@@ -35,7 +35,7 @@ Each system's staff tools are listed below by task, with a link to its staff pag
 
 ## World and places
 
-- **Building:** `+build/review` works through submitted building projects. See [[building-staff]].
+- **Building:** `+buildadmin` works through submitted building projects. See [[building-staff]].
 - **The map:** `+map/place`, `+map/move` and `+map/check` lay rooms out and check the layout. See [[maps-staff]].
 - **Regions:** `+region/create`, `+region/add-room` and `+region/primary` set where rooms belong. See [[regions-staff]].
 - **NPCs:** `+npc/approve` and `+npc/deny` decide permission requests to play shared NPCs. See [[npcs-staff]].

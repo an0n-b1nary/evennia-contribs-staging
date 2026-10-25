@@ -566,7 +566,7 @@ class TestApartments(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(can_enter(self.guest, self.hall.room))
 
     def test_command_consent_and_staff_lifecycle_adapters(self):
-        from .commands import CmdBuild, CmdConsent
+        from .commands import CmdBuildAdmin, CmdConsent
 
         services.enter(self.tenant, self.project)
         self.call(CmdConsent(), "/request", caller=self.tenant)
@@ -577,10 +577,17 @@ class TestApartments(EvenniaCommandTestMixin, EvenniaTest):
         token = preview.split(f"+consent/grant {consent.pk}=")[-1].split()[0]
         self.call(CmdConsent(), f"/grant {consent.pk}={token}", caller=self.char2)
         child = self.approve(self.tenant, self.project)
-        self.call(CmdBuild(), f"/archive {child.pk}=Temporary retirement", caller=self.char1)
+        self.call(CmdBuildAdmin(), f"/archive {child.pk} # Temporary retirement", caller=self.char1)
+        preview = self.call(CmdBuildAdmin(), "/finish", caller=self.char1)
+        token = preview.split("+buildadmin/finish ")[-1].split()[0]
+        self.call(CmdBuildAdmin(), f"/finish {token}", caller=self.char1)
         child.refresh_from_db()
         self.assertEqual(child.state, "archived")
-        self.call(CmdBuild(), f"/restore {child.pk}=Return home", caller=self.char1)
+        preview = self.call(
+            CmdBuildAdmin(), f"/restore {child.pk} # Return home", caller=self.char1
+        )
+        token = preview.split(f"+buildadmin/restore {child.pk}=")[-1].split()[0]
+        self.call(CmdBuildAdmin(), f"/restore {child.pk}={token} # Return home", caller=self.char1)
         child.refresh_from_db()
         self.assertEqual(child.state, "live")
 

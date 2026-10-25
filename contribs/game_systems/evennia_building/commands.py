@@ -25,27 +25,6 @@ from .models import (
 )
 from .visibility import room_visibility
 
-LEGACY_STAFF = {
-    frozenset(values)
-    for values in (
-        ("review",),
-        ("geometry",),
-        ("environment", "approve"),
-        ("transfer",),
-        ("policy",),
-        ("policy", "region"),
-        ("archive",),
-        ("archive", "children"),
-        ("restore",),
-        ("quiet",),
-        ("passage", "propose"),
-        ("passage", "apply"),
-        ("frontier", "steward"),
-        ("frontier", "archive"),
-        ("frontier", "restore"),
-    )
-}
-
 
 class BuildingCommand(MuxCommand):
     """Validate the original switches before MuxCommand can ignore a bad one."""
@@ -77,12 +56,6 @@ class BuildingCommand(MuxCommand):
         """Report domain errors without dropping malformed syntax into another action."""
         try:
             require_revealed(self.caller)
-            if self.key == "+build" and frozenset(self.requested) in LEGACY_STAFF:
-                if not is_staff(self.caller):
-                    raise PermissionDenied("Only Building staff may use that action.")
-                from .staff_commands import LegacyStaffBuild
-
-                return LegacyStaffBuild.func(self)
             if len(self.requested) > 1:
                 raise ValidationError(f"Use one switch at most. See help {self.key}.")
             self.switch = ""
@@ -123,13 +96,95 @@ class BuildingCommand(MuxCommand):
         if self.args:
             raise ValidationError(f"Use {self.key}/{self.switch} without arguments.")
 
-    def preview(self, action, state, token, command, text):
+    def preview(self, action, state, token, command, text, *, suffix=""):
         """Print a complete preview and its exact confirmation command."""
         generated = support.confirm(self.caller, action, state, token)
         if generated:
-            self.caller.msg(f"{text}\nConfirm within 15 minutes: {command}{generated}")
+            self.caller.msg(f"{text}\nConfirm within 15 minutes: {command}{generated}{suffix}")
             return False
         return True
+
+
+class CmdBuildAdmin(BuildingCommand):
+    """Review proposals and administer Building through one switch at a time.
+
+    +buildadmin                       List pending submissions.
+    +buildadmin <submission>           Inspect a frozen submission.
+    +buildadmin/approve <submission>[=<token>] # <reason>
+    +buildadmin/changes <submission>[=<token>] # <reason>
+    +buildadmin/decline <submission>[=<token>] # <reason>
+    +buildadmin/environment <submission>[=<token>] # <reason>
+    +buildadmin/geometry <submission>[=<token>] # <reason>
+    +buildadmin/policy <room>=<policy>  Set a room policy, or reset it.
+    +buildadmin/region <region>=<policy>  Set a region policy, or reset it.
+    +buildadmin/quiet                  Refresh and list quiet-review flags.
+    +buildadmin/transfer <property>=<character> # <reason>
+    +buildadmin/stock <return or transfer>  Set the draft's shop stock choice.
+    +buildadmin/grants <clear or retain>  Set the draft's access-grant choice.
+    +buildadmin/archive <property> # <reason>  Start a property archive plan.
+    +buildadmin/children <yes or no>    Include affected apartments explicitly.
+    +buildadmin/restore <property>[=<token>] # <reason>
+    +buildadmin/retire <frontier> # <reason>  Start a frontier retirement plan.
+    +buildadmin/frontiers [<areas>]    Set comma-listed additional frontier areas.
+    +buildadmin/properties [<homes>]   Set comma-listed affected properties.
+    +buildadmin/replacement <room>/<direction>=<room>  Set replacement passage.
+    +buildadmin/unreplace <room>/<direction>  Remove a replacement connection.
+    +buildadmin/frontierrestore <frontier>[=<token>] # <reason>
+    +buildadmin/steward <room>=<character or none> # <reason>
+    +buildadmin/passage <agreement>=<rooms> # <reason>  Draft replacement passage.
+    +buildadmin/apply <change>[=<token>]  Apply passage after both owners agree.
+    +buildadmin/reason <text>          Set the current draft's reason.
+    +buildadmin/draft                  Inspect your persistent staff draft.
+    +buildadmin/finish [<token>]        Preview the full draft, then confirm it.
+    +buildadmin/cancel                 Abandon your staff draft.
+
+    Policies accept open, residential, commercial, closed or reset. Reasons may
+    follow policy changes after ' # '. Other mutation reasons are mandatory.
+    Tokens expire after 15 minutes and bind the actor and affected records.
+    Transfers default to clearing grants. A shop requires an explicit stock
+    choice. Retirement and restoration retain all domain checks; owners accept
+    replacement passage separately through +passage before staff applies it.
+    """
+
+    key = "+buildadmin"
+    locks = "cmd:building_staff()"
+    switch_options = (
+        "list",
+        "show",
+        "approve",
+        "changes",
+        "decline",
+        "environment",
+        "geometry",
+        "policy",
+        "region",
+        "quiet",
+        "transfer",
+        "stock",
+        "grants",
+        "archive",
+        "children",
+        "restore",
+        "retire",
+        "frontiers",
+        "properties",
+        "replacement",
+        "unreplace",
+        "frontierrestore",
+        "steward",
+        "passage",
+        "apply",
+        "reason",
+        "draft",
+        "finish",
+        "cancel",
+    )
+
+    def run(self):
+        """Keep staff authorization and dispatch separate from player commands."""
+        from .staff_commands import run_staff
+
+        run_staff(self)
 
 
 class CmdBuild(BuildingCommand):
@@ -176,7 +231,7 @@ class CmdBuild(BuildingCommand):
     Stand in the project for edits. Room references use names or room #numbers.
     A room plan starts at the current coordinates; change a field before finishing.
     +collab, +property, +consent, +passage and +frontier handle their own tasks.
-    Existing staff actions remain documented in the Building staff guide.
+    Staff review and administration use +buildadmin.
     """
 
     key = "+build"
@@ -542,17 +597,6 @@ class CmdBuild(BuildingCommand):
         self.caller.msg(
             f"Created room #{room.object_id}; door '{door.key}'{label}, triggered by {triggers}."
         )
-
-    def get_help(self, caller, cmdset):
-        """Keep existing staff forms discoverable during the staged command break."""
-        text = super().get_help(caller, cmdset)
-        if is_staff(caller):
-            from inspect import cleandoc
-
-            from .staff_commands import LegacyStaffBuild
-
-            text += "\n\n" + cleandoc(LegacyStaffBuild.__doc__)
-        return text
 
 
 class CmdCollab(BuildingCommand):

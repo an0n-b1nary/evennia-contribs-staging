@@ -1602,11 +1602,11 @@ command and Social's room-permission seam under the actual partners.
 
 ### Reviewed interiors
 
-Building 0.4 is installed after Links, with the sandbox reveal switch enabled.
+Building 0.5 is installed after Links, with the sandbox reveal switch enabled.
 `BuildingRoomMixin` precedes `DefaultRoom` and `BuildingExitMixin` precedes
 `DefaultExit`; keep cooperative `super()` calls so deletion, staff entry audit
 and traversal checks run. `CmdBuild`, `CmdCollab`, `CmdProperty`, `CmdConsent`, `CmdPassage` and
-`CmdFrontier` are registered in the character command set.
+`CmdFrontier` and staff-only `CmdBuildAdmin` are registered in the character command set.
 The **My Building** page mounts `/building/` and the read-only API mounts
 `/api/v1/building/`. The host composes Building's three-way visibility answer
 with its existing private-preview rules for Maps and Regions.
@@ -1646,7 +1646,14 @@ bedroom and parent floor plan remain private. `world/sandbox/test_apartments.py`
 exercises this under actual room/exit composition, including deletion guards,
 archive/restore, consent pages and Social/Maps privacy.
 
-Staff `/archive`, `/restore` and `/quiet` use Building's shared lifecycle services.
+Staff `+buildadmin` lists the review queue. `/approve`, `/changes`, `/decline`
+and restoration print confirmation commands with the audited reason. Transfers,
+archives and coordinated frontier retirements use persistent drafts, separate
+field commands and `/finish` confirmation. These use Building's shared lifecycle
+services; `help +buildadmin` and the staff guide list the complete flow.
+`world/sandbox/test_building_staff_commands.py` exercises these commands with
+the actual cmdset, room/exit MRO, Jobs, Maps, Regions and Economy.
+Staff `/quiet` refreshes review flags without changing rights.
 The persistent `building_quiet_review` script checks daily using the existing
 character-specific `sandbox_last_seen` activity provider. The runtime threshold
 defaults to 35 days, with a reveal grace. Flags never change ownership/access.

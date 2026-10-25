@@ -2,7 +2,7 @@ from evennia.scripts.scripts import DefaultScript
 
 
 class QuietReview(DefaultScript):
-    """Configure as a persistent global script; manual +build/quiet also refreshes."""
+    """Configure as a persistent global script; manual +buildadmin/quiet also refreshes."""
 
     def at_script_creation(self):
         self.key = "building_quiet_review"

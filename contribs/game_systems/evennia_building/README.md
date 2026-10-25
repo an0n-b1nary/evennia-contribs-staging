@@ -1,6 +1,6 @@
 # evennia-building
 
-Version 0.4.0 supplies reviewed private homes, public frontier and mixed
+Version 0.5.0 supplies reviewed private homes, public frontier and mixed
 settlements. Shared authors draft together under the lead's quotas; every
 contributor acknowledges the exact candidate and content reuse terms. Each
 proposed home owner accepts their own boundary. Staff approve the entire frozen
@@ -22,7 +22,7 @@ BUILDING_SAFE_ROOM = "#2"
 ```
 
 Migrate before use. Register `CmdBuild`, `CmdCollab`, `CmdProperty`, `CmdConsent`,
-`CmdPassage` and `CmdFrontier` in the character command set. Compose
+`CmdPassage`, `CmdFrontier` and staff-only `CmdBuildAdmin` in the character command set. Compose
 `BuildingRoomMixin` before DefaultRoom and `BuildingExitMixin` before DefaultExit
 in the host typeclasses. Keep cooperative `super()` calls. The room mixin guards
 managed-room deletion; the exit mixin rechecks access at traversal. Entry locks
@@ -89,7 +89,7 @@ defaults, then `BUILDING_DEFAULT_POLICY` (`open`). Policies are `open`,
 warn. Links runtime controls default to 2 open projects, 15 total draft rooms,
 6 attachment doors (warning, optionally hard) and the reveal switch off.
 
-Use `policy.set_policy(actor, room, policy)` or `+build/policy` for audited
+Use `policy.set_policy(actor, room, policy)` or `+buildadmin/policy` for audited
 staff changes; `/policy/region` manages region defaults. Drafts deny generic
 describe/configure actions: Building services alone version their content and
 preserve isolation. Live descriptions use `edit_property_room` or
@@ -172,7 +172,7 @@ characters are active; missing history starts at property creation. The runtime
 `BUILDING_QUIET_DAYS` defaults to 35. A persisted first revealed check starts a
 minimum reveal grace of the same duration. New activity resolves open flags;
 repeated checks deduplicate, and flags grant/revoke no rights. Staff see them
-via `+build/quiet`, the Building page and inspection-only admin, even without Jobs.
+via `+buildadmin/quiet`, the Building page and inspection-only admin, even without Jobs.
 
 Schedule automatic checks with a persistent global script:
 
@@ -271,8 +271,23 @@ Player Building is split into `+build`, `+collab`, `+property`, `+consent`,
 the character stands. Submit, discard, withdrawal and agreement actions preview
 the candidate and issue actor-bound, expiring confirmation tokens. Version,
 fingerprint, owner and wording checks remain in the transactional services.
-The old player forms are refused. Staff operations remain under their existing
-`+build` forms until the staff portion of #177.
+The old player forms are refused. Staff operations use `+buildadmin` in 0.5;
+old `+build` staff forms are also refused. See the staff guide for the complete
+command map. `/approve`, `/changes`, `/decline`, `/environment`, `/geometry`,
+`/restore`, `/frontierrestore` and `/apply` preview and print an expiring
+confirmation command. Audited reasons follow ` # `.
+
+Transfers, archives, frontier retirements, stewardship and passage proposals
+start durable private staff drafts. Set each field separately and use
+`+buildadmin/finish` to preview, then repeat its printed confirmation command.
+Use `/draft` to inspect or `/cancel` to abandon it. Transfers default to clearing
+access grants; `/grants retain` preserves them. Shops require `/stock return`
+or `/stock transfer`. Archives require `/children yes` for active apartments.
+Frontier plans list additional `/frontiers` and `/properties` separately;
+`/replacement <room>/<direction>=<room>` adds one bypass connection.
+Tokens bind the actor, draft choices and current affected records; a changed
+owner or steward requires restarting the draft. Passage proposal and staff
+application never replace the two owners' separate `+passage` agreements.
 
 `+build/dig north=Kitchen` places a neighbouring room with destination-named
 doors and direction aliases. Explicit coordinates and custom names use a durable
