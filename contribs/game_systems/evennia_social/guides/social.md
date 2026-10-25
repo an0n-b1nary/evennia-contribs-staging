@@ -15,7 +15,7 @@ These commands help you find people to play with, talk to them out of character,
 
 ## Being found
 
-Some players would rather not be findable from across the game. `+unfindable on` leaves your character out of `+where`, the hangout counts, and any map of who's where. You still show in `who`, and anyone in the same room sees you as usual. Staff can still see where you are. `+unfindable off` undoes it. The setting is per character.
+Some players would rather not be findable from across the game. `+unfindable on` leaves your character out of `who`, `+where`, the hangout counts, and any map of who's where. Anyone in the same room sees you as usual. Staff can still see where you are. `+unfindable off` undoes it. The setting is per character.
 
 `+where/ic` and `+where/ooc` narrow the list to in-character or out-of-character rooms.
 

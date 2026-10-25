@@ -2014,15 +2014,15 @@ class TestPresentWebSeams(SeededSandboxMixin, EvenniaTest):
         self.assertIn("Live: Kickoff Rehearsal", response.content.decode())
 
     def test_recent_connections_empty_state_renders(self):
+        from evennia.objects.models import ObjectDB
         from web.website.views.index import SandboxIndexView
 
-        with mock.patch(
-            "evennia.web.website.views.index._gamestats",
-            return_value={"accounts_connected_recent": []},
-        ):
-            response = SandboxIndexView.as_view()(self.request("/"))
-            response.render()
-            self.assertIn("No accounts have connected recently", response.content.decode())
+        # Puppeting the test character records it as seen.
+        for character in ObjectDB.objects.get_by_attribute(key="sandbox_last_seen"):
+            character.attributes.remove("sandbox_last_seen")
+        response = SandboxIndexView.as_view()(self.request("/"))
+        response.render()
+        self.assertIn("No one has connected recently", response.content.decode())
 
     def test_character_activity_concept_and_hidden_character(self):
         from django.utils import timezone

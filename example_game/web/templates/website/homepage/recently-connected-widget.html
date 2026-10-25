@@ -1,10 +1,10 @@
 <div class="card">
   <h2 class="card-header h5 text-center mb-0">Recently Connected</h2>
   <ul class="list-group list-group-flush">
-    {% for account in accounts_connected_recent %}
-    <li class="list-group-item">{{ account.username }} &mdash; <em>{{ account.last_login|timesince }} ago</em></li>
+    {% for entry in recently_connected %}
+    <li class="list-group-item"><a href="{{ entry.character.web_get_detail_url }}">{{ entry.character }}</a>{{ entry.marker }} &mdash; <em>{{ entry.last_seen|timesince }} ago</em></li>
     {% empty %}
-    <li class="list-group-item text-muted">No accounts have connected recently. Use Play Online to join the sandbox.</li>
+    <li class="list-group-item text-muted">No one has connected recently. Use Play Online to join the sandbox.</li>
     {% endfor %}
   </ul>
 </div>

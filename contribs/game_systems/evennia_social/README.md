@@ -210,19 +210,20 @@ Each character chooses whether it can be found from afar, with `+unfindable`:
 | Setting | `+where`, venue counts, web maps | `who` | Who can set it |
 |---|---|---|---|
 | `findable` (default) | shown | shown | anyone |
-| `unfindable` | hidden | shown | anyone |
+| `unfindable` | hidden | hidden | anyone |
 | `dark` | hidden | hidden | staff (`perm(Builder)`) |
 
 Being in the same room always reveals a character, and staff see through both
-settings (with a marker in `+where`). Unfindable is privacy from people who
-aren't there, not invisibility.
+settings (with a marker in `+where`). Unfindable means unlisted: it is privacy
+from people who aren't there, not invisibility. `dark` hides the same things,
+and only marks the character differently for other staff.
 
 Every presence surface asks `evennia_social.presence`, so they can't disagree.
 In-game code calls `is_findable(character, viewer)` (location) or
 `is_listed(character, viewer)` (online at all); web code with no in-game viewer
 calls `is_publicly_findable(character)` / `is_publicly_listed(character)`.
 
-`who` lives in the AccountCmdSet. To leave dark staff out of it, add this
+`who` lives in the AccountCmdSet. To leave unfindable characters out of it, add this
 contrib's `CmdWho` there; it replaces Evennia's command of the same key:
 
 ```python

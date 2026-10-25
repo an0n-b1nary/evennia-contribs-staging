@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Presence commands: +unfindable, and a ``who`` that honours staff ``dark``.
+Presence commands: +unfindable, and a ``who`` that honours it.
 
 The rules live in ``evennia_social.presence``; these only set and show them.
 """
@@ -20,11 +20,11 @@ from evennia_social.social import is_staff
 _EXPLAIN = {
     presence.FINDABLE: "You are |wfindable|n: you show up in +where and on the map.",
     presence.UNFINDABLE: (
-        "You are |wunfindable|n: hidden from +where, venue counts and the map. "
-        "Anyone in the same room still sees you, and you still appear in who."
+        "You are |wunfindable|n: left out of who, +where, venue counts and the map. "
+        "Anyone in the same room still sees you, and staff see you marked (unfindable)."
     ),
     presence.DARK: (
-        "You are |wdark|n: hidden from who as well as +where and the map. "
+        "You are |wdark|n: left out of who, +where, venue counts and the map. "
         "Anyone in the same room still sees you, and other staff see you marked (dark)."
     ),
 }
@@ -36,12 +36,13 @@ class CmdUnfindable(MuxCommand):
 
     Usage:
         +unfindable          - Show your current setting
-        +unfindable on       - Hide where you are from +where and the map
-        +unfindable off      - Be findable again
-        +unfindable dark     - (staff) Also hide that you are online at all
+        +unfindable on       - Leave your character out of who, +where and the map
+        +unfindable off      - Be listed again
+        +unfindable dark     - (staff) The same, marked (dark) for other staff
 
-    Unfindable hides only where you are. You still appear in who, and anyone
-    in the same room sees you as usual. The setting is per character.
+    Unfindable means unlisted: you don't appear in who, +where, venue counts
+    or the map. Anyone in the same room sees you as usual, and staff still see
+    you. The setting is per character.
     """
 
     key = "+unfindable"
@@ -76,8 +77,8 @@ class CmdWho(DefaultCmdWho):
       who
       doing
 
-    Shows who is currently online. Staff who have gone dark (+unfindable dark)
-    are left out for everyone but other staff.
+    Shows who is currently online. Unfindable characters are left out for
+    everyone but staff and anyone in the same room.
     """
 
     def func(self):

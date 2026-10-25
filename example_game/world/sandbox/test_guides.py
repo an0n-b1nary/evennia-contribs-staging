@@ -350,7 +350,7 @@ class TestGuidesInTheSandbox(EvenniaTest):
         pages = (
             ("moderation-staff", "Reviewing applications"),
             ("jobs-staff", "A decision is separate from status"),
-            ("social-staff", "Going dark"),
+            ("social-staff", "Being unlisted"),
             ("rptracker-staff", "Read activity, never ration it"),
         )
         self._reader(self.account2)
