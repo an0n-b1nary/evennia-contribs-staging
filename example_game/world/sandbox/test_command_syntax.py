@@ -45,6 +45,19 @@ class CommandSyntaxSeams(EvenniaCommandTest):
                         message = self.call(command, args)
                     self.assertRegex(message.lower(), r"usage|see help")
 
+    def test_every_documented_switch_is_accepted(self):
+        # A switch missing from switch_options is now refused, not dropped.
+        for registered in self.contrib_commands():
+            options = getattr(registered, "switch_options", ()) or ()
+            names = {registered.key.lower(), *(alias.lower() for alias in registered.aliases)}
+            pattern = rf"(?<![\w+@/])(?:{'|'.join(map(re.escape, names))})/([a-z][\w-]*)"
+            for switch in set(re.findall(pattern, (type(registered).__doc__ or "").lower())):
+                with self.subTest(command=registered.key, switch=switch):
+                    matches = [option for option in options if option == switch] or [
+                        option for option in options if option.startswith(switch)
+                    ]
+                    self.assertEqual(len(matches), 1)
+
     def test_every_contrib_switch_keeps_numeric_refusals_readable(self):
         # The unrelated missing default and persistence defect is tracked in #216.
         self.char1.lore_lean_type = self.char1.lore_lean_value = None

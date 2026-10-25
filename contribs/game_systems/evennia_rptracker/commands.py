@@ -312,7 +312,7 @@ class CmdRPTrackerStaff(StrictSwitchMixin, MuxCommand):
     per-session — a player's other legitimate sessions are unaffected.
     """
 
-    switch_options = ("flag", "unflag")
+    switch_options = ("review", "flag", "unflag")
 
     key = "+rptracker"
     aliases = []  # noqa: RUF012
