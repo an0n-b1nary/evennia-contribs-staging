@@ -6,8 +6,10 @@ from evennia.commands.default.comms import CmdChannel
 from evennia.comms.models import ChannelDB
 from evennia.utils.utils import strip_unsafe_input
 
+from evennia_links.command_syntax import StrictSwitchMixin
 
-class CmdICChannel(CmdChannel):
+
+class CmdICChannel(StrictSwitchMixin, CmdChannel):
     """Keep normal channel syntax while including opt-in channel typeclasses."""
 
     def search_channel(self, channelname, exact=False, handle_errors=True):

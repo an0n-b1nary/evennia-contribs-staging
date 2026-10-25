@@ -9,10 +9,11 @@ Supports multi-recipient, reply shortcuts, and message history.
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.social import find_character
 
 
-class CmdPage(MuxCommand):
+class CmdPage(StrictSwitchMixin, MuxCommand):
     """
     Send a private message to another player.
 

@@ -6,6 +6,8 @@ from decimal import Decimal, InvalidOperation
 
 from evennia import CmdSet
 
+from evennia_links.command_syntax import whole_number
+
 from . import services, tactics
 from .command_syntax import CombatCommand
 from .data import CombatError
@@ -26,8 +28,8 @@ class CmdCombat(CombatCommand):
     +combat/posed                   Acknowledge your owed pose
     +combat/fade                    Step out; /join restores your place
     +combat/withdraw                Withdraw from accounting
-    +combat/accept <request>         Accept a request or revival
-    +combat/decline <request>        Decline a request or revival
+    +combat/accept <request number or healer name>
+    +combat/decline <request number or healer name>
     +combat/revive accept            Automatically accept allied revival (ask resets)
     +combat/retract                 Withdraw an unaccepted revival
     +combat/unlock                  Announce a build correction; clear queues first
@@ -87,10 +89,13 @@ class CmdCombat(CombatCommand):
             services.setup(actor, reason=self.args.strip())
         elif op == "join":
             services.join(
-                actor, self.lhs.strip(), subject=subject, boss=int(self.rhs) if self.rhs else 1
+                actor,
+                self.lhs.strip(),
+                subject=subject,
+                boss=whole_number(self.rhs) if self.rhs else 1,
             )
         elif op == "cap":
-            services.prepare_cap(actor, int(self.args), subject=subject)
+            services.prepare_cap(actor, whole_number(self.args), subject=subject)
             self.msg("Personal Turn Limit set.")
         elif op == "invite":
             target = actor.search(self.lhs.strip())
@@ -107,7 +112,7 @@ class CmdCombat(CombatCommand):
             if target:
                 services.unignore(actor, target)
         elif op == "rollback":
-            services.rollback(actor, int(self.lhs), self.rhs or "")
+            services.rollback(actor, whole_number(self.lhs), self.rhs or "")
         elif op == "journal":
             self.msg(services.journal(actor))
         elif op == "result":
@@ -433,7 +438,7 @@ class CmdCombatStory(CombatCommand):
                 self.msg(services.shelved(self.caller))
                 return
             if operation == "unshelve":
-                services.unshelve(self.caller, int(self.args.strip().lstrip("#")))
+                services.unshelve(self.caller, whole_number(self.args.strip().lstrip("#")))
                 return
             if operation in ("template", "enrollnpc", "removenpc", "auto", "act"):
                 from django.apps import apps
@@ -450,7 +455,7 @@ class CmdCombatStory(CombatCommand):
                 if operation in ("template", "enrollnpc"):
                     name, _, multiplier = self.lhs.partition("/")
                     side = (self.rhs or "").strip()
-                    boss = int(multiplier) if multiplier else 1
+                    boss = whole_number(multiplier) if multiplier else 1
                     cap = None
                     if operation == "template":
                         blueprint = npcs.find_blueprint(name.strip())
@@ -504,14 +509,16 @@ class CmdCombatStory(CombatCommand):
                     return
                 value, _, reason = (self.rhs or "").partition(" # ")
                 value = (
-                    int(Decimal(value) * 100)
+                    whole_number(Decimal(value) * 100)
                     if operation == "spirit"
-                    else int(value)
+                    else whole_number(value)
                     if operation in ("vitality", "requestcap", "requestreturn")
                     else value.strip()
                 )
             services.storyteller(self.caller, operation, target=target, value=value, reason=reason)
-        except (CombatError, ValueError, LookupError, InvalidOperation) as exc:
+        except InvalidOperation:
+            self.msg("Give a numeric Spirit amount, such as 1.5.")
+        except (CombatError, ValueError, LookupError) as exc:
             self.msg(services.plain(exc, 500))
 
 

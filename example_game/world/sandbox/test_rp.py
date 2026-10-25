@@ -38,7 +38,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
         outfits.save(self.char2, "Travel")
         gear.remove(self.char2, cloak)
         output = self.call(command(), "/svae Travel", caller=self.char2)
-        self.assertIn("Use one outfit switch", output)
+        self.assertIn("Unknown or ambiguous switch", output)
         self.assertFalse(cloak.is_worn)
         self.call(command(), "Travel", "You change into outfit Travel.", caller=self.char2)
         self.assertTrue(cloak.is_worn)

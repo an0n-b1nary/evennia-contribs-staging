@@ -24,9 +24,9 @@ class TestAdmissionRaces(AdmissionFixture, EvenniaTestMixin, TransactionTestCase
         command = command_type()
         command.caller = self.char1
         command.args = args
-        command.switches = []
         command.session = Mock(address="192.0.2.1")
         command.msg = Mock()
+        command.parse()
         flow = command.func()
         next(flow)
         return flow
@@ -40,15 +40,15 @@ class TestAdmissionRaces(AdmissionFixture, EvenniaTestMixin, TransactionTestCase
         raise AssertionError("Unexpected additional confirmation prompt")
 
     def test_two_staff_bans_cannot_overwrite_each_other(self):
-        first = self.prompt(CmdBan, self.account2.key + ": first incident")
-        second = self.prompt(CmdBan, self.account2.key + ": second incident")
+        first = self.prompt(CmdBan, self.account2.key + "=first incident")
+        second = self.prompt(CmdBan, self.account2.key + "=second incident")
         committed_race(lambda: self.finish(first), lambda: self.finish(second))
         self.assertEqual(len(stock_bans()), 2)
         self.assertEqual(ModerationAction.objects.filter(kind="ban").count(), 2)
 
     def test_two_unbans_do_not_restore_a_cleared_ban(self):
-        self.finish(self.prompt(CmdBan, self.account2.key + ": first incident"))
-        self.finish(self.prompt(CmdBan, self.account2.key + ": second incident"))
+        self.finish(self.prompt(CmdBan, self.account2.key + "=first incident"))
+        self.finish(self.prompt(CmdBan, self.account2.key + "=second incident"))
         first = self.prompt(CmdUnban, "1")
         second = self.prompt(CmdUnban, "2")
         committed_race(lambda: self.finish(first), lambda: self.finish(second))

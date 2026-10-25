@@ -26,9 +26,9 @@ from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.utils import inherits_from
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_rp_chargen import abilities, conf, locks, services
 from evennia_rp_chargen.catalog import split_ability_text
-from evennia_rp_chargen.command_syntax import SingleSwitchMixin
 from evennia_rp_chargen.models import (
     AbilityDefinition,
     CharacterAbility,
@@ -54,7 +54,7 @@ def _count(text: str, glyph: str) -> int | None:
     return None
 
 
-class _ChargenCommand(SingleSwitchMixin, MuxCommand):
+class _ChargenCommand(StrictSwitchMixin, MuxCommand):
     help_category = "Character"
     locks = "cmd:all()"
 
@@ -466,6 +466,12 @@ class CmdChargen(_ChargenCommand):
             return
         if TagDefinition.all_objects.filter(key=key).exists():
             self.msg(f"A tag with key '{key}' already exists.")
+            return
+        from evennia_rp_chargen.vocabulary import conflict_message, spelling_conflicts
+
+        conflicts = spelling_conflicts(key, [key, name])
+        if conflicts:
+            self.msg(conflict_message(conflicts))
             return
         TagDefinition.objects.create(key=key, name=name, kind=kind)
         self.msg(f"Added the {kind} tag {name} ('{key}').")

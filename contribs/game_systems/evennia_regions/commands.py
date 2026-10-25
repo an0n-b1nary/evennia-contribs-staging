@@ -23,11 +23,12 @@ from django.db import transaction
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links import EditingMixin
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_regions.models import Region, RegionMembership
 from evennia_regions.permissions import is_staff
 
 
-class CmdRegion(EditingMixin, MuxCommand):
+class CmdRegion(StrictSwitchMixin, EditingMixin, MuxCommand):
     """
     View and manage geographic regions.
 
@@ -43,6 +44,17 @@ class CmdRegion(EditingMixin, MuxCommand):
         +region/primary <name>[=<#dbref>]    - (Staff) Set a room's primary region
                                                (omit the dbref for current room)
     """
+
+    switch_options = (
+        "view",
+        "here",
+        "create",
+        "edit",
+        "add-room",
+        "remove-room",
+        "here-add",
+        "primary",
+    )
 
     key = "+region"
     aliases = []  # noqa: RUF012

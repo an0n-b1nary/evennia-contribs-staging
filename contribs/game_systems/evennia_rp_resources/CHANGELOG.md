@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Teach natural resource amounts in economy offers and keep invalid payout numbers readable.
+
 ## [0.3.0] - 2026-10-22
 
 - Breaking: grants and spending use `<character>=<quantity> <resource> [# note]`; plot payout proposals use `<plot>=<quantity> <resource>`. Reject the old comma forms and invalid or stacked switches, retaining unique prefixes and the existing audit and payout approval services.

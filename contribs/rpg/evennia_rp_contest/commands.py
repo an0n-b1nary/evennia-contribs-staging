@@ -7,8 +7,9 @@ import json
 from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_rp_contest import narration, permissions, services
-from evennia_rp_contest.command_syntax import SingleSwitchMixin, split_comment
+from evennia_rp_contest.command_syntax import split_comment
 from evennia_rp_contest.expiry import sweep_idle
 from evennia_rp_contest.models import Challenge, CheckRecord
 from evennia_rp_contest.parsing import (
@@ -21,7 +22,7 @@ from evennia_rp_contest.parsing import (
 )
 
 
-class CmdTest(SingleSwitchMixin, MuxCommand):
+class CmdTest(StrictSwitchMixin, MuxCommand):
     """Test a stat, optionally with a domain or element. No rewards are awarded.
 
     Usage:
@@ -30,7 +31,7 @@ class CmdTest(SingleSwitchMixin, MuxCommand):
 
     An unnumbered test uses the default difficulty. Name a challenge to answer
     it. Suggestions are guidance: choose any approach. Alternatives and retries
-    are announced. Use kind:key for an ambiguous tag, e.g. element:fire.
+    are announced. Tag names are unique across kinds.
     See +challenge for room challenges and history.
     """
 
@@ -52,7 +53,7 @@ class CmdTest(SingleSwitchMixin, MuxCommand):
             self.msg(str(exc))
 
 
-class CmdChallenge(SingleSwitchMixin, MuxCommand):
+class CmdChallenge(StrictSwitchMixin, MuxCommand):
     """Set and manage room challenges; full breakdowns stay staff-only.
 
     Usage:

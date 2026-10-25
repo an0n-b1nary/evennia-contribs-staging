@@ -22,7 +22,7 @@ classifiers = [
 # Core: models + commands. No web/API deps.
 # evennia-links is HARD because shipped models inherit AbstractArchived /
 # AbstractAuthoredLink, and commands use EditingMixin.
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.2"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13"]
 
 [project.optional-dependencies]
 # [web] enables website views and the DRF API.

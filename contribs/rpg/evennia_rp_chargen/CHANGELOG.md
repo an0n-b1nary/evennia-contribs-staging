@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Keep invalid Signature Power and Accuracy values readable.
+- Keep tag names unique across kinds at runtime: `+chargen/tag` and the admin
+  refuse a tag whose key, name or alias another tag already uses, as the
+  ruleset already does for its own tags.
+
 ## 0.6.0
 
 ### Breaking

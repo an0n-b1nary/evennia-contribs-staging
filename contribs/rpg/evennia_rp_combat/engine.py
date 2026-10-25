@@ -557,7 +557,7 @@ def accept_revival(state, ident, token, *, support_allowed=None):
     row = participant(state, ident)
     exchange = get_exchange(state, token)
     if not exchange.get("revival") or token not in row["incoming"]:
-        raise CombatError("No revival offer matches that token.")
+        raise CombatError("No matching revival offer is pending.")
     if not revivable(row):
         raise CombatError("Only a present, incapacitated participant can accept a revival.")
     row["incoming"].remove(token)

@@ -1,5 +1,12 @@
 # Changelog — evennia-links
 
+## 0.8.13 — 2026-10-25
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Add shared strict switch validation and readable whole-number parsing for contrib commands.
+- Restore the host lock-function cache after stock-command tests temporarily
+  replace settings, so mixed command suites retain contrib locks.
+
 ## 0.8.12 — 2026-10-22
 
 - Add `positional_page=False` to `pagination.reading_target` so commands can

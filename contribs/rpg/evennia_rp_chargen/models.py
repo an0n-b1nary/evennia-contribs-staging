@@ -202,6 +202,16 @@ class TagDefinition(AbstractArchived):
     def __str__(self) -> str:
         return self.name
 
+    def clean(self):
+        # The admin's path: an archived row hides its tag, so it can't clash.
+        if self.is_archived:
+            return
+        from evennia_rp_chargen.vocabulary import conflict_message, spelling_conflicts
+
+        conflicts = spelling_conflicts(self.key, [self.key, self.name, *(self.aliases or ())])
+        if conflicts:
+            raise ValidationError(conflict_message(conflicts))
+
     def as_tagdef(self):
         from evennia_rp_rules.ruleset import TagDef
 

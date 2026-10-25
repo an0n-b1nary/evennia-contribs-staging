@@ -10,8 +10,10 @@ Account-level ignore list management. Filtering enforcement happens in
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 
-class CmdIgnore(MuxCommand):
+
+class CmdIgnore(StrictSwitchMixin, MuxCommand):
     """
     Manage your ignore list.
 
@@ -29,6 +31,8 @@ class CmdIgnore(MuxCommand):
 
     Staff messages always bypass ignore filters.
     """
+
+    switch_options = ("remove", "clear")
 
     key = "+ignore"
     aliases = ["+mute"]  # noqa: RUF012

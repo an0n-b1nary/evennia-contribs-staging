@@ -22,7 +22,7 @@ classifiers = [
 # evennia-links provides AbstractLink (the base of RPSessionSceneLink, which
 # ships unconditionally), connect_soft_ref_cleanup (used by the scene bridge),
 # and resolve_dotted (used to resolve the optional settings hooks in commands.py).
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.5"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

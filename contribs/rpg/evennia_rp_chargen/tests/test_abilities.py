@@ -122,6 +122,20 @@ class VocabularyTests(CatalogTest):
         self.assertIsNone(vocabulary.get("juggling"))
         self.assertEqual(vocabulary.find("fire", kind="element").kind, "element")
 
+    def test_spellings_stay_unique_across_kinds_at_runtime(self):
+        # The ruleset's own check can't see staff rows; ambiguity would strand both tags.
+        TagDefinition.all_objects.all().delete()
+        for fields in (
+            {"key": "blaze", "name": "Fire", "kind": "domain"},
+            {"key": "scaling", "name": "Scaling", "aliases": ["climbing"]},
+            {"key": "fire", "name": "Riddles", "kind": "element"},
+        ):
+            with self.subTest(**fields), self.assertRaisesRegex(ValidationError, "already used"):
+                TagDefinition(**fields).full_clean()
+        # Renaming a ruleset tag keeps its own spellings; archived rows hide, so never clash.
+        TagDefinition(key="riddles", name="Puzzles", aliases=["riddles"]).full_clean()
+        TagDefinition(key="blaze", name="Fire", is_archived=True).full_clean()
+
     def test_ensure_tag_creates_from_the_ruleset(self):
         TagDefinition.all_objects.all().delete()
         row = ensure_tag(self.ruleset.tags["climbing"])

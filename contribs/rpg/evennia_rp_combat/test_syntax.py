@@ -148,7 +148,8 @@ class TestCommandFlows(EvenniaCommandTest):
 
     def test_old_actions_and_unknown_or_stacked_switches_are_refused(self):
         for text in ("/attack Char=balanced", "/recover", "/npc", "/act/npc", "/act/unknown"):
-            self.call(CmdCombat(), text, "Use one known switch.")
+            output = self.call(CmdCombat(), text)
+            self.assertIn("See help +combat for usage.", output)
         self.assertFalse(services.state_for(self.char1)["exchanges"])
 
     def test_unknown_target_reports_only_the_failed_search(self):

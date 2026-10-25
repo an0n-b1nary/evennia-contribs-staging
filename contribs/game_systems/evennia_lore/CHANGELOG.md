@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## 0.10.2 — 2026-10-23
 
 ### Changed

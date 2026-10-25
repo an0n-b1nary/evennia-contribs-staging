@@ -58,14 +58,16 @@ class ParsingTests(RulesetTestMixin, SimpleTestCase):
     def test_any_kind(self):
         self.assertEqual(find_tag("fire").kind, "element")
 
-    def test_cross_kind_collision_requires_selection(self):
+    def test_unique_names_resolve_across_kinds_and_prefixes_can_be_ambiguous(self):
         spec = fresh_test_ruleset()
-        spec["tags"].append({"key": "firecraft", "name": "Fire", "kind": "domain"})
+        spec["tags"].append({"key": "firecraft", "name": "Firecraft", "kind": "domain"})
         with override_settings(RP_RULES_RULESET=spec):
-            with self.assertRaisesRegex(ContestError, "Which tag.*element:fire.*domain:firecraft"):
-                find_tag("Fire")
-            self.assertEqual(find_tag("element:fire").key, "fire")
-            self.assertEqual(find_tag("domain:firecraft").key, "firecraft")
+            with self.assertRaisesRegex(ContestError, "'fi' could mean Fire, Firecraft"):
+                find_tag("fi")
+            self.assertEqual(find_tag("Fire").key, "fire")
+            self.assertEqual(find_tag("Firecraft").key, "firecraft")
+            with self.assertRaises(ContestError):
+                find_tag("element:fire")
 
     @override_settings(RP_CONTEST_DEFAULT_DIFFICULTY=None, RP_CONTEST_DIFFICULTIES={"Hard": "High"})
     def test_default_and_presets(self):

@@ -142,7 +142,9 @@ the build does, so gear can't change at any moment when pips or loadout can't.
 See [Change guards](#change-guards) for the API.
 
 **Tags.** The ruleset's tags seed the vocabulary. `TagDefinition` rows add
-to it, rename tags, or archive them (`+chargen/tag`, or the admin). Set
+to it, rename tags, or archive them (`+chargen/tag`, or the admin). Keys,
+names and aliases stay unique across all kinds, as in the ruleset: both refuse
+a spelling another tag already uses. Set
 `RP_RULES_VOCABULARY = "evennia_rp_chargen.vocabulary.DBVocabulary"` so
 checks and commands see the same vocabulary.
 

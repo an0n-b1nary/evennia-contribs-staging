@@ -13,6 +13,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.objects.models import ObjectDB
 from evennia.utils.search import search_object
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.social import is_staff
 
 
@@ -29,7 +30,7 @@ def _resolve_ooc_room():
     return matches[0] if matches else None
 
 
-class CmdOocTeleport(MuxCommand):
+class CmdOocTeleport(StrictSwitchMixin, MuxCommand):
     """
     Teleport to the OOC Nexus.
 
@@ -66,7 +67,7 @@ class CmdOocTeleport(MuxCommand):
         self.caller.msg("You teleport to the OOC Nexus.")
 
 
-class CmdHome(MuxCommand):
+class CmdHome(StrictSwitchMixin, MuxCommand):
     """
     Teleport to your home room.
 

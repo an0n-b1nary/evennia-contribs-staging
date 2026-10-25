@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## [0.6.0] - 2026-10-22
 
 - Breaking: manual grants use `+xp/grant <character>=<amount> # <reason>`. Reject the old colon form and invalid or stacked switches; retain unique switch prefixes and case-insensitive matching.

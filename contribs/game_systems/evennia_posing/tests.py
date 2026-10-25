@@ -481,7 +481,7 @@ class TestCmdPot(PosingCommandTestCase):
 
     def test_unknown_switch(self):
         result = self.call(CmdPot(), "/bogus", caller=self.char1)
-        self.assertIn("Unknown switch", result)
+        self.assertIn("Unknown or ambiguous switch", result)
 
 
 class TestCmdLastPose(PosingCommandTestCase):
@@ -543,7 +543,7 @@ class TestCmdPoseHeader(PosingCommandTestCase):
 
     def test_unknown_switch(self):
         result = self.call(CmdPoseHeader(), "/bogus", caller=self.char1)
-        self.assertIn("Unknown switch", result)
+        self.assertIn("Unknown or ambiguous switch", result)
 
 
 class TestCmdHighlight(PosingCommandTestCase):
@@ -574,7 +574,7 @@ class TestCmdHighlight(PosingCommandTestCase):
         self.call(CmdHighlight(), "/self", "Usage")
 
     def test_unknown_switch(self):
-        self.call(CmdHighlight(), "/badswitch", "Unknown switch")
+        self.call(CmdHighlight(), "/badswitch", "Unknown or ambiguous switch")
 
 
 # =====================================================================

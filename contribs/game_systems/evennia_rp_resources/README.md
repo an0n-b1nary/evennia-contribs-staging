@@ -14,7 +14,7 @@ are optional; resources imports none of their models.
 
 With economy 0.1 installed, resources 0.1.1 registers the `resource` exchange
 asset and reconciliation figures during app startup. `+offer` accepts
-`resource:grain:3` or `3 Grain`. Both resource ledger rows carry the exchange id,
+`3 Grain`. Both resource ledger rows carry the exchange id,
 and failed swaps roll both holdings and currency back. With economy absent,
 resource commands, passive accrual and gathering work independently. While
 resources are hidden, the asset provider's `available()` keeps them out of

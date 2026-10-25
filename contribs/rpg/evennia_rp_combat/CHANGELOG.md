@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Select revival offers by healer name and show names in prompts and status. Keep invalid cap, join, rollback, story and improvised move numbers readable.
+
 ## 0.3.0
 
 ### Breaking

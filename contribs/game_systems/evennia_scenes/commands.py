@@ -21,6 +21,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
 from evennia_links import EditingMixin
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_scenes.models import LogEntry, LogEntryVersion, Scene, SceneParticipant
 from evennia_scenes.signals import scene_closed, scene_opened
 
@@ -101,7 +102,7 @@ def _desc_quit(caller):
     caller.msg("Description editor closed.")
 
 
-class CmdScene(MuxCommand):
+class CmdScene(StrictSwitchMixin, MuxCommand):
     """
     Manage scenes in the current room.
 
@@ -129,6 +130,19 @@ class CmdScene(MuxCommand):
     appear automatically on the web log browser — no separate publish step is
     needed. Scenes can be paused (closed) and resumed multiple times.
     """
+
+    switch_options = (
+        "open",
+        "close",
+        "resume",
+        "title",
+        "desc",
+        "privacy",
+        "invite",
+        "join",
+        "leave",
+        "info",
+    )
 
     key = "+scene"
     aliases: list = []  # noqa: RUF012
@@ -665,7 +679,7 @@ class CmdScene(MuxCommand):
         return "\n".join(lines)
 
 
-class CmdLog(EditingMixin, MuxCommand):
+class CmdLog(StrictSwitchMixin, EditingMixin, MuxCommand):
     """
     View and edit scene logs.
 
@@ -680,6 +694,8 @@ class CmdLog(EditingMixin, MuxCommand):
         +log/ic <scene_number>        - Show only IC entries
         +log/ooc <scene_number>       - Show only OOC entries
     """
+
+    switch_options = ("edit", "history", "rollback", "diff", "ic", "ooc", "all")
 
     key = "+log"
     aliases: list = []  # noqa: RUF012

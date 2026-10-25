@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- **Breaking:** accept assets as amounts (`40 coins`, `3 grain`), carried names or dbrefs. Remove colon-prefixed forms; conflicting provider names refuse with named matches and a staff warning.
+- Keep invalid offer, shop and listing numbers readable.
+
 ## 0.4.2 — 2026-10-24
 
 - Update the optional shop integration range and staff transfer instructions for

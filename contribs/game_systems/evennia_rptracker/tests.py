@@ -22,7 +22,7 @@ from unittest.mock import patch
 
 from django.apps import apps
 from django.utils import timezone
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_rptracker.models import RPSession, RPSessionPartner, RPSessionSceneLink
 
@@ -540,6 +540,15 @@ class TestCmdRPTrackerStaffLock(EvenniaTest):
         from evennia_rptracker.commands import CmdRPTrackerStaff
 
         self.assertEqual(CmdRPTrackerStaff.locks, "cmd:perm(Builder)")
+
+
+class TestCmdRPTrackerStaffSwitches(EvenniaCommandTest):
+    def test_documented_review_switch_is_accepted(self):
+        from evennia_rptracker.commands import CmdRPTrackerStaff
+
+        for args in ("", "/review", "/rev"):
+            with self.subTest(args=args):
+                self.assertIn("No flagged sessions", self.call(CmdRPTrackerStaff(), args))
 
 
 class TestResolveDottedDegradesGracefully(EvenniaTest):

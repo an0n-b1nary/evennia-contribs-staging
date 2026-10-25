@@ -15,6 +15,7 @@ from evennia_jobs.models import RequestOutcome
 from evennia_jobs.requests import clean_answer, get_request_form
 from evennia_jobs.review import review_request
 
+from evennia_links.command_syntax import StrictSwitchMixin, whole_number
 from evennia_moderation import admissions, services
 from evennia_moderation.models import (
     AdmissionsState,
@@ -52,7 +53,7 @@ def _account(name):
     return account
 
 
-class CmdApply(MuxCommand):
+class CmdApply(StrictSwitchMixin, MuxCommand):
     """Apply for an account as a guest: +apply. Credentials never enter Jobs."""
 
     key = "+apply"
@@ -103,7 +104,7 @@ class CmdApply(MuxCommand):
             _error(self, exc)
 
 
-class CmdReferral(MuxCommand):
+class CmdReferral(StrictSwitchMixin, MuxCommand):
     """Issue an invitation or see your own invitations: +referral[/list]."""
 
     key = "+referral"
@@ -136,7 +137,7 @@ class CmdReferral(MuxCommand):
             _error(self, exc)
 
 
-class StaffCommand(MuxCommand):
+class StaffCommand(StrictSwitchMixin, MuxCommand):
     locks = "cmd:all()"  # Dynamic runtime lock is enforced on every invocation.
     help_category = "Staff"
 
@@ -149,28 +150,13 @@ class StaffCommand(MuxCommand):
         return super().access(srcobj, access_type=access_type, default=default)
 
     def at_pre_cmd(self):
+        if super().at_pre_cmd():
+            return True
         try:
             require_staff(self.caller)
         except PermissionDenied as exc:
             _error(self, exc)
             return True
-        if super().at_pre_cmd():
-            return True
-        raw = self.args.strip()
-        if not raw.startswith("/"):
-            return False
-        head, *tail = raw.split(maxsplit=1)
-        switch = head[1:].lower()
-        if "/" in switch:
-            self.msg("Use one switch at a time.")
-            return True
-        matches = [option for option in self.switch_options if option == switch] or [
-            option for option in self.switch_options if option.startswith(switch)
-        ]
-        if len(matches) != 1:
-            self.msg(f"Unknown or ambiguous switch. See help {self.key} for usage.")
-            return True
-        self.args = f"/{switch}" + (f" {tail[0]}" if tail else "")
         return False
 
 
@@ -213,7 +199,7 @@ class CmdSoftban(StaffCommand):
                     services.lift(self.caller, action)
                 self.msg(f"Lifted {len(actions)} restriction(s).")
             elif "duration" in self.switches:
-                hours = int(self.rhs or "")
+                hours = whole_number(self.rhs or "")
                 if hours <= 0:
                     raise ValidationError("Duration must be a positive whole number of hours.")
                 actions = list(query)
@@ -350,7 +336,7 @@ class CmdAdmissions(StaffCommand):
                 )
             elif self.lhs.strip():
                 application = Application.objects.select_related("job", "code__owner").get(
-                    job__job_number=int(self.lhs)
+                    job__job_number=whole_number(self.lhs)
                 )
                 if set(self.switches) & {"approve", "decline", "declineshare"}:
                     with transaction.atomic():
@@ -392,7 +378,7 @@ class CmdAdmissions(StaffCommand):
             _error(self, exc)
 
 
-class CmdAccountPage(StockPage):
+class CmdAccountPage(StrictSwitchMixin, StockPage):
     """Stock account pages with restrictions; install even with Social pages."""
 
     def func(self):
@@ -436,8 +422,16 @@ class CmdAccountPage(StockPage):
         return super().func()
 
 
-class CmdBan(StockBan):
-    """Stock ban command with persistent history and immediate disconnection."""
+class CmdBan(StrictSwitchMixin, StockBan):
+    """Ban an account name or IP, with persistent history and disconnection.
+
+    Usage:
+      ban[/name] <target>[=<reason>]
+      ban/ip <address>[=<reason>]
+      ban
+    """
+
+    switch_options = ("ip", "name")
 
     def func(self):
         import re
@@ -450,8 +444,11 @@ class CmdBan(StockBan):
         ):
             self.msg(list_bans(self, stock_bans()))
             return
-        target, reason = self.args.rsplit(":", 1) if ":" in self.args else (self.args, "")
+        target, reason = self.lhs, self.rhs or ""
         target = target.strip().lower()
+        if ":" in target:
+            self.msg("Usage: ban <target>=<reason>")
+            return
         matches = IPREGEX.findall(target)
         if matches:
             target = matches[0]
@@ -475,7 +472,7 @@ class CmdBan(StockBan):
         logger.log_sec(f"Banned {kind}: {target} (Caller: {self.caller}).")
 
 
-class CmdUnban(StockUnban):
+class CmdUnban(StrictSwitchMixin, StockUnban):
     """Stock unban command with an append-only lift record."""
 
     def func(self):
@@ -486,7 +483,7 @@ class CmdUnban(StockUnban):
             self.msg(list_bans(self, bans))
             return
         try:
-            number = int(self.args)
+            number = whole_number(self.args)
         except ValueError:
             self.msg("You must supply a valid ban id to clear.")
             return

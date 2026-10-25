@@ -23,7 +23,7 @@ classifiers = [
 # gating. evennia-links is HARD because shipped models inherit AbstractVersion
 # and AbstractAuthoredLink, and apps.py uses connect_soft_ref_cleanup +
 # connect_on_ready.
-dependencies = ["evennia>=6.0", "evennia-links>=0.8"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13"]
 
 [project.optional-dependencies]
 # [web] enables website views, DRF API, accessible forms, and all 14 templates.

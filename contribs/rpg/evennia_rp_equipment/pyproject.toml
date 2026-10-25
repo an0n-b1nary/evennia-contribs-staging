@@ -25,7 +25,7 @@ classifiers = [
 # evennia-links provides the runtime setting behind RP_EQUIPMENT_REVEALED.
 dependencies = [
     "evennia>=6.0",
-    "evennia-links>=0.8.4",
+    "evennia-links>=0.8.13",
     "evennia-rp-rules>=0.1,<0.2",
     "evennia-rp-chargen>=0.6,<0.7",
 ]

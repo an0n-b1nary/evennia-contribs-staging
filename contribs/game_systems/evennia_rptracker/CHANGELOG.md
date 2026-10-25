@@ -7,6 +7,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+  `+rptracker/review` remains accepted, as its help documents.
+
 ## [0.3.0] - 2026-10-21
 
 ### Breaking

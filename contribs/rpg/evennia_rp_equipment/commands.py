@@ -15,6 +15,7 @@ from __future__ import annotations
 from evennia import CmdSet
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_rp_equipment import conf, outfits, services
 from evennia_rp_equipment.display import covered_slots, is_equipment, visible_worn_items, worn_items
 from evennia_rp_equipment.requirements import MET, UNATTUNED, UNKNOWN, describe
@@ -31,7 +32,7 @@ def is_staff(caller) -> bool:
     return conf.is_staff(caller)
 
 
-class _GearCommand(MuxCommand):
+class _GearCommand(StrictSwitchMixin, MuxCommand):
     help_category = "Character"
     locks = "cmd:all()"
 
@@ -40,6 +41,8 @@ class _GearCommand(MuxCommand):
         return super().access(srcobj, access_type, default, **kwargs) and conf.visible(srcobj)
 
     def at_pre_cmd(self):
+        if super().at_pre_cmd():
+            return True
         # A caller that bypasses access() still can't run a hidden command.
         return not conf.visible(self.caller)
 

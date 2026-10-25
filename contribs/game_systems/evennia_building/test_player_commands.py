@@ -142,7 +142,7 @@ class PlayerCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             with self.subTest(args=args):
                 self.assertEqual(
                     self.command(CmdBuild, args),
-                    "Choose one unambiguous switch. See help +build.",
+                    "Unknown or ambiguous switch. See help +build for usage.",
                 )
         # Staff-only names no longer make player prefixes ambiguous.
         self.assertIn("The Bakery — interior", self.command(CmdBuild, "/ch"))

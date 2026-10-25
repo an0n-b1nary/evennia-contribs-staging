@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+
 ## 0.3.0
 
 ### Breaking

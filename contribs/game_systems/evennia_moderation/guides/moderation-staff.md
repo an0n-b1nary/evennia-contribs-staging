@@ -14,7 +14,7 @@ Moderation gives staff account-wide tools: reviewed applications, timed bans, mu
 - **Timed bans:** `+softban <account>=<reason>` bans an account for the default length, and `+softban/ip <address or range>=<reason>` bans an address. `+softban/duration <account>=<hours>` changes the length afterwards, and `+softban/lift` ends it early. A ban disconnects the account's sessions straight away, in the game and on the website.
 - **Mutes:** `+mute <account>=<reason>` stops the account talking to other players: pages, channels, boards and OOC chat. In-character posing, `+request` and pages to staff still work. A mute with no duration lasts until `+mute/lift`. Use a timed ban instead when in-character play must stop too.
 - **Notes and history:** `+notes <account>` shows the private notes and every moderation action on an account, and `+notes <account>=<note>` adds a note. `+notes/actions` lists recent actions.
-- **Permanent bans:** Evennia's own `ban` and `unban` keep their usual behaviour and confirmation, and moderation records each change in the history.
+- **Permanent bans:** `ban <target>=<reason>` and `unban <number>` ask for confirmation, and moderation records each change in the history.
 - **Referrals:** `+admissions/tree <account>` shows who referred whom. `/backfill <account>=<referrer>` records a referral for a player admitted by hand. `/reset` starts a new invitation period; decide pending applications first.
 - **Seats:** if the game caps the number of players, `+admissions/retire <account>` frees an inactive account's seat without closing it, and `/restore` gives it back.
 

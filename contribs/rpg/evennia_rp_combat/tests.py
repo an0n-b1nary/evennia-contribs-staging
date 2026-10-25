@@ -1858,6 +1858,50 @@ class TestCoordinator(EvenniaCommandTest):
         journal = services.journal(self.char1)
         self.assertIn("passes", journal)
 
+    def test_several_revivals_are_rendered_and_selected_by_healer_name(self):
+        ally = self.character("Fallen Ally", "one")
+        healer = self.character("Mara Stone", "one")
+        mend = {"key": "mend", "name": "Mend", "action": "assist", "effects": ["heal"]}
+        services.execute(
+            self.char1,
+            "test injury",
+            lambda state: engine.harm(engine.participant(state, ally.pk), 100),
+        )
+        for actor in (self.char1, healer):
+            services.declare(actor, [ally], "mend", action="assist", improvised=mend)
+        state = services.state_for(ally)
+        tokens = engine.participant(state, ally.pk)["incoming"]
+        self.assertEqual(len(tokens), 2)
+        rendered = services.render(ally)
+        self.assertIn("+combat/accept Mara Stone", rendered)
+        for token in tokens:
+            self.assertNotIn(token, rendered)
+        prompt = self.call(CmdCombat(), "/accept", caller=ally)
+        self.assertIn("name one healer", prompt)
+        self.assertIn("Mara Stone", prompt)
+        self.assertIn(self.char1.key, prompt)
+        for token in tokens:
+            self.assertNotIn(token, prompt)
+        self.call(CmdCombat(), f"/accept {tokens[0]}", "No revival offer matches", caller=ally)
+        self.assertEqual(len(engine.participant(services.state_for(ally), ally.pk)["incoming"]), 2)
+        self.call(CmdCombat(), f"/decline {self.char1.key}", caller=ally)
+        self.assertEqual(len(engine.participant(services.state_for(ally), ally.pk)["incoming"]), 1)
+        self.call(CmdCombat(), "/accept mara stone", caller=ally)
+        revived = engine.participant(services.state_for(ally), ally.pk)
+        self.assertGreater(revived["hp"], 0)
+        self.assertFalse(revived["incoming"])
+
+    def test_bad_storyteller_spirit_amounts_are_readable_and_do_not_change_state(self):
+        before = services.state_for(self.char1)
+        for value in ("", "not-a-number", "5=x"):
+            with self.subTest(value=value):
+                self.call(
+                    CmdCombatStory(),
+                    f"/spirit {self.char2.key}={value}",
+                    "Give a numeric Spirit amount, such as 1.5.",
+                )
+                self.assertEqual(services.state_for(self.char1), before)
+
     def test_ignore_removal_is_explicit_account_wide_and_mutual(self):
         if not apps.is_installed("evennia_social"):
             self.skipTest("optional social partner absent")

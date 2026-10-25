@@ -2,6 +2,11 @@
 
 All notable changes to `evennia_accessibility` are documented here.
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Require evennia-links for the shared command switch validator.
+
 ## [0.3.3] - 2026-10-10
 
 - **Added:** a player guide page for evennia-guides, `accessibility`

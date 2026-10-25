@@ -7,9 +7,9 @@ from evennia.utils.ansi import strip_ansi
 from evennia.utils.dbserialize import deserialize
 
 from evennia_links import runtime
+from evennia_links.command_syntax import StrictSwitchMixin, whole_number
 
 from . import moves
-from .command_syntax import SingleSwitchMixin
 from .services import ChargenError
 
 DRAFT = "signature_draft"
@@ -34,13 +34,13 @@ def label(value):
 def field_value(field, text):
     """Parse one draft field without validating an intentionally incomplete move."""
     if field in ("power", "accuracy"):
-        return int(text)
+        return whole_number(text)
     if field == "effects":
         return [p.strip() for p in text.split(",") if p.strip()]
     return text.strip()
 
 
-class CmdMoves(SingleSwitchMixin, MuxCommand):
+class CmdMoves(StrictSwitchMixin, MuxCommand):
     """Author free Signature Moves with one field per command.
 
     +moves                         Library, loadout and current draft

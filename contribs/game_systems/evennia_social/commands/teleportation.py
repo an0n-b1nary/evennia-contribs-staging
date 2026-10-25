@@ -11,6 +11,7 @@ from datetime import UTC
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.social import find_character, is_staff
 
 _SUMMON_EXPIRY_SECONDS = 600  # 10 minutes
@@ -61,7 +62,7 @@ def _check_ignore_silent(caller, target):
     return caller_account.id in ignore_list and not is_staff_caller
 
 
-class CmdSummon(MuxCommand):
+class CmdSummon(StrictSwitchMixin, MuxCommand):
     """
     Request another player to teleport to your location.
 
@@ -77,6 +78,8 @@ class CmdSummon(MuxCommand):
 
     Staff (Builder+) can summon into staff rooms.
     """
+
+    switch_options = ("accept", "decline", "pending")
 
     key = "+summon"
     aliases = []  # noqa: RUF012
@@ -224,7 +227,7 @@ class CmdSummon(MuxCommand):
         caller.msg("\n".join(lines))
 
 
-class CmdJoin(MuxCommand):
+class CmdJoin(StrictSwitchMixin, MuxCommand):
     """
     Request to teleport to another player's location.
 
@@ -240,6 +243,8 @@ class CmdJoin(MuxCommand):
 
     Staff (Builder+) can join into staff rooms.
     """
+
+    switch_options = ("accept", "decline", "pending")
 
     key = "+join"
     aliases = []  # noqa: RUF012

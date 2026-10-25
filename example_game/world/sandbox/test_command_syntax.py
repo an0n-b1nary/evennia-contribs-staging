@@ -3,8 +3,10 @@
 """Single-switch commands through the reference game's cmdset and typeclasses."""
 
 import re
+from unittest.mock import patch
 
-from commands.default_cmdsets import CharacterCmdSet
+from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
+from django.db import transaction
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest
 from typeclasses.characters import Character
@@ -17,6 +19,85 @@ from evennia_maps.models import MapPlane, RoomTile
 class CommandSyntaxSeams(EvenniaCommandTest):
     character_typeclass = Character
     room_typeclass = Room
+
+    def contrib_commands(self):
+        # Exercise the final merged set, including contrib stock replacements.
+        commands = (CharacterCmdSet() + AccountCmdSet()).commands
+        return [cmd for cmd in commands if type(cmd).__module__.startswith("evennia_")]
+
+    def test_every_contrib_command_refuses_bad_switches_before_queries(self):
+        commands = self.contrib_commands()
+        self.assertGreater(len(commands), 100)
+        for registered in commands:
+            options = getattr(registered, "switch_options", ()) or ()
+            first = next(iter(options), "unknown")
+            for args in ("/definitelyunknown", f"/{first}/{first}", f"/{first}/unknown"):
+                with self.subTest(command=registered.key, args=args):
+                    command = type(registered)()
+                    # Also cover a command instance retaining its previous subject.
+                    command.subject = self.char1
+                    with (
+                        patch.object(
+                            command, "parse", side_effect=AssertionError("Parsed bad switch")
+                        ),
+                        self.assertNumQueries(0),
+                    ):
+                        message = self.call(command, args)
+                    self.assertRegex(message.lower(), r"usage|see help")
+
+    def test_every_documented_switch_is_accepted(self):
+        # A switch missing from switch_options is now refused, not dropped.
+        for registered in self.contrib_commands():
+            options = getattr(registered, "switch_options", ()) or ()
+            names = {registered.key.lower(), *(alias.lower() for alias in registered.aliases)}
+            pattern = rf"(?<![\w+@/])(?:{'|'.join(map(re.escape, names))})/([a-z][\w-]*)"
+            for switch in set(re.findall(pattern, (type(registered).__doc__ or "").lower())):
+                with self.subTest(command=registered.key, switch=switch):
+                    matches = [option for option in options if option == switch] or [
+                        option for option in options if option.startswith(switch)
+                    ]
+                    self.assertEqual(len(matches), 1)
+
+    def test_every_contrib_switch_keeps_numeric_refusals_readable(self):
+        # The unrelated missing default and persistence defect is tracked in #216.
+        self.char1.lore_lean_type = self.char1.lore_lean_value = None
+        for registered in self.contrib_commands():
+            for switch in ("", *(getattr(registered, "switch_options", ()) or ())):
+                for argument in ("", "not-a-number", "999999999"):
+                    args = (f"/{switch} " if switch else " ") + argument
+                    with self.subTest(command=registered.key, args=args), transaction.atomic():
+                        # Each probe gets its own savepoint, including read commands
+                        # whose empty form initializes a record or preference.
+                        original_msg = self.char1.msg
+                        try:
+                            result = self.call(type(registered)(), args)
+                        finally:
+                            self.char1.msg = original_msg
+                            transaction.set_rollback(True)
+                        self.assertNotRegex(
+                            result,
+                            r"invalid literal for int\(|int\(\) argument|could not convert string to float|ConversionSyntax",
+                        )
+
+    def test_bad_move_tiers_preserve_signature_and_improvised_drafts(self):
+        from evennia.utils.dbserialize import deserialize
+
+        for key, attribute, category in (
+            ("+moves", "signature_draft", "rp_chargen"),
+            ("+improv", "improvised_move", "rp_combat"),
+        ):
+            self.call(self.command(key), "/new Syntax draft")
+            original = deserialize(self.char1.attributes.get(attribute, category=category))
+            self.assertTrue(original)
+            for field in ("power", "accuracy"):
+                for value in ("", "not-a-number", "1=old form"):
+                    with self.subTest(command=key, field=field, value=value):
+                        output = self.call(self.command(key), f"/{field} {value}")
+                        self.assertIn("Give a whole number", output)
+                        self.assertEqual(
+                            deserialize(self.char1.attributes.get(attribute, category=category)),
+                            original,
+                        )
 
     def expect(self, command, args, text=None, **kwargs):
         output = self.call(command, args, **kwargs)

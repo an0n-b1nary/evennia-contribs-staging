@@ -242,3 +242,5 @@ one for your game, add a page with the same key to `GUIDES_DIRS`.
 ---
 
 *Extracted from a source MUSH project at commit `7091d1e` on 2026-05-17.*
+
+Command validation requires `evennia-links>=0.8.13`, installed automatically with this package.

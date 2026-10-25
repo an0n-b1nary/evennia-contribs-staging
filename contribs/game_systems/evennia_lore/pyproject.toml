@@ -22,7 +22,7 @@ classifiers = [
 # Core: models + commands + trickle engine + 4 bridge models. No web/API deps.
 # evennia-links is HARD because shipped models inherit AbstractArchived,
 # AbstractVersion, AbstractAuthoredLink, and use connect_soft_ref_cleanup.
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.12,<0.9"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13,<0.9"]
 
 [project.optional-dependencies]
 crafting = ["evennia-rp-crafting>=0.11,<0.13"]

@@ -2,12 +2,13 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 from . import conf
-from .command_syntax import SingleSwitchMixin
 from .errors import CraftingError
 
 
-class CraftCommand(SingleSwitchMixin, MuxCommand):
+class CraftCommand(StrictSwitchMixin, MuxCommand):
     locks = "cmd:all()"
     help_category = "Crafting"
     wave_two = False

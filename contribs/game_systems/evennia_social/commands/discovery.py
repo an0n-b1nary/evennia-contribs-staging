@@ -21,6 +21,7 @@ from collections import defaultdict
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.objects.models import ObjectDB
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_posing.highlighting import format_pose_time
 from evennia_social import presence
 from evennia_social.identity import staff_run_marker
@@ -38,7 +39,7 @@ except ImportError:
         return False
 
 
-class CmdWhere(MuxCommand):
+class CmdWhere(StrictSwitchMixin, MuxCommand):
     """
     List connected characters and their locations.
 
@@ -52,6 +53,8 @@ class CmdWhere(MuxCommand):
     to staff members. Characters who chose |w+unfindable|n are left out
     unless they're in your room.
     """
+
+    switch_options = ("ic", "ooc", "count")
 
     key = "+where"
     aliases = []  # noqa: RUF012
@@ -248,7 +251,7 @@ class CmdWhere(MuxCommand):
         return "\n".join(lines)
 
 
-class CmdHangouts(MuxCommand):
+class CmdHangouts(StrictSwitchMixin, MuxCommand):
     """
     Browse the hangout directory.
 
@@ -263,6 +266,8 @@ class CmdHangouts(MuxCommand):
     designate a room as a hangout. For individual character listings,
     see |w+where|n.
     """
+
+    switch_options = ("all", "types", *HANGOUT_TYPES)
 
     key = "+hangouts"
     aliases = []  # noqa: RUF012

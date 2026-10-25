@@ -17,7 +17,7 @@ from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.eveditor import EvEditor
 
-from evennia_calendar.command_syntax import SingleSwitchMixin
+from evennia_links.command_syntax import StrictSwitchMixin
 
 try:
     from evennia_accessibility import uses_screenreader
@@ -300,7 +300,7 @@ def _finalize_create(caller, ctx):
 # ---------------------------------------------------------------------------
 
 
-class CmdCalendar(SingleSwitchMixin, MuxCommand):
+class CmdCalendar(StrictSwitchMixin, MuxCommand):
     """
     View and manage the event calendar.
 
@@ -829,7 +829,7 @@ def _format_token_row(token):
 # ---------------------------------------------------------------------------
 
 
-class CmdRsvp(SingleSwitchMixin, MuxCommand):
+class CmdRsvp(StrictSwitchMixin, MuxCommand):
     """
     RSVP to a calendar event. Use +cluster for ranked-choice applications.
 
@@ -1301,7 +1301,7 @@ class CmdRsvp(SingleSwitchMixin, MuxCommand):
 # ---------------------------------------------------------------------------
 
 
-class CmdCluster(SingleSwitchMixin, MuxCommand):
+class CmdCluster(StrictSwitchMixin, MuxCommand):
     """
     Manage parallel events and your ranked-choice application.
 

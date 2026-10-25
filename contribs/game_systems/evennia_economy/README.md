@@ -40,11 +40,11 @@ There is no web/API surface in this release.
 ```text
 +balance                         purse and passive-income cap
 +offer                           your open offers
-+offer[/secret] character = 40 coins, resource:grain:3 for item:#12
++offer[/secret] character = 40 coins, 3 grain for #12
 +offer character = 3 Grain       a gift, with a resource provider installed
 +accept[/secret] number
 +offer/cancel number             either party can cancel
-give item:#12 = character        immediate gift (items only while hidden)
+give #12 = character        immediate gift (items only while hidden)
 +economy                         staff reconciliation and account accrual
 +economy/run [dry]
 +economy/stipends
@@ -55,9 +55,9 @@ give item:#12 = character        immediate gift (items only while hidden)
 +economy/reviewed number
 ```
 
-An asset spec is comma-separated. Canonical forms are `money:40`, `item:#12`
-and `<provider>:<stable key>:<quantity>`. Currency nouns and unique carried
-item names work too. Resources adds `3 Grain` and `resource:grain:3`.
+Separate assets with commas: `40 coins`, `3 grain`, a unique carried item
+name, or `#12` for a carried item by dbref. Providers must use distinct names;
+conflicting provider names refuse the trade and log a warning for staff.
 Both parties must share a room when offering and accepting. Leaving that room
 expires the offer immediately, including leave-and-return teleports. Nothing
 is reserved; acceptance checks current funds, items, partner availability,
@@ -90,7 +90,7 @@ contains one item or one resource lot, at a positive whole-number price.
 +stall/name = A new name
 +stall/desc = A description
 +stall/list item name = 10
-+stall/list resource:grain:3 = 5
++stall/list 3 grain = 5
 +stall/unlist <listing number>
 +browse [stall number]
 +buy <listing number>

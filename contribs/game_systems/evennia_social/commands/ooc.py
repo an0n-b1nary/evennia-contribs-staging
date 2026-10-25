@@ -13,10 +13,11 @@ the signal.
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_posing.signals import pose_recorded
 
 
-class CmdOoc(MuxCommand):
+class CmdOoc(StrictSwitchMixin, MuxCommand):
     """
     Send an out-of-character message to the room.
 

@@ -7,10 +7,12 @@ import json
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 from . import runtime
 
 
-class CmdRuntime(MuxCommand):
+class CmdRuntime(StrictSwitchMixin, MuxCommand):
     """List/set runtime controls using JSON values.
 
     Usage:
@@ -20,6 +22,8 @@ class CmdRuntime(MuxCommand):
 
     Only registered controls can be changed. Reset restores the host setting.
     """
+
+    switch_options = ("reset",)
 
     key = "+runtime"
     locks = "cmd:all()"

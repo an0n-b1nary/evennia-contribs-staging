@@ -59,6 +59,12 @@ come from MUSH and MUX clients: they read `/` as one switch and `=` as "this,
 to that", and some clients treat `;` as a line break. When an operation needs
 more than that, add a command or a step instead of more syntax.
 
+These rules cover every contrib-defined command, including replacements of
+Evennia commands. Stock commands that no contrib replaces retain Evennia's
+behavior. Use `evennia_links.command_syntax.StrictSwitchMixin` before an
+Evennia command base and declare `switch_options` (empty for no switches).
+Refuse unknown, ambiguous or stacked switches before any lookup or mutation.
+
 1. **One switch at most.** Never `+build/resident/add`. A modifier becomes a
    switch of its own (`+resident/add`), a companion command (`+thread` beside
    `+plot`), or an armed flag (rule 3).

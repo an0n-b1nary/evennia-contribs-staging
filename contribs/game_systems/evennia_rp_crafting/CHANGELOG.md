@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Keep invalid review record numbers readable.
+
 ## 0.12.1
 
 ### Changed

@@ -41,9 +41,18 @@ This works around Evennia 6.0's test harness; drop it once Evennia's
 import functools
 
 from django.test.runner import ParallelTestSuite
+from django.test.signals import setting_changed
 from evennia.server.tests.testrunner import EvenniaTestSuiteRunner
 
 _ISOLATED = "_evennia_links_isolates_tasks"
+
+
+def _refresh_lock_functions(*, setting, **kwargs):
+    """Restore host locks after stock-command tests temporarily replace settings."""
+    if setting == "LOCK_FUNC_MODULES":
+        from evennia.locks.lockhandler import _cache_lockfuncs
+
+        _cache_lockfuncs()
 
 
 def isolate_tasks():
@@ -56,6 +65,9 @@ def isolate_tasks():
     from evennia.scripts.taskhandler import TASK_HANDLER
     from evennia.utils.test_resources import EvenniaTestMixin
 
+    setting_changed.connect(
+        _refresh_lock_functions, dispatch_uid="evennia_links.test_lock_functions", weak=False
+    )
     if getattr(EvenniaTestMixin.tearDown, _ISOLATED, False):
         return
     set_up, tear_down = EvenniaTestMixin.setUp, EvenniaTestMixin.tearDown

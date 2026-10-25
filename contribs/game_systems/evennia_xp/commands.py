@@ -24,7 +24,9 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
-from .command_syntax import SingleSwitchMixin, split_comment
+from evennia_links.command_syntax import StrictSwitchMixin
+
+from .command_syntax import split_comment
 
 try:
     from evennia_accessibility import uses_screenreader
@@ -43,7 +45,7 @@ def _staff_lock_expr():
     return lock[4:] if lock.startswith("cmd:") else lock
 
 
-class CmdXp(SingleSwitchMixin, MuxCommand):
+class CmdXp(StrictSwitchMixin, MuxCommand):
     """
     View your XP balance, history, and registered sources.
 

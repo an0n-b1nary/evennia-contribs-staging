@@ -23,7 +23,7 @@ classifiers = [
 # evennia-links is HARD: MapPlane inherits AbstractArchived, apps.py wires
 # terrain_changed through connect_on_ready, and the overlay seam merges
 # provider responses with collect_dicts().
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.2"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.13"]
 
 [project.optional-dependencies]
 # [web] enables the website views (SVG + Leaflet) and the DRF API.

@@ -4,6 +4,8 @@
 
 from evennia.utils.dbserialize import deserialize
 
+from evennia_links.command_syntax import whole_number
+
 from . import services
 from .command_syntax import CombatCommand
 from .data import CombatError, Move
@@ -60,7 +62,7 @@ class CmdImprov(CombatCommand):
                 raise CombatError("Start with +improv/new <name>.")
             value = self.args.strip()
             draft[op] = (
-                int(value)
+                whole_number(value)
                 if op in ("power", "accuracy")
                 else [value]
                 if op == "effects" and value

@@ -15,10 +15,11 @@ not part of this contrib — see MIGRATION_NOTES.md.
 
 from evennia.commands.default.muxcommand import MuxCommand
 
+from evennia_links.command_syntax import StrictSwitchMixin
 from evennia_social.search import find_room, find_room_for_player
 
 
-class CmdTel(MuxCommand):
+class CmdTel(StrictSwitchMixin, MuxCommand):
     """
     Teleport to a room by name.
 

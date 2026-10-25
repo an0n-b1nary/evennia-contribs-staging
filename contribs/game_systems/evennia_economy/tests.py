@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.db import IntegrityError, transaction
 from django.test import override_settings
@@ -537,10 +537,29 @@ class EconomyTests(EvenniaTest):
             with self.assertRaises(EconomyError):
                 assets.normalize(spec)
 
-    def test_parser_explicit_and_natural_money_and_item(self):
+    def test_parser_natural_money_and_carried_item_name_or_dbref(self):
         self.assertEqual(assets.parse_spec(self.char1, "4 coins"), money(4))
-        self.assertEqual(assets.parse_spec(self.char1, "money:4"), money(4))
-        self.assertEqual(assets.parse_spec(self.char1, f"item:#{self.obj1.pk}"), item(self.obj1))
+        self.assertEqual(assets.parse_spec(self.char1, f"#{self.obj1.pk}"), item(self.obj1))
+        self.assertEqual(assets.parse_spec(self.char1, self.obj1.key), item(self.obj1))
+        for text in ("money:4", f"item:#{self.obj1.pk}", "resource:grain:3", f"#{self.obj2.pk}"):
+            with self.subTest(text=text), self.assertRaises(EconomyError):
+                assets.parse_spec(self.char1, text)
+
+    def test_ambiguous_providers_name_both_matches_and_log_staff_action(self):
+        first, second = Mock(), Mock()
+        first.parse.return_value = ("grain", 3)
+        second.parse.return_value = ("grain", 3)
+        first.describe.return_value = "Grain"
+        second.describe.return_value = "Wheat"
+        with (
+            patch(
+                "evennia_economy.assets.providers", return_value={"harvest": first, "crop": second}
+            ),
+            self.assertLogs("evennia", level="WARNING") as logs,
+            self.assertRaisesRegex(EconomyError, "harvest.*Grain.*crop.*Wheat.*distinct names"),
+        ):
+            assets.parse_spec(self.char1, "3 grain")
+        self.assertIn("distinct names", logs.output[0])
 
     def test_roundtrip_cross_asset_flag_and_review_hook(self):
         alt = create_object(

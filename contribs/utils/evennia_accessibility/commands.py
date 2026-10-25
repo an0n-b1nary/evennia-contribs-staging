@@ -22,10 +22,12 @@ the value; the command reports that plainly instead of raising.
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils import logger
 
+from evennia_links.command_syntax import StrictSwitchMixin
+
 OPTION_KEY = "screenreader_mode"
 
 
-class CmdScreenreader(MuxCommand):
+class CmdScreenreader(StrictSwitchMixin, MuxCommand):
     """
     Toggle screen-reader-friendly output mode.
 
@@ -40,6 +42,8 @@ class CmdScreenreader(MuxCommand):
 
     This option is stored on your account and persists across sessions.
     """
+
+    switch_options = ("on", "off")
 
     key = "+screenreader"
     aliases = ["+sr"]  # noqa: RUF012
@@ -98,7 +102,7 @@ class CmdScreenreader(MuxCommand):
         return True
 
 
-class CmdAmbient(MuxCommand):
+class CmdAmbient(StrictSwitchMixin, MuxCommand):
     """Mute effects arriving from other rooms or through ambient channels.
 
     Usage: +ambient, +ambient/mute, +ambient/unmute
@@ -106,6 +110,8 @@ class CmdAmbient(MuxCommand):
     Stored per account, across characters and logins. Effects used in your
     current room remain visible as scene content.
     """
+
+    switch_options = ("mute", "unmute")
 
     key = "+ambient"
     help_category = "General"
