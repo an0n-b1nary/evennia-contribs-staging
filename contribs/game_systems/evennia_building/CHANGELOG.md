@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0 — 2026-10-24
+
+### Breaking
+
+- Move all staff operations to `+buildadmin` and refuse the old `+build` staff
+  forms. Review outcomes, environment and manual geometry approval, restoration
+  and passage application use actor-bound confirmations of current records.
+  Revisions, expected owners and stewardship guards are no longer typed.
+- Transfers, property archival, coordinated frontier retirement, stewardship and
+  replacement passage use persistent private drafts, one field per command,
+  followed by an exact-state preview and confirmation. Draft changes, new
+  affected apartments, changed access grants and shop stock invalidate tokens.
+  Shop transfers require an explicit stock choice; passage still needs both
+  current owners to agree separately. Reasons follow ` # ` and retain literal
+  punctuation.
+- Register the staff companion in the reference game, update the packaged staff
+  guide and remove the final command syntax exceptions.
+
 ## 0.4.0 — 2026-10-24
 
 ### Breaking

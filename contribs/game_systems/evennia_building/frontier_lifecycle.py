@@ -98,9 +98,9 @@ def _preserves_connections(nodes, remaining, before, after):
     return True
 
 
-def _replacement(actor, frontier, proposal, removed):
+def replacement_endpoints(proposal, removed):
+    """Validate a proposed public connection without creating any exits."""
     from .frontier import _free, direction, public_room, reverse
-    from .services import _exit, _exit_data
 
     if not isinstance(proposal, dict) or set(proposal) != {"source", "target", "direction"}:
         raise ValidationError("Each replacement needs source, target and direction.")
@@ -128,6 +128,14 @@ def _replacement(actor, frontier, proposal, removed):
             raise ValidationError("A replacement connection must align with existing grid cells.")
         if a.plane_id != b.plane_id and not (a.plane.zstack and a.plane.zstack == b.plane.zstack):
             raise ValidationError("A replacement cannot jump between unrelated stacks.")
+    return source, target, name
+
+
+def _replacement(actor, frontier, proposal, removed):
+    from .frontier import reverse
+    from .services import _exit, _exit_data
+
+    source, target, name = replacement_endpoints(proposal, removed)
     for start, end, label in ((source, target, name), (target, source, reverse(name))):
         from .doors import aliases_for
 

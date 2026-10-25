@@ -311,15 +311,18 @@ class TestInteriors(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(room_permission(self.char2, upper.room, "describe"))
 
     def test_transfer_command_keeps_semicolons_in_reason(self):
-        from .commands import CmdBuild
+        from .commands import CmdBuildAdmin
 
         property = self.approve()
         new_owner = create_object("evennia.objects.objects.DefaultCharacter", key="New owner")
         self.call(
-            CmdBuild(),
-            f"/transfer {property.pk} {self.char2.pk} {new_owner.pk}=Owner left; keys handed over",
+            CmdBuildAdmin(),
+            f"/transfer {property.pk}=#{new_owner.pk} # Owner left; keys handed over",
             caller=self.char1,
         )
+        preview = self.call(CmdBuildAdmin(), "/finish", caller=self.char1)
+        token = preview.split("+buildadmin/finish ")[-1].split()[0]
+        self.call(CmdBuildAdmin(), f"/finish {token}", caller=self.char1)
         property.refresh_from_db()
         self.assertEqual(property.owner_id, new_owner.pk)
         record = BuildAudit.objects.get(property=property, action="transferred")

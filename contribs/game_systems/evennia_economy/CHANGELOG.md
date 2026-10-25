@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2 — 2026-10-24
+
+- Update the optional shop integration range and staff transfer instructions for
+  Building 0.5, including explicit stock disposition before confirmation.
+
 ## 0.4.1 — 2026-10-24
 
 - Update the optional shop integration range for Building 0.4.

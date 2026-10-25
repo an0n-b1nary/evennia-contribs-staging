@@ -104,6 +104,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         for command in _optional_commands(
             "evennia_building",
             "CmdBuild",
+            "CmdBuildAdmin",
             "CmdCollab",
             "CmdProperty",
             "CmdConsent",
