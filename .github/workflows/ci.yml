@@ -108,6 +108,11 @@ jobs:
         run: python scripts/check_templates.py --require-django
       - name: Template convention tests
         run: python scripts/test_check_templates.py
+      - name: Downstream gate failure evidence tests
+        if: matrix.python-version == '3.12'
+        run: |
+          pip install psutil==7.1.0
+          python scripts/test_downstream_gate.py < /dev/null
       - name: Python syntax check
         if: matrix.python-version != '3.12'
         run: python -m py_compile $(git ls-files '*.py')
