@@ -248,7 +248,7 @@ class TestCmdRequestCreate(EvenniaCommandTest):
     def test_editor_path_sets_ndb_context(self):
         with patch("evennia_jobs.commands.EvEditor"):
             self.call(CmdRequest(), "My Proposal", caller=self.char1)
-        ctx = self.char1.ndb._jobs_context
+        ctx = self.char1.db.jobs_editor_context
         self.assertIsNotNone(ctx)
         self.assertEqual(ctx["mode"], "create")
         self.assertEqual(ctx["job_type"], "request")

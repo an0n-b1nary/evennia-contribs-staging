@@ -599,7 +599,7 @@ class TestCmdLoreSubmitAndRead(EvenniaCommandTest):
         """Simulate what start_new_edit callback does on save."""
         from evennia_lore.commands import _lore_submit_save
 
-        self.char1.ndb._lore_submit_ctx = {"title": "My Entry"}
+        self.char1.db.links_editing_context = {"create_context": {"title": "My Entry"}}
         _lore_submit_save(self.char1, "Full body content.")
         entry = LoreEntry.objects.get(title="My Entry")
         self.assertEqual(entry.body, "Full body content.")

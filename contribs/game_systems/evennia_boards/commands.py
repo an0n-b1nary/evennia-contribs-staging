@@ -114,7 +114,7 @@ def _requires_character(caller):
 
 def _bb_load(caller):
     """Load existing content into the EvEditor buffer (edit mode only)."""
-    ctx = getattr(caller.ndb, "_bb_context", None)
+    ctx = caller.attributes.get("boards_editor_context")
     if not ctx:
         return ""
     if ctx.get("mode") == "edit":
@@ -136,7 +136,7 @@ def _bb_save(caller, buffer):
     if blocked:
         caller.msg(blocked)
         return False
-    ctx = getattr(caller.ndb, "_bb_context", None)
+    ctx = caller.attributes.get("boards_editor_context")
     if not ctx:
         caller.msg("|rError: no board editing context found.|n")
         return False
@@ -203,7 +203,7 @@ def _bb_save(caller, buffer):
 
 def _bb_quit(caller):
     """Clean up the board editing context on editor close."""
-    caller.ndb._bb_context = None
+    caller.attributes.remove("boards_editor_context")
     caller.msg("Board editor closed.")
 
 
@@ -440,20 +440,22 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
         if not title:
             caller.msg("Usage: |w+bb/post <board>=<title>|n")
             return
-        if getattr(caller.ndb, "_bb_context", None):
+        if caller.attributes.get("boards_editor_context"):
             caller.msg(
                 "You already have a board editor open. "
                 "Finish or close it first (|w:wq|n to save, |w:q|n to quit)."
             )
             return
-        caller.ndb._bb_context = {"mode": "post", "board_pk": board.pk, "title": title}
+        caller.attributes.add(
+            "boards_editor_context", {"mode": "post", "board_pk": board.pk, "title": title}
+        )
         EvEditor(
             caller,
             loadfunc=_bb_load,
             savefunc=_bb_save,
             quitfunc=_bb_quit,
             key="bb_post_editor",
-            persistent=False,
+            persistent=True,
         )
 
     def _reply(self):
@@ -476,24 +478,27 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
         if err:
             caller.msg(err)
             return
-        if getattr(caller.ndb, "_bb_context", None):
+        if caller.attributes.get("boards_editor_context"):
             caller.msg(
                 "You already have a board editor open. "
                 "Finish or close it first (|w:wq|n to save, |w:q|n to quit)."
             )
             return
-        caller.ndb._bb_context = {
-            "mode": "reply",
-            "board_pk": board.pk,
-            "parent_post_pk": post.pk,
-        }
+        caller.attributes.add(
+            "boards_editor_context",
+            {
+                "mode": "reply",
+                "board_pk": board.pk,
+                "parent_post_pk": post.pk,
+            },
+        )
         EvEditor(
             caller,
             loadfunc=_bb_load,
             savefunc=_bb_save,
             quitfunc=_bb_quit,
             key="bb_reply_editor",
-            persistent=False,
+            persistent=True,
         )
 
     def _edit(self):
@@ -516,20 +521,20 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
         if post.author != caller and not is_staff(caller):
             caller.msg("|rYou can only edit your own posts.|n")
             return
-        if getattr(caller.ndb, "_bb_context", None):
+        if caller.attributes.get("boards_editor_context"):
             caller.msg(
                 "You already have a board editor open. "
                 "Finish or close it first (|w:wq|n to save, |w:q|n to quit)."
             )
             return
-        caller.ndb._bb_context = {"mode": "edit", "post_pk": post.pk}
+        caller.attributes.add("boards_editor_context", {"mode": "edit", "post_pk": post.pk})
         EvEditor(
             caller,
             loadfunc=_bb_load,
             savefunc=_bb_save,
             quitfunc=_bb_quit,
             key="bb_edit_editor",
-            persistent=False,
+            persistent=True,
         )
 
     # -----------------------------------------------------------------------

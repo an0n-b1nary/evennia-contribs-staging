@@ -157,3 +157,39 @@ class TestRunner(EvenniaTestSuiteRunner):
         super().setup_test_environment(**kwargs)
         isolate_tasks()
         discard_thread_work()
+
+
+class EditorPersistenceMixin:
+    """Exercise Evennia's real persisted editor format in contrib and host tests."""
+
+    def reload_editor(self, caller, text="A draft that survives reload."):
+        import pickle
+
+        from evennia.utils.dbserialize import deserialize
+        from evennia.utils.eveditor import _load_editor
+
+        editor = caller.ndb._eveditor
+        self.assertIsNotNone(editor, "The command did not open an editor")
+        self.assertTrue(editor._persistent)
+        editor.update_buffer(text)
+        state = caller.attributes.get("_eveditor_saved")
+        self.assertIsNotNone(state, "Editor fell back to non-persistent mode")
+        self.assertTrue(state[0]["persistent"])
+        pickle.loads(pickle.dumps(deserialize(state)))
+        unsaved = caller.attributes.get("_eveditor_unsaved")
+        caller.nattributes.clear()
+        caller.attributes.reset_cache()
+        _load_editor(caller)
+        restored = caller.ndb._eveditor
+        self.assertIsNot(restored, editor)
+        self.assertEqual(restored._buffer, text)
+        self.assertEqual(restored._unsaved, unsaved)
+        return restored
+
+    def save_and_quit_editor(self, caller, editor, context_key=None):
+        editor.save_buffer()
+        self.assertFalse(editor._unsaved, "The restored editor could not save its buffer")
+        editor.quit()
+        self.assertFalse(caller.attributes.has("_eveditor_saved"))
+        if context_key:
+            self.assertFalse(caller.attributes.has(context_key))

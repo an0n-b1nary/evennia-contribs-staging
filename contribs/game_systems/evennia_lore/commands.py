@@ -158,13 +158,13 @@ def _layer_summary(entry):
 
 
 def _layer_load(caller):
-    ctx = getattr(caller.ndb, "_lore_layer_ctx", None) or {}
+    ctx = caller.attributes.get("lore_layer_editor") or {}
     entry = LoreEntry.all_objects.filter(pk=ctx.get("pk")).first()
     return getattr(entry, ctx.get("field", ""), "") if entry else ""
 
 
 def _layer_save(caller, buffer):
-    ctx = getattr(caller.ndb, "_lore_layer_ctx", None) or {}
+    ctx = caller.attributes.get("lore_layer_editor") or {}
     entry = LoreEntry.all_objects.filter(pk=ctx.get("pk")).first()
     if entry is None:
         caller.msg("|rThat lore entry no longer exists.|n")
@@ -173,7 +173,7 @@ def _layer_save(caller, buffer):
 
 
 def _layer_quit(caller):
-    caller.ndb._lore_layer_ctx = None
+    caller.attributes.remove("lore_layer_editor")
     caller.msg("Editor closed.")
 
 
@@ -636,8 +636,7 @@ class CmdLore(StrictSwitchMixin, EditingMixin, MuxCommand):
                 f"|rA PUBLISHED entry titled '{title}' already exists.|n Use a different title."
             )
             return
-        caller.ndb._lore_submit_ctx = {"title": title}
-        self.start_new_edit(_lore_submit_save)
+        self.start_new_edit(_lore_submit_save, context={"title": title})
 
     def _do_edit(self, arg):
         caller = self.caller
@@ -729,22 +728,22 @@ class CmdLore(StrictSwitchMixin, EditingMixin, MuxCommand):
         if text is not None:
             _apply_layer_text(caller, entry, field, text.strip())
             return
-        if getattr(caller.ndb, "_editing_context", None) or getattr(
-            caller.ndb, "_lore_layer_ctx", None
+        if caller.attributes.get("links_editing_context") or caller.attributes.get(
+            "lore_layer_editor"
         ):
             caller.msg(
                 "You already have an editing session open. "
                 "Finish or quit it first (|w:q|n or |w:wq|n)."
             )
             return
-        caller.ndb._lore_layer_ctx = {"pk": entry.pk, "field": field}
+        caller.attributes.add("lore_layer_editor", {"pk": entry.pk, "field": field})
         EvEditor(
             caller,
             loadfunc=_layer_load,
             savefunc=_layer_save,
             quitfunc=_layer_quit,
             key="lore_notes",
-            persistent=False,
+            persistent=True,
         )
 
     def _do_affirm(self, arg):
@@ -1128,9 +1127,11 @@ class CmdLore(StrictSwitchMixin, EditingMixin, MuxCommand):
 
 def _lore_submit_save(caller, content):
     """Called by EditingMixin.start_new_edit when the user saves a new entry."""
-    ctx = getattr(caller.ndb, "_lore_submit_ctx", None)
-    title = ctx["title"] if ctx else "Untitled"
-    caller.ndb._lore_submit_ctx = None
+    ctx = caller.attributes.get("links_editing_context")
+    if not ctx or not ctx.get("create_context"):
+        caller.msg("|rError: no lore submission context found.|n")
+        return False
+    title = ctx["create_context"]["title"]
     entry = LoreEntry.create_entry(title=title, author=caller, body=content)
 
     caller.msg(

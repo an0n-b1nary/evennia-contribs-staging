@@ -1,5 +1,9 @@
 # Changelog — evennia-links
 
+## [Unreleased]
+
+- Preserve editor buffers and their save context across reloads and restarts.
+
 ## 0.8.13 — 2026-10-25
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
