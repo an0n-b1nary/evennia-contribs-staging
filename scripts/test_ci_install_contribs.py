@@ -190,7 +190,8 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         build, install = (call.args[0] for call in pip.call_args_list)
         # A pyproject without [build-system] builds with setuptools (PEP 518).
         self.assertEqual(
-            build[-3:], ["setuptools-scm>=8", "setuptools>=40.8.0", "setuptools>=61.0"]
+            build[-4:],
+            ["setuptools-scm>=8", "setuptools>=40.8.0", "setuptools>=61.0", "tblib==3.2.2"],
         )
         self.assertIn("--no-build-isolation", install)
         self.assertEqual(self.installed(pip), ["evennia_links", "evennia_maps"])
@@ -254,6 +255,14 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         pip.assert_not_called()
         self.assertIn("cycle", stderr)
         self.assertEqual(self.settings.read_text(encoding="utf-8"), "INSTALLED_APPS = []\n")
+
+    def test_tblib_is_installed_so_parallel_workers_report_their_errors(self):
+        # Without it, Django's parallel runner can't pickle a worker's
+        # traceback and aborts the run without naming the test (#234).
+        self.add("base_systems", "evennia_links")
+        code, pip, _ = self.run_main()
+        self.assertEqual(code, 0)
+        self.assertIn("tblib==3.2.2", pip.call_args_list[0].args[0])
 
 
 class PipInstallCommandTests(unittest.TestCase):

@@ -370,6 +370,36 @@ class TestStaleSessionStateSelfHeals(EvenniaTest):
         state = tracker.get_session_state(self.char1.id)
         self.assertTrue(state is None or state["session_id"] != session_id)
 
+    def test_stale_state_reports_no_activity_for_the_vanished_session(self):
+        # Every active pose fires rp_activity_recorded, not just flushes. With
+        # a scene active in the room, the scene bridge would link the vanished
+        # session to it, and the deferred FK check would fail at commit.
+        from evennia_rptracker import tracker
+        from evennia_rptracker.signals import rp_activity_recorded
+
+        tracker.record_rp_activity(self.char1, self.room1)
+        tracker.record_rp_activity(self.char1, self.room1)
+        session_id = tracker.get_active_session_id(self.char1.id)
+        RPSession.objects.filter(pk=session_id).delete()
+        self.room1.active_scene_id = 7
+
+        reported = []
+
+        def listener(sender, session_id, **kwargs):
+            reported.append(session_id)
+
+        rp_activity_recorded.connect(listener)
+        self.addCleanup(rp_activity_recorded.disconnect, listener)
+        for _ in range(tracker.POSE_FLUSH_THRESHOLD + 1):
+            tracker.record_rp_activity(self.char1, self.room1)
+
+        self.assertNotIn(session_id, reported)
+        self.assertFalse(RPSessionSceneLink.objects.filter(session_id=session_id).exists())
+        # The pose that found the stale entry counts towards a new session.
+        state = tracker.get_session_state(self.char1.id)
+        self.assertNotEqual(state["session_id"], session_id)
+        self.assertGreater(state["pose_count"], 0)
+
 
 # ---------------------------------------------------------------------------
 # Anti-gaming tests

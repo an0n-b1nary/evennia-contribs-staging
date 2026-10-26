@@ -44,6 +44,12 @@ from dataclasses import dataclass
 
 CONTRIBS_ROOT = pathlib.Path("contribs")
 
+# Installed with the contribs' build requirements. Django's parallel test
+# runner pickles each worker's errors to report them; without tblib a
+# traceback can't be pickled, so any error in a worker aborts the whole run
+# without naming the test (#234).
+TEST_REQUIREMENTS = ("tblib==3.2.2",)
+
 # PEP 508 distribution name at the start of a requirement string; anything
 # after it (extras, version specifiers, markers) is irrelevant to ordering.
 _REQUIREMENT_NAME = re.compile(r"\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)")
@@ -224,7 +230,9 @@ def main(game_dir: pathlib.Path, exclude: tuple[str, ...] = ()) -> int:
 
     pip = pip_install_command()
     build_requires = sorted({req for contrib in contribs for req in contrib.build_requires})
-    subprocess.run([*pip, *build_requires], check=True, stdin=subprocess.DEVNULL)
+    subprocess.run(
+        [*pip, *build_requires, *TEST_REQUIREMENTS], check=True, stdin=subprocess.DEVNULL
+    )
     editables = [arg for contrib in contribs for arg in ("-e", str(contrib.path))]
     print(f"Installing {', '.join(labels)}")
     subprocess.run([*pip, "--no-build-isolation", *editables], check=True, stdin=subprocess.DEVNULL)
