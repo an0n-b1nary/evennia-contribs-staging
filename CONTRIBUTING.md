@@ -2,7 +2,7 @@
 
 For lore/readable integration, run
 `python scripts/ci_run_lore_item_tests.py ci_game/lore_items` in a fresh installed
-environment. The `lore-items-partners` CI matrix also starts fresh environments
+environment. The `lore-items-partners` CI job also starts fresh environments
 with either `evennia-rp-crafting` or `evennia-lore` actually excluded by
 `ci_install_contribs.py --exclude`, then uses the matching `--absent` app label.
 This exercises staff tomes without crafting and existing crafted metadata
@@ -320,7 +320,7 @@ Pushes to `main`, a nightly schedule and manual runs (**Run workflow** on the
 Actions tab, for any branch) run every job. A PR runs less:
 
 - **lint** (~1 min): pre-commit (anonymity guard + template and command syntax sweeps + Ruff format + Ruff check) + the command sweep's tests + Python syntax check. Always runs.
-- **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib via pip, runs each contrib's test suite via `evennia test --parallel=auto`. On a PR only 3.12 runs the full suite; 3.13 and 3.14 run a smoke cell (install, migrate, syntax check, template sweep and the `evennia_links` suite with parallel workers), and run in full on `main` and nightly.
+- **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib with uv, runs each contrib's test suite via `evennia test --parallel=auto`. On a PR only 3.12 runs the full suite; 3.13 and 3.14 run a smoke cell (install, migrate, syntax check, template sweep and the `evennia_links` suite with parallel workers), and run in full on `main` and nightly.
 - **Partner jobs**, selected by `scripts/ci_scope.py` from the PR's changed
   files. A job runs when a changed contrib, or a contrib depending on it through
   hard dependencies or optional extras, is one the job installs, or when a file
@@ -337,12 +337,20 @@ Actions tab, for any branch) run every job. A PR runs less:
 - **sandbox**: the `example_game` gate with every contrib installed. It and
   `live-playtest` run whenever any contrib or `example_game` changes.
 
-The partner-profile jobs (`*-partners`, `rp-sandbox`, and the
-`*-independent` jobs) each install one combination of partners in a fresh
-environment. `ci_install_contribs.py` installs the selection with one
-`pip install --no-build-isolation -e … -e …` call after the contribs' build
-requirements, and partner jobs skip
-`evennia migrate` because creating the test database runs the migrations. The
+Each partner profile (in the `*-partners`, `rp-sandbox`, `sandbox` and
+`crafting-independent` jobs) runs through `scripts/ci_profile.py`, which
+installs one combination of partners in a fresh venv and game of its own and
+runs the profile's runner there. A family whose profiles test for a minute or
+two runs them as steps of one job, each in its own venv, so an excluded partner
+is still physically absent; every step runs even after an earlier one fails.
+Building and crafting profiles take longer, so each stays its own matrix job.
+CI installs with uv: on the runners the time goes into installing, not
+downloading, and uv does it several times faster than pip.
+`ci_install_contribs.py` installs the selection with one
+`--no-build-isolation -e … -e …` call after the contribs' build
+requirements, using uv when it's on PATH and pip otherwise, and partner
+profiles skip `evennia migrate` because creating the test database runs the
+migrations. The
 sandbox gate, crafting, lore/items, and building and calendar
 partner suites run with parallel workers; file-backed race runs stay serial.
 Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
@@ -356,8 +364,17 @@ lint and `scope` 5. These bounds include installation.
 A skipped partner job reports as skipped, not failed. A failure in the nightly
 run shows on the Actions tab and notifies whoever last changed the schedule.
 
-To reproduce the absent-calendar cell, use a **fresh** Python 3.12 venv with
-`evennia==6.0.0` installed and its executables on PATH, from the repo root:
+To reproduce a profile, copy its step's command from `ci.yml` and run it from
+the repo root with Python 3.12. `ci_profile.py` builds the venv and game in a
+new temporary directory, removes them afterwards, and uses uv if it's on PATH:
+
+```bash
+python scripts/ci_profile.py --exclude evennia-calendar -- \
+    python scripts/ci_run_partner_tests.py {game} --calendar absent
+```
+
+By hand, the absent-calendar profile needs a **fresh** Python 3.12 venv with
+`evennia==6.0.0` installed and its executables on PATH:
 
 ```bash
 evennia --init ci_game < /dev/null
@@ -415,7 +432,7 @@ Repeat the fresh-environment procedure above, excluding `evennia-rp-resources`,
 `python scripts/ci_run_economy_tests.py ci_game --absent evennia_rp_resources`
 (substitute the excluded app label). Omit exclusions and `--absent` for the
 present profile. This runs the economy suite plus real resource exchange,
-equipment refusal/sealing and staff-review job seams. The resources matrix
+equipment refusal/sealing and staff-review job seams. The resources job
 also checks an environment with economy genuinely unimportable.
 
 When excluding resources, also exclude `evennia-rp-crafting`: resources is a
@@ -447,7 +464,7 @@ and exercises actual scene, plot and contest partners where installed.
 
 The independent profile excludes scenes, plots, contest, posing, social,
 rptracker, XP, chargen and equipment together. Only links and rules are hard
-NPC dependencies. Consult the `npc-partners` CI matrix for the exact arguments.
+NPC dependencies. Consult the `npc-partners` steps in `ci.yml` for the exact arguments.
 The standard sandbox gate also exercises NPC MRO, reward exclusion, scene
 privacy, session switching and idempotent seeding under all real partners.
 

@@ -195,6 +195,15 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         self.assertIn("--no-build-isolation", install)
         self.assertEqual(self.installed(pip), ["evennia_links", "evennia_maps"])
 
+    def test_build_requirements_and_contribs_install_with_uv_when_it_is_on_path(self):
+        self.add("base_systems", "evennia_links")
+        with patch.object(installer.shutil, "which", return_value="/opt/uv"):
+            code, pip, _ = self.run_main()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(pip.call_args_list), 2)
+        for call in pip.call_args_list:
+            self.assertEqual(call.args[0][:3], ["/opt/uv", "pip", "install"])
+
     def test_links_installs_its_task_isolating_test_runner(self):
         self.add("base_systems", "evennia_links")
         code, _, _ = self.run_main()
@@ -245,6 +254,18 @@ class MainTests(ContribTreeMixin, unittest.TestCase):
         pip.assert_not_called()
         self.assertIn("cycle", stderr)
         self.assertEqual(self.settings.read_text(encoding="utf-8"), "INSTALLED_APPS = []\n")
+
+
+class PipInstallCommandTests(unittest.TestCase):
+    def test_uv_on_path_installs_into_the_named_interpreter(self):
+        with patch.object(installer.shutil, "which", return_value="/opt/uv"):
+            command = installer.pip_install_command("/env/bin/python")
+        self.assertEqual(command, ["/opt/uv", "pip", "install", "--python", "/env/bin/python"])
+
+    def test_without_uv_the_interpreter_runs_its_own_pip(self):
+        with patch.object(installer.shutil, "which", return_value=None):
+            command = installer.pip_install_command("/env/bin/python")
+        self.assertEqual(command, ["/env/bin/python", "-m", "pip", "install"])
 
 
 class RepositoryTreeTests(unittest.TestCase):

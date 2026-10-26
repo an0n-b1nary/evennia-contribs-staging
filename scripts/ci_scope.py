@@ -198,6 +198,7 @@ NO_PARTNER_JOB = (
     "scripts/ui_shots.py",
     "scripts/ci_run_tests.py",
     "scripts/test_ci_install_contribs.py",
+    "scripts/test_ci_profile.py",
     "scripts/test_ci_run_partner_tests.py",
     "scripts/test_ci_scope.py",
 )
