@@ -75,7 +75,21 @@ Runs live under `.downstream-runs/<id>/`, or `--output-root <directory>`.
 Only that run's `evidence/` directory is suitable for sharing. The sibling
 environments, games, backup, snapshots and raw logs contain disposable
 credentials and full player data. Keep them local. A failed run exits nonzero
-and retains its artifacts; inspect its logs. To retry with the same revisions:
+and retains its artifacts. `evidence/result.json` includes a structured `failure`
+with phase, step, kind (`timeout`, `nonzero_exit`, `assertion`, or `error`) and
+elapsed seconds. Timeouts also include the budget and whether it was the step
+or the whole phase that timed out; nonzero exits include the exit code. The
+same summary appears in `results.md` and the job log.
+
+Integration failures include the normalized `Ran N tests` summary when
+available, plus failing test IDs verified against the pinned public test
+source. Subtest values, assertion messages, tracebacks, commands, absolute
+paths and raw logs are excluded. Worker progress is checkpointed before each
+step, so a phase timeout can name its last active step even without a final
+worker result. Retrying a failed phase discards its previous failure and
+progress. Inspect private logs locally for additional detail.
+
+To retry with the same revisions:
 
 ```sh
 python scripts/downstream_gate.py \

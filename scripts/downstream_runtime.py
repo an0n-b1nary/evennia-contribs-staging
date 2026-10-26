@@ -15,10 +15,13 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
+import traceback
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
 
+from downstream_failures import GateFailure, Progress, failure, known_test_ids, test_diagnostics
 from playtesting.host import HIDDEN, Host
 from playtesting.session import Session
 
@@ -296,33 +299,49 @@ def integration(source, directory, artifacts):
     shutil.copytree(source / "example_game", game)
     launcher = Path(sys.executable).parent / ("evennia.exe" if os.name == "nt" else "evennia")
     log = directory / "integration.log"
-    with log.open("w", encoding="utf-8") as stream:
-        result = subprocess.run(
-            [
-                str(launcher),
-                "test",
-                "--settings=test_settings.py",
-                "typeclasses",
-                "commands",
-                "world",
-            ],
-            cwd=game,
-            stdin=subprocess.DEVNULL,
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            timeout=INTEGRATION_TIMEOUT,
-            **HIDDEN,
+    started = time.monotonic()
+    try:
+        with log.open("w", encoding="utf-8") as stream:
+            result = subprocess.run(
+                [
+                    str(launcher),
+                    "test",
+                    "--settings=test_settings.py",
+                    "typeclasses",
+                    "commands",
+                    "world",
+                ],
+                cwd=game,
+                stdin=subprocess.DEVNULL,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                timeout=INTEGRATION_TIMEOUT,
+                **HIDDEN,
+            )
+        text = log.read_text(encoding="utf-8", errors="replace")
+        diagnostics = test_diagnostics(text, known_test_ids(source / "example_game"))
+        if result.returncode:
+            raise subprocess.CalledProcessError(result.returncode, [])
+        assert diagnostics.get("test_count", 0) > 0 and re.search(r"^OK(?:\s|$)", text, re.M), (
+            "Integration tests failed or ran zero tests; see integration.log"
         )
-    text = log.read_text(encoding="utf-8", errors="replace")
-    matches = re.findall(r"Ran (\d+) tests?", text)
-    assert (
-        result.returncode == 0
-        and matches
-        and int(matches[-1]) > 0
-        and re.search(r"^OK(?:\s|$)", text, re.M)
-    ), "Integration tests failed or ran zero tests; see integration.log"
-    write(artifacts / "integration.json", {"test_count": int(matches[-1]), "passed": True})
-    return int(matches[-1])
+    except Exception as exc:
+        diagnostics = test_diagnostics(
+            log.read_text(encoding="utf-8", errors="replace") if log.exists() else "",
+            known_test_ids(source / "example_game"),
+        )
+        summary = failure(
+            "fresh",
+            "integration",
+            exc,
+            time.monotonic() - started,
+            diagnostics=diagnostics,
+            budget=INTEGRATION_TIMEOUT,
+        )
+        write(artifacts / "integration.json", {"passed": False, "failure": summary})
+        raise GateFailure(summary) from None
+    write(artifacts / "integration.json", {"test_count": diagnostics["test_count"], "passed": True})
+    return diagnostics["test_count"]
 
 
 def preserved(session, baseline):
@@ -367,6 +386,20 @@ def preserved(session, baseline):
     assert len(session.snapshot()["checks"]) == len(current["checks"]) + 1
 
 
+def close_session(session, host, progress):
+    """Keep the original failure if closing a session/host also fails."""
+    failing = sys.exc_info()[0] is not None
+    if not failing:
+        progress.start("cleanup")
+    for operation in (session.close, host.stop):
+        try:
+            operation()
+        except Exception:
+            if not failing:
+                raise
+            traceback.print_exc()
+
+
 def main():
     if not __debug__:
         raise RuntimeError("Assertions must be enabled")
@@ -397,11 +430,15 @@ def main():
     }
     backup = directory / "backup"
     hosts = []
+    progress = Progress(directory, mode)
     try:
+        progress.start("provenance")
         result["package_count"] = provenance(source, revision, artifacts / "provenance.json")
         if mode == "fresh":
+            progress.start("integration")
             result["integration_tests"] = integration(source, phase, artifacts)
         restore = backup if mode in ("upgrade", "restore") else None
+        progress.start("host-prepare")
         host = SnapshotHost(
             revision,
             consumer_source=consumer,
@@ -416,6 +453,7 @@ def main():
         # legitimately update volatile session/runtime state.
         if restore:
             host.prepare()
+            progress.start("database-preservation")
             expected = json.loads((backup / "logical.json").read_text(encoding="utf-8"))
             counts = verify_database(host.game / "server/evennia.db3", expected)
             population = json.loads((directory / "populate.json").read_text(encoding="utf-8"))
@@ -446,14 +484,17 @@ def main():
             host.prepare = lambda: None
         session = Session(host)
         try:
+            progress.start("host-start")
             host.start()
             if restore:
                 baseline = json.loads((backup / "state.json").read_text(encoding="utf-8"))
+                progress.start("workflows")
                 preserved(session, baseline)
                 result["preserved_tables"] = len(counts)
                 result["preserved_rows"] = sum(counts.values())
                 result["ordinary_workflows"] = True
             else:
+                progress.start("live-cases")
                 scenarios = fixture_module(fixture_source, "scenarios")
 
                 allowance_only = (
@@ -495,9 +536,9 @@ def main():
                     backup.mkdir(exist_ok=True)
                     write(backup / "state.json", session.snapshot())
         finally:
-            session.close()
-            host.stop()
+            close_session(session, host, progress)
         if mode == "populate":
+            progress.start("backup")
             links = cross_links(host.game)
             # Exercise the older public spend service independently of the
             # then-allowance-only chargen integration, including a refund.
@@ -536,6 +577,7 @@ def main():
                 },
             )
         if mode == "fresh":
+            progress.start("normal-cases")
             normal = SnapshotHost(
                 revision,
                 profile="normal",
@@ -554,10 +596,11 @@ def main():
                 result["normal_cases"] = len(cases)
                 write(artifacts / "normal-cases.json", cases)
             finally:
-                session.close()
-                normal.stop()
+                close_session(session, normal, progress)
+            progress.start("web-and-models")
             web_and_models(host.game, artifacts)
         if restore:
+            progress.start("cross-links")
             configured_game(host.game)
             from evennia_lore.models import LoreSceneLink
 
@@ -570,18 +613,28 @@ def main():
             ).exists()
             result["cross_links"] = True
         result["passed"] = True
+    except Exception as exc:
+        result["failure"] = exc.summary if isinstance(exc, GateFailure) else progress.failed(exc)
+        traceback.print_exc()  # The parent redirects all worker output to its private log.
     finally:
+        progress.start("cleanup")
         for index, host in enumerate(hosts):
-            host.stop()
-            logs = (
-                (host.artifacts / "server.log").read_text(encoding="utf-8")
-                if (host.artifacts / "server.log").exists()
-                else ""
-            )
-            if "Traceback" in logs or "[EE]" in logs:
+            try:
+                host.stop()
+                logs = (
+                    (host.artifacts / "server.log").read_text(encoding="utf-8")
+                    if (host.artifacts / "server.log").exists()
+                    else ""
+                )
+                if "Traceback" in logs or "[EE]" in logs:
+                    result["passed"] = False
+                    result["server_errors"] = True
+                    result.setdefault("failure", failure(mode, "server-logs", RuntimeError(), 0))
+                shutil.copytree(host.artifacts, artifacts / f"host-{index}")
+            except Exception as exc:
                 result["passed"] = False
-                result["server_errors"] = True
-            shutil.copytree(host.artifacts, artifacts / f"host-{index}")
+                result.setdefault("failure", progress.failed(exc))
+                traceback.print_exc()
         result["scaffold_override"] = "blank pose separator uses BaseOption; no package patches"
         write(directory / (mode + ".json"), result)
     return 0 if result["passed"] else 1

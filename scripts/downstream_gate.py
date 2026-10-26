@@ -25,6 +25,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
+from downstream_failures import (
+    GateFailure,
+    describe,
+    failure,
+    known_test_ids,
+    public_failure,
+    recorded_step,
+)
+
 REPOSITORY = "https://github.com/an0n-b1nary/evennia-contribs-staging.git"
 # Includes the spend ledger, but predates chargen's additive catalog migration.
 OLD_REVISION = "1939b8aa80d8e90c408715d68ca18a379d1699b4"
@@ -38,7 +47,7 @@ HIDDEN = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else 
 
 def driver_identity(root):
     """Record driver code independently of the immutable package pins."""
-    files = [root / "scripts/downstream_gate.py", root / "scripts/downstream_runtime.py"]
+    files = sorted((root / "scripts").glob("downstream_*.py"))
     files += sorted((root / "scripts/playtesting").rglob("*.py"))
     return {
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -66,26 +75,65 @@ def prepare_fixtures(repository, directory, old_revision, new_revision):
     return {name: fixture["revision"] for name, fixture in fixtures.items()}
 
 
-def run(command, *, cwd, log, timeout=1200, environment=None):
-    """Keep subprocess output local and fail closed on nonzero status/timeouts."""
-    with log.open("a", encoding="utf-8") as stream:
-        result = subprocess.run(
-            [str(part) for part in command],
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            timeout=timeout,
-            env={
-                **os.environ,
-                "PYTHONIOENCODING": "utf-8",
-                "PYTHONUNBUFFERED": "1",
-                **(environment or {}),
-            },
-            **HIDDEN,
+def run(command, *, cwd, log, timeout=1200, environment=None, phase="setup", step="unknown"):
+    """Keep raw output local; exceptions carry only structured public evidence."""
+    started = time.monotonic()
+    try:
+        with log.open("a", encoding="utf-8") as stream:
+            subprocess.run(
+                [str(part) for part in command],
+                cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=True,
+                env={
+                    **os.environ,
+                    "PYTHONIOENCODING": "utf-8",
+                    "PYTHONUNBUFFERED": "1",
+                    **(environment or {}),
+                },
+                **HIDDEN,
+            )
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+        raise GateFailure(
+            failure(phase, step, exc, time.monotonic() - started, budget=timeout)
+        ) from None
+
+
+def run_phase(python, mode, directory, revision):
+    """Recover worker diagnostics, including progress after a phase timeout."""
+    recorded = directory / (mode + ".json")
+    status = directory / (mode + "-status.json")
+    # A retried worker must never inherit the previous attempt's failure/step.
+    recorded.unlink(missing_ok=True)
+    status.unlink(missing_ok=True)
+    try:
+        run(
+            [python, ROOT / "scripts/downstream_runtime.py", mode, directory, revision],
+            cwd=directory,
+            log=directory / (mode + ".log"),
+            timeout=PHASE_TIMEOUT,
+            phase=mode,
+            step="worker",
         )
-    if result.returncode:
-        raise RuntimeError(f"{command[0]} exited {result.returncode}; see {log.name}")
+    except GateFailure as exc:
+        summary = exc.summary
+        summary["step"] = recorded_step(status)
+        if summary["kind"] == "timeout":
+            summary["timeout_scope"] = "phase"
+        elif recorded.is_file():
+            try:
+                worker = json.loads(recorded.read_text(encoding="utf-8"))
+                if isinstance(worker.get("failure"), dict):
+                    summary = public_failure(
+                        {**worker["failure"], "phase": mode},
+                        known_test_ids(directory / "new/snapshot/example_game"),
+                    )
+            except (OSError, ValueError, AttributeError):
+                pass
+        raise GateFailure(summary) from None
 
 
 def requirements(snapshot, revision):
@@ -143,13 +191,14 @@ def environment(directory, source, revision, log):
         [python, "-m", "pip", "install", "-r", directory / "requirements.txt"],
         cwd=directory,
         log=log,
+        step="install-" + directory.name,
         environment={
             "GIT_CONFIG_COUNT": "1",
             "GIT_CONFIG_KEY_0": f"url.{(directory.parent / 'repository').as_uri()}.insteadOf",
             "GIT_CONFIG_VALUE_0": REPOSITORY,
         },
     )
-    run([python, "-m", "pip", "check"], cwd=directory, log=log)
+    run([python, "-m", "pip", "check"], cwd=directory, log=log, step="install-" + directory.name)
     return python
 
 
@@ -229,8 +278,9 @@ def main(argv=None):
         "passed": False,
         "driver_files_sha256": driver,
     }
-    print(f"Downstream gate: {directory}", flush=True)
+    print("Downstream gate started", flush=True)
     started = time.monotonic()
+    current_phase, current_step = "setup", "clone"
     try:
         repository = directory / "repository"
         if not args.resume:
@@ -238,18 +288,23 @@ def main(argv=None):
                 ["git", "clone", "--no-checkout", REPOSITORY, repository],
                 cwd=directory,
                 log=directory / "clone.log",
+                step="clone",
             )
+        current_step = "snapshots"
         for name, revision in (("old", args.old_revision), ("new", args.new_revision)):
             phase = directory / name
             if not args.resume:
                 phase.mkdir()
                 snapshot(repository, revision, phase / "snapshot")
+        current_step = "migration-history"
         result["unchanged_migration_files"] = migration_history(
             directory / "old/snapshot", directory / "new/snapshot"
         )
+        current_step = "fixtures"
         result["fixture_revisions"] = prepare_fixtures(
             repository, directory, args.old_revision, args.new_revision
         )
+        current_step = "environments"
         if args.resume:
             interpreters = {
                 name: directory
@@ -280,18 +335,20 @@ def main(argv=None):
                 }
                 interpreters = {name: future.result() for name, future in jobs.items()}
         print("Both public snapshots installed in fresh environments", flush=True)
+        current_step = "browser-install"
         run(
             [interpreters["new"], "-m", "playwright", "install", "chromium"],
             cwd=directory,
             log=directory / "browser-install.log",
+            step="browser-install",
         )
-        worker = ROOT / "scripts/downstream_runtime.py"
         for mode, name, revision in (
             ("fresh", "new", args.new_revision),
             ("populate", "old", args.old_revision),
             ("upgrade", "new", args.new_revision),
             ("restore", "old", args.old_revision),
         ):
+            current_phase, current_step = mode, "worker"
             print(f"Running {mode} at {revision}", flush=True)
             recorded = directory / (mode + ".json")
             completed = (
@@ -300,12 +357,8 @@ def main(argv=None):
             if not (
                 args.resume and completed.get("passed") and completed.get("revision") == revision
             ):
-                run(
-                    [interpreters[name], worker, mode, directory, revision],
-                    cwd=directory,
-                    log=directory / (mode + ".log"),
-                    timeout=PHASE_TIMEOUT,
-                )
+                run_phase(interpreters[name], mode, directory, revision)
+            current_step = "phase-result"
             phase_result = json.loads((directory / (mode + ".json")).read_text(encoding="utf-8"))
             if not phase_result.get("passed"):
                 raise RuntimeError(f"{mode} did not record a successful result")
@@ -313,8 +366,16 @@ def main(argv=None):
             shutil.copytree(phase_result["evidence"], evidence / mode, dirs_exist_ok=True)
         result["passed"] = True
     except Exception as exc:
-        result["error"] = str(exc)
-        print(f"Downstream gate failed: {exc}", file=sys.stderr, flush=True)
+        summary = (
+            exc.summary
+            if isinstance(exc, GateFailure)
+            else failure(current_phase, current_step, exc, time.monotonic() - started)
+        )
+        result["failure"] = public_failure(
+            summary, known_test_ids(directory / "new/snapshot/example_game")
+        )
+        result["error"] = describe(result["failure"])
+        print(f"Downstream gate failed: {result['error']}", file=sys.stderr, flush=True)
     finally:
         result["elapsed_seconds"] = round(time.monotonic() - started, 1)
         result["package_git_transport"] = (
@@ -322,8 +383,6 @@ def main(argv=None):
         )
         # Paths and credentials stay in the private run directory.
         public = json.loads(json.dumps(result))
-        if "error" in public:
-            public["error"] = "Verification failed; inspect the private run logs."
         for mode in ("fresh", "populate", "upgrade", "restore"):
             recorded = directory / (mode + ".json")
             if mode not in public and recorded.exists():
@@ -332,17 +391,23 @@ def main(argv=None):
                 shutil.copytree(public[mode]["evidence"], evidence / mode, dirs_exist_ok=True)
             if mode in public:
                 public[mode].pop("evidence", None)
+                if "failure" in public[mode]:
+                    public[mode]["failure"] = public_failure(
+                        public[mode]["failure"],
+                        known_test_ids(directory / "new/snapshot/example_game"),
+                    )
         (evidence / "result.json").write_text(json.dumps(public, indent=2) + "\n", encoding="utf-8")
         report = "# Downstream snapshot verification\n\n"
         report += f"Old: `{args.old_revision}`\n\nNew: `{args.new_revision}`\n\n"
         report += "Result: " + ("PASS" if result["passed"] else "FAIL") + "\n\n"
         report += "\n".join(
-            f"- {mode}: PASS"
+            f"- {mode}: {'PASS' if public[mode].get('passed') else 'FAIL'}"
             for mode in ("fresh", "populate", "upgrade", "restore")
-            if mode in result
+            if mode in public
         )
         if "error" in result:
-            report += "\n\nFailure details remain in the local run logs.\n"
+            report += f"\n\nFailure: {result['error']}\n"
+            report += "\nRaw logs remain private.\n"
         (evidence / "results.md").write_text(report + "\n", encoding="utf-8")
     return 0 if result["passed"] else 1
 
