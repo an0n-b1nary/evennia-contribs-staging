@@ -289,7 +289,10 @@ runner, so a long run doesn't slow down as it goes.
 - **Parallel workers:** `--parallel auto` runs one worker per CPU, each with its
   own copy of the test database. Use it for anything larger than one contrib.
   The whole contrib suite takes about 5 minutes with 6 workers, against over 20
-  serially.
+  serially. Workers need `tblib` to report an error. Without it, the first error
+  in a worker aborts the whole run with `cannot pickle 'traceback' object`.
+  `ci_install_contribs.py` installs it; in an environment set up another way,
+  `pip install tblib`.
 - **Keep the test database:** every invocation spends most of a minute creating
   the test database and migrating every app. For repeat runs of a narrow label,
   point the test database at a file in a test-only settings module and pass
