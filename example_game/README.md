@@ -781,8 +781,11 @@ hostname set.
 
 ## Droplet deployment
 
-This droplet already runs a separate, unrelated Evennia **3.x** game on the
-default ports. Two things keep the sandbox from interfering with it:
+These steps were first written for a droplet that already ran a separate,
+unrelated Evennia **3.x** game on the default ports, and that shared host stays
+the worked example. They work as well on a host of its own: the shifted ports
+and the dedicated user cost nothing there. If the host does run another game,
+two things keep the sandbox from interfering with it:
 
 - **A strictly isolated Python 3.10–3.12 venv.** Different Evennia major
   version, different Django/dependency tree — never `pip install` into the
@@ -794,10 +797,9 @@ default ports. Two things keep the sandbox from interfering with it:
   still binds a real TCP port on the host, and the default `4006` collides
   with the other game.
 
-The droplet has so far only been accessed as root. This sandbox is a
-public-facing service sharing the host with another game, so it runs as a
-**dedicated non-root user** — a compromise of the game process should not be
-a compromise of the whole box (or the other game).
+This sandbox is a public-facing service, so it runs as a **dedicated non-root
+user** — a compromise of the game process should not be a compromise of the
+whole box (or of anything else it hosts).
 
 ### 0. Create the service user (as root)
 
@@ -805,7 +807,7 @@ a compromise of the whole box (or the other game).
 adduser --disabled-password contrib_sandbox
 sudo -iu contrib_sandbox
 # Everything below runs as contrib_sandbox. sudo is only needed again for
-# steps 7 (systemd) and 8 (nginx/certbot).
+# steps 7 (systemd) and 8 (nginx/TLS).
 ```
 
 ### 1. Isolate
@@ -1076,7 +1078,7 @@ that step 4's manual migrate/first-boot was skipped.
 
 ### 8. nginx + TLS (as root / via sudo)
 
-**First check whether port 80 is already taken** — on a shared box the other
+**First check whether port 80 is already taken** — on a shared box another
 game may serve its own web directly:
 
 ```bash
@@ -1120,30 +1122,112 @@ nginx -t && systemctl reload nginx
 certbot --nginx -d sandbox.YOURDOMAIN
 ```
 
-#### Case B — port 80 is already held (the shared-droplet case)
+#### Case B — port 80 is already held (a shared host)
 
 You can't bind 80 or use certbot's default http-01 challenge, and you must NOT
-reconfigure the running game. Run nginx on **443 only** and validate the cert
-via a **DNS challenge**.
+reconfigure the running game. Run nginx on **443 only**, and get the cert with a
+challenge that needs no port 80 **and renews without you**. Don't use certbot's
+`--manual` DNS challenge: it can't renew itself, Let's Encrypt no longer emails
+before a cert expires, and a lapsed cert takes a 443-only sandbox offline
+entirely (see [renewal](#both-cases--firewall--renewal) below).
 
-1. Issue the cert with DNS-01 (needs no port 80):
+1. Issue the cert one of two ways.
 
-   ```bash
-   certbot certonly --manual --preferred-challenges dns -d sandbox.YOURDOMAIN
-   ```
-
-   It pauses and gives you a TXT record to create: name `_acme-challenge.sandbox`
-   (**just that** — your DNS host appends the domain automatically; typing the
-   full `_acme-challenge.sandbox.YOURDOMAIN` doubles it and the lookup fails),
-   value = the string shown. Add it at your DNS host, then — before pressing
-   Enter — confirm from another shell, querying a public resolver to dodge
-   negative caching (propagation can lag minutes or more):
+   **B1 — your DNS host has a certbot plugin** (Cloudflare, DigitalOcean, Route
+   53, and others: check the list in certbot's docs and your distro's
+   `python3-certbot-dns-*` packages). certbot creates the TXT record through
+   the provider's API, so renewal is as automatic as Case A's:
 
    ```bash
-   dig +short TXT _acme-challenge.sandbox.YOURDOMAIN @8.8.8.8
+   apt install python3-certbot-dns-PROVIDER
+   # API token per the plugin's docs, in a root-only file:
+   install -d -m 700 /root/.secrets
+   install -m 600 /dev/null /root/.secrets/certbot-PROVIDER.ini
+   certbot certonly --dns-PROVIDER \
+     --dns-PROVIDER-credentials /root/.secrets/certbot-PROVIDER.ini \
+     --deploy-hook "systemctl reload nginx" \
+     -d sandbox.YOURDOMAIN
    ```
 
-2. Write a **443-only** vhost using the issued cert (no `listen 80`):
+   `--deploy-hook` matters: `certonly` doesn't touch nginx, so without the
+   reload nginx keeps serving the old cert from memory after each renewal.
+   certbot saves the hook with the cert, and its own timer does the rest.
+
+   **B2 — no plugin: TLS-ALPN-01 on port 443 with `lego`.** Let's Encrypt
+   validates over 443 itself, so this needs nothing from your DNS host. certbot
+   doesn't support this challenge, so use [lego](https://go-acme.github.io/lego/)
+   (`apt install lego`, or the single binary from its GitHub releases). lego
+   has to bind 443 for the few seconds it takes, so nginx stops briefly; web
+   clients reconnect, and telnet on 4100 isn't touched. Open 443 in the firewall
+   first (`ufw allow 443/tcp`, see below), stop nginx if it is running, then:
+
+   ```bash
+   lego --path /etc/lego --email you@YOURDOMAIN --domains sandbox.YOURDOMAIN \
+     --tls --accept-tos run
+   ```
+
+   The cert lands in `/etc/lego/certificates/sandbox.YOURDOMAIN.crt` (full
+   chain) and `.key`. Renew it from a daily timer that does nothing until a
+   third of the cert's lifetime is left (Let's Encrypt's advice; lifetimes are
+   shrinking, so don't hard-code a day count), and never stops nginx unless
+   its config is valid:
+
+   ```bash
+   #!/bin/bash
+   # /usr/local/sbin/sandbox-cert-renew  (chmod 755)
+   set -euo pipefail
+   DOMAIN=sandbox.YOURDOMAIN
+   CERT=/etc/lego/certificates/$DOMAIN.crt
+
+   # A missing or unreadable cert falls through and is reissued.
+   if [[ -r $CERT ]]; then
+       start=$(date -d "$(openssl x509 -in "$CERT" -noout -startdate | cut -d= -f2)" +%s)
+       end=$(date -d "$(openssl x509 -in "$CERT" -noout -enddate | cut -d= -f2)" +%s)
+       if (( end - $(date +%s) > (end - start) / 3 )); then
+           exit 0
+       fi
+   fi
+
+   nginx -t
+   systemctl stop nginx
+   trap 'systemctl start nginx' EXIT
+   lego --path /etc/lego --email you@YOURDOMAIN --domains "$DOMAIN" \
+     --tls --accept-tos run
+   ```
+
+   ```ini
+   # /etc/systemd/system/sandbox-cert-renew.service
+   [Unit]
+   Description=Renew the sandbox TLS cert when it is due
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/local/sbin/sandbox-cert-renew
+
+   # /etc/systemd/system/sandbox-cert-renew.timer
+   [Unit]
+   Description=Daily sandbox TLS cert check
+
+   [Timer]
+   OnCalendar=*-*-* 04:30
+   RandomizedDelaySec=30m
+   Persistent=true
+
+   [Install]
+   WantedBy=timers.target
+   ```
+
+   ```bash
+   systemctl daemon-reload && systemctl enable --now sandbox-cert-renew.timer
+   ```
+
+   Pick an `OnCalendar` time when few people are on the web client. If a
+   renewal fails, the trap still restarts nginx, the unit shows as failed in
+   `systemctl --failed`, and the next day's run tries again with a third of
+   the lifetime still in hand.
+
+2. Write a **443-only** vhost using the issued cert (no `listen 80`). For B2,
+   point the two `ssl_certificate` lines at lego's `.crt` and `.key` instead:
 
    ```nginx
    # /etc/nginx/sites-available/evennia-sandbox
@@ -1175,8 +1259,9 @@ via a **DNS challenge**.
    it, the web-admin/login POST fails CSRF with a 403.)
 
 3. Enable it and — crucially — **disable any default vhost that listens on 80**,
-   or nginx won't start at all. A single `listen 80` colliding with the other
-   game aborts the *entire* nginx process, including your valid 443 site:
+   or nginx won't start at all. A single `listen 80` colliding with whatever
+   holds port 80 aborts the *entire* nginx process, including your valid 443
+   site:
 
    ```bash
    ln -sf /etc/nginx/sites-available/evennia-sandbox /etc/nginx/sites-enabled/
@@ -1200,10 +1285,19 @@ ufw allow 4100/tcp             # telnet
 ufw allow 443/tcp              # Case B: if ufw is active and 443 isn't open
 ```
 
-**Cert renewal:** Case A's `certbot --nginx` auto-renews. Case B's *manual* DNS
-challenge does **not** (no auto-DNS plugin for the registrar) — re-run the
-`certbot certonly` command and refresh the TXT record before the 90-day cert
-expires. Set a reminder.
+**Cert renewal:** every route above renews itself, and none of them should be
+swapped for renewing by hand. Let's Encrypt stopped sending expiry emails in
+June 2025, and its default cert lifetime drops from 90 days to 64 in February
+2027 and to 45 in February 2028, so a manual renewal would come round about
+monthly with no warning when one is missed.
+
+- **Case A and B1:** certbot's own timer renews them. Check it with
+  `systemctl list-timers | grep certbot` and `certbot renew --dry-run`.
+- **B2:** check `systemctl list-timers sandbox-cert-renew.timer`, and after
+  the first real renewal, `journalctl -u sandbox-cert-renew`.
+
+Wherever the sandbox runs, `openssl x509 -in CERTFILE -noout -enddate` shows
+the current expiry.
 
 ---
 
@@ -1271,7 +1365,7 @@ droplet" configuration:
 | `pyenv install` hangs at `Installing...` for minutes | Normal — it's compiling silently. `tail -f /tmp/python-build.*.log` to watch; check `free -h` for OOM on small boxes. |
 | systemd: `Portal process error: No such file or directory: 'twistd'` | venv bin not on systemd's PATH → add `Environment=PATH=…/venv/bin:…` to the unit (step 7). |
 | systemd stuck at `activating (start)`, Tasks: 1, no ports listening | Same PATH issue, or the manual migrate/first-boot/superuser (step 4) was skipped. |
-| `nginx` won't start / `bind() to 0.0.0.0:80 failed (Address already in use)` | A default vhost with `listen 80` collides with the other game; one bad `listen` aborts all of nginx. Find it with `nginx -T`, disable it (step 8B). |
+| `nginx` won't start / `bind() to 0.0.0.0:80 failed (Address already in use)` | A default vhost with `listen 80` collides with whatever already holds port 80; one bad `listen` aborts all of nginx. Find it with `nginx -T`, disable it (step 8B). |
 | Web client returns **Bad Request (400)** | Request host not in `ALLOWED_HOSTS` → set the real `SANDBOX_HOSTNAME` in `secret_settings.py` and restart (step 4). Means nginx *is* proxying correctly. |
 | Web-admin / login returns **Forbidden (403) CSRF verification failed** | TLS terminates at nginx but Django sees plain HTTP → Origin scheme mismatch. Need `SECURE_PROXY_SSL_HEADER` + `CSRF_TRUSTED_ORIGINS` (steps 4/settings) **and** nginx sending `proxy_set_header X-Forwarded-Proto $scheme;` (step 8). Reload the login page fresh (or clear the site's cookies) after fixing. |
 | Boot fails: `IndentationError: unexpected indent` in `secret_settings.py` | Stray leading whitespace; every line must be flush-left. `sed -i 's/^[[:space:]]*//' server/conf/secret_settings.py`. |
@@ -1303,8 +1397,8 @@ Three mechanisms, for three different needs:
 
 ## Verification checklist
 
-1. **Coexistence** — the other game's telnet/web still respond; no port
-   collision.
+1. **Coexistence** — on a shared host, the other game's telnet/web still
+   respond; no port collision.
 2. **Reachability** — `https://sandbox.YOURDOMAIN/` (webclient) and
    `telnet sandbox.YOURDOMAIN 4100` both connect.
 3. **Every contrib runs** — walk the OOC wing and run what each plaque
