@@ -121,21 +121,36 @@ def _get_active_partner_ids(character, room, now):
 # ---------------------------------------------------------------------------
 
 
+def _drop_if_stale(char_id, state):
+    """Drop an active entry whose RPSession row no longer exists.
+
+    The row can vanish under a surviving in-memory entry: a rolled-back test
+    transaction, a manual DB purge, or a crash between activation and flush.
+    Anything that then writes a row referencing the session (a partner sync,
+    or a scene link from an rp_activity_recorded listener) inserts a dangling
+    FK, which detonates later at commit time under SQLite's deferred FK checks
+    (surfaced when other apps' test suites ran with game glue feeding
+    record_rp_activity() inside rolled-back transactions).
+
+    Returns:
+        bool: True if the entry was stale and has been dropped.
+    """
+    from evennia_rptracker.models import RPSession
+
+    if RPSession.objects.filter(pk=state["session_id"]).exists():
+        return False
+    _active_sessions.pop(char_id, None)
+    return True
+
+
 def _flush_session(char_id, state):
     """Persist the pending pose count for an active session to the DB.
 
     Also syncs RPSessionPartner records with current partner_pose_counts.
     Resets pending_pose_count to 0.
 
-    If the RPSession row no longer exists (rolled-back test transaction,
-    manual DB purge, or crash between activation and flush), the in-memory
-    entry is stale: the pose_count update would silently no-op, but the
-    partner sync would insert rows whose FK references the missing session —
-    which detonates later at commit time under SQLite's deferred FK checks
-    (surfaced when other apps' test suites ran with game glue feeding
-    record_rp_activity() inside rolled-back transactions). Drop the stale
-    entry instead; the next record_rp_activity() starts a fresh pending
-    state.
+    A stale entry (see _drop_if_stale) is dropped instead; the next
+    record_rp_activity() starts a fresh pending state.
     """
     from evennia_rptracker.models import RPSession, RPSessionPartner
 
@@ -143,8 +158,7 @@ def _flush_session(char_id, state):
     if not session_id:
         return
 
-    if not RPSession.objects.filter(pk=session_id).exists():
-        _active_sessions.pop(char_id, None)
+    if _drop_if_stale(char_id, state):
         return
 
     pending = state.get("pending_pose_count", 0)
@@ -282,6 +296,11 @@ def record_rp_activity(character, room):
         return
 
     if state["status"] == "active":
+        # Listeners must never see a session_id with no row behind it; this
+        # pose starts over as the first of a new pending state instead.
+        if _drop_if_stale(char_id, state):
+            _active_sessions[char_id] = _make_pending_state(room.pk, partner_ids)
+            return
         state["pending_pose_count"] += 1
         if state["pending_pose_count"] >= POSE_FLUSH_THRESHOLD:
             _flush_session(char_id, state)
