@@ -1180,8 +1180,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
             return self._do_show()
 
         if "clear" in sw:
-            caller.lore_lean_type = None
-            caller.lore_lean_value = None
+            caller.db.lore_lean_type = None
+            caller.db.lore_lean_value = None
             caller.msg("Your lore lean has been cleared.")
             return
 
@@ -1197,8 +1197,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
 
     def _do_show(self):
         caller = self.caller
-        lean_type = caller.lore_lean_type
-        lean_value = caller.lore_lean_value
+        lean_type = caller.db.lore_lean_type
+        lean_value = caller.db.lore_lean_value
         if not lean_type:
             caller.msg(
                 "You have no active lore lean. Use |w+investigate/<type> <value>|n to set one."
@@ -1221,8 +1221,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
             if err:
                 caller.msg(err)
                 return
-            caller.lore_lean_type = lean_type
-            caller.lore_lean_value = entry.entry_number
+            caller.db.lore_lean_type = lean_type
+            caller.db.lore_lean_value = entry.entry_number
             caller.msg(
                 f"|gLean set:|n investigating {lean_type} — #{entry.entry_number} {entry.title}"
             )
@@ -1239,8 +1239,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
             except Exception:
                 caller.msg(f"No plot #{val} found.")
                 return
-            caller.lore_lean_type = lean_type
-            caller.lore_lean_value = thread.plot_number
+            caller.db.lore_lean_type = lean_type
+            caller.db.lore_lean_value = thread.plot_number
             caller.msg(
                 f"|gLean set:|n investigating {lean_type} — #{thread.plot_number} {thread.name}"
             )
@@ -1253,8 +1253,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
             except Exception:
                 caller.msg(f"No region named '{value}' found.")
                 return
-            caller.lore_lean_type = lean_type
-            caller.lore_lean_value = region.name
+            caller.db.lore_lean_type = lean_type
+            caller.db.lore_lean_value = region.name
             caller.msg(f"|gLean set:|n investigating {lean_type} — {region.name}")
             return
 
@@ -1273,8 +1273,8 @@ class CmdInvestigate(StrictSwitchMixin, MuxCommand):
                 else:
                     caller.msg(f"No tag named '{value}' found.")
                 return
-            caller.lore_lean_type = lean_type
-            caller.lore_lean_value = tag.name
+            caller.db.lore_lean_type = lean_type
+            caller.db.lore_lean_value = tag.name
             caller.msg(f"|gLean set:|n investigating {lean_type} — {tag.name}")
             return
 

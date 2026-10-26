@@ -59,8 +59,6 @@ class CommandSyntaxSeams(EvenniaCommandTest):
                     self.assertEqual(len(matches), 1)
 
     def test_every_contrib_switch_keeps_numeric_refusals_readable(self):
-        # The unrelated missing default and persistence defect is tracked in #216.
-        self.char1.lore_lean_type = self.char1.lore_lean_value = None
         for registered in self.contrib_commands():
             for switch in ("", *(getattr(registered, "switch_options", ()) or ())):
                 for argument in ("", "not-a-number", "999999999"):

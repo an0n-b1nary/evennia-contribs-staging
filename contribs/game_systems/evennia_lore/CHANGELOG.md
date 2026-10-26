@@ -11,6 +11,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+## 0.10.3 — 2026-10-25
+
+### Fixed
+- Save investigation leans as persistent character Attributes shared by commands,
+  the web form and passive selection. Leans and clearing them survive cache
+  eviction and restarts; bare `+investigate` on a new character shows no lean.
+
 ## 0.10.2 — 2026-10-23
 
 ### Changed

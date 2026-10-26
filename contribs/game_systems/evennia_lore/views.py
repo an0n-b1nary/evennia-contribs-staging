@@ -486,8 +486,8 @@ class LoreLeanView(AuthoringMixin, FormView):
         if character is None:
             return {}
         return {
-            "lean_type": getattr(character, "lore_lean_type", None) or "",
-            "lean_value": getattr(character, "lore_lean_value", None) or "",
+            "lean_type": character.db.lore_lean_type or "",
+            "lean_value": character.db.lore_lean_value or "",
         }
 
     def get_context_data(self, **kwargs):
@@ -501,8 +501,8 @@ class LoreLeanView(AuthoringMixin, FormView):
         character = get_object_or_404(ObjectDB, pk=character_id)
         lean_type = form.cleaned_data.get("lean_type") or None
         lean_value = form.cleaned_data.get("lean_value") or None
-        character.lore_lean_type = lean_type
-        character.lore_lean_value = lean_value
+        character.db.lore_lean_type = lean_type
+        character.db.lore_lean_value = lean_value
         return HttpResponseRedirect(reverse("lore-lean"))
 
     def form_invalid(self, form):
