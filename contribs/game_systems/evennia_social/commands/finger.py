@@ -331,6 +331,7 @@ class CmdFinger(StrictSwitchMixin, MuxCommand):
             savefunc=_finger_save,
             quitfunc=_finger_quit,
             key="profile bio",
+            persistent=True,
         )
 
     def _do_custom(self):

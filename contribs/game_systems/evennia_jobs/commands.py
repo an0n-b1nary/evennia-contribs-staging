@@ -234,7 +234,7 @@ def _jobs_save(caller, buffer):
     """Create a job or comment from the editor buffer."""
     from evennia_jobs.models import Job, JobComment
 
-    ctx = getattr(caller.ndb, "_jobs_context", None)
+    ctx = caller.attributes.get("jobs_editor_context")
     if not ctx:
         caller.msg("|rError: no ticket editor context found.|n")
         return False
@@ -281,20 +281,23 @@ def _jobs_save(caller, buffer):
 
 def _jobs_quit(caller):
     """Clean up the ticket editor context."""
-    caller.ndb._jobs_context = None
+    caller.attributes.remove("jobs_editor_context")
     caller.msg("Ticket editor closed.")
 
 
 def _open_editor(caller, job_type, title, mode="create", job_pk=None, staff_only=False):
     """Stash context and open EvEditor for job creation or commenting."""
-    caller.ndb._jobs_context = {
-        "mode": mode,
-        "job_type": job_type,
-        "title": title,
-        "job_pk": job_pk,
-        "is_staff_only": staff_only,
-    }
-    EvEditor(caller, loadfunc=_jobs_load, savefunc=_jobs_save, quitfunc=_jobs_quit)
+    caller.attributes.add(
+        "jobs_editor_context",
+        {
+            "mode": mode,
+            "job_type": str(job_type),
+            "title": title,
+            "job_pk": job_pk,
+            "is_staff_only": staff_only,
+        },
+    )
+    EvEditor(caller, loadfunc=_jobs_load, savefunc=_jobs_save, quitfunc=_jobs_quit, persistent=True)
 
 
 # ---------------------------------------------------------------------------

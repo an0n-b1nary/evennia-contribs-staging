@@ -403,7 +403,7 @@ class TestLayerCommands(LayerTestMixin, EvenniaCommandTest):
     def test_submit_uses_default_kind_then_author_can_change_it(self):
         from evennia_lore.commands import _lore_submit_save
 
-        with patch.object(CmdLore, "start_new_edit"):
+        with patch("evennia_links.editing.EvEditor"):
             self.call(CmdLore(), "/submit Eyes Open", caller=self.char2)
         _lore_submit_save(self.char2, "The royal sleeps with their eyes open.")
         entry = LoreEntry.objects.get(title="Eyes Open")
@@ -513,7 +513,7 @@ class TestLayerCommands(LayerTestMixin, EvenniaCommandTest):
         entry = _entry(author=self.char1, kind="legend", accuracy="accurate")
         result = self.call(CmdLore(), f"/seal #{entry.entry_number}", caller=self.char1)
         self.assertIn("=open", result)
-        self.assertIsNone(getattr(self.char1.ndb, "_lore_layer_ctx", None))
+        self.assertIsNone(self.char1.attributes.get("lore_layer_editor"))
 
     def test_seal_and_unseal_in_game(self):
         entry = _entry(author=self.char1, kind="legend")
@@ -537,7 +537,7 @@ class TestOocEditor(LayerTestMixin, EvenniaCommandTest):
         from evennia_lore.commands import _layer_save
 
         entry = _entry(author=self.char2, kind="rumor", accuracy="partly", ooc_notes="Half.")
-        self.char2.ndb._lore_layer_ctx = {"pk": entry.pk, "field": "ooc_notes"}
+        self.char2.db.lore_layer_editor = {"pk": entry.pk, "field": "ooc_notes"}
         with patch.object(self.char2, "msg") as msg:
             self.assertFalse(_layer_save(self.char2, "   "))
         self.assertIn("OOC notes", msg.call_args[0][0])

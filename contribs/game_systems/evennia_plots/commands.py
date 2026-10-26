@@ -79,7 +79,7 @@ def _plot_web_path(pk):
 
 def _update_load(caller):
     """EvEditor load: return existing block content (edit mode) or empty (new)."""
-    ctx = getattr(caller.ndb, "_plot_update_ctx", None)
+    ctx = caller.attributes.get("plots_update_editor")
     if not ctx:
         return ""
     if ctx.get("mode") == "edit":
@@ -96,7 +96,7 @@ def _update_load(caller):
 
 def _update_save(caller, buffer):
     """EvEditor save: create a new block or update an existing one."""
-    ctx = getattr(caller.ndb, "_plot_update_ctx", None)
+    ctx = caller.attributes.get("plots_update_editor")
     if not ctx:
         caller.msg("|rError: no editing context found.|n")
         return False
@@ -122,9 +122,16 @@ def _update_save(caller, buffer):
         block.save(update_fields=["content", "edited_at"])
         caller.msg(f"|gUpdate block {block.block_number} saved.|n")
     else:
+        from django.apps import apps
+
         from evennia_plots.models import PlotParticipant, PlotUpdate
 
-        parent = ctx["parent"]
+        parent_model = apps.get_model("evennia_plots", ctx["parent_model"])
+        try:
+            parent = parent_model.objects.get(pk=ctx["parent_pk"])
+        except parent_model.DoesNotExist:
+            caller.msg("|rError: the plot or arc no longer exists.|n")
+            return False
         update_type = ctx.get("update_type", PlotUpdate.UpdateType.IC)
         block = PlotUpdate.create_update(
             parent=parent,
@@ -146,7 +153,7 @@ def _update_save(caller, buffer):
 
 def _update_quit(caller):
     """EvEditor quit: clean up context."""
-    caller.ndb._plot_update_ctx = None
+    caller.attributes.remove("plots_update_editor")
     caller.msg("Editor closed.")
 
 
@@ -945,21 +952,25 @@ class CmdPlot(StrictSwitchMixin, MuxCommand):
                 defaults={"character_name": caller.key},
             )
         else:
-            if getattr(caller.ndb, "_plot_update_ctx", None):
+            if caller.attributes.get("plots_update_editor"):
                 caller.msg("You already have an editor open. Finish it first (|w:q|n or |w:wq|n).")
                 return
-            caller.ndb._plot_update_ctx = {
-                "mode": "new",
-                "parent": thread,
-                "update_type": update_type,
-            }
+            caller.attributes.add(
+                "plots_update_editor",
+                {
+                    "mode": "new",
+                    "parent_model": "PlotThread",
+                    "parent_pk": thread.pk,
+                    "update_type": str(update_type),
+                },
+            )
             EvEditor(
                 caller,
                 loadfunc=_update_load,
                 savefunc=_update_save,
                 quitfunc=_update_quit,
                 key="plot_update",
-                persistent=False,
+                persistent=True,
             )
 
     def _do_update_edit(self, arg):
@@ -985,17 +996,17 @@ class CmdPlot(StrictSwitchMixin, MuxCommand):
         if not is_plot_staff(caller) and (block.author_id is None or block.author_id != caller.id):
             caller.msg("You can only edit your own update blocks.")
             return
-        if getattr(caller.ndb, "_plot_update_ctx", None):
+        if caller.attributes.get("plots_update_editor"):
             caller.msg("You already have an editor open. Finish it first (|w:q|n or |w:wq|n).")
             return
-        caller.ndb._plot_update_ctx = {"mode": "edit", "block_pk": block.pk}
+        caller.attributes.add("plots_update_editor", {"mode": "edit", "block_pk": block.pk})
         EvEditor(
             caller,
             loadfunc=_update_load,
             savefunc=_update_save,
             quitfunc=_update_quit,
             key="plot_update_edit",
-            persistent=False,
+            persistent=True,
         )
 
     def _do_tag(self, thread_arg, tag_name, make_major=False):
@@ -2263,21 +2274,25 @@ class CmdArc(StrictSwitchMixin, MuxCommand):
             label = "OOC note" if update_type == "ooc" else "IC update"
             caller.msg(f"|gAdded {label} (block {block.block_number}) to arc #{arc.arc_number}.|n")
         else:
-            if getattr(caller.ndb, "_plot_update_ctx", None):
+            if caller.attributes.get("plots_update_editor"):
                 caller.msg("You already have an editor open. Finish it first.")
                 return
-            caller.ndb._plot_update_ctx = {
-                "mode": "new",
-                "parent": arc,
-                "update_type": update_type,
-            }
+            caller.attributes.add(
+                "plots_update_editor",
+                {
+                    "mode": "new",
+                    "parent_model": "PlotArc",
+                    "parent_pk": arc.pk,
+                    "update_type": str(update_type),
+                },
+            )
             EvEditor(
                 caller,
                 loadfunc=_update_load,
                 savefunc=_update_save,
                 quitfunc=_update_quit,
                 key="arc_update",
-                persistent=False,
+                persistent=True,
             )
 
     def _do_update_edit(self, arg):
@@ -2300,17 +2315,17 @@ class CmdArc(StrictSwitchMixin, MuxCommand):
         except PlotUpdate.DoesNotExist:
             caller.msg(f"Block {block_str} not found on arc #{arc.arc_number}.")
             return
-        if getattr(caller.ndb, "_plot_update_ctx", None):
+        if caller.attributes.get("plots_update_editor"):
             caller.msg("You already have an editor open. Finish it first.")
             return
-        caller.ndb._plot_update_ctx = {"mode": "edit", "block_pk": block.pk}
+        caller.attributes.add("plots_update_editor", {"mode": "edit", "block_pk": block.pk})
         EvEditor(
             caller,
             loadfunc=_update_load,
             savefunc=_update_save,
             quitfunc=_update_quit,
             key="arc_update_edit",
-            persistent=False,
+            persistent=True,
         )
 
 

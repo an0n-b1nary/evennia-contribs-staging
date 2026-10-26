@@ -25,6 +25,8 @@ Usage::
 
 import difflib
 
+from django.apps import apps
+from django.utils.module_loading import import_string
 from evennia.utils.eveditor import EvEditor
 
 VERSIONS_PER_PAGE = 10
@@ -32,12 +34,13 @@ VERSIONS_PER_PAGE = 10
 
 def _load_func(caller):
     """EvEditor loadfunc: return the current field content."""
-    ctx = caller.ndb._editing_context
+    ctx = caller.attributes.get("links_editing_context")
     if not ctx:
         return ""
+    model_class = apps.get_model(*ctx["model_class"])
     try:
-        instance = ctx["model_class"].objects.get(pk=ctx["instance_pk"])
-    except ctx["model_class"].DoesNotExist:
+        instance = model_class.objects.get(pk=ctx["instance_pk"])
+    except model_class.DoesNotExist:
         caller.msg("|rError: the object you were editing no longer exists.|n")
         return ""
     return getattr(instance, ctx["field_name"], "")
@@ -45,14 +48,15 @@ def _load_func(caller):
 
 def _save_func(caller, buffer):
     """EvEditor savefunc: save buffer to the model field with optional versioning."""
-    ctx = caller.ndb._editing_context
+    ctx = caller.attributes.get("links_editing_context")
     if not ctx:
         caller.msg("|rError: no editing context found.|n")
         return False
 
+    model_class = apps.get_model(*ctx["model_class"])
     try:
-        instance = ctx["model_class"].objects.get(pk=ctx["instance_pk"])
-    except ctx["model_class"].DoesNotExist:
+        instance = model_class.objects.get(pk=ctx["instance_pk"])
+    except model_class.DoesNotExist:
         caller.msg("|rError: the object you were editing no longer exists.|n")
         return False
 
@@ -65,6 +69,7 @@ def _save_func(caller, buffer):
 
     version_cls = ctx.get("version_model_class")
     if version_cls:
+        version_cls = apps.get_model(*version_cls)
         version_cls.create_version(parent=instance, content=old_content, editor=caller)
 
     setattr(instance, ctx["field_name"], new_content)
@@ -75,13 +80,18 @@ def _save_func(caller, buffer):
 
 def _quit_func(caller):
     """EvEditor quitfunc: clean up the editing context."""
-    caller.ndb._editing_context = None
+    caller.attributes.remove("links_editing_context")
     caller.msg("Editor closed.")
+
+
+def _new_load_func(caller):
+    """Start a new-content editor with an empty buffer."""
+    return ""
 
 
 def _new_save_func(caller, buffer):
     """EvEditor savefunc for new content creation (calls stored callback)."""
-    ctx = caller.ndb._editing_context
+    ctx = caller.attributes.get("links_editing_context")
     if not ctx:
         caller.msg("|rError: no editing context found.|n")
         return False
@@ -96,13 +106,12 @@ def _new_save_func(caller, buffer):
         caller.msg("Nothing to save — buffer is empty.")
         return False
 
-    callback(caller, content)
-    return True
+    return import_string(callback)(caller, content) is not False
 
 
 def _new_quit_func(caller):
     """EvEditor quitfunc for new content creation."""
-    caller.ndb._editing_context = None
+    caller.attributes.remove("links_editing_context")
     caller.msg("Editor closed.")
 
 
@@ -116,46 +125,63 @@ class EditingMixin:
     def start_edit(self, instance, field_name="content", version_model_class=None):
         """Begin an EvEditor session on an existing object's text field."""
         caller = self.caller
-        if getattr(caller.ndb, "_editing_context", None):
+        if caller.attributes.get("links_editing_context"):
             caller.msg(
                 "You already have an editing session open. "
                 "Finish or quit it first (|w:q|n or |w:wq|n)."
             )
             return
 
-        caller.ndb._editing_context = {
-            "model_class": type(instance),
-            "instance_pk": instance.pk,
-            "field_name": field_name,
-            "version_model_class": version_model_class,
-        }
+        caller.attributes.add(
+            "links_editing_context",
+            {
+                "model_class": (instance._meta.app_label, instance._meta.model_name),
+                "instance_pk": instance.pk,
+                "field_name": field_name,
+                "version_model_class": (
+                    (version_model_class._meta.app_label, version_model_class._meta.model_name)
+                    if version_model_class
+                    else None
+                ),
+            },
+        )
         EvEditor(
             caller,
             loadfunc=_load_func,
             savefunc=_save_func,
             quitfunc=_quit_func,
             key="text_editor",
-            persistent=False,
+            persistent=True,
         )
 
-    def start_new_edit(self, callback):
+    def start_new_edit(self, callback, *, context=None):
         """Begin an EvEditor session for creating new content."""
         caller = self.caller
-        if getattr(caller.ndb, "_editing_context", None):
+        if caller.attributes.get("links_editing_context"):
             caller.msg(
                 "You already have an editing session open. "
                 "Finish or quit it first (|w:q|n or |w:wq|n)."
             )
             return
 
-        caller.ndb._editing_context = {"create_callback": callback}
+        # Reject closures, lambdas and bound methods before storing any state.
+        path = f"{callback.__module__}.{callback.__name__}"
+        if import_string(path) is not callback:
+            raise ValueError("Editor creation callbacks must be module-level functions.")
+        caller.attributes.add(
+            "links_editing_context",
+            {
+                "create_callback": path,
+                "create_context": context or {},
+            },
+        )
         EvEditor(
             caller,
-            loadfunc=lambda caller: "",
+            loadfunc=_new_load_func,
             savefunc=_new_save_func,
             quitfunc=_new_quit_func,
             key="text_editor",
-            persistent=False,
+            persistent=True,
         )
 
     def view_versions(self, instance, version_model_class, page=1):

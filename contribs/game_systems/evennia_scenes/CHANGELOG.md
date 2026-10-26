@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Preserve editor buffers and their save context across reloads and restarts.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
 ## 0.8.4 — 2026-10-20

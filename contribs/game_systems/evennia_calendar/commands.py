@@ -217,7 +217,7 @@ def _format_event_detail(event, sr_mode=False):
 
 def _cal_load(caller):
     """Load existing description into editor (edit mode) or blank (create)."""
-    ctx = getattr(caller.ndb, "_calendar_context", None)
+    ctx = caller.attributes.get("calendar_editor_context")
     if not ctx:
         return ""
     if ctx.get("mode") == "edit":
@@ -234,7 +234,7 @@ def _cal_load(caller):
 
 def _cal_save(caller, buffer):
     """Save description buffer to context or directly to existing event."""
-    ctx = getattr(caller.ndb, "_calendar_context", None)
+    ctx = caller.attributes.get("calendar_editor_context")
     if not ctx:
         caller.msg("|rNo calendar editing context found.|n")
         return False
@@ -252,17 +252,18 @@ def _cal_save(caller, buffer):
         caller.msg(f"|gEvent #{event.pk} description updated.|n")
     else:
         ctx["description"] = buffer.strip()
+        caller.attributes.add("calendar_editor_context", dict(ctx))
     return True
 
 
 def _cal_quit(caller):
     """Finalise create flow or clean up edit context."""
-    ctx = getattr(caller.ndb, "_calendar_context", None)
+    ctx = caller.attributes.get("calendar_editor_context")
     if not ctx:
         return
     if ctx.get("mode") == "create":
         _finalize_create(caller, ctx)
-    caller.ndb._calendar_context = None
+    caller.attributes.remove("calendar_editor_context")
 
 
 def _finalize_create(caller, ctx):
@@ -545,22 +546,26 @@ class CmdCalendar(StrictSwitchMixin, MuxCommand):
             )
             return
 
-        self.caller.ndb._calendar_context = {
-            "mode": "create",
-            "title": title,
-            "scheduled_time": scheduled_time,
-            "emphasis": CalendarEvent.Emphasis.FREEFORM,
-            "cap": None,
-            "is_staff_event": False,
-            "cluster": None,
-            "description": "",
-        }
+        self.caller.attributes.add(
+            "calendar_editor_context",
+            {
+                "mode": "create",
+                "title": title,
+                "scheduled_time": scheduled_time,
+                "emphasis": str(CalendarEvent.Emphasis.FREEFORM),
+                "cap": None,
+                "is_staff_event": False,
+                "cluster": None,
+                "description": "",
+            },
+        )
         EvEditor(
             self.caller,
             loadfunc=_cal_load,
             savefunc=_cal_save,
             quitfunc=_cal_quit,
             key="Event Description",
+            persistent=True,
         )
 
     # ------------------------------------------------------------------
@@ -575,13 +580,16 @@ class CmdCalendar(StrictSwitchMixin, MuxCommand):
         if not _is_event_owner(self.caller, event):
             self.caller.msg("|rYou can only edit your own events.|n")
             return
-        self.caller.ndb._calendar_context = {"mode": "edit", "event_pk": event.pk}
+        self.caller.attributes.add(
+            "calendar_editor_context", {"mode": "edit", "event_pk": event.pk}
+        )
         EvEditor(
             self.caller,
             loadfunc=_cal_load,
             savefunc=_cal_save,
-            quitfunc=lambda c: setattr(c.ndb, "_calendar_context", None),
+            quitfunc=_cal_quit,
             key="Event Description",
+            persistent=True,
         )
 
     # ------------------------------------------------------------------

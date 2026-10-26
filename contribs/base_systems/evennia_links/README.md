@@ -181,6 +181,14 @@ class CmdPost(EditingMixin, MuxCommand):
             self.start_new_edit(callback=my_create_callback)
 ```
 
+Editor buffers and their context survive reloads and restarts. Creation callbacks
+must be importable module-level functions; lambdas, closures and bound methods
+are not supported. Pass optional metadata with
+`start_new_edit(my_create_callback, context={"title": title})`; the callback can
+read it from `caller.attributes.get("links_editing_context")["create_context"]`.
+Use plain values such as strings and IDs in that metadata. The editor removes
+its context on quit, including save-and-quit.
+
 `EditingMixin` is imported lazily — bringing in `evennia_links` does **not**
 import `EvEditor` until `EditingMixin` is first accessed, so model-only consumers
 pay no extra import cost.

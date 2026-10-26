@@ -68,7 +68,7 @@ def _scene_web_path(pk):
 
 def _desc_load(caller):
     """Load the scene description into the editor."""
-    ctx = caller.ndb._scene_desc_context
+    ctx = caller.attributes.get("scenes_description_editor")
     if not ctx:
         return ""
     try:
@@ -81,7 +81,7 @@ def _desc_load(caller):
 
 def _desc_save(caller, buffer):
     """Save the editor buffer to the scene description."""
-    ctx = caller.ndb._scene_desc_context
+    ctx = caller.attributes.get("scenes_description_editor")
     if not ctx:
         caller.msg("|rError: no scene editing context found.|n")
         return False
@@ -98,7 +98,7 @@ def _desc_save(caller, buffer):
 
 def _desc_quit(caller):
     """Clean up the scene description editing context."""
-    caller.ndb._scene_desc_context = None
+    caller.attributes.remove("scenes_description_editor")
     caller.msg("Description editor closed.")
 
 
@@ -393,14 +393,14 @@ class CmdScene(StrictSwitchMixin, MuxCommand):
             caller.msg("Only the scene creator or staff can edit the description.")
             return
 
-        if getattr(caller.ndb, "_scene_desc_context", None):
+        if caller.attributes.get("scenes_description_editor"):
             caller.msg(
                 "You already have a description editor open. "
                 "Finish or quit it first (|w:q|n or |w:wq|n)."
             )
             return
 
-        caller.ndb._scene_desc_context = {"scene_pk": scene.pk}
+        caller.attributes.add("scenes_description_editor", {"scene_pk": scene.pk})
 
         EvEditor(
             caller,
@@ -408,7 +408,7 @@ class CmdScene(StrictSwitchMixin, MuxCommand):
             savefunc=_desc_save,
             quitfunc=_desc_quit,
             key="scene_desc_editor",
-            persistent=False,
+            persistent=True,
         )
 
     def _privacy(self):

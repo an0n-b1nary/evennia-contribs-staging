@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Preserve editor buffers and their save context across reloads and restarts.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
 ## 0.6.0 — 2026-10-22

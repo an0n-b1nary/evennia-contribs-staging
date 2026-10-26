@@ -25,7 +25,7 @@ class LoreSyntaxTests(EvenniaCommandTest):
 
     @override_settings(LORE_REQUIRE_APPROVAL=True)
     def test_submit_then_kind_and_scene_work_for_the_author_before_approval(self):
-        with patch.object(CmdLore, "start_new_edit") as editor:
+        with patch("evennia_links.editing.EvEditor") as editor:
             self.call(CmdLore(), "/SuB A visitor's story", caller=self.char2)
             editor.assert_called_once()
         _lore_submit_save(self.char2, "An account of the road.")
@@ -47,7 +47,7 @@ class LoreSyntaxTests(EvenniaCommandTest):
 
     def test_old_stacked_and_unknown_switches_cannot_open_an_editor_or_add_tags(self):
         entry = LoreEntry.create_entry("An account", self.char1, body="The road.")
-        with patch.object(CmdLore, "start_new_edit") as editor:
+        with patch("evennia_links.editing.EvEditor") as editor:
             for args in (
                 "/submit/rumor Old rumor",
                 "/submit/scene 9001=Old scene",
@@ -60,7 +60,7 @@ class LoreSyntaxTests(EvenniaCommandTest):
                 with self.subTest(args=args):
                     self.call(CmdLore(), args)
             editor.assert_not_called()
-        self.assertIsNone(self.char1.ndb._lore_submit_ctx)
+        self.assertIsNone(self.char1.db.links_editing_context)
         self.assertFalse(LoreTag.objects.exists())
         self.assertFalse(entry.tags.exists())
 
