@@ -310,7 +310,7 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         plot = PlotThread.create_thread("Syntax plot", self.char2)
         command = self.command("+lore")
         with override_settings(LORE_REQUIRE_APPROVAL=True):
-            with patch.object(type(command), "start_new_edit") as editor:
+            with patch("evennia_links.editing.EvEditor") as editor:
                 self.expect(command, "/submit/rumor Old syntax", "one switch", caller=self.char2)
                 editor.assert_not_called()
                 self.call(command, "/submit Syntax account", caller=self.char2)
