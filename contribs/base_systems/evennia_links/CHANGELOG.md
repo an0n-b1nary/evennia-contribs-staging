@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add the account-default communication identity setting, per-session visitor
+  policy, neutral account display mixin and deferred startup/system checks.
+- Give disposable guest characters generated adjective-and-animal names,
+  with collision retries, numeric fallback and a configurable generator.
 - Preserve editor buffers and their save context across reloads and restarts.
 
 ## 0.8.13 — 2026-10-25

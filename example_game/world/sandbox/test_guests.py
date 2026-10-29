@@ -308,6 +308,9 @@ class TestGuestSeed(EvenniaTest):
         self.assertIsNotNone(guest)
         self.addCleanup(lambda: guest.delete() if guest.pk else None)
         character = guest.characters.all()[0]
+        self.assertNotEqual(character.key, guest.key)
+        self.assertEqual(len(character.key.split()), 2)
+        self.assertIn("(guest)", guest.get_display_name(self.account))
         self.assertEqual(character.location, start)
         self.assertEqual(character.home, start)
         with patch.object(guest, "puppet_object") as puppet:

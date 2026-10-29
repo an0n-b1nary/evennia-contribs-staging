@@ -32,6 +32,12 @@ def at_server_start():
     This is called every time the server starts up, regardless of
     how it was shut down.
     """
+    # evennia_links — refuse communication-identity components wired under
+    # the wrong EVENNIA_COMMS_IDENTITY mode. The launcher skips Django checks.
+    from evennia_links.identity import check_comms_identity
+
+    check_comms_identity()
+
     # evennia_rptracker — recover DB sessions orphaned by a crash/kill,
     # then ensure the idle-check Script is running.
     if apps.is_installed("evennia_rptracker"):
