@@ -9,16 +9,20 @@ DefaultCharacter/DefaultRoom used by the base test classes don't have
 record_pose()/get_characters_by_pose_time() etc.
 
 Account options (show_pose_headers, highlight_enabled, ...) are registered
-onto settings.OPTIONS_ACCOUNT_DEFAULT in setUpClass — the same registration
-step a consuming game performs in server/conf/settings.py (see README step
-3) — so this contrib's own suite is self-contained.
+for each test class — the same registration step a consuming game performs
+in server/conf/settings.py (see README step 3) — so this contrib's own suite
+is self-contained. A host that runs these tests keeps its own definitions,
+and later test classes see its settings unchanged.
 
 Objects available from EvenniaTest/EvenniaCommandTest:
     self.char1 (key="Char"), self.char2 (key="Char2") — both in self.room1
     self.account, self.account2 — linked to char1/char2 respectively
 """
 
+import unittest
+
 from django.conf import settings
+from django.test import TestCase, override_settings
 from evennia.objects.objects import DefaultCharacter, DefaultRoom
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
@@ -53,6 +57,15 @@ _POSING_OPTIONS = {
 }
 
 
+def _register_posing_options(cls):
+    """Apply _POSING_OPTIONS for one test class; host definitions win."""
+    cls.enterClassContext(
+        override_settings(
+            OPTIONS_ACCOUNT_DEFAULT={**_POSING_OPTIONS, **settings.OPTIONS_ACCOUNT_DEFAULT}
+        )
+    )
+
+
 class PosingTestCharacter(PosingCharacterMixin, DefaultCharacter):
     """Test-local Character typeclass mixing in the posing pipeline."""
 
@@ -69,12 +82,11 @@ class PosingTestCase(EvenniaTest):
 
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
         # Mirrors README step 3 — the game registers these once at startup.
-        # OPTIONS_ACCOUNT_DEFAULT is read by reference by AccountDB.options
-        # (a lazy_property), so mutating it here before any account's
-        # .options is first accessed is sufficient and self-contained.
-        settings.OPTIONS_ACCOUNT_DEFAULT.update(_POSING_OPTIONS)
+        # AccountDB.options reads the setting when an account first uses it,
+        # so a class-wide override reaches every account these tests create.
+        _register_posing_options(cls)
+        super().setUpClass()
 
 
 class PosingCommandTestCase(EvenniaCommandTest):
@@ -85,8 +97,42 @@ class PosingCommandTestCase(EvenniaCommandTest):
 
     @classmethod
     def setUpClass(cls):
+        _register_posing_options(cls)
         super().setUpClass()
-        settings.OPTIONS_ACCOUNT_DEFAULT.update(_POSING_OPTIONS)
+
+
+_HOST_SEPARATOR = ("Host separator.", "BaseOption", "")
+
+
+class TestAccountOptionScope(TestCase):
+    """The shared test bases keep their account options to their own classes.
+
+    A host game runs these bases under its own settings. Changing the host's
+    options would break whichever test class happens to run next.
+    """
+
+    def test_host_options_win_and_survive_the_class(self):
+        for base in (PosingTestCase, PosingCommandTestCase):
+            with self.subTest(base=base.__name__):
+
+                class Probe(base):
+                    seen = {}  # noqa: RUF012 — collects what the probe saw
+
+                    def test_reads_options(self):
+                        self.seen.update(settings.OPTIONS_ACCOUNT_DEFAULT)
+
+                host = {"pose_separator": _HOST_SEPARATOR}
+                result = unittest.TestResult()
+                with override_settings(OPTIONS_ACCOUNT_DEFAULT=host):
+                    unittest.TestSuite([Probe("test_reads_options")]).run(result)
+                    after = settings.OPTIONS_ACCOUNT_DEFAULT
+
+                self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+                self.assertEqual(Probe.seen["pose_separator"], _HOST_SEPARATOR)
+                self.assertEqual(
+                    Probe.seen["highlight_enabled"], _POSING_OPTIONS["highlight_enabled"]
+                )
+                self.assertEqual(after, {"pose_separator": _HOST_SEPARATOR})
 
 
 # =====================================================================
