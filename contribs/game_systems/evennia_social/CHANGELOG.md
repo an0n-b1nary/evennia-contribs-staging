@@ -10,6 +10,13 @@ All notable changes to `evennia_social` are documented here.
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+### Breaking
+
+- Remove the public `DARK` presence value. `+unfindable dark` and service writes
+  of `"dark"` are rejected for every character. Existing stored `"dark"` values
+  now read as unfindable without being rewritten, so no data migration is needed;
+  staff-facing lists use the same `(unfindable)` marker as player characters.
+
 ## [0.9.0] - 2026-10-25
 
 ### Breaking

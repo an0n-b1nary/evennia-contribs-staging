@@ -21,8 +21,8 @@ Public API:
     HANGOUT_TYPES                          — valid +hangouts categories
     find_room(caller, query), find_room_for_player(caller, query, character)
     is_staff(character), get_connected_characters(), find_character(name)
-    evennia_social.presence — per-character findable / unfindable / (staff)
-        dark, and is_findable / is_listed for every presence surface
+    evennia_social.presence — per-character findable / unfindable, and
+        is_findable / is_listed for every presence surface
 
 Commands (import explicitly when needed):
 

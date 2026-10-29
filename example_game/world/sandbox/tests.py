@@ -929,14 +929,19 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
         self.char1.location = market
         self.assertEqual(self.session.get_puppet(), self.char1)
         url = reverse("api-plane-tiles", args=[self.plane.pk])
-        for visibility, public_names, staff_names in (
-            (presence.FINDABLE, [self.char1.key], [self.char1.key]),
-            (presence.UNFINDABLE, [], [f"{self.char1.key} (unfindable)"]),
-            (presence.DARK, [], [f"{self.char1.key} (dark)"]),
-        ):
-            presence.set_visibility(self.char1, visibility)
+        cases = (
+            (presence.FINDABLE, "current", [self.char1.key], [self.char1.key]),
+            (presence.UNFINDABLE, "current", [], [f"{self.char1.key} (unfindable)"]),
+            ("dark", "legacy", [], [f"{self.char1.key} (unfindable)"]),
+        )
+        self.assertTrue(cases)
+        for visibility, source, public_names, staff_names in cases:
+            if source == "legacy":
+                self.char1.attributes.add(presence.ATTRIBUTE, visibility)
+            else:
+                presence.set_visibility(self.char1, visibility)
             for account, expected in ((self.account2, public_names), (self.account, staff_names)):
-                with self.subTest(visibility=visibility, account=account.key):
+                with self.subTest(visibility=visibility, source=source, account=account.key):
                     self.client.force_login(account)
                     response = self.client.get(url)
                     self.assertEqual(response.status_code, 200)
