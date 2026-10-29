@@ -9,13 +9,15 @@ README requires (social before posing), since the stock Evennia
 DefaultCharacter/DefaultRoom used by EvenniaTest don't carry either
 contrib's state.
 
-Account options both contribs need are registered onto
-settings.OPTIONS_ACCOUNT_DEFAULT in setUpClass, mirroring the registration
-step a consuming game performs (see both READMEs' "Register the account
-options" steps), so this contrib's own suite is self-contained.
+Account options both contribs need are registered for each test class,
+mirroring the registration step a consuming game performs (see both READMEs'
+"Register the account options" steps), so this contrib's own suite is
+self-contained. A host that runs these tests keeps its own definitions, and
+later test classes see its settings unchanged.
 """
 
 from django.conf import settings
+from django.test import override_settings
 from evennia.objects.objects import DefaultCharacter, DefaultRoom
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
@@ -40,6 +42,15 @@ _ACCOUNT_OPTIONS = {
 }
 
 
+def _register_account_options(cls):
+    """Apply _ACCOUNT_OPTIONS for one test class; host definitions win."""
+    cls.enterClassContext(
+        override_settings(
+            OPTIONS_ACCOUNT_DEFAULT={**_ACCOUNT_OPTIONS, **settings.OPTIONS_ACCOUNT_DEFAULT}
+        )
+    )
+
+
 class SocialTestCharacter(SocialCharacterMixin, PosingCharacterMixin, DefaultCharacter):
     """Test-local Character mixing social (first) + posing (second)."""
 
@@ -56,8 +67,8 @@ class SocialTestCase(EvenniaTest):
 
     @classmethod
     def setUpClass(cls):
+        _register_account_options(cls)
         super().setUpClass()
-        settings.OPTIONS_ACCOUNT_DEFAULT.update(_ACCOUNT_OPTIONS)
 
 
 class SocialCommandTestCase(EvenniaCommandTest):
@@ -68,5 +79,5 @@ class SocialCommandTestCase(EvenniaCommandTest):
 
     @classmethod
     def setUpClass(cls):
+        _register_account_options(cls)
         super().setUpClass()
-        settings.OPTIONS_ACCOUNT_DEFAULT.update(_ACCOUNT_OPTIONS)

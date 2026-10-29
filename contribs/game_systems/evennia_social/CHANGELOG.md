@@ -4,6 +4,8 @@ All notable changes to `evennia_social` are documented here.
 
 ## [Unreleased]
 
+- Test bases register their account options for each test class only, so a host game that runs them keeps its own option definitions and later test classes see its settings unchanged.
+
 - Preserve editor buffers and their save context across reloads and restarts.
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
