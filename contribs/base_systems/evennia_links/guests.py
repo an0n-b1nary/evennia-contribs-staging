@@ -170,7 +170,16 @@ class GuestAccountMixin:
             start = guest_start()
         except ValueError as exc:
             return None, [str(exc)]
-        kwargs.update(key=guest_character_name(), location=start, home=start)
+        try:
+            key = guest_character_name()
+        except Exception:
+            # Raising here would skip authenticate()'s cleanup and strand the
+            # new guest account, consuming its GUEST_LIST name for good.
+            from evennia.utils import logger
+
+            logger.log_trace("Cannot name a guest character.")
+            return None, ["Guest characters are unavailable. Please contact staff."]
+        kwargs.update(key=key, location=start, home=start)
         character, errors = super().create_character(*args, **kwargs)
         if character:
             character.tags.add("character", category="guest")

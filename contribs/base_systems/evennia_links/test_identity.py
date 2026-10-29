@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Identity policy and deferred host configuration validation."""
 
 from types import SimpleNamespace
@@ -138,6 +139,15 @@ class TestAccountDisplay(EvenniaTest):
             with self.subTest(looker=looker):
                 self.assertEqual(self.account.get_display_name(looker), "Newcomer")
 
+    def test_display_name_does_not_rewrite_the_character_roster(self):
+        self.account.characters.add(self.char1)
+        with patch(
+            "evennia.accounts.accounts.CharactersHandler.all",
+            side_effect=AssertionError("characters.all() saves the roster"),
+        ):
+            self.assertEqual(self.account.get_display_name(self.account2), "Newcomer")
+            self.assertIn(self.account.key, self.account.get_display_name(self.char1))
+
     def test_self_and_owned_characters_retain_account_name(self):
         self.account.characters.add(self.char1)
         for looker in (self.account, self.char1):
@@ -200,6 +210,15 @@ class TestIdentityConfiguration(SimpleTestCase):
         with self.settings(CMDSET_ACCOUNT=path(AccountCommands)):
             self.assertIsNone(check_comms_identity())
         with self.character_settings(CMDSET_CHARACTER=path(CharacterCommands)):
+            self.assertIsNone(check_comms_identity())
+
+    def test_paths_relative_to_evennia_search_paths_resolve(self):
+        with self.settings(
+            TYPECLASS_PATHS=["evennia.comms"],
+            BASE_CHANNEL_TYPECLASS="comms.DefaultChannel",
+            CMDSET_PATHS=["evennia.commands"],
+            CMDSET_ACCOUNT="cmdset.CmdSet",
+        ):
             self.assertIsNone(check_comms_identity())
 
     def test_each_cmdset_is_instantiated_and_checked_in_both_modes(self):

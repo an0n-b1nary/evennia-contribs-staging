@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Communication identity policy, independent of record ownership.
 
 Typeclasses are imported inside the check, after Django's app registry is
@@ -65,7 +66,9 @@ class CharacterCommsAccountMixin:
             looker == self
             or _is_staff(looker)
             or (looker is not None and getattr(looker, "account", None) == self)
-            or (looker is not None and looker in self.characters.all())
+            # Read the roster directly: characters.all() rewrites the attribute
+            # on every call, and strangers reach this test on every message.
+            or (looker is not None and looker in (self.db._playable_characters or ()))
         ):
             return super().get_display_name(looker, **kwargs)
         return "Newcomer"
@@ -94,14 +97,15 @@ def check_comms_identity():
                     f"{source}: {base.__module__}.{base.__qualname__} requires {marker!r} mode"
                 )
 
-    def resolve(setting_name):
+    def resolve(setting_name, search_paths, required=True):
+        # Evennia accepts paths relative to TYPECLASS_PATHS and CMDSET_PATHS.
         path = getattr(settings, setting_name, None)
         if not path:
-            if not setting_name.startswith("GUEST_"):
+            if required:
                 problems.append(f"{setting_name}: a class path is required")
             return None
         try:
-            cls = class_from_module(path)
+            cls = class_from_module(path, defaultpaths=getattr(settings, search_paths, None))
             if not isinstance(cls, type):
                 raise TypeError("expected a class")
         except (ImportError, AttributeError, TypeError, ValueError) as exc:
@@ -111,7 +115,7 @@ def check_comms_identity():
         return cls
 
     for name in ("BASE_ACCOUNT_TYPECLASS", "BASE_GUEST_TYPECLASS", "BASE_CHANNEL_TYPECLASS"):
-        cls = resolve(name)
+        cls = resolve(name, "TYPECLASS_PATHS")
         if mode != "character":
             continue
         if name == "BASE_CHANNEL_TYPECLASS":
@@ -119,7 +123,7 @@ def check_comms_identity():
                 problems.append(f"{name} requires CharacterCommsChannelMixin (character marker)")
         elif cls is None or not issubclass(cls, CharacterCommsAccountMixin):
             problems.append(f"{name} requires CharacterCommsAccountMixin first in its MRO")
-        elif cls.__mro__[1] is not CharacterCommsAccountMixin:
+        else:
             # Host subclasses may inherit an already correctly composed class.
             for base in cls.__mro__[1:]:
                 if base is CharacterCommsAccountMixin:
@@ -136,7 +140,7 @@ def check_comms_identity():
         "GUEST_ACCOUNT_CMDSET",
         "GUEST_CHARACTER_CMDSET",
     ):
-        cls = resolve(name)
+        cls = resolve(name, "CMDSET_PATHS", required=not name.startswith("GUEST_"))
         if cls is None:
             continue
         try:

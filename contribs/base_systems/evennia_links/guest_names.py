@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Readable disposable character names; account usernames stay unchanged."""
 
 import random
@@ -83,7 +84,8 @@ def guest_character_name():
         name = generator()
         if not isinstance(name, str) or not name.strip():
             raise ImproperlyConfigured("EVENNIA_GUEST_NAME_GENERATOR must return a nonempty name.")
-        name = name.strip()
+        # Character.create() normalizes the key; check the name it will store.
+        name = DefaultCharacter.normalize_name(name.strip())
         if not exists(name):
             return name
     number = 2

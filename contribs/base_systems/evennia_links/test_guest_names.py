@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Guest character naming through the real account creation hook."""
 
 import random
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 from evennia.accounts.accounts import DefaultGuest
+from evennia.accounts.models import AccountDB
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -25,6 +27,10 @@ class NamedCharacter(DefaultCharacter):
 
 def custom_name():
     return "Wandering Heron"
+
+
+def accented_name():
+    return "Café Fox"
 
 
 @override_settings(
@@ -94,3 +100,21 @@ class TestGuestNames(EvenniaTest):
                 self.assertRaisesMessage(ImproperlyConfigured, "EVENNIA_GUEST_NAME_GENERATOR"),
             ):
                 guest_character_name()
+
+    @override_settings(
+        GUEST_ENABLED=True,
+        GUEST_LIST=["NamingGuest"],
+        BASE_GUEST_TYPECLASS=f"{__name__}.NamedGuest",
+        EVENNIA_GUEST_NAME_GENERATOR=3,
+    )
+    def test_bad_generator_at_login_does_not_strand_guest_account(self):
+        with patch("evennia.utils.logger.log_trace"):
+            guest, errors = NamedGuest.authenticate()
+        self.assertIsNone(guest)
+        self.assertIn("Guest characters are unavailable. Please contact staff.", errors)
+        self.assertFalse(AccountDB.objects.filter(username__iexact="NamingGuest").exists())
+
+    @override_settings(EVENNIA_GUEST_NAME_GENERATOR=accented_name)
+    def test_collisions_compare_the_normalized_stored_name(self):
+        self.char1.key = "Cafe Fox"
+        self.assertEqual(guest_character_name(), "Cafe Fox 2")
