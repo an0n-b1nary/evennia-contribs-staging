@@ -4,6 +4,8 @@ All notable changes to `evennia_posing` are documented here.
 
 ## [Unreleased]
 
+- Test bases register their account options for each test class only, so a host game that runs them keeps its own option definitions and later test classes see its settings unchanged.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
 ## 0.1.3 — 2026-10-18
