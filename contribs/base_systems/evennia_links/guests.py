@@ -9,6 +9,8 @@ GUEST_ACCOUNT_CMDSET with the host's restricted command sets.
 
 from django.conf import settings
 
+from .identity import is_visitor  # noqa: F401 — public re-export
+
 
 def is_guest(obj):
     """Recognize actual guest accounts, including their offline characters.
@@ -162,11 +164,13 @@ class GuestAccountMixin:
         self.cmdset.add(settings.GUEST_ACCOUNT_CMDSET, persistent=True)
 
     def create_character(self, *args, **kwargs):
+        from .guest_names import guest_character_name
+
         try:
             start = guest_start()
         except ValueError as exc:
             return None, [str(exc)]
-        kwargs.update(location=start, home=start)
+        kwargs.update(key=guest_character_name(), location=start, home=start)
         character, errors = super().create_character(*args, **kwargs)
         if character:
             character.tags.add("character", category="guest")

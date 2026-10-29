@@ -505,6 +505,91 @@ references to deleted objects. Required database listeners must run within the
 decorated service; schedule cache notifications after commit. It does not undo
 external effects or mutations made after the decorated service returns.
 
+## Communication identity
+
+`evennia_links.identity.comms_identity()` reads `EVENNIA_COMMS_IDENTITY`:
+
+| Value | Player-facing communication |
+|---|---|
+| `"account"` (default) | Evennia's account names and account-addressed communication. |
+| `"character"` | Characters identify players; accounts without a character speak as "Newcomer". |
+
+Use `comms_identity()` rather than reading the setting in commands. Unknown
+values raise `ImproperlyConfigured`. This setting governs OOC communication
+and listings, not ownership: posts, scenes, jobs and other records retain
+their character authors in both modes.
+
+`identity.is_visitor(actor, session=None)` (also exported from
+`evennia_links.guests`) is true for disposable guests in either mode. In
+character mode it also recognizes a non-staff account without a puppet.
+Pass the originating session in multisession games: an account can be playing
+in one session and visiting character select in another. Without a session,
+any active puppet makes the account a non-visitor; consumers must separately
+refuse an ambiguous sender with multiple puppets. Staff means a superuser or
+an account with `Builder` permission. Characters themselves are non-visitors,
+except guest characters. `is_guest` still means disposable; use it for guest
+deletion, confinement and reward exclusions, not for visitor communication.
+
+Visitors may send to the welcome channel and page staff, and are omitted from
+remote player listings. A visitor's existing channel subscriptions can remain;
+the restriction concerns sending. A guest puppeting a character speaks under
+that character's generated name. The account label is only the fallback for
+an account acting without a character.
+
+For character-mode account privacy, put `CharacterCommsAccountMixin` **first**
+on both account and guest typeclasses, before `ModerationAccountMixin`,
+`GuestAccountMixin` and the Evennia base class:
+
+```python
+from evennia.accounts.accounts import DefaultAccount, DefaultGuest
+from evennia_links.guests import GuestAccountMixin
+from evennia_links.identity import CharacterCommsAccountMixin
+
+class Account(CharacterCommsAccountMixin, DefaultAccount):
+    pass
+
+class Guest(CharacterCommsAccountMixin, GuestAccountMixin, DefaultGuest):
+    pass
+```
+
+The mixin returns `"Newcomer"` to strangers and anonymous viewers, including
+when `looker=None`. Staff, the account itself and its owned characters see
+the cooperative original display name, including the guest suffix.
+
+Mode-specific mixins, commands and cmdsets declare a class attribute
+`comms_identity = "character"` or `"account"`. Unmarked classes are shared
+between modes. `identity.check_comms_identity()` resolves the configured
+account, guest and channel typeclasses and instantiates `CMDSET_ACCOUNT`,
+`CMDSET_CHARACTER`, `GUEST_ACCOUNT_CMDSET` and `GUEST_CHARACTER_CMDSET` (the
+guest cmdsets are optional). It checks their commands and base-class markers
+and reports all mode mismatches in one `ImproperlyConfigured` exception.
+Character mode also requires the account display mixin on both account
+typeclasses and a character-marked channel typeclass. This prevents switching
+the setting while leaving account-specific components installed.
+
+The check is registered as Django system check `evennia_links.E001`, covering
+`migrate` and `evennia test`. Evennia's server launcher does not run Django
+checks, so hosts must also call it from their existing startup hook:
+
+```python
+# server/conf/at_server_startstop.py
+def at_server_start():
+    from evennia_links.identity import check_comms_identity
+    check_comms_identity()
+```
+
+Imports of typeclasses and cmdsets happen when the check runs, after the app
+registry is ready; `AppConfig.ready()` only registers the check.
+
+This release supplies the identity foundation. Full character-mode channels,
+Social listings/ignores/visitor paging, and Moderation's mode-aware account
+page composition are subsequent parts of [#223](https://github.com/an0n-b1nary/evennia-contribs-staging/issues/223).
+Keep existing hosts in account mode until those consumers are available.
+Account-mode cmdsets retain Moderation's `CmdAccountPage`. Character-mode
+composition replaces it with Social's character `page` at both account and
+character level and a staff-only `apage`; channels must use the forthcoming
+`CharacterCommsChannelMixin`. Switch the setting and composition together.
+
 ## Disposable guests
 
 Added disposable guest identification, movement and inventory boundaries, seeded arrival and restricted account lifecycle. Shared playable-character and web-character helpers exclude guests.
@@ -534,6 +619,19 @@ Custom exit command classes require an explicit host policy.
 
 Override `GuestAccountMixin.guest_welcome` to name the host's guest commands;
 the default mentions none.
+
+`GuestAccountMixin.create_character()` gives each guest character a readable
+adjective-and-animal name such as "Wandering Heron", independent of the
+unchanged `GuestN` account username. The `(guest)` display marker remains.
+Names are checked case-insensitively across character typeclasses. After five
+collisions the final candidate receives an unused numeric suffix (starting
+at 2). Deleting the guest and its character at logout frees the name.
+
+To replace the word lists in `evennia_links.guest_names`, set
+`EVENNIA_GUEST_NAME_GENERATOR` to a zero-argument callable, or its dotted
+import path, returning a nonempty string. Collision checks and numbering
+also apply to custom generators. Invalid configuration raises
+`ImproperlyConfigured`.
 
 
 ## Optional communication restrictions
