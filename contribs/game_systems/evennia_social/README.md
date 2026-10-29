@@ -35,7 +35,7 @@ place.
 | `HANGOUT_TYPES` | Tuple of valid `+hangouts` categories |
 | `commands/finger.py` | `CmdFinger` — profile view/edit, bio (`EvEditor`), followed themes |
 | `commands/discovery.py` | `CmdWhere`, `CmdHangouts` — player/venue discovery |
-| `commands/presence.py` | `CmdUnfindable`, `CmdWho` — per-character presence and a `who` that honours staff `dark` |
+| `commands/presence.py` | `CmdUnfindable`, `CmdWho` — per-character presence and a `who` that honours unfindable |
 | `integrations/maps.py` | Who's here on the live map (`present`), wired only when `evennia-maps` is installed |
 | `commands/filtering.py` | `CmdIgnore` — account-level ignore list |
 | `commands/messaging.py` | `CmdPage` — private OOC messaging |
@@ -203,7 +203,7 @@ behaves sensibly and needs to do nothing here.
 
 ---
 
-## Presence: unfindable and dark
+## Presence: unfindable
 
 Each character chooses whether it can be found from afar, with `+unfindable`:
 
@@ -211,12 +211,11 @@ Each character chooses whether it can be found from afar, with `+unfindable`:
 |---|---|---|---|
 | `findable` (default) | shown | shown | anyone |
 | `unfindable` | hidden | hidden | anyone |
-| `dark` | hidden | hidden | staff (`perm(Builder)`) |
 
-Being in the same room always reveals a character, and staff see through both
-settings (with a marker in `+where`). Unfindable means unlisted: it is privacy
-from people who aren't there, not invisibility. `dark` hides the same things,
-and only marks the character differently for other staff.
+Being in the same room always reveals a character, and staff see through
+unfindable with a `(unfindable)` marker in `+where` and staff-facing maps.
+Unfindable means unlisted: it is privacy from people who aren't there, not
+invisibility. These are the only supported presence settings.
 
 Every presence surface asks `evennia_social.presence`, so they can't disagree.
 In-game code calls `is_findable(character, viewer)` (location) or
@@ -248,7 +247,7 @@ different label.
 
 The map follows the table above. Players see only findable characters, in
 both the names and the "N here" count. Staff see everyone, with the
-`(unfindable)` / `(dark)` marker. From evennia-maps 0.9 the live map passes
+`(unfindable)` marker. From evennia-maps 0.9 the live map passes
 the viewer, the character the visitor plays on the website, and the same-room
 rule applies too: if that character is connected and standing in the room, the
 names and count there include unfindable characters, as `look` would. A

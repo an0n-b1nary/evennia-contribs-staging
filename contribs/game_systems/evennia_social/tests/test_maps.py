@@ -11,6 +11,7 @@ from unittest import skipUnless
 from unittest.mock import patch
 
 from django.apps import apps
+from django.test import override_settings
 from evennia.utils import create
 
 from evennia_social import presence
@@ -18,6 +19,8 @@ from evennia_social.integrations.maps import provide
 from evennia_social.tests.base import SocialTestCase, SocialTestCharacter
 
 _CONNECTED = "evennia_social.social.get_connected_characters"
+_IDENTITY_MODES = ("account", "character")
+_HIDDEN_CASES = ((presence.UNFINDABLE, "canonical"), ("dark", "legacy"))
 
 
 class TestWhosHereOverlay(SocialTestCase):
@@ -43,19 +46,40 @@ class TestWhosHereOverlay(SocialTestCase):
     def test_offline_characters_are_not_here(self):
         self.assertEqual(self._provide([self.char3]), {"present": {self.room2.pk: ["Ashwren"]}})
 
-    def test_unfindable_and_dark_are_hidden_from_players(self):
-        presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
-        overlay = self._provide([self.char1, self.char2, self.char3])
-        self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})
+    def test_canonical_and_legacy_unfindable_are_hidden_from_public_overlay(self):
+        self.assertTrue(_HIDDEN_CASES)
+        for mode in _IDENTITY_MODES:
+            with override_settings(EVENNIA_COMMS_IDENTITY=mode), self.subTest(mode=mode):
+                for value, source in _HIDDEN_CASES:
+                    with self.subTest(source=source):
+                        if source == "legacy":
+                            self.char1.attributes.add(presence.ATTRIBUTE, value)
+                        else:
+                            presence.set_visibility(self.char1, value)
+                        presence.set_visibility(self.char2, presence.UNFINDABLE)
+                        overlay = self._provide([self.char1, self.char2, self.char3])
+                        self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})
+                        staff_overlay = self._provide([self.char1, self.char2], staff=True)[
+                            "present"
+                        ][self.room1.pk]
+                        self.assertEqual(
+                            staff_overlay,
+                            sorted(
+                                [
+                                    f"{self.char1.key} (unfindable)",
+                                    f"{self.char2.key} (unfindable)",
+                                ]
+                            ),
+                        )
+                        self.assertNotIn("(dark)", " ".join(staff_overlay))
 
     def test_staff_see_everyone_with_a_marker(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
+        self.char1.attributes.add(presence.ATTRIBUTE, "dark")
         overlay = self._provide([self.char1, self.char2], staff=True)
         self.assertEqual(
             overlay["present"][self.room1.pk],
-            sorted([f"{self.char1.key} (dark)", f"{self.char2.key} (unfindable)"]),
+            sorted([f"{self.char1.key} (unfindable)", f"{self.char2.key} (unfindable)"]),
         )
 
     def test_only_the_requested_rooms(self):
@@ -71,19 +95,28 @@ class TestWhosHereOverlay(SocialTestCase):
         """Pretend *character* has a live session, as a player in-game would."""
         return patch.object(character.sessions, "count", return_value=1)
 
-    def test_a_connected_viewer_in_the_same_room_sees_the_unfindable(self):
+    def test_connected_viewer_in_same_room_sees_canonical_and_legacy_unfindable(self):
         """Unfindable hides you from afar, not from someone standing there."""
-        presence.set_visibility(self.char2, presence.UNFINDABLE)
-        self.char3.location = self.room1
-        with self._connected(self.char3):
-            overlay = self._provide([self.char2, self.char3], viewer=self.char3)
-        self.assertEqual(
-            overlay["present"][self.room1.pk], sorted([self.char2.key, self.char3.key])
-        )
+        for mode in _IDENTITY_MODES:
+            with override_settings(EVENNIA_COMMS_IDENTITY=mode), self.subTest(mode=mode):
+                for value, source in _HIDDEN_CASES:
+                    with self.subTest(source=source):
+                        if source == "legacy":
+                            self.char2.attributes.add(presence.ATTRIBUTE, value)
+                        else:
+                            presence.set_visibility(self.char2, value)
+                        self.char2.location = self.room1
+                        self.char3.location = self.room1
+                        with self._connected(self.char3):
+                            overlay = self._provide([self.char2, self.char3], viewer=self.char3)
+                        self.assertEqual(
+                            overlay["present"][self.room1.pk],
+                            sorted([self.char2.key, self.char3.key]),
+                        )
 
     def test_a_viewer_elsewhere_does_not(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
+        self.char1.attributes.add(presence.ATTRIBUTE, "dark")
         with self._connected(self.char3):
             overlay = self._provide([self.char1, self.char2, self.char3], viewer=self.char3)
         self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})

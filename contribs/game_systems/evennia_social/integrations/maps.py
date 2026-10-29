@@ -16,9 +16,9 @@ shows to a viewer who is connected and standing in the same room in-game, as
 they would through ``look``. With no viewer, or one not connected in-game
 (the public SVG map, a visitor with no character or browsing offline, or an
 older evennia-maps), the rule is ``is_publicly_findable``, and
-unfindable or dark characters are left out of both the names and the count.
-Staff renders list everyone, with the same " (unfindable)" / " (dark)"
-marker ``+where`` shows staff.
+unfindable characters are left out of both the names and the count.
+Staff renders list everyone, marking unfindable characters with the same
+`` (unfindable)`` marker ``+where`` shows staff.
 
 Overlay key
 -----------

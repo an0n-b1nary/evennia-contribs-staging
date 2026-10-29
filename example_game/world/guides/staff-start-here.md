@@ -15,7 +15,7 @@ Each system's staff tools are listed below by task, with a link to its staff pag
 - **Admissions:** `+admissions` reviews applications to join. See [[moderation-staff]] for bans, mutes, notes and referrals.
 - **Problem accounts:** `+softban` for a timed ban, `+mute` to silence every alt, and `+notes` for staff-only notes on an account. `ban` and `unban` are Evennia's permanent bans.
 - **Activity:** `+rptracker/review` and `+report/activity` show how roleplay is being counted, and let you flag sessions that look wrong. See [[rptracker-staff]].
-- **Presence:** staff can go fully dark with `+unfindable dark`. [[social-staff]] covers what else staff see and can do.
+- **Presence:** staff can use `+unfindable on` to stay out of remote presence lists. [[social-staff]] covers what else staff see and can do.
 
 ## Requests and review queues
 

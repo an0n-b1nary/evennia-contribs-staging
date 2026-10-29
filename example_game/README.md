@@ -286,8 +286,8 @@ the others.
 
 Who's here shows only on the live map, which requires a login: "N here" in the
 tooltip and room list, and the names in the room panel. It honors `+unfindable`.
-Players don't see unfindable or dark characters there unless their own
-connected character is in the same room; staff see them with a marker. Browser
+Players don't see unfindable characters there unless their own
+connected character is in the same room; staff see them with an `(unfindable)` marker. Browser
 check: connect two characters to one room, set one `+unfindable`, and compare
 the live map as a player in that room, a player elsewhere, and staff.
 
