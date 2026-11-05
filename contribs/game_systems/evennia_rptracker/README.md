@@ -305,9 +305,10 @@ from `evennia_rptracker.typeclasses`.
 
 `CmdICChannel` reads the mode without changing cmdsets. In character mode,
 `channel/who` lists distinct online puppets by display name, shows muted
-subscriptions, and counts sessions without a character as newcomers. Guest
-puppets remain named. When Social is installed its presence policy hides
-unlisted characters from other players; staff retain visibility. Boot and ban
+subscriptions, and counts visitor sessions as newcomers. Guest puppets and
+relay bots remain named. When Social is installed, its presence policy hides
+unlisted characters as Social's `who` does, judged from the caller's puppet:
+staff, the character itself and people in its room still see it. Boot and ban
 notices use public display names for the target and moderator. Account mode
 retains Evennia's subscriber list and moderation messages.
 

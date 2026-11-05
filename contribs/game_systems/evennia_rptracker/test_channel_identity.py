@@ -9,8 +9,9 @@ from unittest.mock import patch
 from django.apps import apps
 from django.test import override_settings
 from evennia.accounts.accounts import DefaultAccount
+from evennia.accounts.bots import Bot
 from evennia.comms.comms import DefaultChannel
-from evennia.utils.create import create_channel
+from evennia.utils.create import create_account, create_channel
 from evennia.utils.test_resources import EvenniaCommandTest
 
 from evennia_links.communication import CharacterCommsChannelMixin, CommunicationChannelMixin
@@ -86,6 +87,8 @@ class TestChannelIdentity(EvenniaCommandTest):
         from evennia_social.presence import UNFINDABLE, set_visibility
 
         set_visibility(self.char2, UNFINDABLE)
+        # Social lists unfindable characters to people in the same room.
+        self.char2.location = self.room2
         with (
             patch.object(self.channel.subscriptions, "online", return_value=[self.account2]),
             patch.object(
@@ -97,6 +100,31 @@ class TestChannelIdentity(EvenniaCommandTest):
             self.account.permissions.clear()
             self.account.is_superuser = False
             self.assertEqual(command.channel_list_who(self.channel), [])
+
+    @skipUnless(apps.is_installed("evennia_social"), "requires Social presence")
+    def test_who_shows_a_players_own_unlisted_puppet_to_that_session(self):
+        from evennia_social.presence import UNFINDABLE, set_visibility
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        set_visibility(self.char1, UNFINDABLE)
+        with (
+            patch.object(self.channel.subscriptions, "online", return_value=[self.account]),
+            patch.object(
+                self.account.sessions, "all", return_value=[SimpleNamespace(puppet=self.char1)]
+            ),
+        ):
+            names = self.command().channel_list_who(self.channel)
+        self.assertEqual(names, [self.char1.get_display_name(self.account)])
+
+    def test_who_names_relay_bots_without_counting_them_as_newcomers(self):
+        bot = create_account("IRCRelay", None, None, typeclass=Bot)
+        with (
+            patch.object(self.channel.subscriptions, "online", return_value=[bot]),
+            patch.object(bot.sessions, "all", return_value=[SimpleNamespace(puppet=None)]),
+        ):
+            names = self.command().channel_list_who(self.channel)
+        self.assertEqual(names, [bot.get_display_name(self.account)])
 
     def test_who_keeps_guest_puppets_and_omits_staff_without_puppet(self):
         self.char2.tags.add("character", category="guest")

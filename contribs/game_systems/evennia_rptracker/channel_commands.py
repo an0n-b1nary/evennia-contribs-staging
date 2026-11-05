@@ -3,6 +3,7 @@
 """Evennia 6 channel command with heterogeneous typeclass discovery."""
 
 from django.apps import apps
+from evennia.accounts.bots import Bot
 from evennia.accounts.models import AccountDB
 from evennia.commands.default.comms import CmdChannel
 from evennia.comms.models import ChannelDB
@@ -55,29 +56,40 @@ class CmdICChannel(StrictSwitchMixin, CmdChannel):
         if comms_identity() == "account":
             return super().channel_list_who(channel)
 
+        # Keyed by object: account and character primary keys can coincide.
         characters = {}
+        bots = {}
         newcomers = 0
         muted = set(channel.mutelist)
         for subscriber in channel.subscriptions.online():
-            if isinstance(subscriber, AccountDB):
+            if isinstance(subscriber, Bot):
+                # Relay bots are named for their external link, not a player.
+                bots[subscriber] = subscriber in muted
+            elif isinstance(subscriber, AccountDB):
                 for session in subscriber.sessions.all():
                     character = subscriber.get_puppet(session)
                     if character is not None:
-                        characters[character.pk] = (character, subscriber in muted)
+                        characters[character] = subscriber in muted
                     elif is_visitor(subscriber, session):
                         newcomers += 1
             else:
-                characters[subscriber.pk] = (subscriber, subscriber in muted)
+                characters[subscriber] = subscriber in muted
 
         # Social is optional; its provider owns all presence policy when present.
-        is_listed = None
+        # Judge presence from this session's puppet, as Social's who does.
+        viewer = self.caller.get_puppet(self.session) or self.caller
         if apps.is_installed("evennia_social"):
             from evennia_social.presence import is_listed
 
+            characters = {
+                character: muting
+                for character, muting in characters.items()
+                if is_listed(character, viewer)
+            }
+
         names = [
-            character.get_display_name(self.caller) + (" (muting)" if muting else "")
-            for character, muting in characters.values()
-            if is_listed is None or is_listed(character, self.caller)
+            entry.get_display_name(self.caller) + (" (muting)" if muting else "")
+            for entry, muting in (characters | bots).items()
         ]
         names.sort(key=str.casefold)
         if newcomers:

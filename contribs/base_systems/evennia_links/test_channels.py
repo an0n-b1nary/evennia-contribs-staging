@@ -8,6 +8,7 @@ from unittest.mock import patch
 from django.test import override_settings
 from django.urls import reverse
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
+from evennia.accounts.bots import Bot
 from evennia.comms.comms import DefaultChannel
 from evennia.utils.create import create_account, create_channel
 from evennia.utils.test_resources import EvenniaTest
@@ -154,6 +155,23 @@ class TestLinksCharacterChannels(EvenniaTest):
             self.account.permissions.add("Admin")
             self.channel.msg("Staff emit", senders=self.account, emit=True)
             self.assertIn("Staff emit", received.call_args.args[0])
+
+    def test_relay_bot_posts_on_any_channel_without_refusal_echo(self):
+        bot = create_account("IRCRelay", None, None, typeclass=Bot)
+        with (
+            patch.object(bot, "msg") as feedback,
+            patch.object(self.account2, "channel_msg") as received,
+            patch("evennia.utils.logger.log_file") as history,
+        ):
+            self.channel.msg("someone@#mud: Hi", senders=bot)
+        feedback.assert_not_called()
+        self.assertEqual(received.call_args.kwargs["senders"], [bot])
+        self.assertIn(
+            f"{bot.get_display_name(self.account2)}: someone@#mud: Hi", received.call_args.args[0]
+        )
+        history.assert_called_once_with(
+            "IRCRelay: someone@#mud: Hi", self.channel.get_log_filename()
+        )
 
     def test_communication_restriction_prevents_delivery_and_logging(self):
         with (

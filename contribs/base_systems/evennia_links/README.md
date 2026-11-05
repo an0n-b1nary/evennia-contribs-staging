@@ -575,8 +575,9 @@ Visitors may send only to the unique channel tagged `welcome` in category
 `comms`, resolved by `guests.welcome_channel()`. Missing or duplicate tags
 refuse visitor sends. Guests with a puppet use their character's name;
 accounts without a character use the account display mixin's neutral label.
-Subscriptions and listening remain per account. System messages and authorized
-staff emits pass through without selecting a puppet.
+Subscriptions and listening remain per account. System messages, authorized
+staff emits and relay bots (IRC, RSS, Grapevine, Discord) pass through without
+selecting a puppet.
 
 Live messages use each receiver's view of the speaker, so staff still identify
 visitor accounts. Logs use `get_display_name(None)` instead of account keys:

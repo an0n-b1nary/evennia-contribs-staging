@@ -77,6 +77,7 @@ class CharacterCommsChannelMixin:
     comms_identity = "character"
 
     def msg(self, message, senders=None, bypass_mute=False, **kwargs):
+        from evennia.accounts.bots import Bot
         from evennia.utils.utils import make_iter
 
         from .guests import welcome_channel
@@ -85,8 +86,10 @@ class CharacterCommsChannelMixin:
         senders = list(make_iter(senders)) if senders else []
         if not isinstance(message, str) or not message.strip():
             return
-        if not senders:
-            return super().msg(message, bypass_mute=bypass_mute, **kwargs)
+        # IRC, RSS, Grapevine and Discord relays are puppetless accounts named
+        # for the external link, not players; refusing them would echo back.
+        if not senders or all(isinstance(sender, Bot) for sender in senders):
+            return super().msg(message, senders=senders, bypass_mute=bypass_mute, **kwargs)
         if kwargs.get("emit") or kwargs.get("external"):
             if all(self.access(sender, "control") for sender in senders):
                 return super().msg(message, senders=senders, bypass_mute=bypass_mute, **kwargs)
@@ -116,8 +119,13 @@ class CharacterCommsChannelMixin:
 
     def at_post_msg(self, message, **kwargs):
         """Store public display names in the log shared by history and the web."""
+        from evennia.accounts.bots import Bot
         from evennia.utils import logger
 
         if log_file := self.get_log_filename():
-            names = ",".join(sender.get_display_name(None) for sender in kwargs.get("senders", []))
+            # Relay bots keep Evennia's plain key; their display name is coloured.
+            names = ",".join(
+                sender.key if isinstance(sender, Bot) else sender.get_display_name(None)
+                for sender in kwargs.get("senders", [])
+            )
             logger.log_file(f"{names}: {message}" if names else message, log_file)
