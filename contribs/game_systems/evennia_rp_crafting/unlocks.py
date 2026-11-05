@@ -9,10 +9,10 @@ from django.core import signing
 from django.db.models import F
 from evennia.objects.models import ObjectDB
 from evennia.utils.dbserialize import deserialize
-from evennia_rp_resources.models import ResourceDefinition
 
 from evennia_links.runtime import get
 from evennia_links.transactions import atomic_objects
+from evennia_rp_resources.models import ResourceDefinition
 
 from . import conf, services
 from .behaviours import registry

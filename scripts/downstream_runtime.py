@@ -222,6 +222,7 @@ def configured_game(game):
 def cross_links(game):
     configured_game(game)
     from evennia.objects.models import ObjectDB
+
     from evennia_lore.models import LoreAcquisition, LoreEntry, LoreSceneLink
     from evennia_scenes.models import Scene
 
@@ -543,8 +544,9 @@ def main():
             # Exercise the older public spend service independently of the
             # then-allowance-only chargen integration, including a refund.
             from evennia.objects.models import ObjectDB
-            from evennia_xp.spending import refund_xp, spend_xp
             from playtest_support.snapshot import snapshot
+
+            from evennia_xp.spending import refund_xp, spend_xp
 
             bob = ObjectDB.objects.get(db_key="pt-bob")
             spend_xp(bob.pk, 1, ref_key="upgrade-persistent-spend")

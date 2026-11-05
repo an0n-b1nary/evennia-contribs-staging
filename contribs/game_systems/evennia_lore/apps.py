@@ -52,10 +52,9 @@ class LoreConfig(AppConfig):
         # --- rptracker: register the passive-trickle listener ---
         rptracker_label = getattr(settings, "LORE_RPTRACKER_APP_LABEL", "evennia_rptracker")
         if _app_present(rptracker_label):
-            from evennia_rptracker.signals import rp_session_ended
-
             from evennia_links import connect_on_ready
             from evennia_lore.listeners import _on_rp_session_ended
+            from evennia_rptracker.signals import rp_session_ended
 
             connect_on_ready(rp_session_ended, _on_rp_session_ended)
 

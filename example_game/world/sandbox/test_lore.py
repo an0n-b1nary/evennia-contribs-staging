@@ -9,11 +9,11 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
-from evennia_lore import test_lean
-from evennia_lore.models import LoreEntry, LoreNotice, PlotLoreLink
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_lore import test_lean
+from evennia_lore.models import LoreEntry, LoreNotice, PlotLoreLink
 from world.sandbox import content
 from world.sandbox.seeding import SeededSandboxMixin
 
@@ -38,7 +38,6 @@ class LoreLeanSeams(test_lean.TestLoreLeanPersistence):
     def test_region_lean_survives_cache_eviction(self):
         from evennia_lore.commands import CmdInvestigate
         from evennia_lore.models import LoreRegionLink
-
         from evennia_regions.models import Region
 
         region = Region.objects.create(name="The Archive")
@@ -83,8 +82,9 @@ class LoreLayerSeams(EvenniaCommandTest):
         self.assertFalse(entry.acquisitions.exists())
 
     def test_api_filter_preserves_private_declines(self):
-        from evennia_lore.api.views import LoreEntryViewSet
         from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from evennia_lore.api.views import LoreEntryViewSet
 
         declined = LoreEntry.create_entry(title="Declined legend", author=self.char1)
         declined.decline(declined_by=self.char1, note="For the author only.")
@@ -102,6 +102,7 @@ class LoreLayerSeams(EvenniaCommandTest):
     @override_settings(LORE_DEFAULT_KIND="legend")
     def test_web_submission_uses_the_configured_default_kind(self):
         from django.urls import resolve, reverse
+
         from evennia_lore.views import LoreCreateView
 
         self.account2.characters.add(self.char2)
@@ -175,6 +176,7 @@ class SeededLoreSeams(SeededSandboxMixin, EvenniaTest):
 
     def test_detail_page_separates_the_layers_and_keeps_the_seal(self):
         from django.urls import resolve, reverse
+
         from evennia_lore.views import LoreDetailView
 
         legend = self._seeded("exile")

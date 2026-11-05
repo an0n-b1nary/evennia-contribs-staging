@@ -87,10 +87,9 @@ class TestSignatureLibrary(ChargenCommandTest):
 
         if not apps.is_installed("evennia_rp_combat"):
             self.skipTest("optional combat partner absent")
+        from evennia_rp_chargen import locks, services
         from evennia_rp_combat import services as combat
         from evennia_rp_combat.tests import build
-
-        from evennia_rp_chargen import locks, services
 
         self.make_sheet(self.char1)
         row = moves.create(self.char1, "Ready")

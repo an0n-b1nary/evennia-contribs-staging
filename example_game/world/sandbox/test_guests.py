@@ -95,6 +95,7 @@ class TestGuestBoundaries(GuestFixture, EvenniaTest):
 
     def test_guest_cannot_post_to_board(self):
         from django.core.exceptions import PermissionDenied
+
         from evennia_boards.models import Board, Post
 
         board = Board.objects.create(name="Guest boundary")
@@ -105,7 +106,6 @@ class TestGuestBoundaries(GuestFixture, EvenniaTest):
         from evennia_rp_chargen.models import CharacterBuild
         from evennia_rp_chargen.services import reset_trial
         from evennia_rp_chargen.subject import ChargenSubject
-
         from evennia_rp_rules.checks import CheckError
         from evennia_rp_rules.ruleset import get_ruleset
 
@@ -138,7 +138,6 @@ class TestGuestBoundaries(GuestFixture, EvenniaTest):
         from evennia_rp_contest import services, signals
         from evennia_rp_contest.models import CheckRecord
         from evennia_rp_contest.parsing import parse_test
-
         from evennia_rp_rules.ruleset import get_ruleset
         from evennia_rp_rules.signals import check_resolved
 

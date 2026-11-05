@@ -5,6 +5,7 @@
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
+
 from evennia_rp_resources.models import ResourceDefinition
 
 from .errors import CraftingError

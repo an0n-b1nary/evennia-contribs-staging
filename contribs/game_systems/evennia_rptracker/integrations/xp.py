@@ -61,10 +61,9 @@ def collect_rp_channel_sessions(window_end):
 
 
 def _collect(window_end, source):
+    from evennia_rptracker.models import RPSession
     from evennia_xp.batch import Award
     from evennia_xp.gating import resolve_xp_multiplier
-
-    from evennia_rptracker.models import RPSession
 
     window_start = _window_start(window_end)
     sessions = RPSession.objects.filter(
@@ -122,9 +121,8 @@ def flip_channel_session_flags(window_end, awards, week_label):
 
 
 def _flip_flags(awards, week_label, source):
-    from evennia_xp.models import XPLog
-
     from evennia_rptracker.models import RPSession
+    from evennia_xp.models import XPLog
 
     expected = {(a.character_id, a.source_ref_id) for a in awards if a.source_type == source}
     if not expected:

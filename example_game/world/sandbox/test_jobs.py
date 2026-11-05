@@ -10,10 +10,10 @@ from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import resolve
 from evennia.utils.test_resources import EvenniaTest
+
 from evennia_jobs.models import Job
 from evennia_jobs.review import submit_request
 from evennia_jobs.signals import request_approved
-
 from world.sandbox import content
 
 

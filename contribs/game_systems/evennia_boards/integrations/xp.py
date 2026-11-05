@@ -160,11 +160,10 @@ def collect_cutscene_posts(window_end):
     Yields:
         Award per eligible IC-board Post.
     """
+    from evennia_boards.models import Post
     from evennia_xp.batch import Award
     from evennia_xp.gating import resolve_xp_multiplier
     from evennia_xp.models import XPLog
-
-    from evennia_boards.models import Post
 
     window_start = _window_start(window_end)
     # Post.objects (ArchivedManager default) already excludes archived posts.

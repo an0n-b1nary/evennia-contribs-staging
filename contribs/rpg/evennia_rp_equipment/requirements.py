@@ -90,7 +90,6 @@ def parse(text: str) -> Requirement:
     if not match:
         raise RequirementError(USAGE)
     from evennia_rp_chargen.pips import PipPolicy
-
     from evennia_rp_rules.ruleset import get_ruleset
 
     try:
@@ -198,7 +197,6 @@ def status(character, req: Requirement) -> str:
     """`MET`, `UNMET`, `UNATTUNED` or `UNKNOWN` for `character` right now."""
     if req.on_stat:
         from evennia_rp_chargen.stats import StatHandler
-
         from evennia_rp_rules.ruleset import get_ruleset
 
         ruleset = get_ruleset()

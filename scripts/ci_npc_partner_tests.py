@@ -7,10 +7,10 @@ from unittest import skipUnless
 from django.apps import apps
 from django.test import override_settings
 from evennia.utils.test_resources import BaseEvenniaCommandTest
+
 from evennia_npcs import services as svc
 from evennia_npcs.commands import CmdNPCPose, NPCCmdSet
 from evennia_npcs.models import NPCSceneAppearance, PlotNPCLink
-
 from evennia_rp_rules.ruleset import get_ruleset
 
 

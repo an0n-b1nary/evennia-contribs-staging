@@ -9,10 +9,11 @@ from django.core.management import call_command
 from django.test import override_settings
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import Character
+
 from evennia_rp_crafting import states
 from evennia_rp_crafting.errors import CraftingError
 from evennia_rp_crafting.models import CraftRecord
-from typeclasses.characters import Character
 
 
 class StateSeams(EvenniaTest):
@@ -23,7 +24,6 @@ class StateSeams(EvenniaTest):
             self.skipTest("Equipment absent")
         from evennia_rp_equipment import outfits
         from evennia_rp_equipment import services as gear
-
         from world.sandbox.crafting import CLOAK_NAME
 
         call_command("seed_sandbox", verbosity=0)
@@ -66,7 +66,6 @@ class StateSeams(EvenniaTest):
         from evennia_rp_chargen import services as chargen
         from evennia_rp_chargen.stats import StatHandler
         from evennia_rp_equipment import services as gear
-
         from evennia_rp_rules.ruleset import reset_ruleset_cache
         from evennia_rp_rules.testing import TEST_RULESET
         from world.sandbox.crafting import CLOAK_NAME

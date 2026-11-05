@@ -10,10 +10,10 @@ from unittest.mock import patch
 from django.apps import apps
 from django.test import SimpleTestCase, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest
+
 from evennia_rp_combat import engine, partners
 from evennia_rp_combat import services as combat
 from evennia_rp_combat.data import CombatError
-
 from evennia_rp_rules.dice import ScriptedRoller
 from evennia_rp_rules.subjects import DictStatSource
 from evennia_rp_rules.testing import RulesetTestMixin
@@ -633,6 +633,7 @@ class TestBoundContest(RulesetTestMixin, EvenniaCommandTest):
 
     def test_individual_failure_only_no_double_wave_and_void_blocks_resolution(self):
         from django.utils import timezone
+
         from evennia_rp_contest.models import CheckRecord
 
         ident = self.offer()

@@ -155,6 +155,7 @@ class TestShippedIntegrationHooks(EvenniaTest):
         from datetime import timedelta
 
         from django.utils import timezone
+
         from evennia_jobs.models import Job, JobType
         from evennia_rptracker.antigaming import sweep_rp_sessions
         from evennia_rptracker.models import RPSession
@@ -189,9 +190,8 @@ class TestShippedIntegrationHooks(EvenniaTest):
     def test_lore_trickle_gets_room_region_and_threads(self):
         from evennia_lore.selection import _resolve_context
         from evennia_plots.models import PlotThread, ScenePlotLink
-        from evennia_rptracker.models import RPSession, RPSessionSceneLink
-
         from evennia_regions.models import Region, RegionMembership
+        from evennia_rptracker.models import RPSession, RPSessionSceneLink
 
         region = Region.objects.create(name="The Proving Coast")
         RegionMembership.objects.create(region=region, room=self.room1, is_primary=True)
@@ -256,6 +256,7 @@ class TestScreenreaderCommandSeam(EvenniaTest):
         from datetime import timedelta
 
         from django.utils import timezone
+
         from evennia_boards.commands import CmdBoard
         from evennia_boards.models import Board
         from evennia_calendar.commands import CmdCalendar
@@ -871,7 +872,6 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
             },
         )
         from evennia_building.models import DraftRoom, FrontierRoom
-
         from evennia_maps.overlays import collect_overlays
 
         public_ids = list(
@@ -1621,6 +1621,7 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
         and only one of them copies SceneListView.
         """
         from django.utils import timezone
+
         from evennia_scenes.models import Scene
 
         Scene.objects.create(
@@ -1649,6 +1650,7 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
     def test_index_shows_a_public_scene(self):
         """The other half of the previous test: the filter is not simply hiding everything."""
         from django.utils import timezone
+
         from evennia_scenes.models import Scene
 
         Scene.objects.create(
@@ -1665,6 +1667,7 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
     def test_index_hides_unpublished_lore(self):
         """Mirrors LoreListView: only PUBLISHED, non-archived entries are public."""
         from django.db.models import Max
+
         from evennia_lore.models import LoreEntry
 
         # entry_number is a required unique column with no default; the contrib
@@ -1686,6 +1689,7 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
         from datetime import timedelta
 
         from django.utils import timezone
+
         from evennia_calendar.models import CalendarEvent
 
         CalendarEvent.objects.create(
@@ -1714,10 +1718,9 @@ class TestSandboxIndex(SeededSandboxMixin, EvenniaTest):
         from evennia_boards.models import Board
         from evennia_calendar.models import CalendarEvent
         from evennia_lore.models import LoreEntry
+        from evennia_maps.models import MapPlane
         from evennia_plots.models import PlotThread
         from evennia_scenes.models import Scene
-
-        from evennia_maps.models import MapPlane
 
         for model in (Scene, LoreEntry, CalendarEvent, Board, PlotThread, MapPlane):
             model.objects.all().delete()
@@ -1995,11 +1998,11 @@ class TestPresentWebSeams(SeededSandboxMixin, EvenniaTest):
 
     def test_home_and_map_link_to_readable_seeded_live_scene(self):
         from django.urls import reverse
-        from evennia_scenes.models import Scene
         from web.website.views.index import SandboxIndexView
 
         from evennia_maps.models import MapPlane
         from evennia_maps.views import PlaneMapView
+        from evennia_scenes.models import Scene
         from world.sandbox import content
 
         scene = Scene.objects.get(title="Kickoff Rehearsal")
@@ -2049,7 +2052,6 @@ class TestPresentWebSeams(SeededSandboxMixin, EvenniaTest):
         from evennia_boards.models import Board, Post
         from evennia_lore.models import LoreEntry
         from evennia_scenes.models import Scene
-
         from world.sandbox import content
 
         scenes = Scene.objects.filter(title__in=[spec["title"] for spec in content.SCENES])

@@ -10,11 +10,12 @@ from django.apps import apps
 from django.test import override_settings
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import Character
+from typeclasses.rooms import Room
+
 from evennia_rp_crafting.events import use
 from evennia_rp_crafting.test_events import EventFixture
 from evennia_rp_crafting.test_wave_two import WaveTwoFixture
-from typeclasses.characters import Character
-from typeclasses.rooms import Room
 
 
 @skipUnless(

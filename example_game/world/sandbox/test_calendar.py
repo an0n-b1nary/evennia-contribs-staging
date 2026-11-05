@@ -7,10 +7,11 @@ from unittest import mock
 
 from django.utils import timezone
 from evennia.utils.test_resources import EvenniaTest
-from evennia_calendar.models import RSVP, CalendarEvent, CalendarNotice
-from evennia_calendar.scheduler import promote_waitlist
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
+
+from evennia_calendar.models import RSVP, CalendarEvent, CalendarNotice
+from evennia_calendar.scheduler import promote_waitlist
 
 
 class CalendarNoticeSeams(EvenniaTest):

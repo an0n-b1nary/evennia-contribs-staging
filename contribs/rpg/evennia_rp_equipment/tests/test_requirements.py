@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from evennia_rp_chargen import abilities
 from evennia_rp_chargen import services as chargen
-
 from evennia_rp_equipment.requirements import (
     ABILITY,
     FLAW,

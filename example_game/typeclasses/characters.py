@@ -90,7 +90,6 @@ class Character(
             from evennia_economy.batch import ensure_stipends
             from evennia_economy.stalls import note_login
             from evennia_economy.summary import notify_economy_summary
-
             from evennia_links.runtime import get
 
             if not get("RP_ECONOMY_FROZEN"):

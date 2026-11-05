@@ -70,6 +70,7 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
 
     def test_coowner_can_propose_but_unrelated_character_cannot(self):
         from evennia.utils.create import create_object
+
         from evennia_plots.models import PlotOwner
 
         coowner = create_object("evennia.objects.objects.DefaultCharacter", key="Co-owner")

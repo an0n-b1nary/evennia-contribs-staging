@@ -7,11 +7,12 @@ from django.apps import apps
 from django.core.management import call_command
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
-from evennia_npcs import services as svc
-from evennia_npcs.models import NPCSceneAppearance, PlotNPCLink
 from typeclasses.characters import Character
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+
+from evennia_npcs import services as svc
+from evennia_npcs.models import NPCSceneAppearance, PlotNPCLink
 
 
 @override_settings(NPCS_REVEALED=True, NPCS_FROZEN=False)
@@ -208,7 +209,6 @@ class NPCCommandSeams(EvenniaCommandTest):
 
     def test_reference_seed_populates_npcs_idempotently(self):
         from evennia_npcs.models import NPCBlueprint, NPCSpawnRecord
-
         from world.sandbox import content
 
         for _ in range(2):

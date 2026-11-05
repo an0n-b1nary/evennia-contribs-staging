@@ -13,7 +13,6 @@ class ModerationConfig(AppConfig):
             request_review_form,
             request_reviewed,
         )
-
         from evennia_links.communication import communication_requested
         from evennia_moderation.admissions import admission_review_fields, review_admission
         from evennia_moderation.config import register_settings

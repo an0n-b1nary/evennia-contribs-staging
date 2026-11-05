@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest
+
 from evennia_rp_combat import engine, partners
 from evennia_rp_combat import services as combat
 from evennia_rp_combat.commands import CmdAction, CmdSurge

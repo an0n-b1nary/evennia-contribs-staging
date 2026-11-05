@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from django.core.checks import Error
+
 from evennia_rp_combat.partners import number
 
 from . import conf

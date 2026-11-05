@@ -172,6 +172,7 @@ class Command(BaseCommand):
         objs = search_tag(SANDBOX_TAG, category=SANDBOX_TAG_CATEGORY)
         if apps.is_installed("evennia_rp_crafting") and not dry_run:
             from django.utils import timezone
+
             from evennia_rp_crafting.models import FixtureInstallation, RoomLayer
 
             demo_ids = [obj.pk for obj in objs]
@@ -185,6 +186,7 @@ class Command(BaseCommand):
             # Close demo-owned stalls before rebuilding their owners or market.
             # Player-owned stalls in rooms being rebuilt need explicit staff recovery.
             from django.db.models import Q
+
             from evennia_economy.models import Storefront
             from evennia_economy.stalls import recover
 
@@ -372,6 +374,7 @@ class Command(BaseCommand):
                 grant(author, "timber", 3, "staff", note="Sandbox demonstration stores")
         if apps.is_installed("evennia_economy"):
             from evennia.utils.create import create_object
+
             from evennia_economy.services import credit
             from evennia_economy.stalls import claim, list_stock
 
@@ -411,6 +414,7 @@ class Command(BaseCommand):
             counts.update(self._create_npcs(authors, rooms))
         if apps.is_installed("evennia_jobs"):
             from evennia.server.models import ServerConfig
+
             from evennia_jobs.models import Job
             from evennia_jobs.review import submit_request
 
@@ -430,9 +434,9 @@ class Command(BaseCommand):
 
     def _create_lore_items(self, authors, rooms, entries):
         from django.apps import apps
+
         from evennia_lore.items import create_tome
         from evennia_lore.models import LoreAcquisition
-
         from world.sandbox import crafting
 
         owner = authors[-1]
@@ -490,7 +494,6 @@ class Command(BaseCommand):
     def _create_npcs(self, authors, rooms):
         from evennia_npcs import services
         from evennia_npcs.models import NPCBlueprint, NPCPermission
-
         from evennia_rp_rules.ruleset import get_ruleset
 
         owner = authors[0]
@@ -524,10 +527,10 @@ class Command(BaseCommand):
 
     def _create_crafting(self, authors, rooms):
         from django.apps import apps
+
         from evennia_rp_crafting.catalog import seed_catalog
         from evennia_rp_crafting.services import craft, unlock
         from evennia_rp_resources.services import grant
-
         from world.sandbox import crafting
 
         owner = authors[-1]
@@ -774,8 +777,8 @@ class Command(BaseCommand):
     def _seed_patterns(self, owner):
         """Spreading demonstration Patterns; definitions are updated, never duplicated."""
         from django.utils import timezone
-        from evennia_rp_crafting.models import Pattern, PatternKnowledge
 
+        from evennia_rp_crafting.models import Pattern, PatternKnowledge
         from world.sandbox import crafting
 
         for key, spec in crafting.PATTERNS.items():
@@ -814,7 +817,6 @@ class Command(BaseCommand):
             from evennia_rp_chargen import abilities, services
             from evennia_rp_chargen.catalog import seed_catalog
             from evennia_rp_chargen.models import AbilityDefinition, TagDefinition
-
             from evennia_rp_rules.ruleset import get_ruleset
 
             seed_catalog(update=True)
@@ -905,6 +907,7 @@ class Command(BaseCommand):
         those pips and abilities from the start.
         """
         from evennia.utils.create import create_object
+
         from evennia_rp_equipment import conf as gear_conf
         from evennia_rp_equipment import outfits
         from evennia_rp_equipment import services as gear
@@ -1247,6 +1250,7 @@ class Command(BaseCommand):
 
     def _create_plot(self):
         from django.db.models import Max
+
         from evennia_plots.models import PlotArc, PlotThread
 
         # PlotArc has no create classmethod, so assign arc_number ourselves.
@@ -1527,6 +1531,7 @@ class Command(BaseCommand):
             return {}
 
         from django.utils import timezone
+
         from evennia_scenes.models import LogEntry, Scene
 
         made = {}

@@ -1,6 +1,7 @@
 """Persistent approved shop and plot budget; system seller stays switched off."""
 
 from django.db import transaction
+
 from evennia_building import services
 from evennia_building.models import BuildProject, Property
 from evennia_economy import shops, stalls

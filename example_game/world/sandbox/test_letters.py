@@ -8,14 +8,14 @@ from django.apps import apps
 from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
+from typeclasses.characters import Character
+from typeclasses.rooms import Room
+
 from evennia_rp_crafting import services
 from evennia_rp_crafting.errors import CraftingError
 from evennia_rp_crafting.letters import seal
 from evennia_rp_crafting.models import LetterState
 from evennia_rp_resources.services import grant
-from typeclasses.characters import Character
-from typeclasses.rooms import Room
-
 from world.sandbox import crafting
 
 

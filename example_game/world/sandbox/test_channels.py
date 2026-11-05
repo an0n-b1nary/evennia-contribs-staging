@@ -6,10 +6,11 @@ from unittest.mock import patch
 from django.utils import timezone
 from evennia.utils.create import create_channel
 from evennia.utils.test_resources import EvenniaTest
-from evennia_rptracker import channel_tracker, tracker
-from evennia_rptracker.models import RPSession, RPSessionSceneLink
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
+
+from evennia_rptracker import channel_tracker, tracker
+from evennia_rptracker.models import RPSession, RPSessionSceneLink
 
 
 class ChannelSeams(EvenniaTest):

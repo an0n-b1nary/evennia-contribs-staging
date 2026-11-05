@@ -34,6 +34,7 @@ class TestConfiguredPlotXP(EvenniaTest):
         from decimal import Decimal
 
         from django.utils import timezone
+
         from evennia_plots.integrations.xp import collect_thread_bonuses
         from evennia_plots.models import PlotArc, PlotParticipant, PlotThread
 

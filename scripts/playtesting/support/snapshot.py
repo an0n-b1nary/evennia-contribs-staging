@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from evennia.accounts.models import AccountDB
+
 from evennia_building.models import BuildProject, BuildSubmission, Property
 from evennia_calendar.models import RSVP, CalendarEvent, ClusterRSVP, PriorityToken
 from evennia_economy.models import (

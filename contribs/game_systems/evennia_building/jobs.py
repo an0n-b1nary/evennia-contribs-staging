@@ -1,6 +1,7 @@
 """Optional Jobs adapter. Answers identify a Building snapshot, never its content."""
 
 from django.core.exceptions import ValidationError
+
 from evennia_jobs.models import RequestSubmission
 from evennia_jobs.review import submit_request
 from evennia_jobs.signals import request_approved, request_reviewed, request_withdrawn

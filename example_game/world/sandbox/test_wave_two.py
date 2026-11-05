@@ -11,15 +11,15 @@ from django.core.management import call_command
 from django.test import override_settings
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import Character
+from typeclasses.rooms import Room
+
+from evennia_links.rooms import can, owner_of
 from evennia_rp_crafting import fixtures
 from evennia_rp_crafting.errors import CraftingError
 from evennia_rp_crafting.models import FixtureInstallation
 from evennia_rp_crafting.test_wave_two import WaveTwoFixture
 from evennia_rp_crafting.wave_two import activate
-from typeclasses.characters import Character
-from typeclasses.rooms import Room
-
-from evennia_links.rooms import can, owner_of
 
 
 @skipUnless(apps.is_installed("evennia_building"), "building absent")
@@ -173,8 +173,8 @@ class WaveTwoSeedSeams(EvenniaTest):
 
     def test_seeded_fixture_is_visible_and_reseed_preserves_history(self):
         from evennia.objects.models import ObjectDB
-        from evennia_rp_crafting.models import CraftRecord
 
+        from evennia_rp_crafting.models import CraftRecord
         from world.sandbox import crafting
 
         call_command("seed_sandbox", verbosity=0)

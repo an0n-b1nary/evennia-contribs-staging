@@ -18,6 +18,7 @@ from django.test import override_settings
 from django.urls import include, path, reverse
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
+
 from evennia_jobs.models import Job
 from evennia_lore.models import LoreAcquisition, LoreEntry
 

@@ -439,6 +439,7 @@ class PatternRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
             self.skipTest("Race gate requires a file-backed test database")
         from evennia.utils.create import create_object
+
         from evennia_scenes.models import Scene, SceneParticipant
 
         from . import patterns
@@ -487,6 +488,7 @@ class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
             self.skipTest("Race gate requires a file-backed test database")
         from evennia.utils.create import create_object
+
         from evennia_jobs.review import submit_request
 
         from .pattern_form import FORM
@@ -517,6 +519,7 @@ class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
 
     def test_competing_proposals_for_one_name_create_one_pattern(self):
         from django.core.exceptions import ValidationError
+
         from evennia_jobs.models import RequestDecision
 
         from .models import Pattern, PatternKnowledge

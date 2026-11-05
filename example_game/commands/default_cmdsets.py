@@ -18,9 +18,12 @@ from importlib import import_module
 
 from django.apps import apps
 from evennia import default_cmds
+
+from commands.sandbox import CmdSandbox
 from evennia_boards.commands import CmdBoard
 from evennia_calendar.commands import CmdCalendar, CmdCluster, CmdRsvp
 from evennia_jobs.commands import CmdBug, CmdDiscuss, CmdIssue, CmdJobs, CmdRequest
+from evennia_links.commands import CmdRuntime
 from evennia_lore.commands import (
     CmdForget,
     CmdHint,
@@ -31,10 +34,6 @@ from evennia_lore.commands import (
     CmdShare,
     CmdTome,
 )
-from evennia_plots.commands import CmdArc, CmdHook, CmdPlot, CmdThread
-
-from commands.sandbox import CmdSandbox
-from evennia_links.commands import CmdRuntime
 from evennia_maps.commands import CmdMap
 from evennia_moderation.commands import (
     CmdAccountPage,
@@ -47,6 +46,7 @@ from evennia_moderation.commands import (
     CmdSoftban,
     CmdUnban,
 )
+from evennia_plots.commands import CmdArc, CmdHook, CmdPlot, CmdThread
 from evennia_posing.commands import (
     CmdEmit,
     CmdHighlight,

@@ -6,17 +6,17 @@ import ast
 from pathlib import Path
 
 from django.test import SimpleTestCase
-from evennia_boards import test_editor_persistence as boards
-from evennia_calendar import test_editor_persistence as calendar
-from evennia_jobs import test_editor_persistence as jobs
-from evennia_lore import test_editor_persistence as lore
-from evennia_plots import test_editor_persistence as plots
-from evennia_scenes import test_editor_persistence as scenes
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_boards import test_editor_persistence as boards
+from evennia_calendar import test_editor_persistence as calendar
+from evennia_jobs import test_editor_persistence as jobs
 from evennia_links import test_editor_persistence as links
+from evennia_lore import test_editor_persistence as lore
+from evennia_plots import test_editor_persistence as plots
 from evennia_regions import test_editor_persistence as regions
+from evennia_scenes import test_editor_persistence as scenes
 from evennia_social.tests import test_editor_persistence as social
 
 

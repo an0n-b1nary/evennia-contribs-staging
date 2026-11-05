@@ -7,11 +7,11 @@ import json
 import random
 
 from evennia.objects.models import ObjectDB
+
+from evennia_links.guests import is_guest
 from evennia_rp_combat import engine
 from evennia_rp_combat import services as combat
 from evennia_rp_combat.data import CombatError
-
-from evennia_links.guests import is_guest
 
 from . import boss, rules, services, subjects
 

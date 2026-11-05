@@ -11,13 +11,14 @@ from evennia.objects.models import ObjectDB
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from typeclasses.characters import Character
+from typeclasses.objects import Object
+from typeclasses.rooms import Room
+
 from evennia_rp_crafting import companions, modifiers, services
 from evennia_rp_crafting.models import ActivationUse, CompanionState, ModificationLayer
 from evennia_rp_crafting.test_wave_three import WaveThreeFixture
 from evennia_rp_crafting.wave_two import activate
-from typeclasses.characters import Character
-from typeclasses.objects import Object
-from typeclasses.rooms import Room
 
 
 class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
@@ -167,6 +168,7 @@ class WaveThreeSeams(WaveThreeFixture, EvenniaTest):
     def test_transferred_companion_ambient_logs_current_owner_without_pose_counts(self):
         from evennia import SESSION_HANDLER
         from evennia.server.serversession import ServerSession
+
         from evennia_scenes.models import LogEntry, Scene, SceneParticipant
 
         # EvenniaTest connects only the first account. The new owner must be
@@ -276,6 +278,7 @@ class ModifierCommandSeams(WaveThreeFixture, EvenniaCommandTest):
 
     def test_registered_draft_commands_commit_exact_service_on_host_objects(self):
         from commands.default_cmdsets import CharacterCmdSet
+
         from evennia_economy.services import balance
         from evennia_rp_crafting.models import ModificationOffer
 

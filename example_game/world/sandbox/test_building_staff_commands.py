@@ -3,11 +3,12 @@
 """Staff Building commands with actual host composition and optional partners."""
 
 from django.test import override_settings
-from evennia_building import test_staff_commands as staff_tests
-from evennia_building.commands import CmdBuildAdmin
 from typeclasses.characters import Character
 from typeclasses.exits import Exit
 from typeclasses.rooms import Room
+
+from evennia_building import test_staff_commands as staff_tests
+from evennia_building.commands import CmdBuildAdmin
 
 
 @override_settings(ROOT_URLCONF="web.urls")

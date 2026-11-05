@@ -55,6 +55,7 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
 
     def test_seeded_signatures_tactics_and_command_registration(self):
         from commands.default_cmdsets import CharacterCmdSet
+
         from evennia_rp_chargen.models import SignatureMove
         from evennia_rp_combat.models import Tactics
 
@@ -161,7 +162,6 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_combat import services
         from evennia_rp_combat.modifiers import rules
         from evennia_rp_combat.sources import snapshot
-
         from world.ruleset import COMBAT_ABILITIES
 
         for entry in COMBAT_ABILITIES:
@@ -248,7 +248,6 @@ class TestCombatPlayground(RPSeedMixin, EvenniaCommandTest):
             self.skipTest("optional NPC partner absent")
         from evennia_npcs import services as npcs
         from evennia_rp_combat import services
-
         from evennia_rp_rules.ruleset import get_ruleset
 
         actor, target = self.samples[:2]

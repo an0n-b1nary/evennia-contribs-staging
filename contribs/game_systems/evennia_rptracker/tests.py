@@ -751,9 +751,8 @@ class TestDefaultSceneDisplay(EvenniaTest):
 
     @skipUnless(apps.is_installed("evennia_scenes"), "requires evennia_scenes")
     def test_uses_public_scene_number_not_pk(self):
-        from evennia_scenes.models import Scene
-
         from evennia_rptracker.commands import _default_scene_display
+        from evennia_scenes.models import Scene
 
         scene = Scene.objects.create(
             title="Bridge",

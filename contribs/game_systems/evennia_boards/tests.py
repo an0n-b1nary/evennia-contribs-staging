@@ -609,9 +609,8 @@ class TestCollectCutscenePosts(EvenniaTest):
         self.ic_board = _make_ic_board()
 
     def test_ic_post_yields_award(self):
-        from evennia_xp.models import XPLog
-
         from evennia_boards.integrations.xp import collect_cutscene_posts
+        from evennia_xp.models import XPLog
 
         _make_ic_post(self.char1, self.ic_board, window_end=self.now)
         with patch(_XP_GATING, return_value=Decimal("1.0")):
@@ -650,9 +649,8 @@ class TestCollectCutscenePosts(EvenniaTest):
         self.assertEqual(len(awards), 0)
 
     def test_already_awarded_skipped(self):
-        from evennia_xp.models import XPLog
-
         from evennia_boards.integrations.xp import collect_cutscene_posts
+        from evennia_xp.models import XPLog
 
         post = _make_ic_post(self.char1, self.ic_board, window_end=self.now)
         XPLog.objects.create(

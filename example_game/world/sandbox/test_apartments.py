@@ -1,11 +1,12 @@
 """Apartment consent, passage and lifecycle with the actual host composition."""
 
 from django.test import override_settings
-from evennia_building import attachments, lifecycle, services
-from evennia_building.test_apartments import TestApartments
 from typeclasses.characters import Character
 from typeclasses.exits import Exit
 from typeclasses.rooms import Room
+
+from evennia_building import attachments, lifecycle, services
+from evennia_building.test_apartments import TestApartments
 
 
 @override_settings(ROOT_URLCONF="web.urls")
@@ -59,6 +60,7 @@ class ApartmentSeams(TestApartments):
         from datetime import timedelta
 
         from django.utils import timezone
+
         from evennia_building.models import BuildingClock, Property
 
         now = timezone.now()

@@ -22,7 +22,6 @@ from django.utils import timezone
 from evennia.objects.objects import DefaultRoom
 from evennia.utils.test_resources import EvenniaTest
 from evennia.web.urls import urlpatterns as evennia_default_urlpatterns
-from evennia_scenes.models import Scene
 
 from evennia_links.runtime import get as _runtime
 from evennia_maps.models import MapPlane, RoomTile
@@ -30,6 +29,7 @@ from evennia_maps.overlays import collect_overlays, overlay_url_templates
 from evennia_maps.typeclasses import MapsRoomMixin
 from evennia_maps.views import PlaneLiveMapView
 from evennia_regions.models import Region, RegionMembership
+from evennia_scenes.models import Scene
 
 urlpatterns = [
     path("map/", include("evennia_maps.urls")),
