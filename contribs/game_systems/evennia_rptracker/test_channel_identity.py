@@ -171,9 +171,11 @@ class TestChannelIdentity(EvenniaCommandTest):
         ):
             self.assertEqual(command.boot_user(self.channel, self.account2), (True, ""))
             self.assertEqual(
-                broadcast.call_args.args[0], "Newcomer was booted from channel by Newcomer."
+                broadcast.call_args.args[0], "Newcomer was booted from channel by staff."
             )
-            self.assertNotIn(self.account.key, target.call_args.args[0])
+            self.assertEqual(
+                target.call_args.args[0], "You were booted from channel Ordinary by staff."
+            )
             self.channel.connect(self.account2)
             broadcast.reset_mock()
             command.boot_user(self.channel, self.account2, quiet=True)

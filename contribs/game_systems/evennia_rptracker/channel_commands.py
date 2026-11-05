@@ -100,9 +100,11 @@ class CmdICChannel(StrictSwitchMixin, CmdChannel):
         if comms_identity() == "account":
             return super().boot_user(channel, target, quiet=quiet, reason=reason)
         target_name = (sending_character(target) or target).get_display_name(None)
-        caller_name = (
-            sending_character(self.caller, self.session) or self.caller
-        ).get_display_name(None)
+        # Without a puppet the booter is named "staff", not the account's
+        # "Newcomer". Boot and ban need only channel control, so this also
+        # covers non-staff holders: revisit if players may run their own channels.
+        caller = sending_character(self.caller, self.session)
+        caller_name = caller.get_display_name(None) if caller is not None else "staff"
         if not channel.subscriptions.has(target):
             return False, f"{target_name} is not connected to channel {channel.key}."
         # DefaultChannel.post_leave_channel removes channel nicks and aliases.

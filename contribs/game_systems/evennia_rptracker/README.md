@@ -309,8 +309,10 @@ subscriptions, and counts visitor sessions as newcomers. Guest puppets and
 relay bots remain named. When Social is installed, its presence policy hides
 unlisted characters as Social's `who` does, judged from the caller's puppet:
 staff, the character itself and people in its room still see it. Boot and ban
-notices use public display names for the target and moderator. Account mode
-retains Evennia's subscriber list and moderation messages.
+notices use public display names for the target and moderator. A moderator
+without a character is named "staff", which applies to any holder of the
+channel's `control` lock. Account mode retains Evennia's subscriber list and
+moderation messages.
 
 Visitors may send only to the channel tagged `welcome` in category `comms`.
 Their other subscriptions and listening remain intact. Character-mode logs

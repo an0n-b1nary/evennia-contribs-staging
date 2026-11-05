@@ -11,7 +11,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - In character communication mode, list online channel puppets and newcomer
   counts, apply Social's optional presence policy, and identify boot/ban
-  participants by public display name. Account mode retains stock behavior.
+  participants by public display name (a moderator without a character is
+  "staff"). Account mode retains stock behavior.
   Share sender resolution from Links, retaining the existing public import.
 - An active session whose `RPSession` row has gone (purged, or rolled back under a surviving tracker entry) no longer reports activity. Its entry is dropped and the pose starts a new pending session, so `rp_activity_recorded` listeners never get a `session_id` with no row behind it. Before, the scenes bridge could link such a session to the room's active scene, leaving a dangling foreign key. This was the cause of an intermittent sandbox-gate failure. Each active pose now costs one primary-key existence check.
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
