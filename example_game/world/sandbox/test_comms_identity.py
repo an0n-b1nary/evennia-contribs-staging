@@ -325,7 +325,7 @@ class TestChannelLogCutover(EvenniaCommandTest):
                 self.account2.nicks.nickreplace(
                     "greeting hello", categories=("inputline",), include_account=False
                 ),
-                "channel welcome = hello",
+                "@channel welcome = hello",
             )
             self.assertEqual(
                 self.account2.nicks.nickreplace(

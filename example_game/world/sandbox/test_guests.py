@@ -297,7 +297,7 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
             patch("evennia.utils.logger.log_file") as logged,
         ):
             self.call(CmdWelcome(), "Guest greeting")
-        self.assertIn("Char: Guest greeting", str(received.call_args.args[0]))
+        self.assertIn("Char: Guest greeting", str(received.call_args.kwargs["text"]))
         self.assertEqual(logged.call_args.args[0], "Char: Guest greeting")
 
     def test_guest_chat_honours_channel_ban(self):
