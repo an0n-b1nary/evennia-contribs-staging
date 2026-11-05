@@ -9,14 +9,14 @@ from django.apps import apps
 from django.conf import settings
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTest
-from evennia_rp_resources import gathering
-from evennia_rp_resources.batch import run_weekly_batch
-from evennia_rp_resources.catalog import seed_catalog
-from evennia_rp_resources.services import grant, total_held
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
 from evennia_links import runtime
+from evennia_rp_resources import gathering
+from evennia_rp_resources.batch import run_weekly_batch
+from evennia_rp_resources.catalog import seed_catalog
+from evennia_rp_resources.services import grant, total_held
 
 
 class ResourceSeams(EvenniaTest):

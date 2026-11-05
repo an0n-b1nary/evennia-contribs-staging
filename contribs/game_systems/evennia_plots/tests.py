@@ -1041,9 +1041,8 @@ class TestCollectors(EvenniaTest):
         )
 
     def test_idempotent_when_xplog_already_has_credit(self):
-        from evennia_xp.models import XPLog
-
         from evennia_plots.integrations.xp import collect_thread_bonuses
+        from evennia_xp.models import XPLog
 
         thread, now = self._make_concluded_thread_with_bonus(bonus=2)
         PlotParticipant.objects.create(

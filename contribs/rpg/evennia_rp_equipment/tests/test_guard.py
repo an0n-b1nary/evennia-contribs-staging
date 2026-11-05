@@ -8,7 +8,6 @@ from evennia_rp_chargen import abilities
 from evennia_rp_chargen import services as chargen
 from evennia_rp_chargen.guards import build_change_requested
 from evennia_rp_chargen.services import ChargenError
-
 from evennia_rp_equipment import services
 from evennia_rp_equipment.guard import DISPATCH_UID
 

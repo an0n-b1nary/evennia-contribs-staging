@@ -59,6 +59,7 @@ def fixture(game, phase):
 
     from evennia.objects.models import ObjectDB
     from evennia.utils.create import create_object
+
     from evennia_rp_combat import engine, partners, services
     from evennia_rp_combat.data import Build
     from evennia_rp_combat.models import Fight
@@ -215,10 +216,10 @@ def contest_fixture(game, phase):
 
     from evennia.objects.models import ObjectDB
     from evennia.utils.create import create_object
+
     from evennia_rp_combat import services as combat
     from evennia_rp_combat.data import Build, CombatError
     from evennia_rp_party import boss, boss_services, services
-
     from evennia_rp_rules.dice import ScriptedRoller
 
     path = game / "party-contest-fixture.json"

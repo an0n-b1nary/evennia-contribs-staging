@@ -8,11 +8,11 @@ from django.apps import apps
 from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
-from evennia_lore.item_commands import CmdTome
-from evennia_lore.models import LoreAcquisition, LoreEntry, LoreTomeRecord
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_lore.item_commands import CmdTome
+from evennia_lore.models import LoreAcquisition, LoreEntry, LoreTomeRecord
 from world.sandbox import crafting
 
 
@@ -111,6 +111,7 @@ class LoreItemSeams(EvenniaCommandTest):
     @skipUnless(apps.is_installed("evennia_rp_crafting"), "crafting absent")
     def test_recognition_address_survives_real_crafting_and_unlocks_after_reading(self):
         from evennia.utils.dbserialize import deserialize
+
         from evennia_rp_crafting.commands import DRAFT_KEY
         from evennia_rp_resources.services import total_held
 

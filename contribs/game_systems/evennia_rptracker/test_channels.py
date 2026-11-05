@@ -271,10 +271,9 @@ class ChannelCollectionTests(EvenniaCommandTest):
 
     @skipUnless(apps.is_installed("evennia_xp"), "requires evennia_xp")
     def test_post_batch_flags_require_confirmed_matching_ledger_rows(self):
+        from evennia_rptracker.integrations.xp import flip_channel_session_flags
         from evennia_xp.batch import Award
         from evennia_xp.models import XPLog
-
-        from evennia_rptracker.integrations.xp import flip_channel_session_flags
 
         self.exchange()
         session = self.tracked_session()
@@ -297,10 +296,9 @@ class ChannelCollectionTests(EvenniaCommandTest):
 
     @skipUnless(apps.is_installed("evennia_xp"), "requires evennia_xp")
     def test_post_batch_flags_ignore_ledger_rows_for_another_character(self):
+        from evennia_rptracker.integrations.xp import flip_channel_session_flags
         from evennia_xp.batch import Award
         from evennia_xp.models import XPLog
-
-        from evennia_rptracker.integrations.xp import flip_channel_session_flags
 
         self.exchange()
         session = self.tracked_session()

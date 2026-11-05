@@ -3,13 +3,13 @@
 from unittest.mock import patch
 
 from django.test import override_settings
-from evennia_building import services
-from evennia_building.models import Property
-from evennia_building.tests import TestInteriors
 from typeclasses.characters import Character
 from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 
+from evennia_building import services
+from evennia_building.models import Property
+from evennia_building.tests import TestInteriors
 from evennia_maps.permissions import is_room_web_visible
 from evennia_social import presence
 
@@ -35,7 +35,6 @@ class BuildingInteriorSeams(TestInteriors):
         from evennia_rptracker import tracker
         from evennia_scenes.commands import CmdScene
         from evennia_scenes.models import Scene
-
         from evennia_social.commands.roomconfig import CmdRoomConfig
         from evennia_social.mood import can_set_mood
 

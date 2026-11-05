@@ -5,6 +5,7 @@
 import re
 
 from django.db.models import Sum
+
 from evennia_economy.services import EconomyError
 
 from . import conf

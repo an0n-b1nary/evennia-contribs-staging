@@ -8,11 +8,11 @@ from django.apps import apps
 from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
-from evennia_rp_crafting.item_details import examine
-from evennia_rp_crafting.models import CraftRecord
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_rp_crafting.item_details import examine
+from evennia_rp_crafting.models import CraftRecord
 from world.sandbox import crafting
 
 

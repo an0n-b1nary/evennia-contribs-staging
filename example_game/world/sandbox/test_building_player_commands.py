@@ -3,6 +3,10 @@
 """Player Building commands under the reference game's actual MRO and cmdset."""
 
 from django.test import override_settings
+from typeclasses.characters import Character
+from typeclasses.exits import Exit
+from typeclasses.rooms import Room
+
 from evennia_building import test_player_commands as player_tests
 from evennia_building.commands import (
     CmdBuild,
@@ -12,9 +16,6 @@ from evennia_building.commands import (
     CmdPassage,
     CmdProperty,
 )
-from typeclasses.characters import Character
-from typeclasses.exits import Exit
-from typeclasses.rooms import Room
 
 
 @override_settings(ROOT_URLCONF="web.urls")

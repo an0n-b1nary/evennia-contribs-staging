@@ -9,11 +9,11 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 from evennia.objects.models import ObjectDB
-from evennia_rp_resources import services as resources
 
 from evennia_links.characters import account_ids
 from evennia_links.runtime import get
 from evennia_links.transactions import atomic_objects
+from evennia_rp_resources import services as resources
 
 from . import conf
 from .behaviours import registry, text

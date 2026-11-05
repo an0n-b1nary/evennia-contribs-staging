@@ -27,7 +27,6 @@ class RPEquipmentConfig(AppConfig):
             description="Expose equipment commands to players.",
         )
         from evennia_rp_chargen.guards import build_change_requested
-
         from evennia_rp_equipment.guard import DISPATCH_UID, on_build_change
 
         # evennia_rp_chargen is a hard dependency, so the guard is always

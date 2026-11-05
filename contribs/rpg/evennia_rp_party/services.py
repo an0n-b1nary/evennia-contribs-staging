@@ -3,12 +3,12 @@
 """Authorized Party operations through combat's locked, journaled coordinator."""
 
 from evennia.objects.models import ObjectDB
+
+from evennia_links import runtime
 from evennia_rp_combat import conf as combat_conf
 from evennia_rp_combat import engine, partners
 from evennia_rp_combat import services as combat
 from evennia_rp_combat.data import CombatError
-
-from evennia_links import runtime
 
 from . import conf, providers, rules
 

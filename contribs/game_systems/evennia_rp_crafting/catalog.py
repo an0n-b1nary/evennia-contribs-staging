@@ -4,6 +4,7 @@
 
 from django.core.validators import validate_slug
 from django.db import transaction
+
 from evennia_rp_resources.conf import categories
 
 from . import conf

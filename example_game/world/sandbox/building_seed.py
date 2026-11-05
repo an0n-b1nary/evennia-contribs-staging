@@ -4,9 +4,9 @@ from django.conf import settings
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
+
 from evennia_building import attachments, collaboration, frontier, services
 from evennia_building.models import BuildProject, Property, RegionBuildPolicy
-
 from evennia_regions.models import Region, RegionMembership
 
 TAG = "building_demo"

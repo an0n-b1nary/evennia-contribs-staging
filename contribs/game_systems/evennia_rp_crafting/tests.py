@@ -11,11 +11,11 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.ansi import strip_ansi
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
-from evennia_rp_resources.models import ResourceDefinition, ResourceGrant, ResourceHolding
-from evennia_rp_resources.services import grant
 
 from evennia_links.runtime import cap_raise, get
 from evennia_links.runtime import set as set_runtime
+from evennia_rp_resources.models import ResourceDefinition, ResourceGrant, ResourceHolding
+from evennia_rp_resources.services import grant
 
 from . import conf, services
 from .behaviours import behaviour

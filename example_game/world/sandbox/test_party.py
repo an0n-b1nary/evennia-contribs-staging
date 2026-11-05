@@ -30,6 +30,7 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
 
     def test_seed_is_opt_in_and_commands_and_guide_are_registered(self):
         from commands.default_cmdsets import CharacterCmdSet
+
         from evennia_rp_combat import services as combat
         from evennia_rp_party import rules
 
@@ -160,7 +161,6 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         from evennia_rp_combat import engine
         from evennia_rp_combat import services as combat
         from evennia_rp_party import boss, boss_services, services
-
         from evennia_rp_rules.dice import ScriptedRoller
 
         first, second = self.samples

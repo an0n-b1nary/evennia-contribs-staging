@@ -6,10 +6,11 @@ from django.apps import apps
 from django.core.management import call_command
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTest
-from evennia_rp_crafting import services
-from evennia_rp_crafting.models import CraftRecord, NicheDefinition, Workshop
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
+
+from evennia_rp_crafting import services
+from evennia_rp_crafting.models import CraftRecord, NicheDefinition, Workshop
 
 
 class CraftingSeams(EvenniaTest):
@@ -20,10 +21,10 @@ class CraftingSeams(EvenniaTest):
         if not apps.is_installed("evennia_rp_equipment"):
             self.skipTest("equipment absent")
         from evennia.objects.models import ObjectDB
+
         from evennia_rp_equipment import outfits
         from evennia_rp_equipment import services as gear
         from evennia_rp_equipment.display import worn_lines
-
         from world.sandbox.crafting import CLOAK_NAME
 
         call_command("seed_sandbox", verbosity=0)
@@ -74,9 +75,9 @@ class CraftingSeams(EvenniaTest):
 
     def test_host_book_uses_carried_lifecycle_and_record_based_read_dispatch(self):
         from evennia.objects.models import ObjectDB
-        from evennia_rp_crafting.composition import invoke
         from typeclasses.craft_items import CraftedBook
 
+        from evennia_rp_crafting.composition import invoke
         from world.sandbox.crafting import BOOK_NAME, BOOK_TEXT
 
         call_command("seed_sandbox", verbosity=0)
@@ -87,11 +88,10 @@ class CraftingSeams(EvenniaTest):
             self.assertEqual(invoke(self.char1, book, "readable"), BOOK_TEXT)
 
     def test_real_collectors_raise_caps_and_lower_them_on_abandonment(self):
+        from evennia_links.runtime import get
         from evennia_rp_resources.batch import holdings_cap
         from evennia_rp_resources.catalog import seed_catalog as seed_resources
         from evennia_rp_resources.services import grant
-
-        from evennia_links.runtime import get
 
         seed_resources()
         from evennia_rp_crafting.catalog import seed_catalog
@@ -118,9 +118,10 @@ class CraftingSeams(EvenniaTest):
         from unittest.mock import patch
 
         from evennia.objects.models import ObjectDB
+        from typeclasses.craft_items import CraftedConsumable
+
         from evennia_rp_crafting.events import use
         from evennia_rp_crafting.models import EventUse
-        from typeclasses.craft_items import CraftedConsumable
 
         call_command("seed_sandbox", verbosity=0)
         item = ObjectDB.objects.get(db_key="a sample spice cake")

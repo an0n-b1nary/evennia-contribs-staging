@@ -17,9 +17,9 @@ from django.utils.crypto import salted_hmac
 from evennia.accounts.models import AccountDB
 from evennia.utils import create
 from evennia.utils.utils import class_from_module
+
 from evennia_jobs.models import RequestOutcome
 from evennia_jobs.review import submit_request
-
 from evennia_links.guests import is_guest
 from evennia_moderation.config import value
 from evennia_moderation.models import (

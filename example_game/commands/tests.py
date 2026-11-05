@@ -20,13 +20,13 @@ from evennia.commands.command import CMD_IGNORE_PREFIXES
 from evennia.objects.models import ObjectDB
 from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
-from evennia_jobs.commands import CmdJobs
-from evennia_npcs.commands import CmdNPCPose, challenge_command, contest_command
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 from world.sandbox.seeding import SeededSandboxMixin
 
 from commands.sandbox import CmdSandbox, _stray_rooms
+from evennia_jobs.commands import CmdJobs
+from evennia_npcs.commands import CmdNPCPose, challenge_command, contest_command
 from evennia_posing.commands import CmdLastPose, CmdPose, CmdPot
 from evennia_social.commands import (
     CmdFinger,
@@ -99,6 +99,7 @@ class TestCharacterCmdSet(EvenniaTest):
 
     def test_rp_commands_resolve_to_their_implementations(self):
         from evennia.commands.cmdparser import cmdparser
+
         from evennia_rp_contest.commands import CmdChallenge, CmdTest
 
         expected = {"+test": contest_command(), "+challenge": challenge_command()}

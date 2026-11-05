@@ -3,6 +3,7 @@
 """Party membership and dedicated Cover commands using current puppet state."""
 
 from evennia import CmdSet
+
 from evennia_rp_combat import services as combat
 from evennia_rp_combat.command_syntax import CombatCommand
 from evennia_rp_combat.data import CombatError

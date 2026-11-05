@@ -140,9 +140,9 @@ class CommandSyntaxSeams(EvenniaCommandTest):
 
     def test_activity_switch_reads_real_region_totals(self):
         from django.utils import timezone
-        from evennia_rptracker.models import RPSession
 
         from evennia_regions.models import Region, RegionMembership
+        from evennia_rptracker.models import RPSession
 
         region = Region.create_region("Syntax report region", self.char1)
         RegionMembership.objects.create(region=region, room=self.room1, is_primary=True)
@@ -157,7 +157,6 @@ class CommandSyntaxSeams(EvenniaCommandTest):
     def test_dotted_review_and_withdrawal_use_real_host_forms(self):
         from evennia_jobs.models import RequestDecision, RequestWithdrawal
         from evennia_jobs.review import submit_request
-
         from world.sandbox import content
 
         def submit():
@@ -275,6 +274,7 @@ class CommandSyntaxSeams(EvenniaCommandTest):
 
     def test_npc_fields_reach_host_spawn_ratings_and_combat_profile(self):
         from django.test import override_settings
+
         from evennia_npcs import services
         from evennia_npcs.models import NPCCombatProfile
 
@@ -301,6 +301,7 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         from unittest.mock import patch
 
         from django.test import override_settings
+
         from evennia_lore.commands import _lore_submit_save
         from evennia_lore.models import LoreEntry, LoreSceneLink, PlotLoreLink
         from evennia_plots.models import PlotThread
@@ -370,6 +371,7 @@ class CommandSyntaxSeams(EvenniaCommandTest):
 
     def test_flat_plot_links_use_real_scene_board_and_calendar_partners(self):
         from django.utils import timezone
+
         from evennia_boards.models import Board, Post
         from evennia_calendar.models import CalendarEvent
         from evennia_plots.models import PlotBoardLink, PlotCalendarLink, PlotThread, ScenePlotLink
@@ -401,6 +403,7 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         import random
 
         from django.utils import timezone
+
         from evennia_calendar.models import RSVP, CalendarEvent, ClusterRSVP, EventCluster
         from evennia_calendar.scheduler import run_cluster_lottery
 
@@ -435,10 +438,9 @@ class CommandSyntaxSeams(EvenniaCommandTest):
         from evennia_rp_chargen.models import CharacterBuild
         from evennia_rp_chargen.stats import StatHandler
         from evennia_rp_contest.models import Challenge, CheckRecord
-        from evennia_scenes.models import LogEntry, Scene
-
         from evennia_rp_rules.dice import ScriptedRoller
         from evennia_rp_rules.ruleset import get_ruleset
+        from evennia_scenes.models import LogEntry, Scene
 
         CharacterBuild.objects.create(character=self.char2)
         stats = StatHandler(self.char2)

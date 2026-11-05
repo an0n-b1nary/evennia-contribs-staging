@@ -64,11 +64,10 @@ def collect_lore_authored(window_end):
     Yields:
         Award for each eligible LoreEntry.
     """
+    from evennia_lore.models import LoreEntry
     from evennia_xp.batch import Award
     from evennia_xp.gating import resolve_xp_multiplier
     from evennia_xp.models import XPLog
-
-    from evennia_lore.models import LoreEntry
 
     window_start = _window_start(window_end)
     entries = LoreEntry.objects.filter(
@@ -134,11 +133,11 @@ def collect_lore_inspiration(window_end):
     """
     from django.apps import apps as django_apps
     from django.conf import settings
+
+    from evennia_lore.models import LoreInspirationCredit, LoreSceneLink
     from evennia_xp.batch import Award
     from evennia_xp.gating import resolve_xp_multiplier
     from evennia_xp.models import XPLog
-
-    from evennia_lore.models import LoreInspirationCredit, LoreSceneLink
 
     window_start = _window_start(window_end)
     links = LoreSceneLink.objects.filter(

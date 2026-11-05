@@ -136,7 +136,6 @@ class TestModerationSeams(EvenniaCommandTest):
     def test_explicit_ooc_and_party_chat_are_blocked_even_in_ic_room(self):
         from evennia_rp_combat.data import CombatError
         from evennia_rp_party import services as party
-
         from evennia_social.commands.ooc import CmdOoc
 
         self.room1.room_type = "ic"
@@ -149,7 +148,6 @@ class TestModerationSeams(EvenniaCommandTest):
         self,
     ):
         from evennia_npcs import services as npcs
-
         from evennia_social.identity import staff_run_marker
 
         blueprint = npcs.create_blueprint(self.char2, "Moderation NPC", "template")
@@ -230,8 +228,8 @@ class TestModerationSeams(EvenniaCommandTest):
     def test_application_context_is_staff_only_and_web_decline_can_share_reason(self):
         from evennia.accounts.accounts import DefaultGuest
         from evennia.utils.create import create_account, create_object
-        from evennia_jobs.review import review_fields
 
+        from evennia_jobs.review import review_fields
         from evennia_moderation import admissions
         from evennia_moderation.models import Notice
 

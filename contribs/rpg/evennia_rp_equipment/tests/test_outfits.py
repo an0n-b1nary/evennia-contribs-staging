@@ -7,7 +7,6 @@ from unittest.mock import patch
 from evennia_rp_chargen import abilities, locks
 from evennia_rp_chargen import services as chargen
 from evennia_rp_chargen.services import ChargenError
-
 from evennia_rp_equipment import outfits, services
 from evennia_rp_equipment.display import worn_items
 from evennia_rp_equipment.requirements import PIPS, Requirement

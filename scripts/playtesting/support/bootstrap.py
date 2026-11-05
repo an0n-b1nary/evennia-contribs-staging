@@ -17,8 +17,9 @@ def at_initial_setup():
     SEEDED_THIS_PROCESS = True
     guard()
     from evennia import create_account, create_object
-    from evennia_rp_chargen import abilities, services
     from server.conf.at_initial_setup import at_initial_setup as original
+
+    from evennia_rp_chargen import abilities, services
 
     original()
     call_command("seed_sandbox", verbosity=0)

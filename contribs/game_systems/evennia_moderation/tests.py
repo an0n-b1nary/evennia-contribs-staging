@@ -12,9 +12,9 @@ from evennia.accounts.accounts import DefaultGuest
 from evennia.accounts.models import AccountDB
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+
 from evennia_jobs.models import Job, RequestDecision, RequestSubmission
 from evennia_jobs.review import review_request
-
 from evennia_links.communication import denial
 from evennia_moderation import admissions, services
 from evennia_moderation.auth import ModerationBackend, ModerationMiddleware

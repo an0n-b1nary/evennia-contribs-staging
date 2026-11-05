@@ -8,8 +8,8 @@ from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from evennia.server.models import ServerConfig
 from evennia.utils.test_resources import EvenniaTestMixin
-from evennia_jobs.models import RequestDecision
 
+from evennia_jobs.models import RequestDecision
 from evennia_links.test_transactions import committed_race
 from evennia_moderation import admissions
 from evennia_moderation.commands import CmdBan, CmdUnban

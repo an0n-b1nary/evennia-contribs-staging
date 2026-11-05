@@ -29,6 +29,7 @@ class TestRPPlayground(RPSeedMixin, EvenniaCommandTest):
     @skipUnless(apps.is_installed("evennia_rp_equipment"), "equipment absent")
     def test_outfit_switch_typo_preserves_the_current_equipment(self):
         from commands.default_cmdsets import CharacterCmdSet
+
         from evennia_rp_equipment import outfits
         from evennia_rp_equipment import services as gear
 

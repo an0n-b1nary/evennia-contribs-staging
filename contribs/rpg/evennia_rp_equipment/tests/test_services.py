@@ -7,8 +7,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from django.test import override_settings
-from evennia_rp_chargen import abilities, locks
 
+from evennia_rp_chargen import abilities, locks
 from evennia_rp_equipment import services
 from evennia_rp_equipment.requirements import PIPS, Requirement
 from evennia_rp_equipment.services import GearError

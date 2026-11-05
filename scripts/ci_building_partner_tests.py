@@ -7,6 +7,7 @@ from django.conf import settings
 from django.test import override_settings
 from django.urls import include, path
 from evennia.web.urls import urlpatterns as defaults
+
 from evennia_building import test_player_commands, test_staff_commands
 from evennia_building.test_apartments import TestApartments
 from evennia_building.test_frontier import TestFrontier

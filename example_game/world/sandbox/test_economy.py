@@ -5,11 +5,12 @@
 from unittest.mock import patch
 
 from django.test import override_settings
+from typeclasses.characters import Character
+
 from evennia_economy.batch import run_weekly_batch
 from evennia_economy.models import StipendPayment
 from evennia_economy.partner_tests import EconomyPartnerTests
 from evennia_economy.services import balance
-from typeclasses.characters import Character
 
 
 class EconomySeams(EconomyPartnerTests):
@@ -17,6 +18,7 @@ class EconomySeams(EconomyPartnerTests):
 
     def test_cmdsets_register_atomic_give_and_economy_commands(self):
         from commands.default_cmdsets import CharacterCmdSet
+
         from evennia_economy.commands import CmdGive
 
         commands = CharacterCmdSet().commands
@@ -55,6 +57,7 @@ class EconomySeams(EconomyPartnerTests):
 
     def test_start_helper_idempotent(self):
         from evennia.scripts.models import ScriptDB
+
         from evennia_economy.scripts import ensure_economy_script_running
 
         ensure_economy_script_running()
@@ -66,9 +69,10 @@ class EconomySeams(EconomyPartnerTests):
 
         from django.utils import timezone
         from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+
         from evennia_economy.models import Storefront
         from evennia_economy.stalls import claim
-        from typeclasses.rooms import Room
 
         room = create_object(Room, key="Test market")
         room.tags.add("market", category="rp_economy")
@@ -92,8 +96,8 @@ class EconomySeams(EconomyPartnerTests):
 
     def test_seed_market_is_populated_and_reseed_recovers_stock(self):
         from django.core.management import call_command
-        from evennia_economy.models import Storefront
 
+        from evennia_economy.models import Storefront
         from world.sandbox import content
 
         for _ in range(2):

@@ -14,11 +14,11 @@ from decimal import Decimal
 from django.test import override_settings
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+
 from evennia_rp_chargen import abilities
 from evennia_rp_chargen import services as chargen
 from evennia_rp_chargen.catalog import seed_catalog
 from evennia_rp_chargen.stats import StatHandler
-
 from evennia_rp_equipment import services
 from evennia_rp_equipment.typeclasses import EquipmentCharacterMixin
 from evennia_rp_rules.testing import RulesetTestMixin

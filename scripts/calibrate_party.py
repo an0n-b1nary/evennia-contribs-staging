@@ -17,6 +17,7 @@ from random import Random
 
 def samples():
     from django.test import override_settings
+
     from evennia_rp_combat import arithmetic, engine
     from evennia_rp_combat.data import Build, Move
     from evennia_rp_party import rules
@@ -111,6 +112,7 @@ def sustained(seeds=100, *, alternating=False):
     Resists attacks. No targets, resources or allowances are fabricated.
     """
     from django.test import override_settings
+
     from evennia_rp_combat import engine
     from evennia_rp_combat.data import Build, Move
     from evennia_rp_party import rules
@@ -260,6 +262,7 @@ def sustained(seeds=100, *, alternating=False):
 
 def cover_samples():
     from django.test import override_settings
+
     from evennia_rp_combat import arithmetic, engine
     from evennia_rp_combat.data import Build, Move
     from evennia_rp_party import rules

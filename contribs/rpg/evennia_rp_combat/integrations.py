@@ -55,6 +55,7 @@ def chargen_build(character):
     import json
 
     from django.db.models import Q
+
     from evennia_rp_chargen.models import CharacterAbility, CharacterBuild
     from evennia_rp_chargen.moves import library
     from evennia_rp_chargen.subject import ChargenSubject

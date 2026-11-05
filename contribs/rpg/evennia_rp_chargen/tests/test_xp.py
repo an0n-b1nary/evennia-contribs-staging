@@ -30,9 +30,8 @@ class XPLedgerTests(CatalogTest, EvenniaCommandTest):
         abilities.set_allowance(self.char1, 1)
 
     def test_commands_buy_and_upgrade_with_real_xp(self):
-        from evennia_xp.models import XPSpend
-
         from evennia_rp_chargen.commands import CmdSpend, CmdUpgrade
+        from evennia_xp.models import XPSpend
 
         result = self.call(CmdSpend(), "/ability domain expertise/climbing")
         self.assertIn("1 starting allowance and 2 XP", result)

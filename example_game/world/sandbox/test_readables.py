@@ -6,12 +6,12 @@ from django.apps import apps
 from django.core.management import call_command
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaCommandTest
-from evennia_rp_crafting.models import JournalRevision, ReadableEdition
-from evennia_rp_crafting.readable_commands import CmdJournal
-from evennia_rp_crafting.readables import write
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_rp_crafting.models import JournalRevision, ReadableEdition
+from evennia_rp_crafting.readable_commands import CmdJournal
+from evennia_rp_crafting.readables import write
 from world.sandbox import crafting
 
 
