@@ -14,12 +14,21 @@ map.
 
 Why a signal instead of reading the partner models directly
 -----------------------------------------------------------
-Most overlays carry a privacy rule *only the owning domain
+Several overlays carry a privacy rule *only the owning domain
 knows*. ``evennia_scenes`` exposes ``room.active_scene_id`` as a bare pk
 with no privacy dimension — light a pin from it and a view-private scene
 announces itself to every anonymous visitor. Same for the heatmap (window
-visibility tiers) and the calendar (public lottery events). A standalone
-evennia_maps must not re-encode any of those rules, so it asks instead.
+visibility tiers). A standalone evennia_maps must not re-encode any of
+those rules, so it asks instead.
+
+Other overlays have no privacy rule but still belong to their own domain.
+The calendar has no visibility tier: an uncancelled event is public, and
+``is_staff_event`` selects the lottery RSVP mode rather than hiding
+anything, so player and staff renders get the same ``upcoming_events``. It
+answers through its own provider because only the calendar knows how an
+event reaches a room — via a ``SceneCalendarLink`` to an evennia_scenes
+scene — and that path runs through optional partners evennia_maps must not
+import.
 
 Overlay keys evennia_maps reads
 -------------------------------
@@ -27,10 +36,6 @@ Each value is a ``{room_id: value}`` dict; missing rooms simply have no
 overlay. Providers must write **disjoint** top-level keys — receiver order
 is not guaranteed, so two providers claiming one key is a bug in the
 providers.
-
-Calendar's ``is_staff_event`` flag is a public lottery RSVP mode, not a
-visibility tier; the calendar provider returns those events to both player and
-staff map renders. Privacy filtering remains owned by each provider's domain.
 
 ===================  ============  ===============================================
 Key                  Owner         Value
