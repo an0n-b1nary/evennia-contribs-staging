@@ -51,6 +51,24 @@ def is_visitor(actor, session=None):
     return not actor.get_all_puppets()
 
 
+def sending_character(sender, session=None):
+    """Resolve one active character, using the originating session when given.
+
+    Never choose an arbitrary alt for an account with several puppets.
+    """
+    from evennia.accounts.models import AccountDB
+
+    if isinstance(sender, AccountDB):
+        if session is not None:
+            character = sender.get_puppet(session)
+            if character is not None and getattr(character, "account", None) == sender:
+                return character
+            return None
+        puppets = {obj.pk: obj for obj in sender.get_all_puppets()}
+        return next(iter(puppets.values())) if len(puppets) == 1 else None
+    return sender if getattr(sender, "account", None) else None
+
+
 class CharacterCommsAccountMixin:
     """Mask account names from other players, including anonymous histories.
 
@@ -78,11 +96,12 @@ def check_comms_identity():
     """Refuse mode-specific classes wired under the wrong communication mode.
 
     Call from the host's ``at_server_start`` as well as Django system checks.
-    Channel implementations opt in with the ``comms_identity`` class marker;
-    character mode requires a character-marked channel and the account display
+    Character mode requires the channel identity mixin and the account display
     mixin on both account typeclasses. Unmarked commands work in either mode.
     """
     from evennia.utils.utils import class_from_module
+
+    from .communication import CharacterCommsChannelMixin
 
     mode = comms_identity()
     problems = []
@@ -119,8 +138,8 @@ def check_comms_identity():
         if mode != "character":
             continue
         if name == "BASE_CHANNEL_TYPECLASS":
-            if cls is None or getattr(cls, "comms_identity", None) != "character":
-                problems.append(f"{name} requires CharacterCommsChannelMixin (character marker)")
+            if cls is None or not issubclass(cls, CharacterCommsChannelMixin):
+                problems.append(f"{name} requires CharacterCommsChannelMixin")
         elif cls is None or not issubclass(cls, CharacterCommsAccountMixin):
             problems.append(f"{name} requires CharacterCommsAccountMixin first in its MRO")
         else:

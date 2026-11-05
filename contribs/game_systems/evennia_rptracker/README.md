@@ -293,6 +293,33 @@ are outside this report.
 Players can use `+activity/endchannel <channel name>` to end one channel session;
 the normal `+activity/end` continues to end their room session.
 
+### Communication identity
+
+Ordinary OOC channels can also speak as characters through Links'
+[`EVENNIA_COMMS_IDENTITY` integration](../../base_systems/evennia_links/README.md#communication-identity).
+Put `CharacterCommsChannelMixin` before `CommunicationChannelMixin` and
+`DefaultChannel` on the host's ordinary channel typeclass. IC channels retain
+their own character attribution and RP eligibility in either mode.
+`sending_character` now lives in `evennia_links.identity` and remains exported
+from `evennia_rptracker.typeclasses`.
+
+`CmdICChannel` reads the mode without changing cmdsets. In character mode,
+`channel/who` lists distinct online puppets by display name, shows muted
+subscriptions, and counts visitor sessions as newcomers. Guest puppets and
+relay bots remain named. When Social is installed, its presence policy hides
+unlisted characters as Social's `who` does, judged from the caller's puppet:
+staff, the character itself and people in its room still see it. Boot and ban
+notices use public display names for the target and moderator. A moderator
+without a character is named "staff", which applies to any holder of the
+channel's `control` lock. Account mode retains Evennia's subscriber list and
+moderation messages.
+
+Visitors may send only to the channel tagged `welcome` in category `comms`.
+Their other subscriptions and listening remain intact. Character-mode logs
+contain public character names or `Newcomer`, so normal history and the web
+channel page share the same identities. Archive old account-named logs when
+switching an existing game to character mode.
+
 ## Guide pages
 
 The `guides/` directory holds player guide pages for

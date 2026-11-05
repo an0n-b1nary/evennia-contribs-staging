@@ -86,6 +86,16 @@ def guest_start():
     return rooms[0]
 
 
+def welcome_channel():
+    """Resolve the unique welcome channel; refuse missing or ambiguous seeds."""
+    from evennia.comms.models import ChannelDB
+
+    channels = list(ChannelDB.objects.get_by_tag("welcome", category="comms"))
+    if len(channels) != 1:
+        raise ValueError("The welcome channel is unavailable. Please contact staff.")
+    return channels[0]
+
+
 class GuestCharacterMixin:
     """Enforce the guest boundary on exits and direct command-driven moves."""
 
@@ -138,7 +148,7 @@ class GuestCharacterMixin:
 
 
 class GuestAccountMixin:
-    """Seeded guest arrival, restricted commands, and a single guest channel."""
+    """Seeded guest arrival, restricted commands, and the shared welcome channel."""
 
     # Hosts override this to name their own guest commands.
     guest_welcome = "Welcome, guest. Pages may be sent to staff only."
@@ -192,10 +202,11 @@ class GuestAccountMixin:
         # Account creation may subscribe to DEFAULT_CHANNELS before this hook.
         for channel in ChannelDB.objects.get_subscriptions(self):
             channel.disconnect(self)
-        channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
-        if len(channels) != 1:
-            self.msg("The guest channel is unavailable. Please contact staff.")
+        try:
+            channel = welcome_channel()
+        except ValueError as exc:
+            self.msg(str(exc))
         else:
-            channels[0].connect(self)
+            channel.connect(self)
         super().at_post_login(session=session, **kwargs)
         self.msg(self.guest_welcome)

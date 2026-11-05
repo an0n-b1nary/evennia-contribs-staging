@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Add `CharacterCommsChannelMixin` for character-attributed ordinary channels,
+  visitor sends restricted to Welcome, relay bots passed through, and public
+  display names in logs shared by command history and web pages. Share `identity.sending_character` without
+  requiring RP tracker.
+- **Breaking:** Guest login now resolves the unique `welcome` tag in category `comms`;
+  hosts must re-tag channels formerly tagged `chat` in category `guest`.
 - Add the account-default communication identity setting, per-session visitor
   policy, neutral account display mixin and deferred startup/system checks.
 - Give disposable guest characters generated adjective-and-animal names,
