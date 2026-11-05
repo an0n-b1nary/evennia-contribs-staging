@@ -35,7 +35,7 @@ class CmdCombat(CombatCommand):
     +combat/unlock                  Announce a build correction; clear queues first
     +combat/relock                  Validate and announce the corrected build lock
     +combat/cap <number>             Set your join cap; after joining, only reduce it
-    +combat/unignore <character>     Remove account-wide ignore
+    +combat/unignore <character>     Remove the entry under that name
     +combat/rollback <seq>=<reason>  Staff recovery
     +combat/journal                 Retained public summaries
     +combat/result <exchange>        Recover committed results

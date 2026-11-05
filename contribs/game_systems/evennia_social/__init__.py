@@ -7,8 +7,8 @@ games: character profiles (+finger), player/venue discovery (+where,
 (+summon/+join), OOC room chat and navigation shortcuts (+ooc, +home), room
 mood (+mood), and an enhanced @tel.
 
-No Django models — all state lives on Character/Room AttributeProperty
-fields, so there is nothing to migrate.
+No Django models — state lives on Character, Room and Account attributes,
+so there is no schema to migrate.
 
 Hard-depends on `evennia_posing` (pyproject.toml `dependencies`): reuses
 `format_pose_time`, reads posing's `last_pose_time`/`pose_status` for
@@ -17,7 +17,7 @@ Hard-depends on `evennia_posing` (pyproject.toml `dependencies`): reuses
 
 Public API:
 
-    SocialCharacterMixin, SocialRoomMixin  — mix into your typeclasses
+    SocialAccountMixin, SocialCharacterMixin, SocialRoomMixin — typeclass mixins
     HANGOUT_TYPES                          — valid +hangouts categories
     find_room(caller, query), find_room_for_player(caller, query, character)
     is_staff(character), get_connected_characters(), find_character(name)
@@ -56,6 +56,7 @@ listed in INSTALLED_APPS).
 __version__ = "0.9.0"
 
 _LAZY = {
+    "SocialAccountMixin": "typeclasses",
     "SocialCharacterMixin": "typeclasses",
     "SocialRoomMixin": "typeclasses",
     "HANGOUT_TYPES": "typeclasses",
@@ -68,6 +69,7 @@ _LAZY = {
 
 __all__ = [
     "HANGOUT_TYPES",
+    "SocialAccountMixin",
     "SocialCharacterMixin",
     "SocialRoomMixin",
     "find_character",

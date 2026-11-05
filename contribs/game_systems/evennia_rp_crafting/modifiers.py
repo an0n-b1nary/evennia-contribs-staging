@@ -137,6 +137,11 @@ def _lock(maker, customer, target, *, locked_room=_UNLOCKED):
             raise CraftingError("Guests cannot request crafting services.")
     if maker != customer and same_account(maker, customer):
         raise CraftingError("Services cannot be exchanged between characters on the same account.")
+    if maker != customer and apps.is_installed("evennia_social"):
+        from evennia_social.ignore import NONE, ignore_level
+
+        if ignore_level(customer, maker) != NONE or ignore_level(maker, customer) != NONE:
+            raise CraftingError("Both players must allow contact before requesting a service.")
     positions = dict(
         ObjectDB.objects.filter(pk__in=[maker.pk, customer.pk]).values_list("pk", "db_location_id")
     )

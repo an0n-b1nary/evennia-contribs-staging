@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Mark `ICChannel.is_ic = True` so Social's channel receiver filtering treats IC lines as character posts, including visible-post exceptions.
+
 - In character communication mode, list online channel puppets and newcomer
   counts, apply Social's optional presence policy, and identify boot/ban
   participants by public display name (a moderator without a character is

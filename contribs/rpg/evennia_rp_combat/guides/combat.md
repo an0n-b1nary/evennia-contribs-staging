@@ -48,7 +48,7 @@ You're active in one fight at a time. While you are, your abilities, pips and eq
 
 - **Cancelling:** `+combat/cancel <token>` cancels an attack aimed at you, but only before you've accepted a reaction to it. Use it for an agreed mistake, not a roll you didn't like. Once an exchange is accepted, only staff can roll the fight back, and they restore the whole fight to a checkpoint for everyone to see.
 - **Fixing a build:** to correct your sheet mid-fight, clear your queue and use `+combat/unlock <reason>`, then `+combat/relock <reason>`. Both are announced.
-- **Ignoring someone:** if someone you ignore tries to interact with you in a fight, you're asked privately. `+combat/unignore <character>` removes the ignore entirely, including on alts and channels, until you add it back. You can share a fight with someone you ignore without interacting with them.
+- **Ignoring someone:** if someone you ignore tries to interact with you in a fight, you're asked privately. `+combat/unignore <character>` removes only your entry under that name. It warns about account-wide protection only for a `/full` entry. A covering full ignore can still apply; earlier unnamed full ignores require `+ignore/clear`. You can share a fight with someone you ignore without interacting with them.
 - **The storyteller asks:** anything a storyteller would change about your character arrives as a numbered request you accept or decline. [[combat-storytelling]] covers it.
 
 ## If deciding is hard

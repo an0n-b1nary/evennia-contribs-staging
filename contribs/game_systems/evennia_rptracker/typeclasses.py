@@ -21,6 +21,8 @@ class ICChannel(CommunicationChannelMixin, DefaultChannel):
     system messages and staff emits are logged but never count as RP.
     """
 
+    is_ic = True
+
     def msg(self, message, senders=None, bypass_mute=False, **kwargs):
         senders = list(make_iter(senders)) if senders else []
         if not isinstance(message, str) or not message.strip():

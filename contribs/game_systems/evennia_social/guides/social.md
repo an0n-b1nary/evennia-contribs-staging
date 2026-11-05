@@ -41,7 +41,7 @@ A page can go to several people at once: `page <name>,<name>=<message>`. `page/l
 
 ## Ignoring someone
 
-`+ignore <character>` hides that player's poses behind a short placeholder, drops their whispers and blocks their pages. It applies to every character that player has, not only the one you named. `+ignore/remove` undoes it. Messages from staff always get through.
+`+ignore <character>` hides that character's room posts behind placeholders and blocks contact. `/full <character>` covers the whole player, including alts; it can reveal alts through filtering, so use it for boundaries, never to discover who plays whom. `/except <character>` shows posts while still blocking contact. Character entries override full entries. OOC channel lines from an ignored player stay hidden even for exceptions. `/remove <character>` removes only the entry you made under that name; a covering full entry can still apply. `/clear` removes everything, including earlier full ignores with no recorded name. Bare `+ignore` lists only your entries. Staff messages always get through.
 
 ## Rooms
 

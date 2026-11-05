@@ -2038,3 +2038,13 @@ form is at `/jobs/forms/pattern/`. Staff see what approval would create in
 Pattern at Spreading, known to the proposer. Staff add tested combinations
 afterwards with `+pattern/combo`. The reference game enables the form because
 it reveals Patterns; a dark-launching game sets `"enabled": False` until then.
+
+
+Social's account mixin filters channel subscriptions in both communication
+modes. `+ignore` hides a character, `/full` covers the whole player and
+`/except` permits posts while blocking contact; `/remove` acts only on a
+named entry and `/clear` also removes earlier unnamed full ignores. See
+[Social's policy and API](../contribs/game_systems/evennia_social/README.md#personal-boundaries).
+The reference host retains account mode until #223's final adoption PR;
+Social identity seams exercise character `who`, visitor paging and partner
+filtering without changing the production cmdsets yet.

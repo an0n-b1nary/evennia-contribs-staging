@@ -1902,21 +1902,53 @@ class TestCoordinator(EvenniaCommandTest):
                 )
                 self.assertEqual(services.state_for(self.char1), before)
 
-    def test_ignore_removal_is_explicit_account_wide_and_mutual(self):
+    def test_ignore_removal_is_named_and_mutual(self):
         if not apps.is_installed("evennia_social"):
             self.skipTest("optional social partner absent")
-        first, second = self.account, self.account2
-        self.char1.db.account, self.char2.db.account = first, second
-        first.db.ignore_list, second.db.ignore_list = [second.pk], [first.pk]
+        from evennia_social import ignore
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        self.char1.db.account, self.char2.db.account = self.account, self.account2
+        ignore.set_entry(self.char1, self.char2, ignore.FULL)
+        ignore.set_entry(self.char2, self.char1, ignore.POSTS)
         with self.assertRaisesRegex(CombatError, "confirmation"):
             services.declare(self.char1, [self.char2])
         services.unignore(self.char1, self.char2)
-        self.assertEqual(first.db.ignore_list, [])
-        self.assertEqual(second.db.ignore_list, [first.pk])
+        self.assertIsNone(ignore.named_entry(self.char1, self.char2))
         with self.assertRaisesRegex(CombatError, "confirmation"):
             services.declare(self.char1, [self.char2])
         services.unignore(self.char2, self.char1)
         services.declare(self.char1, [self.char2])
+
+    def test_unignore_never_removes_an_unnamed_alt_or_earlier_full_ignore(self):
+        if not apps.is_installed("evennia_social"):
+            self.skipTest("optional social partner absent")
+        from evennia.utils.create import create_object
+
+        from evennia_social import ignore
+
+        self.char1.db.account, self.char2.db.account = self.account, self.account2
+        self.account2.characters.add(self.char2)
+        alt = create_object(
+            "evennia.objects.objects.DefaultCharacter",
+            key="Unnamed alt",
+            location=self.char1.location,
+        )
+        alt.db.account = self.account2
+        self.account2.characters.add(alt)
+        ignore.set_entry(self.char1, self.char2, ignore.FULL)
+        for mode in ("account", "character"):
+            with self.subTest(mode=mode), override_settings(EVENNIA_COMMS_IDENTITY=mode):
+                with self.assertRaisesRegex(CombatError, "isn't on your list"):
+                    services.unignore(self.char1, alt)
+                self.assertIsNotNone(ignore.named_entry(self.char1, self.char2))
+                self.call(CmdCombat(), f"/unignore {alt.key}", "Unnamed alt isn't on your list.")
+        ignore.clear(self.char1)
+        self.account.db.ignore_list = [self.account2.pk]
+        with self.assertRaisesRegex(CombatError, "isn't on your list"):
+            services.unignore(self.char1, self.char2)
+        self.assertEqual(self.account.db.ignore_list, [self.account2.pk])
 
     def test_committed_results_survive_reload_without_repeating_writes(self):
         ex_id = services.declare(self.char1, [self.char2], bet="subtle")

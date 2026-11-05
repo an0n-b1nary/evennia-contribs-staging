@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Use Social's shared character/full/exception policy for direct combat, NPC controllers and partner consumers; staff remain exempt. `+combat/unignore` removes only the named entry and warns about account-wide protection only for `/full`. Earlier unnamed full ignores require `+ignore/clear`.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - Select revival offers by healer name and show names in prompts and status. Keep invalid cap, join, rollback, story and improvised move numbers readable.
 

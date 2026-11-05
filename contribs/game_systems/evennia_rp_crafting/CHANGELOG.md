@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Use Social's shared character/full/exception ignore levels for Companion visibility. Exceptions show posts and Companions but block contact. Check both players' contact boundaries before proposing and accepting modifier services; preserve operation without Social.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - Keep invalid review record numbers readable.
 

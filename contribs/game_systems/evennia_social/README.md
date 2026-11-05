@@ -37,7 +37,7 @@ place.
 | `commands/discovery.py` | `CmdWhere`, `CmdHangouts` — player/venue discovery |
 | `commands/presence.py` | `CmdUnfindable`, `CmdWho` — per-character presence and a `who` that honours unfindable |
 | `integrations/maps.py` | Who's here on the live map (`present`), wired only when `evennia-maps` is installed |
-| `commands/filtering.py` | `CmdIgnore` — account-level ignore list |
+| `commands/filtering.py` | `CmdIgnore` — character, full-player and exception entries |
 | `commands/messaging.py` | `CmdPage` — private OOC messaging |
 | `commands/teleportation.py` | `CmdSummon`, `CmdJoin` — consensual teleport requests |
 | `commands/ooc.py` | `CmdOoc` — OOC room chat |
@@ -48,8 +48,7 @@ place.
 | `search.py` | `find_room()`, `find_room_for_player()` — fuzzy room matching |
 | `social.py` | `is_staff()`, `get_connected_characters()`, `find_character()` |
 
-**No Django models.** All state lives on Character/Room `AttributeProperty`
-fields, so there is nothing to migrate.
+**No Django models.** State lives on Character, Room and Account attributes; no schema migration is needed.
 
 ---
 
@@ -95,6 +94,26 @@ on Character) and call `super()` to chain — the order above is required for
 `msg()`'s cooperative behavior (ignore-filter runs first, then
 header/highlight). Order between the two Room mixins does not matter since
 they touch disjoint state.
+
+Account subscribers also need channel filtering. Compose `SocialAccountMixin`
+before `DefaultAccount` and `DefaultGuest` (and any host class overriding
+`channel_msg`), in both communication modes:
+
+```python
+from evennia_social import SocialAccountMixin
+
+class Account(SocialAccountMixin, DefaultAccount):
+    pass
+
+class Guest(SocialAccountMixin, DefaultGuest):
+    pass
+```
+
+It filters in `channel_msg`, preserving delivery to other subscribers.
+`SocialCharacterMixin` also covers channels subscribed to directly by characters.
+IC channel hosts should set `is_ic = True` on their channel typeclass; RP
+tracker's `ICChannel` already does. IC lines use the character's post level.
+Ordinary OOC channel lines use the player-level boundary even for exceptions.
 
 ### 2. Add the commands to your CharacterCmdSet
 
@@ -343,6 +362,82 @@ account typeclass and playable ownership rather than a hierarchical Guest
 permission check. See the reference game for restricted command composition.
 
 
+## Communication identity
+
+See [Links' communication identity guide](../../base_systems/evennia_links/README.md#communication-identity)
+for `EVENNIA_COMMS_IDENTITY`, display mixins and the startup check. Social's
+commands read the mode; they do not need different cmdsets per mode.
+
+- `"account"` (default): `who` keeps its account table and Social's `page`
+  requires a character. Hosts can also mount Moderation's account paging.
+- `"character"`: `who` lists each distinct puppet by display name, with
+  character staff-run markers and a character count. Unpuppeted sessions
+  are omitted, guest characters remain listed, and presence rules still
+  apply. Developer/Admin `who` keeps Evennia's privileged session table;
+  `doing` always uses the public table.
+- In character mode, mount Social's `CmdPage` in the **account and guest
+  account cmdsets** as well as the character cmdsets. Visitors without a
+  puppet can page staff-owned characters only. A visitor's Msg sender is
+  their account: staff can identify them, and public histories use
+  `Newcomer`. Staff reply with `page <message>` through a private
+  `last_pager_account` pointer, without resolving public account names.
+  Staff replies without a puppet use the public label `Staff`, and the
+  paged player can answer them the same way.
+
+The reference game retains account mode until #223's final adoption PR;
+its focused seams exercise these commands in both modes meanwhile.
+
+## Personal boundaries
+
+Both communication modes share these rules:
+
+| Command | Effect |
+|---|---|
+| `+ignore <character>` | Hide this character's posts and block contact |
+| `+ignore/full <character>` | Hide every character on that player's account |
+| `+ignore/except <character>` | Show this character's posts, still block contact |
+| `+ignore/remove <character>` | Remove only the entry made under this name |
+| `+ignore/clear` | Remove all entries, including earlier unnamed full ignores |
+| `+ignore` | Show only your named entries, labelled full or except |
+
+A character entry overrides a covering full ignore. An exception without
+any full ignore also blocks contact while showing posts. Changing hidden to
+except (or back) updates that character's entry. Removing an entry may
+leave a covering full ignore active. Add, except and remove replies never
+depend on who owns another character. Character-mode lists show no account
+names or unnamed alts; account-mode lists additionally show account names.
+
+Posts include room poses, says and OOC, IC channel lines and crafting
+events. Hidden poses, says and OOC become muted placeholders; hidden
+crafting events are suppressed as before. Contact includes pages,
+whispers, summon/join requests, direct combat and crafting service proposals.
+An exception shows posts and Companion objects but still blocks contact.
+A blocked page stays in the sender's history and is hidden from the
+recipient's, so neither history reveals the ignore to the sender.
+OOC channel lines from a player with any ignored character remain hidden,
+including for exceptions. Staff senders always bypass filtering.
+
+`/full` can reveal alts by how it filters. Use it to enforce boundaries,
+including when someone follows you onto alts; do not use it to discover who
+plays whom. The list and replies show only names you explicitly added.
+
+`evennia_social.ignore.ignore_level(viewer, character)` is the shared API:
+`"none"`, `"posts"` (posts visible, contact blocked), or `"hidden"`.
+`set_entry`, `remove_entry`, `clear` and `named_entry` own mutations and
+named lookups; `blocks_channel` covers ordinary OOC delivery. Viewer may be
+an account or a character. Full coverage uses playable ownership, including
+offline characters; staff characters are exempt. Optional consumers must
+gate imports on Social being installed.
+
+Data lives in `account.db.ignore_entries`, keyed by named character id,
+with level, fallback name and owner ids. Existing `account.db.ignore_list`
+entries retain full protection and appear as “N earlier full ignores, made
+before names were recorded”. They cannot be removed by guessing a
+character name; only `/clear` removes them. This is a lazy interpretation
+of existing attributes, requiring no data or schema migration. Code that
+previously read or wrote `ignore_list` directly must adopt the shared API
+for named entries. Combat and Crafting do so when Social is installed.
+
 ## Staff-run character identity and communication policy
 
 `SOCIAL_STAFF_RUN_MARKER = True` adds a public `(staff-run)` marker to
@@ -367,6 +462,6 @@ semantics; a temporary grant never permits installation or lasting configuration
 `+roomconfig/smell <text>` and `/sound <text>` set free owner-written sensory
 prose (400 characters; empty clears), using `configure` permission. These work
 without Crafting; its room sensory commands append fixture lines when installed.
-Tuple-tagged `crafting_event` messages from ignored ordinary players are fully
+Tuple-tagged `crafting_event` messages from hidden ordinary players are fully
 suppressed, without a pose placeholder or header. Staff keep existing bypass
 semantics. Item events never enter Social/Posing's ordinary pose processing.
