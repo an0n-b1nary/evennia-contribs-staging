@@ -12,17 +12,15 @@ from typeclasses.channels import Channel
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
-from evennia_links.communication import CharacterCommsChannelMixin
-from evennia_links.identity import CharacterCommsAccountMixin
 from evennia_rptracker import channel_tracker, tracker
 from evennia_rptracker.models import RPSession, RPSessionSceneLink
 
 
-class SandboxChannelAccount(CharacterCommsAccountMixin, Account):
+class SandboxChannelAccount(Account):
     pass
 
 
-class SandboxCharacterChannel(CharacterCommsChannelMixin, Channel):
+class SandboxCharacterChannel(Channel):
     pass
 
 

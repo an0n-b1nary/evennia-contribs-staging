@@ -24,12 +24,15 @@ several more options for customizing the Guest account system.
 
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
-from evennia_links.guests import GuestAccountMixin
+from evennia_links.guests import GuestAccountMixin, welcome_channel
+from evennia_links.identity import CharacterCommsAccountMixin
 from evennia_moderation.auth import ModerationAccountMixin
 from evennia_social.typeclasses import SocialAccountMixin
 
 
-class Account(SocialAccountMixin, ModerationAccountMixin, DefaultAccount):
+class Account(
+    CharacterCommsAccountMixin, SocialAccountMixin, ModerationAccountMixin, DefaultAccount
+):
     """
     An Account is the actual OOC player entity. It doesn't exist in the game,
     but puppets characters.
@@ -140,16 +143,29 @@ class Account(SocialAccountMixin, ModerationAccountMixin, DefaultAccount):
 
     """
 
-    pass
+    def at_account_creation(self):
+        super().at_account_creation()
+        # Only creation joins automatically; leaving Welcome survives logins.
+        try:
+            channel = welcome_channel()
+        except ValueError:
+            return  # A fresh database has not been seeded yet.
+        channel.connect(self)
 
 
-class Guest(SocialAccountMixin, ModerationAccountMixin, GuestAccountMixin, DefaultGuest):
+class Guest(
+    CharacterCommsAccountMixin,
+    SocialAccountMixin,
+    ModerationAccountMixin,
+    GuestAccountMixin,
+    DefaultGuest,
+):
     """
     This class is used for guest logins. Unlike Accounts, Guests and their
     characters are deleted after disconnection.
     """
 
     guest_welcome = (
-        "Welcome, guest. Use guest <message> to chat, +stats to try a sheet, "
+        "Welcome, guest. Use welcome <message> to chat, +stats to try a sheet, "
         "and +stats/reset to start again. Pages may be sent to staff only."
     )

@@ -58,3 +58,14 @@ Each system's staff tools are listed below by task, with a link to its staff pag
 ## Writing and checking guide pages
 
 [[writing-guides]] explains how pages like this one are written, hidden until their system opens, and checked.
+
+
+## Communication identity
+
+Players meet as characters. `who` and channel history list character names;
+visitors at character select chat with `welcome <message>` (`wel`) as
+"Newcomer" and may page staff only. New accounts join Welcome automatically
+and can leave it. A guest with a puppet uses its generated character name.
+Staff can use `apage <account>=<message>` for account contact. Recipients see
+your current character or "Staff" without a puppet and can reply with `page`.
+Staff account attribution stays in the persistent message.

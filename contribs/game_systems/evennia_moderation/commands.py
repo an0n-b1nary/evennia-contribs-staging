@@ -381,6 +381,8 @@ class CmdAdmissions(StaffCommand):
 class CmdAccountPage(StrictSwitchMixin, StockPage):
     """Stock account pages with restrictions; install even with Social pages."""
 
+    comms_identity = "account"
+
     def func(self):
         from django.db.models import Q
         from evennia.comms.models import Msg
@@ -420,6 +422,65 @@ class CmdAccountPage(StrictSwitchMixin, StockPage):
                 self.msg(blocked)
                 return
         return super().func()
+
+
+class CmdStaffAccountPage(StrictSwitchMixin, MuxCommand):
+    """Page an account as staff, without exposing the sender's account name.
+
+    Usage:
+      apage <account>=<message>
+
+    Addresses every session of the account. The recipient sees the staff
+    character's display name, or Staff when sent without a character. Reply
+    with page. The persistent message retains the real account for staff.
+    """
+
+    key = "apage"
+    locks = "cmd:perm(Builder)"
+    help_category = "Moderation"
+    comms_identity = "character"
+    account_caller = True
+
+    def func(self):
+        from evennia.utils.create import create_message
+
+        from evennia_links.communication import denial
+        from evennia_links.identity import sending_character
+
+        try:
+            require_staff(self.caller)
+            if not self.lhs or not self.rhs or not self.rhs.strip():
+                self.msg("Usage: apage <account>=<message>")
+                return
+            account = acting_account(self.caller)
+            target = _account(self.lhs)
+            blocked = denial(account, "page", target)
+            if blocked:
+                self.msg(blocked)
+                return
+            character = sending_character(account, self.session)
+            name = character.get_display_name(None) if character is not None else "Staff"
+            message = self.rhs.strip()
+            create_message(
+                account,
+                message,
+                receivers=[target],
+                locks=(
+                    f"read:pid({account.pk}) or pid({target.pk}) or perm(Admin);"
+                    f"delete:pid({account.pk}) or perm(Admin);"
+                    f"edit:pid({account.pk}) or perm(Admin)"
+                ),
+                tags=[("page", "comms")],
+            )
+            # Social's reply shortcut works from character select and from
+            # every current puppet, even if staff unpuppet before the reply.
+            for receiver in [target, *target.get_all_puppets()]:
+                receiver.db.last_pager = None
+                receiver.db.last_pager_account = account.pk
+            target.msg((f"|w{name}|n pages: {message}", {"type": "page"}), from_obj=account)
+            self.msg(f"You paged {target.key}: {message}")
+        except (ValidationError, PermissionDenied) as exc:
+            _error(self, exc)
 
 
 class CmdBan(StrictSwitchMixin, StockBan):

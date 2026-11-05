@@ -192,7 +192,7 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
     def test_connected_guest_is_marked_and_located_in_both_where_layouts(self):
         from evennia_social.commands import CmdWhere
 
-        self.assertIn("(guest)", self.guest.get_display_name(self.account2))
+        self.assertEqual(self.guest.get_display_name(self.account2), "Newcomer")
         for screenreader in (False, True):
             with (
                 patch(
@@ -263,7 +263,7 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
 
         commands = GuestCharacterCmdSet()
         keys = {command.key for command in commands.commands}
-        self.assertTrue({"+stats", "+test", "+request", "+bug", "page", "guest"} <= keys)
+        self.assertTrue({"+stats", "+test", "+request", "+bug", "page", "welcome"} <= keys)
         self.assertFalse(
             {"+sandbox", "+bb", "give", "get", "+scene", "+craft", "+summon", "+join", "channel"}
             & keys
@@ -275,15 +275,40 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
 
         self.assertIn("plain private requests", self.call(CmdRequest(), "/form building=Hello"))
 
+    def test_welcome_chat_is_not_rewritten_to_the_unavailable_channel_command(self):
+        from commands.guests import CmdWelcome
+        from evennia.utils.create import create_channel
+        from typeclasses.channels import Channel
+
+        channel = create_channel("Welcome", typeclass=Channel)
+        channel.tags.add("welcome", category="comms")
+        channel.send_to_online_only = False
+        channel.connect(self.guest)
+        channel.connect(self.account2)
+        self.assertEqual(
+            self.guest.nicks.nickreplace(
+                "welcome hello", categories=("inputline", "channel"), include_account=False
+            ),
+            "welcome hello",
+        )
+        with (
+            patch.object(self.guest, "get_puppet", return_value=self.char1),
+            patch.object(self.account2, "msg") as received,
+            patch("evennia.utils.logger.log_file") as logged,
+        ):
+            self.call(CmdWelcome(), "Guest greeting")
+        self.assertIn("Char: Guest greeting", str(received.call_args.args[0]))
+        self.assertEqual(logged.call_args.args[0], "Char: Guest greeting")
+
     def test_guest_chat_honours_channel_ban(self):
-        from commands.guests import CmdGuestChat
+        from commands.guests import CmdWelcome
         from evennia.utils.create import create_channel
 
         channel = create_channel("Guest Test")
         channel.tags.add("welcome", category="comms")
         channel.connect(self.guest)
         channel.ban(self.guest)
-        self.assertIn("cannot speak", self.call(CmdGuestChat(), "hello"))
+        self.assertIn("cannot speak", self.call(CmdWelcome(), "hello"))
 
 
 class TestGuestSeed(EvenniaTest):
@@ -305,7 +330,8 @@ class TestGuestSeed(EvenniaTest):
             self.assertEqual(welcome_channel(), channel)
             self.assertTrue(channel.has_connection(self.account))
             self.assertFalse(channel.tags.has("chat", category="guest"))
-            self.assertEqual(ChannelDB.objects.filter(db_key="Guest").count(), 1)
+            self.assertEqual(ChannelDB.objects.filter(db_key="Welcome").count(), 1)
+            self.assertEqual(channel.key, "Welcome")
 
     def test_guest_login_uses_seeded_wing_and_only_guest_channel(self):
         from django.core.management import call_command

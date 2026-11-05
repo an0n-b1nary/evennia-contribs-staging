@@ -42,6 +42,11 @@ SERVERNAME = "Contrib Sandbox"
 EVENNIA_ADMIN = False
 
 ######################################################################
+# Communication identity (evennia-links) — players meet as characters
+######################################################################
+EVENNIA_COMMS_IDENTITY = "character"
+
+######################################################################
 # Contrib apps
 ######################################################################
 
@@ -870,6 +875,7 @@ RP_CHARGEN_GUEST_TRIALS = True
 MULTISESSION_MODE = 3
 MAX_NR_CHARACTERS = 1000
 AUTO_CREATE_CHARACTER_WITH_ACCOUNT = False
+AUTO_PUPPET_ON_LOGIN = False
 
 ######################################################################
 # Moderation and reviewed admissions (evennia-moderation)

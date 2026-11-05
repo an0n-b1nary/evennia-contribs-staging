@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Mark `CmdAccountPage` as account-mode only; character-mode hosts mount
+  Social's page instead. Add Builder-locked `CmdStaffAccountPage` (`apage`)
+  with character/Staff public sender labels and private account attribution.
+
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - **Breaking:** use `ban <target>=<reason>`; reasons may contain colons. Keep invalid admissions numbers readable.
 

@@ -294,7 +294,9 @@ class Command(BaseCommand):
 
     def _rebuild(self):
         counts = {}
+        self._archive_channel_logs()
         self._create_guest_wing()
+        self._archive_channel_logs()
         self._create_moderation_demo()
         from django.apps import apps
 
@@ -1707,6 +1709,40 @@ class Command(BaseCommand):
             character.delete()
             guest.delete()
 
+    def _archive_channel_logs(self):
+        """One-time cutover; run seed_sandbox with the server stopped.
+
+        Channel history and the website read the active filename. Keep old
+        account-named logs in a private archive and give each channel a fresh
+        filename, so renaming Guest cannot resurrect an earlier Welcome log.
+        """
+        from pathlib import Path
+        from uuid import uuid4
+
+        from django.conf import settings
+        from evennia.comms.models import ChannelDB
+
+        if settings.EVENNIA_COMMS_IDENTITY != "character":
+            return
+        log_dir = Path(settings.LOG_DIR).resolve()
+        for channel in ChannelDB.objects.all():
+            if getattr(channel, "is_ic", False) or channel.db.comms_log_version == "character":
+                continue
+            filename = channel.get_log_filename()
+            if filename:
+                path = (log_dir / filename).resolve()
+                if not path.is_relative_to(log_dir):
+                    raise CommandError("Channel logs must be inside LOG_DIR before cutover.")
+                files = [path, *path.parent.glob(path.name + ".*")]
+                archive = log_dir / "account-history-archive" / uuid4().hex
+                for old in files:
+                    if old.is_file():
+                        archive.mkdir(parents=True, exist_ok=True)
+                        old.rename(archive / old.name)
+                channel.set_log_filename(f"channel_{channel.pk}_{uuid4().hex}.log")
+                channel._log_file = None  # Evennia 6 setter leaves its read cache intact.
+            channel.db.comms_log_version = "character"
+
     def _create_guest_wing(self):
         from evennia.utils.create import create_channel, create_object
         from evennia.utils.search import search_tag
@@ -1748,12 +1784,38 @@ class Command(BaseCommand):
             # Re-tag an existing seed; communication policy uses only the new tag.
             channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
         if not channels:
+            if ChannelDB.objects.filter(db_key__iexact="Welcome").exists():
+                raise CommandError("An unrelated channel already uses the Welcome name.")
             channel = create_channel(
-                "Guest",
-                desc=content.GUEST_CHANNEL_DESC,
+                "Welcome",
+                desc=content.WELCOME_CHANNEL_DESC,
                 locks="listen:all();send:all();control:perm(Builder)",
             )
             channels = [channel]
+        if len(channels) != 1:
+            raise CommandError("Exactly one Welcome channel is required.")
+        channel = channels[0]
+        if ChannelDB.objects.filter(db_key__iexact="Welcome").exclude(pk=channel.pk).exists():
+            raise CommandError("An unrelated channel already uses the Welcome name.")
+        aliases = {}
+        if channel.key != "Welcome":
+            # Rewrite subscriber nicks while preserving personal aliases and
+            # subscriptions. Stock nick replacements contain the old key.
+            for subscriber in channel.subscriptions.all():
+                aliases[subscriber] = [
+                    nick[2]
+                    for nick in subscriber.nicks.get(
+                        category="channel", return_tuple=True, return_list=True
+                    )
+                    if nick[3].lower() == channel.key.lower()
+                ]
+                channel.post_leave_channel(subscriber)
+        channel.key = "Welcome"
+        channel.db.desc = content.WELCOME_CHANNEL_DESC
         for channel in channels:
             channel.tags.remove("chat", category="guest")
             channel.tags.add("welcome", category="comms")
+        for subscriber, personal in aliases.items():
+            channel.post_join_channel(subscriber)
+            for alias in personal:
+                channel.add_user_channel_alias(subscriber, alias)

@@ -589,8 +589,9 @@ character resolution and eligibility policy.
 Hosts using RP tracker can replace stock `CmdChannel` with
 `evennia_rptracker.channel_commands.CmdICChannel` to pass the originating
 session and list characters with `/who`. Without RP tracker, channel delivery,
-visitor restrictions and public history still work; a custom channel command
-should pass `session` to `channel.msg()` for multisession disambiguation.
+visitor restrictions and public history still work. Install
+`evennia_links.commands.CmdSessionChannel` to pass the originating session
+for multisession disambiguation; it retains stock channel listings.
 Stock `/who` lists accounts through their display names; use a character-aware
 command to list puppets. See [RP tracker's channel integration](../../game_systems/evennia_rptracker/README.md#communication-identity).
 
@@ -620,10 +621,9 @@ def at_server_start():
 Imports of typeclasses and cmdsets happen when the check runs, after the app
 registry is ready; `AppConfig.ready()` only registers the check.
 
-This release supplies identity policy and character-mode channels.
-Social listings/ignores/visitor paging and Moderation's mode-aware account
-page composition are subsequent parts of [#223](https://github.com/an0n-b1nary/evennia-contribs-staging/issues/223).
-Keep existing hosts in account mode until those consumers are available.
+The reference game demonstrates the complete character-mode composition,
+including Social listings, named ignore boundaries and visitor pages, plus
+Moderation's staff account contact.
 Account-mode cmdsets retain Moderation's `CmdAccountPage`. Character-mode
 composition replaces it with Social's character `page` at both account and
 character level and a staff-only `apage`; ordinary channels must use

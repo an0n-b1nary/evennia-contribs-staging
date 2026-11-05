@@ -14,10 +14,10 @@ to be modified.
 
 from evennia.comms.comms import DefaultChannel
 
-from evennia_links.communication import CommunicationChannelMixin
+from evennia_links.communication import CharacterCommsChannelMixin, CommunicationChannelMixin
 
 
-class Channel(CommunicationChannelMixin, DefaultChannel):
+class Channel(CharacterCommsChannelMixin, CommunicationChannelMixin, DefaultChannel):
     r"""
     This is the base class for all Channel Comms. Inherit from this to
     create different types of communication channels.
@@ -117,4 +117,11 @@ class Channel(CommunicationChannelMixin, DefaultChannel):
 
     """
 
-    pass
+    def post_join_channel(self, joiner, **kwargs):
+        from evennia_links.guests import is_guest
+
+        # Guests have an explicit welcome command and no channel command.
+        # A stock input nick would rewrite welcome into that missing command.
+        if is_guest(joiner) and self.tags.has("welcome", category="comms"):
+            return
+        return super().post_join_channel(joiner, **kwargs)
