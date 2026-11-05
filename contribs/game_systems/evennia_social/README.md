@@ -381,7 +381,8 @@ commands read the mode; they do not need different cmdsets per mode.
   their account: staff can identify them, and public histories use
   `Newcomer`. Staff reply with `page <message>` through a private
   `last_pager_account` pointer, without resolving public account names.
-  Staff replies without a puppet use the public label `Staff`.
+  Staff replies without a puppet use the public label `Staff`, and the
+  paged player can answer them the same way.
 
 The reference game retains account mode until #223's final adoption PR;
 its focused seams exercise these commands in both modes meanwhile.
@@ -411,6 +412,8 @@ events. Hidden poses, says and OOC become muted placeholders; hidden
 crafting events are suppressed as before. Contact includes pages,
 whispers, summon/join requests, direct combat and crafting service proposals.
 An exception shows posts and Companion objects but still blocks contact.
+A blocked page stays in the sender's history and is hidden from the
+recipient's, so neither history reveals the ignore to the sender.
 OOC channel lines from a player with any ignored character remain hidden,
 including for exceptions. Staff senders always bypass filtering.
 

@@ -122,30 +122,43 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
                     else "Guests may page staff only."
                 )
                 return
-            # Only staff can use the private reply pointer to an account.
+            # The private reply pointer reaches a visitor's account only from
+            # staff; players may still answer staff who paged without a puppet.
             # Accounts are never resolved by the public name search.
-            if isinstance(target, AccountDB) and not self._staff_owned(caller_char):
+            if isinstance(target, AccountDB) and not (
+                self._staff_owned(caller_char) or self._staff_owned(target)
+            ):
                 self.caller.msg("Visitors may page staff only.")
                 return
 
         deliver = [target for target in targets if ignore_level(target, caller_char) == NONE]
-        if deliver:
 
-            def lock(actor):
-                return f"{'pid' if isinstance(actor, AccountDB) else 'id'}({actor.pk})"
+        def lock(actor):
+            return f"{'pid' if isinstance(actor, AccountDB) else 'id'}({actor.pk})"
 
-            read = " or ".join(lock(t) for t in [*deliver, caller_char])
-            create.create_message(
-                caller_char,
-                message,
-                receivers=deliver,
-                locks=(
-                    f"read:{read} or perm(Admin);"
-                    f"delete:{lock(caller_char)} or perm(Admin);"
-                    f"edit:{lock(caller_char)} or perm(Admin)"
-                ),
-                tags=[("page", "comms")],
-            )
+        read = " or ".join(lock(t) for t in [*deliver, caller_char])
+        # Keep every target on the Msg so the sender's history cannot reveal
+        # an ignore; hide it from the targets who ignore the sender.
+        page = create.create_message(
+            caller_char,
+            message,
+            receivers=targets,
+            locks=(
+                f"read:{read} or perm(Admin);"
+                f"delete:{lock(caller_char)} or perm(Admin);"
+                f"edit:{lock(caller_char)} or perm(Admin)"
+            ),
+            tags=[("page", "comms")],
+        )
+        # Evennia's hide_from setter adds the class rather than the instance.
+        for target in targets:
+            if target not in deliver:
+                hide = (
+                    page.db_hide_from_accounts
+                    if isinstance(target, AccountDB)
+                    else page.db_hide_from_objects
+                )
+                hide.add(target)
         for target in deliver:
             if isinstance(caller_char, AccountDB):
                 target.db.last_pager_account = caller_char.pk

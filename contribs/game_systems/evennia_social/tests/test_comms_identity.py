@@ -146,6 +146,17 @@ class TestSocialIdentity(SocialCommandTestCase):
                 self.assertNotIn(self.account.key, shown)
                 self.assertIn("Staff", shown)
 
+    def test_player_replies_to_staff_who_paged_without_a_puppet(self):
+        self.account2.permissions.clear()
+        self.account2.is_superuser = False
+        with patch.object(self.account, "get_puppet", return_value=None):
+            self.call(CmdPage(), f"{self.char2.key}=Checking in", caller=self.account)
+        self.assertEqual(self.char2.db.last_pager_account, self.account.pk)
+        with patch.object(self.account, "msg") as staff:
+            output = self.call(CmdPage(), "Thanks", caller=self.char2)
+        self.assertNotIn("may page staff only", output)
+        self.assertIn(f"{self.char2.key} pages: Thanks", strip_ansi(staff.call_args.args[0][0]))
+
     def test_page_history_masks_old_account_senders_for_nonstaff(self):
         from evennia.utils.create import create_message
 

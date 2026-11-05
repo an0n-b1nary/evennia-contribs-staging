@@ -119,6 +119,13 @@ class TestNamedIgnores(SocialCommandTestCase):
         self.assertEqual(ignore.ignore_level(self.char1, self.alt), ignore.NONE)
         self.assertFalse(ignore.blocks_channel(self.char1, self.alt))
 
+    def test_viewers_without_entries_skip_the_owner_sweep(self):
+        # Every pose, say and channel line asks, once per listener.
+        with patch("evennia_social.ignore.account_ids") as sweep:
+            self.assertEqual(ignore.ignore_level(self.char1, self.char2), ignore.NONE)
+            self.assertFalse(ignore.blocks_channel(self.char1, self.char2))
+        sweep.assert_not_called()
+
     def test_posts_and_contact_delivery_for_each_level(self):
         for level in (ignore.HIDDEN, ignore.POSTS):
             ignore.set_entry(self.char1, self.char2, level)
@@ -142,10 +149,11 @@ class TestNamedIgnores(SocialCommandTestCase):
             with patch.object(self.char1, "msg") as received:
                 self.call(CmdPage(), f"{self.char1.key}=Hidden page", caller=self.char2)
                 received.assert_not_called()
-            self.call(CmdPage(), "/last")
-            from evennia.comms.models import Msg
-
-            self.assertFalse(Msg.objects.filter(db_message="Hidden page").exists())
+            self.assertNotIn("Hidden page", self.call(CmdPage(), "/last"))
+            self.assertNotIn("Hidden page", self.call(CmdPage(), "/recall"))
+            # The sender's own history must not reveal the ignore.
+            sent = self.call(CmdPage(), "/recall", caller=self.char2)
+            self.assertIn(f"To {self.char1.key}: Hidden page", sent)
 
     def test_ooc_channels_filter_account_subscribers_without_aborting_other_receivers(self):
         channel = create_channel("Ignore seam", typeclass=DefaultChannel)

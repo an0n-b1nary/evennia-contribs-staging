@@ -37,10 +37,10 @@ def owners(actor):
     return ids
 
 
-def _staff(actor):
+def _staff(ids):
     return any(
         account.is_superuser or account.check_permstring("Builder")
-        for account in AccountDB.objects.filter(pk__in=owners(actor))
+        for account in AccountDB.objects.filter(pk__in=ids)
     )
 
 
@@ -65,17 +65,22 @@ def ignore_level(viewer, character):
     filtering, including offline playable staff characters.
     """
     account = account_for(viewer)
-    if not account or not character or viewer == character or _staff(character):
+    if not account or not character or viewer == character:
         return NONE
-    named = entries(account)
-    if not isinstance(character, AccountDB) and (entry := named.get(character.pk)):
-        return POSTS if entry["level"] == POSTS else HIDDEN
+    named, old = entries(account), earlier(account)
+    # Every delivery asks; owners() sweeps all accounts, so skip it when empty.
+    if not named and not old:
+        return NONE
     ids = owners(character)
-    if ids & earlier(account) or any(
+    if not isinstance(character, AccountDB) and (entry := named.get(character.pk)):
+        level = POSTS if entry["level"] == POSTS else HIDDEN
+    elif ids & old or any(
         entry["level"] == FULL and ids.intersection(entry["accounts"]) for entry in named.values()
     ):
-        return HIDDEN
-    return NONE
+        level = HIDDEN
+    else:
+        return NONE
+    return NONE if _staff(ids) else level
 
 
 def blocks_channel(viewer, sender):
@@ -84,12 +89,16 @@ def blocks_channel(viewer, sender):
     Channels address the player: any named boundary on that player's
     characters covers their OOC channel lines in either communication mode.
     """
-    if not sender or viewer == sender or _staff(sender):
+    if not sender or viewer == sender:
+        return False
+    named, old = entries(viewer), earlier(viewer)
+    if not named and not old:
         return False
     ids = owners(sender)
-    return bool(ids & earlier(viewer)) or any(
-        ids.intersection(entry["accounts"]) for entry in entries(viewer).values()
+    covered = bool(ids & old) or any(
+        ids.intersection(entry["accounts"]) for entry in named.values()
     )
+    return covered and not _staff(ids)
 
 
 def _locked(account):
