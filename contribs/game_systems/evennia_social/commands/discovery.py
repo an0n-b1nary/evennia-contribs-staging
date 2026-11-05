@@ -7,8 +7,8 @@ Provides location-based player discovery: who's where, which hangout
 venues are active, and room population counts.
 
 Every listing and count here leaves out characters who aren't findable by
-the viewer (``evennia_social.presence``): unfindable or dark characters,
-unless the viewer shares their room or is staff. Staff see a marker instead.
+the viewer (``evennia_social.presence``): unfindable characters, unless the
+viewer shares their room or is staff. Staff see an unfindable marker instead.
 
 Requires the caller's Room typeclass to mix in
 ``evennia_social.SocialRoomMixin`` (for ``hangout_type``) and

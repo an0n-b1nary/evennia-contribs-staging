@@ -95,7 +95,7 @@ class SocialCharacterMixin:
     # -- Home room --
     home_room = AttributeProperty(default=None, autocreate=False)
 
-    # -- Presence: "findable", "unfindable" or (staff) "dark" --
+    # -- Presence: "findable" or "unfindable" --
     # Read and written through evennia_social.presence, never directly.
     presence_visibility = AttributeProperty(default="findable", autocreate=False)
 

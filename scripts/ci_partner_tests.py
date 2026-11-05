@@ -212,14 +212,14 @@ class TestPartnerIntegration(EvenniaTest):
 
         url = reverse("api-plane-tiles", args=[self.plane.pk])
         self.assertEqual(self.session.get_puppet(), self.char1)
-        for visibility, public_names, staff_names in (
+        for stored, public_names, staff_names in (
             (presence.FINDABLE, [self.char1.key], [self.char1.key]),
             (presence.UNFINDABLE, [], [f"{self.char1.key} (unfindable)"]),
-            (presence.DARK, [], [f"{self.char1.key} (dark)"]),
+            ("dark", [], [f"{self.char1.key} (unfindable)"]),  # retired level, still stored
         ):
-            presence.set_visibility(self.char1, visibility)
+            self.char1.attributes.add(presence.ATTRIBUTE, stored)
             for account, expected in ((self.account2, public_names), (self.account, staff_names)):
-                with self.subTest(visibility=visibility, account=account.key):
+                with self.subTest(stored=stored, account=account.key):
                     self.client.force_login(account)
                     response = self.client.get(url)
                     self.assertEqual(response.status_code, 200)

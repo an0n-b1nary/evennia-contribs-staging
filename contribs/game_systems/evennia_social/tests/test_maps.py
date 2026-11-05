@@ -18,6 +18,8 @@ from evennia_social.integrations.maps import provide
 from evennia_social.tests.base import SocialTestCase, SocialTestCharacter
 
 _CONNECTED = "evennia_social.social.get_connected_characters"
+# The retired staff level. Stored values still read as unfindable.
+_DARK = "dark"
 
 
 class TestWhosHereOverlay(SocialTestCase):
@@ -43,19 +45,19 @@ class TestWhosHereOverlay(SocialTestCase):
     def test_offline_characters_are_not_here(self):
         self.assertEqual(self._provide([self.char3]), {"present": {self.room2.pk: ["Ashwren"]}})
 
-    def test_unfindable_and_dark_are_hidden_from_players(self):
+    def test_unfindable_and_stored_dark_are_hidden_from_players(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         overlay = self._provide([self.char1, self.char2, self.char3])
         self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})
 
     def test_staff_see_everyone_with_a_marker(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         overlay = self._provide([self.char1, self.char2], staff=True)
         self.assertEqual(
             overlay["present"][self.room1.pk],
-            sorted([f"{self.char1.key} (dark)", f"{self.char2.key} (unfindable)"]),
+            sorted([f"{self.char1.key} (unfindable)", f"{self.char2.key} (unfindable)"]),
         )
 
     def test_only_the_requested_rooms(self):
@@ -74,16 +76,18 @@ class TestWhosHereOverlay(SocialTestCase):
     def test_a_connected_viewer_in_the_same_room_sees_the_unfindable(self):
         """Unfindable hides you from afar, not from someone standing there."""
         presence.set_visibility(self.char2, presence.UNFINDABLE)
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         self.char3.location = self.room1
         with self._connected(self.char3):
-            overlay = self._provide([self.char2, self.char3], viewer=self.char3)
+            overlay = self._provide([self.char1, self.char2, self.char3], viewer=self.char3)
         self.assertEqual(
-            overlay["present"][self.room1.pk], sorted([self.char2.key, self.char3.key])
+            overlay["present"][self.room1.pk],
+            sorted([self.char1.key, self.char2.key, self.char3.key]),
         )
 
     def test_a_viewer_elsewhere_does_not(self):
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        presence.set_visibility(self.char1, presence.DARK)
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         with self._connected(self.char3):
             overlay = self._provide([self.char1, self.char2, self.char3], viewer=self.char3)
         self.assertEqual(overlay, {"present": {self.room2.pk: ["Ashwren"]}})

@@ -10,6 +10,14 @@ All notable changes to `evennia_social` are documented here.
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+### Breaking
+
+- Retire the staff-only `dark` presence level, which hid exactly what
+  `unfindable` hides. `presence.DARK` and `+unfindable dark` are gone, and
+  `set_visibility(character, "dark")` raises `ValueError`. A stored `"dark"`
+  reads as `unfindable` and is marked `(unfindable)` for staff, so no data
+  migration is needed. Staff use `+unfindable on`.
+
 ## [0.9.0] - 2026-10-25
 
 ### Breaking

@@ -24,10 +24,6 @@ _EXPLAIN = {
         "You are |wunfindable|n: left out of who, +where, venue counts and the map. "
         "Anyone in the same room still sees you, and staff see you marked (unfindable)."
     ),
-    presence.DARK: (
-        "You are |wdark|n: left out of who, +where, venue counts and the map. "
-        "Anyone in the same room still sees you, and other staff see you marked (dark)."
-    ),
 }
 
 
@@ -39,7 +35,6 @@ class CmdUnfindable(StrictSwitchMixin, MuxCommand):
         +unfindable          - Show your current setting
         +unfindable on       - Leave your character out of who, +where and the map
         +unfindable off      - Be listed again
-        +unfindable dark     - (staff) The same, marked (dark) for other staff
 
     Unfindable means unlisted: you don't appear in who, +where, venue counts
     or the map. Anyone in the same room sees you as usual, and staff still see
@@ -57,14 +52,9 @@ class CmdUnfindable(StrictSwitchMixin, MuxCommand):
         if not arg:
             caller.msg(_EXPLAIN[presence.visibility(caller)])
             return
-        choice = {"on": presence.UNFINDABLE, "off": presence.FINDABLE, "dark": presence.DARK}.get(
-            arg
-        )
+        choice = {"on": presence.UNFINDABLE, "off": presence.FINDABLE}.get(arg)
         if choice is None:
-            caller.msg("Usage: +unfindable [on|off|dark]")
-            return
-        if choice == presence.DARK and not is_staff(caller):
-            caller.msg("Only staff can go dark. |w+unfindable on|n hides where you are.")
+            caller.msg("Usage: +unfindable [on|off]")
             return
         presence.set_visibility(caller, choice)
         caller.msg(_EXPLAIN[choice])

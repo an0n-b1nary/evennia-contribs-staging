@@ -9,13 +9,14 @@ Attribute (``SocialCharacterMixin.presence_visibility``):
 - ``findable`` (default): shown wherever presence is shown.
 - ``unfindable``: unlisted. Hidden from every *remote* presence surface:
   ``who``, ``+where``, ``+hangouts`` counts, a web map's who's-here and the
-  public web. Any player may choose it.
-- ``dark``: staff only, and hides what ``unfindable`` hides; staff see it
-  marked ``(dark)``. A stored ``dark`` on a character that is no longer staff
-  reads as ``unfindable``.
+  public web. Any character may choose it.
+
+Only these two visibility values are supported. A legacy stored value of
+``dark`` is read as ``unfindable`` and left unchanged until the character
+chooses a supported setting.
 
 Being in the same room always reveals a character: presence is privacy from
-people who aren't there, not invisibility. Staff see through both settings,
+people who aren't there, not invisibility. Staff see unfindable characters
 with a marker.
 
 Every presence surface asks this module, so the settings can't disagree:
@@ -29,18 +30,17 @@ from evennia_social.social import is_staff
 
 FINDABLE = "findable"
 UNFINDABLE = "unfindable"
-DARK = "dark"
-VISIBILITIES = (FINDABLE, UNFINDABLE, DARK)
+VISIBILITIES = (FINDABLE, UNFINDABLE)
 ATTRIBUTE = "presence_visibility"
 
 
 def visibility(character):
-    """The character's effective visibility: ``findable``, ``unfindable`` or ``dark``."""
+    """The character's effective visibility: ``findable`` or ``unfindable``."""
     if character is None:
         return FINDABLE
     stored = character.attributes.get(ATTRIBUTE, default=None)
-    if stored == DARK:
-        return DARK if is_staff(character) else UNFINDABLE
+    if stored == "dark":
+        return UNFINDABLE
     return stored if stored in VISIBILITIES else FINDABLE
 
 
@@ -49,12 +49,10 @@ def set_visibility(character, value):
     Store a visibility.
 
     Raises:
-        ValueError: for an unknown value, or ``dark`` on a non-staff character.
+        ValueError: for a value other than ``findable`` or ``unfindable``.
     """
     if value not in VISIBILITIES:
         raise ValueError(f"unknown visibility {value!r}")
-    if value == DARK and not is_staff(character):
-        raise ValueError("only staff can go dark")
     if value == FINDABLE:
         character.attributes.remove(ATTRIBUTE)
     else:
@@ -100,6 +98,6 @@ def is_publicly_listed(character):
 
 
 def staff_marker(character):
-    """``" (unfindable)"``, ``" (dark)"`` or ``""``, for staff-facing lists."""
+    """``" (unfindable)"`` or ``""``, for staff-facing lists."""
     current = visibility(character)
-    return "" if current == FINDABLE else f" ({current})"
+    return " (unfindable)" if current == UNFINDABLE else ""

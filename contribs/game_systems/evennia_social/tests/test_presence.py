@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
-Presence: +unfindable (unlisted), staff dark, and the surfaces that honour them.
+Presence: +unfindable (unlisted), stored values from the retired dark level,
+and the surfaces that honour them.
 
 EvenniaTest defaults: char1 is Developer (staff), char2 is not. Both start
 in room1.
@@ -18,6 +19,8 @@ from evennia_social.commands import CmdHangouts, CmdUnfindable, CmdWhere, CmdWho
 from evennia_social.tests.base import SocialCommandTestCase, SocialTestCase
 
 _CONNECTED = "evennia_social.commands.discovery.get_connected_characters"
+# The retired staff level. Stored values still read as unfindable.
+_DARK = "dark"
 
 
 class TestPresenceRules(SocialTestCase):
@@ -38,19 +41,25 @@ class TestPresenceRules(SocialTestCase):
         presence.set_visibility(self.char2, presence.FINDABLE)
         self.assertFalse(self.char2.attributes.has(presence.ATTRIBUTE))
 
-    def test_only_staff_can_go_dark(self):
-        with self.assertRaises(ValueError):
-            presence.set_visibility(self.char2, presence.DARK)
-        presence.set_visibility(self.char1, presence.DARK)
-        self.assertFalse(presence.is_publicly_listed(self.char1))
+    def test_stored_dark_reads_as_unfindable_and_is_kept(self):
+        for character in (self.char1, self.char2):  # staff and player
+            with self.subTest(character=character.key):
+                character.attributes.add(presence.ATTRIBUTE, _DARK)
+                self.assertEqual(presence.visibility(character), presence.UNFINDABLE)
+                self.assertFalse(presence.is_publicly_listed(character))
+                self.assertEqual(presence.staff_marker(character), " (unfindable)")
+                self.assertEqual(character.attributes.get(presence.ATTRIBUTE), _DARK)
 
-    def test_stored_dark_on_a_non_staff_character_reads_as_unfindable(self):
-        # Lost staff permissions must not keep a player hidden from who.
-        self.char2.attributes.add(presence.ATTRIBUTE, presence.DARK)
-        self.assertEqual(presence.visibility(self.char2), presence.UNFINDABLE)
+    def test_dark_can_no_longer_be_set(self):
+        for character in (self.char1, self.char2):
+            with self.subTest(character=character.key):
+                presence.set_visibility(character, presence.UNFINDABLE)
+                with self.assertRaises(ValueError):
+                    presence.set_visibility(character, _DARK)
+                self.assertEqual(presence.visibility(character), presence.UNFINDABLE)
 
     def test_same_room_and_staff_see_through(self):
-        presence.set_visibility(self.char1, presence.DARK)
+        presence.set_visibility(self.char1, presence.UNFINDABLE)
         self.assertTrue(presence.is_findable(self.char1, self.char2))  # same room
         self.assertTrue(presence.is_listed(self.char1, self.char2))
         self.char2.location = self.room2
@@ -68,6 +77,7 @@ class TestPresenceRules(SocialTestCase):
 class TestDiscoveryHonoursPresence(SocialTestCase):
     def setUp(self):
         super().setUp()
+        self.char1.key = "HiddenStaff"
         self.char1.location = self.room2  # staff, elsewhere
         presence.set_visibility(self.char1, presence.UNFINDABLE)
 
@@ -83,11 +93,25 @@ class TestDiscoveryHonoursPresence(SocialTestCase):
             shown = CmdWhere._format(self.char2)
         self.assertIn(self.char1.key, shown)
 
-    def test_staff_see_unfindable_characters_marked(self):
-        presence.set_visibility(self.char2, presence.UNFINDABLE)
+    def test_staff_see_unfindable_and_stored_dark_marked_unfindable(self):
+        for stored in (presence.UNFINDABLE, _DARK):
+            with self.subTest(stored=stored):
+                self.char1.attributes.add(presence.ATTRIBUTE, stored)
+                with patch(_CONNECTED, return_value=[self.char1, self.char2]):
+                    shown = CmdWhere._format(self.char1)
+                self.assertIn(f"{self.char1.key} (unfindable)", shown)
+                self.assertNotIn("(dark)", shown)
+
+    def test_stored_dark_is_left_out_like_unfindable(self):
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
+        self.room2.hangout_type = "bar"
         with patch(_CONNECTED, return_value=[self.char1, self.char2]):
-            shown = CmdWhere._format(self.char1)
-        self.assertIn(f"{self.char2.key} (unfindable)", shown)
+            shown = CmdWhere._format(self.char2)
+            counts = CmdWhere._format_count(self.char2)
+            venues = CmdHangouts._format(self.char2)
+        self.assertNotIn(self.char1.key, shown)
+        self.assertNotIn(self.room2.key, counts)
+        self.assertNotIn(self.room2.key, venues)
 
     def test_where_count_and_hangouts_leave_them_out(self):
         self.room2.hangout_type = "bar"
@@ -106,13 +130,24 @@ class TestCmdUnfindable(SocialCommandTestCase):
         self.call(CmdUnfindable(), "off", "You are findable", caller=self.char2)
         self.assertEqual(presence.visibility(self.char2), presence.FINDABLE)
 
-    def test_players_cannot_go_dark(self):
-        self.call(CmdUnfindable(), "dark", "Only staff can go dark", caller=self.char2)
-        self.assertEqual(presence.visibility(self.char2), presence.FINDABLE)
+    def test_dark_is_no_longer_an_option(self):
+        for caller in (self.char1, self.char2):  # staff and player
+            with self.subTest(caller=caller.key):
+                presence.set_visibility(caller, presence.UNFINDABLE)
+                output = self.call(CmdUnfindable(), _DARK, caller=caller)
+                self.assertEqual(output, "Usage: +unfindable [on|off]")
+                self.assertEqual(caller.attributes.get(presence.ATTRIBUTE), presence.UNFINDABLE)
 
-    def test_staff_can_go_dark(self):
-        self.call(CmdUnfindable(), "dark", "You are dark", caller=self.char1)
-        self.assertEqual(presence.visibility(self.char1), presence.DARK)
+    def test_stored_dark_status_is_explained_as_unfindable(self):
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
+        self.call(
+            CmdUnfindable(),
+            "",
+            "You are unfindable: left out of who, +where, venue counts and the map. "
+            "Anyone in the same room still sees you, and staff see you marked (unfindable).",
+            caller=self.char1,
+            use_assertequal=True,
+        )
 
     def test_bad_argument(self):
         self.call(CmdUnfindable(), "maybe", "Usage: +unfindable", caller=self.char2)
@@ -146,8 +181,8 @@ class TestCmdWho(SocialTestCase):
         # account-name assertions below.
         return strip_ansi(str(output[0]))
 
-    def test_dark_staff_left_out_for_players(self):
-        presence.set_visibility(self.char1, presence.DARK)
+    def test_stored_dark_staff_left_out_for_players(self):
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         self.char2.location = self.room2
         shown = self._who(self.char2)
         self.assertNotRegex(shown, rf"\b{re.escape(self.account.key)}\b")
@@ -163,7 +198,7 @@ class TestCmdWho(SocialTestCase):
         shown = self._who(self.char2)  # both in room1
         self.assertRegex(shown, rf"\b{re.escape(self.account.key)}\b")
 
-    def test_same_room_reveals_dark_staff(self):
-        presence.set_visibility(self.char1, presence.DARK)
+    def test_same_room_reveals_stored_dark_staff(self):
+        self.char1.attributes.add(presence.ATTRIBUTE, _DARK)
         shown = self._who(self.char2)  # both in room1
         self.assertRegex(shown, rf"\b{re.escape(self.account.key)}\b")
