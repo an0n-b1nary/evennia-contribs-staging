@@ -143,6 +143,11 @@ class Account(
 
     """
 
+    ooc_appearance_template = DefaultAccount.ooc_appearance_template.replace(
+        "|wpublic <text>|n - talk on public channel",
+        "|wwelcome <text>|n - talk with welcoming players",
+    )
+
     def at_account_creation(self):
         super().at_account_creation()
         # Only creation joins automatically; leaving Welcome survives logins.

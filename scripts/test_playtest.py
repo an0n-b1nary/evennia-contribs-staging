@@ -12,7 +12,7 @@ import threading
 import unittest
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import playtest
 from playtesting.client import Client, ClientError, Decoder, SocketTransport
@@ -20,6 +20,7 @@ from playtesting.evidence import Evidence, plain
 from playtesting.host import Host, HostError, allocate_ports, poll_log
 from playtesting.maps import place_cells
 from playtesting.scenarios import Suite
+from playtesting.session import Session
 from twisted.conch.telnet import DO, IAC, WONT
 
 TEMP_ROOT = Path(__file__).resolve().parents[1] / ".playtest-runs" / "unit-tests"
@@ -132,6 +133,43 @@ class ProtocolTests(unittest.TestCase):
             suite.case("injected failure", lambda: suite.command("alice", "look", "absent"))
         )
         self.assertFalse(suite.results[0]["passed"])
+
+
+class LoginTests(unittest.TestCase):
+    def test_login_selects_fixture_character_before_room_and_identity_probes(self):
+        host = SimpleNamespace(
+            credentials={"alice": {"name": "pt-alice", "password": "test-pass"}},
+            ports={"telnet": 1234},
+            evidence=MagicMock(),
+            action_timeout=5,
+            run_id="test-run",
+        )
+        with (
+            patch("playtesting.session.Client") as factory,
+            patch("playtesting.session.time.sleep"),
+        ):
+            client = factory.return_value
+            client.send.side_effect = [10, 20, 30]
+            client.frame.return_value = {
+                "run_id": "test-run",
+                "role": "alice",
+                "superuser": False,
+                "character": 7,
+            }
+            self.assertIs(Session(host).connect("alice"), client)
+        self.assertEqual(
+            client.method_calls[:5],
+            [
+                call.expect(r"[Cc]onnect|\[Placeholder\]"),
+                call.send("connect pt-alice test-pass"),
+                call.expect(r"enter the game as character", after=10),
+                call.send("ic pt-alice"),
+                call.expect(r"Playtest .* laboratory", after=20),
+            ],
+        )
+        host.evidence.write.assert_called_once_with(
+            "identity-alice.json", client.frame.return_value
+        )
 
 
 class HostTests(unittest.TestCase):

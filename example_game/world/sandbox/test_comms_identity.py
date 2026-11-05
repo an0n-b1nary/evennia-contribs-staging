@@ -333,6 +333,7 @@ class TestCommunicationAudit(EvenniaCommandTest):
         self.assertTrue(welcome_channel().has_connection(player))
         self.welcome.disconnect(player)
         session = self.login(player, 5)
+        self.assertIn("welcome <text>", player.at_look(target=player.characters, session=session))
         self.assertFalse(self.welcome.has_connection(player))
         evennia.SESSION_HANDLER.pop(session.sessid)
         self.other_sessions.remove(session)

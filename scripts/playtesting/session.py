@@ -23,6 +23,8 @@ class Session:
         client.expect(r"[Cc]onnect|\[Placeholder\]")
         spec = self.host.credentials[actor]
         cursor = client.send(f"connect {spec['name']} {spec['password']}")
+        client.expect(r"enter the game as character", after=cursor)
+        cursor = client.send(f"ic {spec['name']}")
         client.expect(r"Playtest .* laboratory", after=cursor)
         token = secrets.token_hex(8)
         cursor = client.send(f"+playtest/info {token}")
