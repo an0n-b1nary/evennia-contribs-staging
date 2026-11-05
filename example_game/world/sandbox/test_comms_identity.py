@@ -277,6 +277,48 @@ class TestCommunicationAudit(EvenniaCommandTest):
             self.command("@channel", "Public = Refused", self.account, self.session)
             logged.assert_not_called()
 
+    def test_channel_account_moderation_is_staff_only_even_for_player_controlled_channels(self):
+        from django.apps import apps
+
+        installed = apps.is_installed
+        self.public.locks.add(f"control:pid({self.account.pk})")
+        self.public.ban(self.staff)
+        for tracker in (True, False):
+            with (
+                self.subTest(tracker=tracker),
+                patch(
+                    "commands.default_cmdsets.apps.is_installed",
+                    side_effect=lambda label, tracker=tracker: (
+                        installed(label) if tracker or label != "evennia_rptracker" else False
+                    ),
+                ),
+            ):
+                channel_command = AccountCmdSet().get("@channel")
+                self.assertFalse(channel_command.access(self.account, "admin"))
+                self.assertTrue(channel_command.access(self.staff, "admin"))
+                self.assertFalse(channel_command.access(self.account, "manage"))
+                self.assertTrue(channel_command.access(self.staff, "manage"))
+                with override_settings(EVENNIA_COMMS_IDENTITY="account"):
+                    self.assertTrue(AccountCmdSet().get("@channel").access(self.account, "admin"))
+                    self.assertTrue(AccountCmdSet().get("@channel").access(self.account, "manage"))
+                for args in (
+                    "/ban Public",
+                    "/boot Public=Nobody",
+                    "/unban Public=Nobody",
+                    "/create Unsafe:evennia.comms.comms.DefaultChannel=An unsafe channel",
+                ):
+                    with (
+                        patch.object(self.account, "search") as lookup,
+                        patch.object(self.account, "msg") as output,
+                    ):
+                        self.command("@channel", args, self.account, self.session)
+                    lookup.assert_not_called()
+                    self.assertTrue(output.called)
+                    self.assertNotIn(self.staff.key, str(output.call_args))
+                    from evennia.comms.models import ChannelDB
+
+                    self.assertFalse(ChannelDB.objects.filter(db_key="Unsafe").exists())
+
     def test_guest_account_surface_has_welcome_and_character_page(self):
         from commands.guests import CmdWelcome
 

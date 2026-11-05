@@ -322,9 +322,14 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         if apps.is_installed("evennia_rptracker"):
             from evennia_rptracker.channel_commands import CmdICChannel
 
-            self.add(CmdICChannel)
+            channel_command = CmdICChannel()
         else:
-            self.add(CmdSessionChannel)
+            channel_command = CmdSessionChannel()
+        if comms_identity() == "character":
+            # Stock moderation searches accounts; /create can choose a
+            # typeclass that logs account keys. Keep that wiring with staff.
+            channel_command.lockhandler.add("admin:perm(Builder);manage:perm(Builder)")
+        self.add(channel_command)
 
         # Presence (evennia_social): replaces Evennia's who, leaving unfindable
         # characters out of it for players. +unfindable is in-character.

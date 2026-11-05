@@ -2054,7 +2054,10 @@ channel history and the channel website identify characters. Account names
 stay private to staff. Social's `page` and `+ignore` work at character select
 as well as in character; visitors page staff only. Staff use
 `apage <account>=<message>` for account contact, announced as their current
-character or "Staff" without one. Players reply with `page`.
+character or "Staff" without one. Players reply with `page`. Channel
+creation and administration are staff-only in this mode: stock moderation
+addresses accounts, and custom channel typeclasses can bypass the identity
+policy. Owning a channel does not expose those lookups.
 
 New accounts join Welcome on creation and may leave it; logging in does not
 resubscribe them. Guests and newcomers use `welcome <message>` (`wel`). A guest
