@@ -270,7 +270,7 @@ class TestCommunicationAudit(EvenniaCommandTest):
                 "commands.default_cmdsets.apps.is_installed",
                 side_effect=lambda label: label != "evennia_rptracker" and installed(label),
             ),
-            patch("evennia.utils.logger.log_file") as logged,
+            patch.object(self.public, "at_post_msg") as logged,
         ):
             self.assertIsInstance(AccountCmdSet().get("@channel"), CmdSessionChannel)
             check_comms_identity()
