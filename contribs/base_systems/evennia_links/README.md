@@ -556,6 +556,43 @@ The mixin returns `"Newcomer"` to strangers and anonymous viewers, including
 when `looker=None`. Staff, the account itself and its owned characters see
 the cooperative original display name, including the guest suffix.
 
+For ordinary channels in character mode, compose the channel mixins in this
+order:
+
+```python
+from evennia.comms.comms import DefaultChannel
+from evennia_links.communication import CharacterCommsChannelMixin, CommunicationChannelMixin
+
+class Channel(CharacterCommsChannelMixin, CommunicationChannelMixin, DefaultChannel):
+    pass
+```
+
+`CharacterCommsChannelMixin.msg()` resolves account senders through
+`identity.sending_character(sender, session=None)`. With a session, only that
+session's puppet can speak; without one, the account must have exactly one
+distinct puppet. Staff without a puppet must also choose a character.
+Visitors may send only to the unique channel tagged `welcome` in category
+`comms`, resolved by `guests.welcome_channel()`. Missing or duplicate tags
+refuse visitor sends. Guests with a puppet use their character's name;
+accounts without a character use the account display mixin's neutral label.
+Subscriptions and listening remain per account. System messages and authorized
+staff emits pass through without selecting a puppet.
+
+Live messages use each receiver's view of the speaker, so staff still identify
+visitor accounts. Logs use `get_display_name(None)` instead of account keys:
+`channel/history` and Evennia's web channel page read those same public names.
+The mixin replaces stock `at_post_msg` logging; put any additional post-send
+hooks before it and call `super()`. IC channels keep RP tracker's own
+character resolution and eligibility policy.
+
+Hosts using RP tracker can replace stock `CmdChannel` with
+`evennia_rptracker.channel_commands.CmdICChannel` to pass the originating
+session and list characters with `/who`. Without RP tracker, channel delivery,
+visitor restrictions and public history still work; a custom channel command
+should pass `session` to `channel.msg()` for multisession disambiguation.
+Stock `/who` lists accounts through their display names; use a character-aware
+command to list puppets. See [RP tracker's channel integration](../../game_systems/evennia_rptracker/README.md#communication-identity).
+
 Mode-specific mixins, commands and cmdsets declare a class attribute
 `comms_identity = "character"` or `"account"`. Unmarked classes are shared
 between modes. `identity.check_comms_identity()` resolves the configured
@@ -564,7 +601,8 @@ account, guest and channel typeclasses and instantiates `CMDSET_ACCOUNT`,
 guest cmdsets are optional). It checks their commands and base-class markers
 and reports all mode mismatches in one `ImproperlyConfigured` exception.
 Character mode also requires the account display mixin on both account
-typeclasses and a character-marked channel typeclass. This prevents switching
+typeclasses and `CharacterCommsChannelMixin` on the channel typeclass. A marker
+alone does not supply channel identity. This prevents switching
 the setting while leaving account-specific components installed.
 
 The check is registered as Django system check `evennia_links.E001`, covering
@@ -581,13 +619,13 @@ def at_server_start():
 Imports of typeclasses and cmdsets happen when the check runs, after the app
 registry is ready; `AppConfig.ready()` only registers the check.
 
-This release supplies the identity foundation. Full character-mode channels,
-Social listings/ignores/visitor paging, and Moderation's mode-aware account
+This release supplies identity policy and character-mode channels.
+Social listings/ignores/visitor paging and Moderation's mode-aware account
 page composition are subsequent parts of [#223](https://github.com/an0n-b1nary/evennia-contribs-staging/issues/223).
 Keep existing hosts in account mode until those consumers are available.
 Account-mode cmdsets retain Moderation's `CmdAccountPage`. Character-mode
 composition replaces it with Social's character `page` at both account and
-character level and a staff-only `apage`; channels must use the forthcoming
+character level and a staff-only `apage`; ordinary channels must use
 `CharacterCommsChannelMixin`. Switch the setting and composition together.
 
 ## Disposable guests
@@ -601,7 +639,9 @@ permission check. See the reference game for restricted command composition.
 The host mixes `GuestCharacterMixin` **before** its other character mixins and
 `GuestAccountMixin` before `DefaultGuest`. Tag every allowed room `wing` in
 category `guest`, and exactly one room `start` in that category. Tag the one
-welcoming channel `chat` in category `guest`. No room IDs are hardcoded.
+welcoming channel `welcome` in category `comms`. `welcome_channel()` refuses
+missing or ambiguous tags. Re-tag existing guest channels when adopting this
+release. No room IDs are hardcoded.
 Set `GUEST_CHARACTER_CMDSET` and `GUEST_ACCOUNT_CMDSET` to restricted host
 cmdsets. The reference sets use Replace with priorities 100/90, disable object
 and channel cmdsets, and explicitly select commands. New commands are denied

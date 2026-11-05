@@ -11,9 +11,11 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings
 from evennia import CmdSet, Command
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
+from evennia.comms.comms import DefaultChannel
 from evennia.utils.create import create_account
 from evennia.utils.test_resources import EvenniaTest
 
+from evennia_links.communication import CharacterCommsChannelMixin, CommunicationChannelMixin
 from evennia_links.guests import GuestAccountMixin
 from evennia_links.guests import is_visitor as guest_is_visitor
 from evennia_links.identity import (
@@ -33,9 +35,11 @@ class PrivateGuest(CharacterCommsAccountMixin, GuestAccountMixin, DefaultGuest):
     pass
 
 
-class CharacterChannel:
-    # PR 3 supplies the channel implementation; this fixture exercises its
-    # marker contract without introducing channel behavior in the foundation.
+class CharacterChannel(CharacterCommsChannelMixin, CommunicationChannelMixin, DefaultChannel):
+    pass
+
+
+class MarkedOnlyChannel:
     comms_identity = "character"
 
 
@@ -261,6 +265,14 @@ class TestIdentityConfiguration(SimpleTestCase):
             check_comms_identity()
         for name in ("BASE_ACCOUNT_TYPECLASS", "BASE_GUEST_TYPECLASS", "BASE_CHANNEL_TYPECLASS"):
             self.assertIn(name, str(caught.exception))
+
+    def test_channel_marker_alone_does_not_supply_character_identity(self):
+        with (
+            self.character_settings(),
+            self.settings(BASE_CHANNEL_TYPECLASS=path(MarkedOnlyChannel)),
+            self.assertRaisesMessage(ImproperlyConfigured, "requires CharacterCommsChannelMixin"),
+        ):
+            check_comms_identity()
 
     def test_mixed_commands_and_hidden_base_markers_are_rejected(self):
         with (

@@ -4,27 +4,14 @@
 
 import logging
 
-from evennia.accounts.models import AccountDB
 from evennia.comms.comms import DefaultChannel
 from evennia.utils.utils import make_iter
 
 from evennia_links.communication import CommunicationChannelMixin
+from evennia_links.identity import sending_character  # public re-export
 from evennia_rptracker.channel_tracker import eligible, end_subscriber_sessions
 
 logger = logging.getLogger("evennia")
-
-
-def sending_character(sender, session=None):
-    """Resolve a single active character; never pick arbitrarily among puppets."""
-    if isinstance(sender, AccountDB):
-        if session is not None:
-            character = sender.get_puppet(session)
-            if character is not None and getattr(character, "account", None) == sender:
-                return character
-            return None
-        puppets = {obj.pk: obj for obj in sender.get_all_puppets()}
-        return next(iter(puppets.values())) if len(puppets) == 1 else None
-    return sender if getattr(sender, "account", None) else None
 
 
 class ICChannel(CommunicationChannelMixin, DefaultChannel):

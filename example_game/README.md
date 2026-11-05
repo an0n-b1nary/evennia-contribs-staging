@@ -1852,6 +1852,11 @@ are available. `practice` leads to an OOC practice room; `+ooc` and `+home`
 return to the lounge. Guests may finalize/test/reset their own builds, practise
 posing, chat with `guest <message>`, page staff, and file `+request` or `+bug`.
 Players can enter through `guests` at Arrival and join the Guest channel.
+The channel carries the `welcome` tag in category `comms`, shared by guest
+login and the chat command. Re-running `seed_sandbox` re-tags an existing
+guest channel. The reference game remains in account communication mode;
+Links' character-mode channel mixin is available for hosts adopting the
+[communication identity integration](../contribs/base_systems/evennia_links/README.md#communication-identity).
 
 Guests cannot enter player areas, use join/summon/teleport to escape, receive
 items, trade assets, post to boards, open scenes, or create shared challenges.

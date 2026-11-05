@@ -1743,11 +1743,17 @@ class Command(BaseCommand):
                 )
         from evennia.comms.models import ChannelDB
 
-        channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
+        channels = list(ChannelDB.objects.get_by_tag("welcome", category="comms"))
+        if not channels:
+            # Re-tag an existing seed; communication policy uses only the new tag.
+            channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
         if not channels:
             channel = create_channel(
                 "Guest",
                 desc=content.GUEST_CHANNEL_DESC,
                 locks="listen:all();send:all();control:perm(Builder)",
             )
-            channel.tags.add("chat", category="guest")
+            channels = [channel]
+        for channel in channels:
+            channel.tags.remove("chat", category="guest")
+            channel.tags.add("welcome", category="comms")

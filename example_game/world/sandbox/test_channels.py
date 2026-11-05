@@ -3,14 +3,55 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.utils import timezone
 from evennia.utils.create import create_channel
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
+from typeclasses.accounts import Account
+from typeclasses.channels import Channel
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
+from evennia_links.communication import CharacterCommsChannelMixin
+from evennia_links.identity import CharacterCommsAccountMixin
 from evennia_rptracker import channel_tracker, tracker
 from evennia_rptracker.models import RPSession, RPSessionSceneLink
+
+
+class SandboxChannelAccount(CharacterCommsAccountMixin, Account):
+    pass
+
+
+class SandboxCharacterChannel(CharacterCommsChannelMixin, Channel):
+    pass
+
+
+@override_settings(EVENNIA_COMMS_IDENTITY="character")
+class CharacterChannelSeams(EvenniaCommandTest):
+    account_typeclass = SandboxChannelAccount
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def test_channel_command_with_host_mixins_uses_character_and_visitor_names(self):
+        from evennia_rptracker.channel_commands import CmdICChannel
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        channel = create_channel("Welcome seam", typeclass=SandboxCharacterChannel)
+        channel.tags.add("welcome", category="comms")
+        channel.send_to_online_only = False
+        channel.connect(self.account2)
+        for puppet, name in ((self.char1, self.char1.key), (None, "Newcomer")):
+            with (
+                self.subTest(puppet=puppet),
+                patch.object(self.account, "get_puppet", return_value=puppet),
+                patch.object(self.account2, "channel_msg") as received,
+                patch("evennia.utils.logger.log_file") as history,
+            ):
+                self.call(CmdICChannel(), "Welcome seam = Hello", caller=self.account)
+                self.assertIn(f"{name}: Hello", received.call_args.args[0])
+                self.assertNotIn(self.account.key, received.call_args.args[0])
+                self.assertEqual(history.call_args.args[0], f"{name}: Hello")
 
 
 class ChannelSeams(EvenniaTest):

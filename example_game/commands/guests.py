@@ -5,6 +5,8 @@ from evennia import CmdSet, default_cmds
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils.utils import class_from_module
 
+from evennia_links.guests import welcome_channel
+
 
 class CmdGuestChat(MuxCommand):
     """Chat with guests and welcoming players: guest <message>."""
@@ -15,14 +17,12 @@ class CmdGuestChat(MuxCommand):
     help_category = "Communication"
 
     def func(self):
-        from evennia.comms.models import ChannelDB
-
         account = self.caller.account if hasattr(self.caller, "account") else self.caller
-        channels = list(ChannelDB.objects.get_by_tag("chat", category="guest"))
-        if len(channels) != 1:
-            self.msg("The guest channel is unavailable. Please contact staff.")
+        try:
+            channel = welcome_channel()
+        except ValueError as exc:
+            self.msg(str(exc))
             return
-        channel = channels[0]
         if (
             account in channel.banlist
             or not channel.has_connection(account)
@@ -33,7 +33,7 @@ class CmdGuestChat(MuxCommand):
         if not self.args.strip():
             self.msg("Use guest <message> to chat with guests and welcoming players.")
             return
-        channel.msg(self.args.strip(), senders=account)
+        channel.msg(self.args.strip(), senders=account, session=self.session)
 
 
 class GuestAccountCmdSet(CmdSet):

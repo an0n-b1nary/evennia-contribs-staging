@@ -65,3 +65,59 @@ class CommunicationChannelMixin:
                 actor.msg(blocked)
                 return None
         return super().at_pre_msg(message, **kwargs)
+
+
+class CharacterCommsChannelMixin:
+    """Character-mode ordinary channels, before CommunicationChannelMixin.
+
+    Compose with DefaultChannel. IC channels already resolve their speakers
+    and enforce their own eligibility policy. Subscriptions remain per account.
+    """
+
+    comms_identity = "character"
+
+    def msg(self, message, senders=None, bypass_mute=False, **kwargs):
+        from evennia.utils.utils import make_iter
+
+        from .guests import welcome_channel
+        from .identity import is_visitor, sending_character
+
+        senders = list(make_iter(senders)) if senders else []
+        if not isinstance(message, str) or not message.strip():
+            return
+        if not senders:
+            return super().msg(message, bypass_mute=bypass_mute, **kwargs)
+        if kwargs.get("emit") or kwargs.get("external"):
+            if all(self.access(sender, "control") for sender in senders):
+                return super().msg(message, senders=senders, bypass_mute=bypass_mute, **kwargs)
+            return
+
+        session = kwargs.get("session")
+        if len(senders) == 1:
+            sender = senders[0]
+            if is_visitor(sender, session):
+                try:
+                    welcome = welcome_channel()
+                except ValueError as exc:
+                    sender.msg(str(exc))
+                    return
+                if self != welcome:
+                    sender.msg("Visitors may speak on the welcome channel only.")
+                    return
+                # A guest with a puppet uses its generated character name.
+                speaker = sending_character(sender, session) or sender
+            else:
+                speaker = sending_character(sender, session)
+            if speaker is not None:
+                return super().msg(message, senders=[speaker], bypass_mute=bypass_mute, **kwargs)
+
+        for sender in senders:
+            sender.msg("Speak on this channel as one puppeted character.")
+
+    def at_post_msg(self, message, **kwargs):
+        """Store public display names in the log shared by history and the web."""
+        from evennia.utils import logger
+
+        if log_file := self.get_log_filename():
+            names = ",".join(sender.get_display_name(None) for sender in kwargs.get("senders", []))
+            logger.log_file(f"{names}: {message}" if names else message, log_file)

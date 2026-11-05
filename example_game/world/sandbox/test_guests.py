@@ -280,7 +280,7 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
         from evennia.utils.create import create_channel
 
         channel = create_channel("Guest Test")
-        channel.tags.add("chat", category="guest")
+        channel.tags.add("welcome", category="comms")
         channel.connect(self.guest)
         channel.ban(self.guest)
         self.assertIn("cannot speak", self.call(CmdGuestChat(), "hello"))
@@ -289,6 +289,23 @@ class TestGuestCommands(GuestFixture, EvenniaCommandTest):
 class TestGuestSeed(EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
+
+    def test_seed_retags_existing_guest_channel_without_duplicate(self):
+        from django.core.management import call_command
+        from evennia.comms.models import ChannelDB
+        from evennia.utils.create import create_channel
+
+        from evennia_links.guests import welcome_channel
+
+        channel = create_channel("Guest")
+        channel.tags.add("chat", category="guest")
+        channel.connect(self.account)
+        for _ in range(2):
+            call_command("seed_sandbox", verbosity=0)
+            self.assertEqual(welcome_channel(), channel)
+            self.assertTrue(channel.has_connection(self.account))
+            self.assertFalse(channel.tags.has("chat", category="guest"))
+            self.assertEqual(ChannelDB.objects.filter(db_key="Guest").count(), 1)
 
     def test_guest_login_uses_seeded_wing_and_only_guest_channel(self):
         from django.core.management import call_command
@@ -317,7 +334,7 @@ class TestGuestSeed(EvenniaTest):
         puppet.assert_called_once_with(self.session, character)
         subscriptions = list(ChannelDB.objects.get_subscriptions(guest))
         self.assertEqual(len(subscriptions), 1)
-        self.assertTrue(subscriptions[0].tags.has("chat", category="guest"))
+        self.assertTrue(subscriptions[0].tags.has("welcome", category="comms"))
 
     def test_guest_login_before_seed_fails_without_consuming_slot(self):
         from evennia.accounts.models import AccountDB
