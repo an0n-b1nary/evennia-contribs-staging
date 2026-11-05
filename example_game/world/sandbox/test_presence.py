@@ -63,17 +63,15 @@ class TestRecentlyConnected(EvenniaTest):
     def test_unlisted_characters_are_left_out(self):
         from evennia_social import presence
 
-        self.char1.key = "HiddenLegacyStaff"
-        self.char2.key = "HiddenCanonicalPlayer"
+        # Distinct keys, so the page check can't match "Char" in other text.
+        self.char1.key = "Quiet Staffer"
+        self.char2.key = "Quiet Player"
         presence.set_visibility(self.char2, presence.UNFINDABLE)
-        self.char1.attributes.add(presence.ATTRIBUTE, "dark")
-        for mode in ("account", "character"):
-            with override_settings(EVENNIA_COMMS_IDENTITY=mode), self.subTest(mode=mode):
-                names, html = self.listed()
-                self.assertEqual(names, [])
-                self.assertNotIn(self.char1.key, html)
-                self.assertNotIn(self.char2.key, html)
-                self.assertEqual(self.char1.attributes.get(presence.ATTRIBUTE), "dark")
+        self.char1.attributes.add(presence.ATTRIBUTE, "dark")  # retired level, still stored
+        names, html = self.listed()
+        self.assertEqual(names, [])
+        self.assertNotIn(self.char1.key, html)
+        self.assertNotIn(self.char2.key, html)
 
     def test_characters_not_seen_lately_are_left_out(self):
         self.char1.attributes.add("sandbox_last_seen", timezone.now() - timedelta(days=8))

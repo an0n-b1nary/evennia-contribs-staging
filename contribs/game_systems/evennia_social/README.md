@@ -207,15 +207,15 @@ behaves sensibly and needs to do nothing here.
 
 Each character chooses whether it can be found from afar, with `+unfindable`:
 
-| Setting | `+where`, venue counts, web maps | `who` | Who can set it |
-|---|---|---|---|
-| `findable` (default) | shown | shown | anyone |
-| `unfindable` | hidden | hidden | anyone |
+| Setting | `+where`, venue counts, web maps | `who` |
+|---|---|---|
+| `findable` (default) | shown | shown |
+| `unfindable` | hidden | hidden |
 
 Being in the same room always reveals a character, and staff see through
-unfindable with a `(unfindable)` marker in `+where` and staff-facing maps.
+unfindable, with an `(unfindable)` marker in `+where` and on the map.
 Unfindable means unlisted: it is privacy from people who aren't there, not
-invisibility. These are the only supported presence settings.
+invisibility. A `dark` value stored by an earlier version reads as `unfindable`.
 
 Every presence surface asks `evennia_social.presence`, so they can't disagree.
 In-game code calls `is_findable(character, viewer)` (location) or
