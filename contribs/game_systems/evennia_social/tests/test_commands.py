@@ -42,15 +42,15 @@ class TestCmdIgnore(SocialCommandTestCase):
     def test_add_view_remove(self):
         result = self.call(CmdIgnore(), "Char2")
         self.assertIn("Now ignoring", result)
-        self.assertIn(self.account2.id, self.account.db.ignore_list)
+        self.assertIn(self.char2.id, self.account.db.ignore_entries)
 
         result = self.call(CmdIgnore(), "")
         self.assertIn("Ignore List", result)
-        self.assertIn("1 player", result)
+        self.assertIn("Char2", result)
 
         result = self.call(CmdIgnore(), "/remove Char2")
         self.assertIn("No longer ignoring", result)
-        self.assertNotIn(self.account2.id, self.account.db.ignore_list)
+        self.assertNotIn(self.char2.id, self.account.db.ignore_entries)
 
     def test_cannot_ignore_self(self):
         result = self.call(CmdIgnore(), "Char")

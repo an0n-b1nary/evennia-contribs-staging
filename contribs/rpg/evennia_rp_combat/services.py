@@ -222,10 +222,9 @@ def account(subject):
 def ignored_by(subject, other):
     if not apps.is_installed("evennia_social"):
         return False
-    own_account, other_account = account(subject), account(other)
-    return bool(
-        own_account and other_account and other_account.pk in (own_account.db.ignore_list or [])
-    )
+    from evennia_social.ignore import NONE, ignore_level
+
+    return ignore_level(owner(subject), owner(other)) != NONE
 
 
 def interaction(first, second):
@@ -235,11 +234,19 @@ def interaction(first, second):
         if ignored_by(subject, other):
             controller = owner(subject)
             if controller:
+                from evennia_social.ignore import FULL, named_entry
+
+                entry = named_entry(controller, owner(other))
+                warning = (
+                    " Removing this /full entry removes its account-wide protection, including alts."
+                    if entry and entry["level"] == FULL
+                    else ""
+                )
                 controller.msg(
                     "Someone you ignore is attempting a direct combat interaction. "
-                    "+combat/unignore <character> removes the account-wide ignore, "
-                    "including alts and channel filtering, until you turn it on again. "
-                    "You may instead cancel an unaccepted incoming attack."
+                    "+combat/unignore <character> removes only the entry under that name."
+                    + warning
+                    + " You may instead cancel an unaccepted incoming attack."
                 )
             blocked = True
     if blocked:
@@ -251,23 +258,22 @@ def interaction(first, second):
 def unignore(actor, other):
     """An explicit command with warning, never an automatic reaction side effect."""
     require(actor)
-    own_account, other_account = account(actor), account(other)
-    if own_account is None or other_account is None:
-        raise CombatError("No account ignore entry is available for these characters.")
-    with transaction.atomic():
-        from evennia.accounts.models import AccountDB
+    if not apps.is_installed("evennia_social"):
+        raise CombatError("Personal ignores require Social.")
+    from evennia_social.ignore import FULL, remove_entry
 
-        AccountDB.objects.select_for_update().get(pk=own_account.pk)
-        own_account.attributes.reset_cache()
-        ignored = list(own_account.db.ignore_list or [])
-        if other_account.pk not in ignored:
-            raise CombatError("You are not ignoring that account.")
-        ignored.remove(other_account.pk)
-        own_account.db.ignore_list = ignored
-    actor.msg(
-        "Ignore removed account-wide, including alts and channel filtering. "
-        "It stays off until you turn it on again with +ignore."
+    character = owner(other)
+    if character is None:
+        raise CombatError("There is no named character entry to remove.")
+    entry = remove_entry(owner(actor), character)
+    if entry is None:
+        raise CombatError(f"{character.key} isn't on your list.")
+    warning = (
+        " This /full entry's account-wide protection, including alts and channel filtering, is removed."
+        if entry["level"] == FULL
+        else ""
     )
+    actor.msg(f"No longer ignoring {character.key}." + warning)
 
 
 def identity(subject):

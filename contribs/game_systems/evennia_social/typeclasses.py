@@ -86,6 +86,7 @@ class SocialCharacterMixin:
 
     # -- Page / +msg --
     last_pager = AttributeProperty(default=None, autocreate=False)
+    last_pager_account = AttributeProperty(default=None, autocreate=False)
     last_page_seen = AttributeProperty(default=None, autocreate=False)
 
     # -- Summon / join --
@@ -172,41 +173,24 @@ class SocialCharacterMixin:
             msg_type = msg_opts.get("type", "")
 
             if msg_text and msg_type in ("pose", "say", "whisper", "page", "ooc", "crafting_event"):
-                from_acct = getattr(from_obj, "account", None)
-                if msg_type == "crafting_event" and from_acct is None:
-                    from evennia.accounts.models import AccountDB
+                from evennia_social.ignore import HIDDEN, NONE, ignore_level
 
-                    from evennia_links.characters import account_ids
-
-                    accounts = list(AccountDB.objects.filter(pk__in=account_ids(from_obj)))
-                    ignored = set(self.account.db.ignore_list or [])
-                    if any(account.pk in ignored for account in accounts) and not any(
-                        account.check_permstring("Builder") for account in accounts
-                    ):
+                level = ignore_level(self, from_obj)
+                if level != NONE and msg_type in ("whisper", "page"):
+                    return
+                if level == HIDDEN:
+                    # Crafting event suppression predates named ignores. Keep
+                    # that behaviour for hidden senders; exceptions show it.
+                    if msg_type == "crafting_event":
                         return
-                if from_acct:
-                    ignore_list = self.account.db.ignore_list or []
-                    is_staff_sender = from_acct.check_permstring("Builder")
-                    if from_acct.id in ignore_list and not is_staff_sender:
-                        if msg_type in ("whisper", "page", "crafting_event"):
-                            return  # full suppression
-                        placeholder = _ignore_placeholder(msg_type)
-                        # Retag as "system": the placeholder is no longer
-                        # real pose/say content, and passing the original
-                        # "pose"/"say" type through would let a downstream
-                        # mixin's msg() (e.g. PosingCharacterMixin) apply
-                        # pose headers/highlighting to the muted notice.
-                        text = (placeholder, {**msg_opts, "type": "system"})
-                        super().msg(
-                            text=text,
-                            from_obj=from_obj,
-                            session=session,
-                            options=options,
-                            **kwargs,
-                        )
-                        return
+                    text = (_ignore_placeholder(msg_type), {**msg_opts, "type": "system"})
 
         super().msg(text=text, from_obj=from_obj, session=session, options=options, **kwargs)
+
+    def channel_msg(self, message, channel, senders=None, **kwargs):
+        if _blocked_channel(self, channel, senders):
+            return
+        return super().channel_msg(message, channel, senders=senders, **kwargs)
 
     def get_display_name(self, looker=None, **kwargs):
         """Returns the character's display name, with short_desc if set.
@@ -243,3 +227,24 @@ class SocialRoomMixin:
             byline = f" |x(set by {self.room_mood_setter})|n" if self.room_mood_setter else ""
             desc = f"{desc}\n\n|w[Mood]|n {self.room_mood}{byline}"
         return desc
+
+
+def _blocked_channel(viewer, channel, senders):
+    from evennia_social.ignore import HIDDEN, blocks_channel, ignore_level
+
+    if getattr(channel, "is_ic", False):
+        return any(ignore_level(viewer, sender) == HIDDEN for sender in senders or ())
+    return any(blocks_channel(viewer, sender) for sender in senders or ())
+
+
+class SocialAccountMixin:
+    """Filter channel delivery to account subscribers, before DefaultAccount.
+
+    Filter at channel_msg rather than at_pre_channel_msg: Evennia 6 aborts
+    the whole broadcast if a subscriber's pre-hook returns None.
+    """
+
+    def channel_msg(self, message, channel, senders=None, **kwargs):
+        if _blocked_channel(self, channel, senders):
+            return
+        return super().channel_msg(message, channel, senders=senders, **kwargs)

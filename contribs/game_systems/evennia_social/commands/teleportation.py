@@ -21,12 +21,20 @@ def _get_pending_requests(character):
     """Return the pending requests dict for a character, cleaning expired."""
     from datetime import datetime
 
+    from evennia.objects.models import ObjectDB
+
     requests = character.pending_summon_requests or {}
+    requesters = ObjectDB.objects.in_bulk(requests)
     now = datetime.now(UTC)
     expired = []
     for char_id, info in requests.items():
         ts = datetime.fromisoformat(info["timestamp"])
-        if (now - ts).total_seconds() > _SUMMON_EXPIRY_SECONDS:
+        requester = requesters.get(char_id)
+        if (
+            (now - ts).total_seconds() > _SUMMON_EXPIRY_SECONDS
+            or requester is None
+            or _check_ignore_silent(requester, character)
+        ):
             expired.append(char_id)
     for char_id in expired:
         del requests[char_id]
@@ -53,13 +61,9 @@ def _check_ignore_silent(caller, target):
 
     Staff (Builder+) bypass ignore lists.
     """
-    caller_account = caller.account
-    target_account = target.account
-    if not caller_account or not target_account:
-        return False
-    ignore_list = target_account.db.ignore_list or []
-    is_staff_caller = caller_account.check_permstring("Builder")
-    return caller_account.id in ignore_list and not is_staff_caller
+    from evennia_social.ignore import NONE, ignore_level
+
+    return ignore_level(target, caller) != NONE
 
 
 class CmdSummon(StrictSwitchMixin, MuxCommand):
@@ -121,15 +125,13 @@ class CmdSummon(StrictSwitchMixin, MuxCommand):
             caller.msg("You cannot summon players to a staff room.")
             return
 
-        # Store request on target.
-        _store_request(target, caller, "summon", room.id)
-
         # Always show confirmation to caller (no ignore info leak).
         caller.msg(f"You sent a summon request to |w{target.key}|n.")
 
-        # If ignored, don't notify target.
+        # Block both notification and pending contact without changing the reply.
         if _check_ignore_silent(caller, target):
             return
+        _store_request(target, caller, "summon", room.id)
 
         target.msg(
             f"|w{caller.key}|n wants to summon you to |w{room.get_display_name(target)}|n.\n"
@@ -286,15 +288,13 @@ class CmdJoin(StrictSwitchMixin, MuxCommand):
             caller.msg("You cannot join a player in a staff room.")
             return
 
-        # Store request on target.
-        _store_request(target, caller, "join", target_room.id)
-
         # Always show confirmation to caller (no ignore info leak).
         caller.msg(f"You sent a join request to |w{target.key}|n.")
 
-        # If ignored, don't notify target.
+        # Block both notification and pending contact without changing the reply.
         if _check_ignore_silent(caller, target):
             return
+        _store_request(target, caller, "join", target_room.id)
 
         target.msg(
             f"|w{caller.key}|n wants to join you at your location.\n"

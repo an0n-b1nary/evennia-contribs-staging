@@ -14,6 +14,7 @@ from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils import utils
 
 from evennia_links.command_syntax import StrictSwitchMixin
+from evennia_links.identity import comms_identity
 from evennia_social import presence
 from evennia_social.identity import staff_run_marker
 from evennia_social.social import is_staff
@@ -99,6 +100,25 @@ class CmdWho(StrictSwitchMixin, DefaultCmdWho):
             ):
                 continue
             sessions.append(session)
+        if comms_identity() == "character":
+            puppets = {}
+            for session in sessions:
+                if puppet := session.get_puppet():
+                    puppets.setdefault(puppet.pk, (puppet, session))
+            table = self.styled_table("|wCharacter", "|wOn for", "|wIdle")
+            for puppet, session in sorted(puppets.values(), key=lambda row: row[0].key.casefold()):
+                table.add_row(
+                    utils.crop(puppet.get_display_name(viewer or account), width=25)
+                    + staff_run_marker(puppet)
+                    + (presence.staff_marker(puppet) if viewer_is_staff else ""),
+                    utils.time_format(time.time() - session.conn_time, 0),
+                    utils.time_format(time.time() - session.cmd_last_visible, 1),
+                )
+            count = len(puppets)
+            self.msg(
+                f"|wCharacters:|n\n{table}\n{count} character{'' if count == 1 else 's'} online."
+            )
+            return
         sessions.sort(key=lambda s: s.account.key)
         table = self.styled_table("|wAccount name", "|wOn for", "|wIdle")
         for session in sessions:

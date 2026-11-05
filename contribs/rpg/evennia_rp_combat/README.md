@@ -47,8 +47,10 @@ Absent partners are checked through the app registry before importing them.
 Every PC explicitly joins. Attacking an unenrolled character privately
 invites them to join any side; refusal spends nothing, is not announced and
 only tells the inviter. An ignore crossing prompts its owner privately.
-`+combat/unignore character` explicitly removes the account-wide entry,
-including alts/channel filtering, until manually restored. Ignore never
+`+combat/unignore character` removes only the entry made under that name,
+using [Social's shared ignore policy](../../game_systems/evennia_social/README.md#personal-boundaries).
+Only removing a `/full` entry warns about account-wide protection. Earlier
+unnamed full ignores require `+ignore/clear`. Staff senders bypass filtering. Ignore never
 prevents unrelated members of the same fight from participating.
 
 Resolve or cancel all incoming packets before your own next outgoing action.

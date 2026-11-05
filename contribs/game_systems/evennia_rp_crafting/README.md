@@ -1004,3 +1004,11 @@ create, or what blocks it. Declined requests and other forms create nothing.
 
 Additive migration 0009 adds `Pattern.proposal_submission_id` and the
 `proposal` learning route. Existing Patterns and knowledge are unchanged.
+
+
+Social's [personal boundary service](../evennia_social/README.md#personal-boundaries)
+controls Companion visibility by the owner's character, including offline
+owners. Exceptions show Companions and their posts while blocking contact.
+Modifier service proposals and acceptance check both players' contact
+boundaries before spending resources. These checks are optional: games
+without Social keep existing behaviour.

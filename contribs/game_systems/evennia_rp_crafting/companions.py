@@ -108,23 +108,12 @@ class CompanionObject(CraftedItemMixin, DefaultObject):
 
     def access(self, accessing_obj, access_type="read", default=False, **kwargs):
         if access_type == "view" and apps.is_installed("evennia_social"):
-            from evennia_links.characters import account_ids
+            from evennia_social.ignore import HIDDEN, ignore_level
 
-            account = getattr(accessing_obj, "account", None)
             row = CompanionState.objects.filter(item=self).first()
             owner = ObjectDB.objects.filter(pk=row.owner_id).first() if row else None
-            if account and owner:
-                ids = set(account_ids(owner))
-                if owner.account:
-                    ids.add(owner.account.pk)
-                if ids & set(account.db.ignore_list or []):
-                    from evennia.accounts.models import AccountDB
-
-                    if not any(
-                        actor.check_permstring("Builder")
-                        for actor in AccountDB.objects.filter(pk__in=ids)
-                    ):
-                        return False
+            if owner and ignore_level(accessing_obj, owner) == HIDDEN:
+                return False
         return super().access(accessing_obj, access_type, default, **kwargs)
 
     def at_pre_get(self, getter, **kwargs):

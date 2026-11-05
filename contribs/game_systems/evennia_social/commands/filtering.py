@@ -1,16 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""
-Player filtering — +ignore/+mute command.
-
-Account-level ignore list management. Filtering enforcement happens in
-``SocialCharacterMixin.msg()`` (typeclasses.py), not here.
-"""
+"""Named personal boundaries; all enforcement lives in evennia_social.ignore."""
 
 from django.conf import settings
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links.command_syntax import StrictSwitchMixin
+from evennia_links.identity import comms_identity
+from evennia_social import ignore
+from evennia_social.social import find_character
 
 
 class CmdIgnore(StrictSwitchMixin, MuxCommand):
@@ -18,22 +16,27 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
     Manage your ignore list.
 
     Usage:
-        +ignore                     - View your ignore list
-        +ignore <character>         - Add someone to your ignore list
-        +ignore/remove <character>  - Remove someone from your ignore list
-        +ignore/clear               - Clear your entire ignore list
+        +ignore                     - View your entries
+        +ignore <character>         - Hide this character's posts and contact
+        +ignore/full <character>    - Hide the whole player, including alts
+        +ignore/except <character>  - Show posts, but still block contact
+        +ignore/remove <character>  - Remove the entry made under this name
+        +ignore/clear               - Remove every entry, including earlier ignores
         +mute <character>           - Alias for +ignore
 
-    Ignoring a player filters their content across the game. Poses and
-    says are replaced with a muted placeholder; whispers are suppressed
-    entirely; pages are blocked. Ignore operates at the account level —
-    ignoring one character ignores all of that player's alts.
+    Posts are room poses, says, OOC and crafting events. Hidden posts become
+    muted placeholders. Contact (pages, whispers, summons, joins, direct
+    combat and crafting proposals) is blocked even for an exception. OOC
+    channel lines from an ignored player stay hidden, including exceptions.
+    Staff always bypass filtering.
 
-    Staff messages always bypass ignore filters.
+    A character entry overrides /full. /except also works without /full.
+    /full can reveal alts through filtering: use it for boundaries, never
+    to discover who plays whom. Replies and lists name only your entries.
+    Earlier full ignores have no recorded name and require /clear.
     """
 
-    switch_options = ("remove", "clear")
-
+    switch_options = ("full", "except", "remove", "clear")
     key = "+ignore"
     aliases = ["+mute"]  # noqa: RUF012
     help_category = "Social"
@@ -45,124 +48,68 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         super().__init__(**kwargs)
 
     def func(self):
-        """Execute command."""
         caller = self.caller
-        account = caller.account
+        account = ignore.account_for(caller)
         if not account:
             caller.msg("You must be logged in to use this command.")
             return
-
-        if "remove" in self.switches:
-            self._remove(caller, account)
-        elif "clear" in self.switches:
-            self._clear(caller, account)
-        elif self.switches:
-            caller.msg(f"Unknown switch '/{self.switches[0]}'. See |whelp +ignore|n for usage.")
-        elif self.args.strip():
-            self._add(caller, account)
-        else:
+        if "clear" in self.switches:
+            count = ignore.clear(account)
+            caller.msg(f"Ignore list cleared. Removed {count} entries.")
+            return
+        if not self.args.strip() and not self.switches:
             self._view(caller, account)
+            return
+        target, error = find_character(self.args.strip())
+        if error:
+            caller.msg(error)
+            return
+        if "remove" in self.switches:
+            if ignore.remove_entry(account, target):
+                caller.msg(f"No longer ignoring |w{target.key}|n.")
+            else:
+                caller.msg(f"{target.key} isn't on your list.")
+            return
+        level = (
+            ignore.FULL
+            if "full" in self.switches
+            else (ignore.POSTS if "except" in self.switches else ignore.HIDDEN)
+        )
+        try:
+            changed = ignore.set_entry(caller, target, level)
+        except ValueError as exc:
+            caller.msg(str(exc))
+            return
+        if not changed:
+            caller.msg(f"{target.key} already has that entry on your list.")
+        elif level == ignore.POSTS:
+            caller.msg(f"Showing posts from |w{target.key}|n; contact stays blocked.")
+        elif level == ignore.FULL:
+            caller.msg(f"Now ignoring |w{target.key}|n (full), including alts.")
+        else:
+            caller.msg(f"Now ignoring |w{target.key}|n. Their posts appear as muted placeholders.")
 
     def _view(self, caller, account):
-        """Display the current ignore list."""
-        ignore_list = account.db.ignore_list or []
-        if not ignore_list:
+        from evennia.accounts.models import AccountDB
+        from evennia.objects.models import ObjectDB
+
+        named, earlier = ignore.entries(account), ignore.earlier(account)
+        if not named and not earlier:
             caller.msg("Your ignore list is empty.")
             return
-
-        from evennia.accounts.models import AccountDB
-
-        width = 70
-        lines = [f"|w+{'=' * (width - 2)}+|n"]
-        header = " Ignore List "
-        pad = width - 2 - len(header)
-        left = pad // 2
-        right = pad - left
-        lines.append(f"|w+{'=' * left}{header}{'=' * right}+|n")
-
-        for i, acct_id in enumerate(ignore_list, 1):
-            try:
-                ignored_acct = AccountDB.objects.get(id=acct_id)
-                # Show character names associated with this account
-                chars = ignored_acct.db._playable_characters or []
-                char_names = ", ".join(c.key for c in chars if c) or "no characters"
-                lines.append(f" {i}. {ignored_acct.key} ({char_names})")
-            except AccountDB.DoesNotExist:
-                lines.append(f" {i}. Unknown (Account #{acct_id})")
-
-        lines.append(f"|w{'-' * width}|n")
-        count = len(ignore_list)
-        lines.append(
-            f" {count} player{'s' if count != 1 else ''} ignored. "
-            "Use |w+ignore/remove <name>|n to unblock."
-        )
-        lines.append(f"|w+{'=' * (width - 2)}+|n")
+        lines = ["|wIgnore List|n"]
+        account_mode = comms_identity() == "account"
+        for char_id, entry in named.items():
+            target = ObjectDB.objects.filter(pk=char_id).first()
+            name = target.key if target else entry["name"]
+            label = {ignore.FULL: " (full)", ignore.POSTS: " (except)"}.get(entry["level"], "")
+            if account_mode:
+                accounts = AccountDB.objects.filter(pk__in=entry["accounts"])
+                label += " — " + ", ".join(a.key for a in accounts)
+            lines.append(f"  {name}{label}")
+        if earlier:
+            lines.append(f"  {len(earlier)} earlier full ignores, made before names were recorded")
+            if account_mode:
+                lines.extend(f"    {a.key}" for a in AccountDB.objects.filter(pk__in=earlier))
+        lines.append("Use +ignore/remove <character> or +ignore/clear to remove entries.")
         caller.msg("\n".join(lines))
-
-    def _add(self, caller, account):
-        """Add a player to the ignore list."""
-        target = caller.search(self.args.strip())
-        if not target:
-            return
-
-        if target == caller:
-            caller.msg("You can't ignore yourself.")
-            return
-
-        target_account = target.account
-        if not target_account:
-            # Character exists but no connected account — try the stored
-            # account reference for offline characters.
-            target_account = target.db.account
-        if not target_account:
-            caller.msg("Could not determine that character's account.")
-            return
-
-        ignore_list = account.db.ignore_list or []
-        if target_account.id in ignore_list:
-            caller.msg(f"You are already ignoring {target.key}.")
-            return
-
-        ignore_list.append(target_account.id)
-        account.db.ignore_list = ignore_list
-        caller.msg(
-            f"Now ignoring |w{target.key}|n. Their poses and says will "
-            "appear as muted placeholders."
-        )
-
-    def _remove(self, caller, account):
-        """Remove a player from the ignore list."""
-        if not self.args.strip():
-            caller.msg("Usage: |w+ignore/remove <character>|n")
-            return
-
-        target = caller.search(self.args.strip())
-        if not target:
-            return
-
-        target_account = target.account
-        if not target_account:
-            target_account = target.db.account
-        if not target_account:
-            caller.msg("Could not determine that character's account.")
-            return
-
-        ignore_list = account.db.ignore_list or []
-        if target_account.id not in ignore_list:
-            caller.msg(f"You are not ignoring {target.key}.")
-            return
-
-        ignore_list.remove(target_account.id)
-        account.db.ignore_list = ignore_list
-        caller.msg(f"No longer ignoring |w{target.key}|n.")
-
-    def _clear(self, caller, account):
-        """Clear the entire ignore list."""
-        ignore_list = account.db.ignore_list or []
-        if not ignore_list:
-            caller.msg("Your ignore list is already empty.")
-            return
-
-        count = len(ignore_list)
-        account.db.ignore_list = []
-        caller.msg(f"Ignore list cleared. Removed {count} player{'s' if count != 1 else ''}.")

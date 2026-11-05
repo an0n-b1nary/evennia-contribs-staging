@@ -105,6 +105,34 @@ class WaveThreeFixture(CraftingFixture):
 
 @skipUnless(HAS_ECONOMY, "Economy absent: services unavailable")
 class ModifierTests(WaveThreeFixture, EvenniaTest):
+    @skipUnless(apps.is_installed("evennia_social"), "Social absent")
+    def test_named_ignores_block_proposals_and_recheck_acceptance(self):
+        from evennia_economy.services import balance
+        from evennia_social import ignore
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        before = (balance(self.char1), balance(self.char2), self.held("spark"))
+        for mode in ("account", "character"):
+            for level in (ignore.HIDDEN, ignore.POSTS, ignore.FULL):
+                with (
+                    self.subTest(mode=mode, level=level),
+                    override_settings(EVENNIA_COMMS_IDENTITY=mode),
+                ):
+                    ignore.set_entry(self.char2, self.char1, level)
+                    with self.assertRaisesMessage(CraftingError, "allow contact"):
+                        self.offer()
+                    self.assertFalse(ModificationOffer.objects.exists())
+                    ignore.clear(self.char2)
+        offer = self.offer()
+        ignore.set_entry(self.char2, self.char1, ignore.POSTS)
+        with self.assertRaisesMessage(CraftingError, "allow contact"):
+            modifiers.accept(self.char2, offer.pk)
+        self.assertEqual((balance(self.char1), balance(self.char2), self.held("spark")), before)
+        self.assertFalse(ModificationLayer.objects.exists())
+
     def test_consent_payment_resources_and_layer_commit_once(self):
         from evennia_economy.services import balance
 
@@ -245,6 +273,24 @@ class ModifierTests(WaveThreeFixture, EvenniaTest):
 
 class CompanionTests(WaveThreeFixture, EvenniaTest):
     character_typeclass = CompanionOwner
+
+    @skipUnless(apps.is_installed("evennia_social"), "Social absent")
+    def test_companion_view_uses_owner_character_boundary_offline(self):
+        from evennia_social import ignore
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        pet = self.pet()
+        for level, shown in ((ignore.HIDDEN, False), (ignore.POSTS, True), (ignore.FULL, False)):
+            with self.subTest(level=level):
+                ignore.set_entry(self.char2, self.char1, level)
+                self.assertEqual(pet.access(self.char2, "view"), shown)
+        self.char1.account = None
+        self.assertFalse(pet.access(self.char2, "view"))
+        self.account.permissions.add("Builder")
+        self.assertTrue(pet.access(self.char2, "view"))
 
     def test_follow_does_not_bypass_a_host_exit_traversal_hook(self):
         for path in self.room1.exits:

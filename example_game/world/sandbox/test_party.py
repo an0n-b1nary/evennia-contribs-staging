@@ -76,12 +76,15 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         before = deepcopy(fight.state)
         if apps.is_installed("evennia_social"):
             self.account2.db.ignore_list = [self.account.pk]
+            # Exercise an ordinary player boundary; staff bypass the policy.
+            self.account.permissions.remove("Developer")
             with self.assertRaisesRegex(ValueError, "confirmation"):
                 services.cover(attacker, defender, token, subject=coverer)
             fight.refresh_from_db()
             self.assertEqual(fight.state, before)
             self.assertEqual(self.account2.db.ignore_list, [self.account.pk])
             self.account2.db.ignore_list = []
+            self.account.permissions.add("Developer")
         services.cover(attacker, defender, token, subject=coverer)
         state = combat.state_for(attacker)
         self.assertEqual(state["exchanges"][exchange]["targets"], [str(coverer.pk)])
@@ -151,8 +154,11 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
             two.assert_called_once()
             if apps.is_installed("evennia_social"):
                 self.account2.db.ignore_list = [self.account.pk]
+                self.assertEqual(services.chat(first, "Staff bypass"), 2)
+                self.account.permissions.remove("Developer")
                 self.assertEqual(services.chat(first, "Filtered secret"), 1)
-                self.assertEqual(two.call_count, 1)
+                self.assertEqual(two.call_count, 2)
+                self.account.permissions.add("Developer")
         fight.refresh_from_db()
         self.assertEqual(fight.state, before)
         self.assertEqual(fight.entries.count(), entries)
@@ -174,9 +180,12 @@ class TestPartyPlayground(RPSeedMixin, EvenniaCommandTest):
         services.change(second, "formation", "front")
         if apps.is_installed("evennia_social"):
             self.account2.db.ignore_list = [self.account.pk]
+            # Exercise an ordinary player boundary; staff bypass the policy.
+            self.account.permissions.remove("Developer")
             with self.assertRaisesRegex(ValueError, "confirmation"):
                 boss_services.issue(first, [key], "tank", subject=opponent)
             self.account2.db.ignore_list = []
+            self.account.permissions.add("Developer")
         ident = boss_services.issue(first, [key], "tank", subject=opponent)[0]
         fight = combat.open_fight(self.grounds)
         before = deepcopy(combat.state_for(first)["participants"][str(opponent.pk)])

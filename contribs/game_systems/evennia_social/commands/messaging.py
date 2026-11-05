@@ -10,6 +10,8 @@ Supports multi-recipient, reply shortcuts, and message history.
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links.command_syntax import StrictSwitchMixin
+from evennia_links.identity import comms_identity, is_visitor, sending_character
+from evennia_social.ignore import NONE, ignore_level, owners
 from evennia_social.social import find_character
 
 
@@ -40,10 +42,14 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
 
         if isinstance(self.caller, DefaultCharacter):
             return self.caller
-        # AccountCmdSet context — try to get puppet
-        puppet = self.caller.get_puppet(self.session)
+        # Resolve only this session; another session's puppet is not ours.
+        puppet = sending_character(self.caller, self.session)
         if puppet:
             return puppet
+        if comms_identity() == "character" and (
+            is_visitor(self.caller, self.session) or self.caller.check_permstring("Builder")
+        ):
+            return self.caller
         self.caller.msg("You must be puppeting a character to page.")
         return None
 
@@ -77,93 +83,102 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
                 targets.append(target)
         return targets, errors
 
+    def _staff_owned(self, actor):
+        from evennia.accounts.models import AccountDB
+
+        return any(
+            owner.is_superuser or owner.check_permstring("Builder")
+            for owner in AccountDB.objects.filter(pk__in=owners(actor))
+        )
+
+    def _display(self, actor, viewer):
+        from evennia.accounts.models import AccountDB
+
+        if (
+            isinstance(actor, AccountDB)
+            and comms_identity() == "character"
+            and not self._staff_owned(viewer)
+        ):
+            return "Staff" if self._staff_owned(actor) else "Newcomer"
+        return actor.get_display_name(viewer)
+
     def _send_page(self, caller_char, targets, message):
-        """Create the Msg and deliver to online targets."""
+        """Persist and deliver allowed contact, with identical sender replies."""
+        from evennia.accounts.models import AccountDB
         from evennia.utils import create
 
         from evennia_links.communication import denial
 
+        visitor = is_visitor(caller_char, getattr(self, "session", None))
         for target in targets:
             blocked = denial(caller_char, "page", target)
             if blocked:
                 self.caller.msg(blocked)
                 return
+            if visitor and not self._staff_owned(target):
+                self.caller.msg(
+                    "Visitors may page staff only."
+                    if comms_identity() == "character"
+                    else "Guests may page staff only."
+                )
+                return
+            # Only staff can use the private reply pointer to an account.
+            # Accounts are never resolved by the public name search.
+            if isinstance(target, AccountDB) and not self._staff_owned(caller_char):
+                self.caller.msg("Visitors may page staff only.")
+                return
 
-        caller_account = caller_char.account
+        deliver = [target for target in targets if ignore_level(target, caller_char) == NONE]
+        if deliver:
 
-        from evennia_links.guests import is_guest
+            def lock(actor):
+                return f"{'pid' if isinstance(actor, AccountDB) else 'id'}({actor.pk})"
 
-        if is_guest(caller_char):
-            from evennia.accounts.models import AccountDB
-
-            from evennia_links.characters import account_ids
-
-            for target in targets:
-                owners = AccountDB.objects.filter(pk__in=account_ids(target))
-                if target.account:
-                    owners = [target.account, *owners]
-                if not any(
-                    owner.is_superuser or owner.check_permstring("Builder") for owner in owners
-                ):
-                    caller_char.msg("Guests may page staff only.")
-                    return
-
-        # Create the persistent Msg with Character sender/receivers.
-        target_perms = " or ".join([f"id({t.id})" for t in [*targets, caller_char]])
-        create.create_message(
-            caller_char,
-            message,
-            receivers=targets,
-            locks=(
-                f"read:{target_perms} or perm(Admin);"
-                f"delete:id({caller_char.id}) or perm(Admin);"
-                f"edit:id({caller_char.id}) or perm(Admin)"
-            ),
-            tags=[("page", "comms")],
-        )
-
-        # Build display strings.
-        target_names = [t.key for t in targets]
-        target_str = ", ".join(target_names)
-
-        # Deliver to each target.
-        offline_targets = []
-        for target in targets:
-            # Set reply tracking on the receiver.
-            target.db.last_pager = caller_char.id
-
-            if not target.has_account:
-                offline_targets.append(target.key)
-                continue
-
-            # Check ignore at delivery time. Sender's account in target's
-            # ignore list = silently skip delivery (not Msg creation).
-            target_account = target.account
-            ignore_list = target_account.db.ignore_list or []
-            is_staff = caller_account.check_permstring("Builder")
-            if caller_account.id in ignore_list and not is_staff:
-                continue
-
-            # Format the delivery message.
-            if len(targets) == 1:
-                recv_text = f"|w{caller_char.key}|n pages: {message}"
-            else:
-                others = [t.key for t in targets if t != target]
-                others_str = ", ".join(others)
-                recv_text = f"|w{caller_char.key}|n pages you and {others_str}: {message}"
-
-            target.msg(
-                (recv_text, {"type": "page"}),
-                from_obj=caller_char,
+            read = " or ".join(lock(t) for t in [*deliver, caller_char])
+            create.create_message(
+                caller_char,
+                message,
+                receivers=deliver,
+                locks=(
+                    f"read:{read} or perm(Admin);"
+                    f"delete:{lock(caller_char)} or perm(Admin);"
+                    f"edit:{lock(caller_char)} or perm(Admin)"
+                ),
+                tags=[("page", "comms")],
             )
+        for target in deliver:
+            if isinstance(caller_char, AccountDB):
+                target.db.last_pager_account = caller_char.pk
+                target.db.last_pager = None
+            else:
+                target.db.last_pager = caller_char.pk
+                target.db.last_pager_account = None
+            if not isinstance(target, AccountDB) and not target.has_account:
+                continue
+            if isinstance(caller_char, AccountDB) and comms_identity() == "character":
+                # The persistent Msg identifies the account to staff; live
+                # visitor contact uses the public label even for staff.
+                sender_name = "Staff" if self._staff_owned(caller_char) else "Newcomer"
+            else:
+                sender_name = self._display(caller_char, target)
+            if len(targets) == 1:
+                recv_text = f"|w{sender_name}|n pages: {message}"
+            else:
+                others = ", ".join(self._display(t, target) for t in targets if t != target)
+                recv_text = f"|w{sender_name}|n pages you and {others}: {message}"
+            target.msg((recv_text, {"type": "page"}), from_obj=caller_char)
 
-        # Sender confirmation — always show "You paged" regardless of
-        # online status (no information leak about ignore or connectivity).
+        target_str = ", ".join(self._display(t, caller_char) for t in targets)
         self.caller.msg(f"You paged {target_str}: {message}")
-        if offline_targets:
-            offline_str = ", ".join(f"|C{n}|n" for n in offline_targets)
+        # Connectivity advice must not change depending on ignore delivery.
+        offline = [
+            self._display(t, caller_char)
+            for t in targets
+            if not (t.is_connected if isinstance(t, AccountDB) else t.has_account)
+        ]
+        if offline:
             self.caller.msg(
-                f"{offline_str} is offline. They will see your page when they next connect."
+                f"{', '.join(offline)} is offline. They will see your page when they next connect."
             )
 
     def _show_last(self, count=5):
@@ -192,7 +207,7 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
         lines = ["|wRecent pages received:|n"]
         for msg in pages:
             senders = msg.senders
-            sender_name = senders[0].key if senders else "Unknown"
+            sender_name = self._display(senders[0], caller_char) if senders else "Unknown"
             timestamp = msg.db_date_created.strftime("%m/%d %H:%M")
             lines.append(f"  [{timestamp}] From {sender_name}: {msg.message}")
 
@@ -245,10 +260,10 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
             is_sent = caller_char in senders
 
             if is_sent:
-                recv_names = ", ".join(r.key for r in receivers)
+                recv_names = ", ".join(self._display(r, caller_char) for r in receivers)
                 lines.append(f"  [{timestamp}] >> To {recv_names}: {msg.message}")
             else:
-                sender_name = senders[0].key if senders else "Unknown"
+                sender_name = self._display(senders[0], caller_char) if senders else "Unknown"
                 lines.append(f"  [{timestamp}] << From {sender_name}: {msg.message}")
 
         self.caller.msg("\n".join(lines))
@@ -297,20 +312,25 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
             return
 
         # No = sign — reply to last pager.
-        last_pager_id = caller_char.last_pager
-        if not last_pager_id:
+        last_pager_id = caller_char.db.last_pager
+        last_account_id = caller_char.db.last_pager_account
+        if not last_pager_id and not last_account_id:
             self.caller.msg(
                 "No one has paged you yet. Use |wpage <character>=<message>|n to start."
             )
             return
 
+        from evennia.accounts.models import AccountDB
         from evennia.objects.models import ObjectDB
 
-        try:
-            target = ObjectDB.objects.get(id=last_pager_id)
-        except ObjectDB.DoesNotExist:
-            self.caller.msg("The character who last paged you no longer exists.")
-            caller_char.last_pager = None
+        if last_account_id:
+            target = AccountDB.objects.filter(pk=last_account_id).first()
+        else:
+            target = ObjectDB.objects.filter(pk=last_pager_id).first()
+        if target is None:
+            self.caller.msg("The person who last paged you no longer exists.")
+            caller_char.db.last_pager = None
+            caller_char.db.last_pager_account = None
             return
 
         message = self.args.strip()
