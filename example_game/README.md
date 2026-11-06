@@ -1613,7 +1613,8 @@ passes, recorded as such. Timeouts are configurable with `--startup-timeout`
 `--shutdown-timeout` (30). Exit codes: 0 means the selected nonempty suite
 passed, 1 means a scenario or server-log assertion failed, 2 means setup,
 protocol or cleanup failed. Inspect `evidence/results.md` for case results.
-CI runs the complete pass twice on Ubuntu after the sandbox integration gate.
+CI runs the complete pass on Ubuntu after the sandbox integration gate, and
+the nightly run repeats it on a second fresh host.
 
 For exploration, keep one runner process alive:
 
