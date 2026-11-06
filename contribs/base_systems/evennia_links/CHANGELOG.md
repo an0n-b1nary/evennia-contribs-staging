@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## 0.8.14 — 2026-11-06
+
+- Add optional, fail-open presentation filtering and a transaction-aware
+  pre-change signal for durable ignore-policy bookkeeping.
+
 - Add `CmdSessionChannel` for session-aware sends without RP tracker, keeping
   visitor restrictions local to the originating session. Document the complete
   reference-game communication composition.

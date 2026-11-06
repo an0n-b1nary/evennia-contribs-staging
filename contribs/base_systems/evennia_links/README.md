@@ -25,11 +25,30 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `Page`, `split_pages`, `page_at`, `contents` | `pagination.py` | Authored IC pages with stable numbering and plain-text contents |
 | `connect_on_ready` | `listeners.py` | Import-order-safe signal-registration helper |
 | `connect_soft_ref_cleanup` | `softref.py` | Cascade compensation for integer soft-reference fields |
+| `ignore_mode`, `ignore_mode_requested` | `ignoring.py` | Optional fail-open presentation filtering for comfort preferences |
+| `ignore_policy_changing` | `ignoring.py` | Pre-change hook for transactional policy bookkeeping |
 | `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
 | `resolve_dotted` | `collect.py` | Import an object from a `"pkg.mod.attr"` settings path |
 | `TestRunner` | `testing.py` | Evennia test runner that stops each test's leftover tasks and thread work slowing the run |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
+
+### Optional presentation filtering
+
+Contribs may use `evennia_links.ignoring.ignore_mode(viewer, sender, kind)` to
+ask optional providers whether content should be shown normally, shown as a
+placeholder, or hidden. Providers return `None`, `"placeholder"`, or `"hide"`.
+Hide wins when providers compose. An absent provider, provider exception, or
+invalid result returns `None`, so a comfort filter cannot blank content when
+its provider is unavailable. This is not an authorization boundary.
+
+Consumers that must preserve unread state across a policy change can listen to
+`ignore_policy_changing`. Call `notify_ignore_policy_changing(viewer, kind)`
+inside the locked policy transaction immediately before an effective change.
+It uses normal signal dispatch: receiver failures propagate and should roll
+back the policy mutation with its bookkeeping. `kind=None` identifies ignore
+entry/clear changes; a string identifies a per-kind preference change. No
+provider is required for either signal.
 
 ---
 
