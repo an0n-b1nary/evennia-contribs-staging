@@ -29,6 +29,14 @@ Editing a post keeps every earlier version. Staff can archive a post, which take
 
 Guests can read the boards but can't post or reply. If staff have stopped someone communicating, for example with a mute, they can't post, reply or edit until it ends, on the website as well as in game.
 
+## Ignored posts
+
+If your game has Social installed, ignored authors' posts use your account's
+`+ignore/boards show` preference by default. `show` displays a placeholder,
+never the ignored title, author or text; `+ignore/boards hide` omits the posts.
+Both settings apply to IC and OOC boards, and replies from other authors remain
+visible. Without Social, board posts remain visible.
+
 ## On the website
 
 The website shows each board's newest post and, when you're logged in, how many you haven't read. Reading a board on the website marks it read there, but it doesn't use up the notice you'd get in game when you log in.

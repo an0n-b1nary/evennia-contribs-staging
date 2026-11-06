@@ -187,7 +187,7 @@ def _map_summary(request=None):
     }
 
 
-def _recent_activity():
+def _recent_activity(request=None):
     """One time-ordered feed across the four contribs that publish public rows.
 
     Plot *updates* are deliberately absent even though they are the most
@@ -236,20 +236,31 @@ def _recent_activity():
 
     if apps.is_installed("evennia_boards"):
         from evennia_boards.models import Post
+        from evennia_boards.permissions import is_staff_user
+        from evennia_boards.presentation import PolicyContext, web_viewer
 
         # Post.objects is an ArchivedManager; boards carry no privacy tier, which
         # is why evennia_boards.views.BoardListView filters on nothing.
-        for post in (
+        viewer = web_viewer(request) if request else None
+        staff = is_staff_user(request) if request else False
+        policy = PolicyContext(viewer, staff=staff)
+        posts = list(
             Post.objects.filter(created_at__gte=cutoff)
-            .select_related("board")
-            .order_by("-created_at")[:ACTIVITY_LIMIT]
-        ):
+            .select_related("author", "board", "parent_post", "parent_post__author")
+            .order_by("-created_at")
+        )
+        projected = policy.project_many(posts)
+        for post in posts:
+            safe = projected[post.pk]
+            if safe is None:
+                continue
             rows.append(
                 {
                     "kind": "Post",
-                    "label": f"{post.title} ({post.board.name})",
-                    "when": post.created_at,
-                    "url": _url("evennia_boards:board-detail", post.board_id),
+                    "label": f"{safe.title} ({safe.board.name})",
+                    "when": safe.created_at,
+                    "url": _url("evennia_boards:board-detail", safe.board_id),
+                    "_board_placeholder_id": safe.pk if safe.is_placeholder else None,
                 }
             )
 
@@ -425,8 +436,28 @@ class SandboxIndexView(EvenniaIndexView):
     looks empty, but it lists characters rather than the stock accounts.
     """
 
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        account = self.request.user
+        if getattr(account, "is_authenticated", False):
+            ids = tuple(getattr(self, "_board_activity_placeholder_ids", ()))
+            if ids and apps.is_installed("evennia_boards"):
+                from evennia_boards.presentation import commit_rendered_state
+
+                response.add_post_render_callback(
+                    lambda rendered: commit_rendered_state(account, placeholder_ids=ids)
+                )
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        recent_activity = _recent_activity(self.request)
+        self._board_activity_placeholder_ids = tuple(
+            row.pop("_board_placeholder_id")
+            for row in recent_activity
+            if row.get("_board_placeholder_id") is not None
+        )
         context.update(
             {
                 # Replaces the stock account list, so no template can show it.
@@ -437,7 +468,7 @@ class SandboxIndexView(EvenniaIndexView):
                 "upcoming_events": _upcoming_events(),
                 "calendar_url": _url("evennia_calendar:calendar-list"),
                 "map_summary": _map_summary(self.request),
-                "recent_activity": _recent_activity(),
+                "recent_activity": recent_activity,
                 "current_arc": _current_arc(),
                 "plot_list_url": _url("evennia_plots:plot-list"),
                 "systems": _systems(),

@@ -712,6 +712,45 @@ class TestThreadWebPages(ThreadTestMixin, EvenniaTest):
         self.assertNotIn("Dredge the harbour", html)
         self.assertNotIn("Manage Owners", html)
 
+    def test_linked_board_titles_follow_ignore_projection_and_render_receipt(self):
+        if not apps.is_installed("evennia_social") or not apps.is_installed("evennia_boards"):
+            self.skipTest("requires the optional Social and Boards integrations")
+        from evennia_boards.models import Board, Post, PostReadSuppression
+        from evennia_plots.models import PlotBoardLink
+        from evennia_plots.views import PlotDetailView
+        from evennia_social import ignore
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        self.account.save()
+        self.char1.permissions.clear()
+        ignore.clear(self.account)
+        ignore.set_entry(self.account, self.char2)
+        board = Board.objects.create(name="Plot link privacy", board_type="ic")
+        post = Post.create_post(
+            board=board,
+            author=self.char2,
+            title="SECRET LINK TITLE",
+            content="SECRET LINK BODY",
+        )
+        post.archive(editor=self.char2)
+        PlotBoardLink.create_link(thread=self.plot, post=post)
+
+        response = self._response(PlotDetailView, user=self.account, pk=self.plot.pk)
+        html = response.content.decode()
+        self.assertIn("[A post by an ignored player.]", html)
+        self.assertNotIn("SECRET LINK TITLE", html)
+        self.assertNotIn("SECRET LINK BODY", html)
+        self.assertTrue(
+            PostReadSuppression.objects.filter(account=self.account, post=post).exists()
+        )
+
+        ignore.set_boards_preference(self.account, "hide")
+        response = self._response(PlotDetailView, user=self.account, pk=self.plot.pk)
+        html = response.content.decode()
+        self.assertNotIn("SECRET LINK TITLE", html)
+        self.assertNotIn("[A post by an ignored player.]", html)
+
     def test_plot_page_empty_state(self):
         from evennia_plots.views import PlotDetailView
 

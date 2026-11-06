@@ -162,6 +162,7 @@ def _bb_save(caller, buffer):
 
     elif mode == "reply":
         from evennia_boards.models import Board, Post
+        from evennia_boards.presentation import PolicyContext
 
         try:
             board = Board.objects.get(pk=ctx["board_pk"])
@@ -169,10 +170,17 @@ def _bb_save(caller, buffer):
         except (Board.DoesNotExist, Post.DoesNotExist):
             caller.msg("|rError: the board or parent post no longer exists.|n")
             return False
+        policy = PolicyContext(caller, staff=is_staff(caller))
+        parent_view = policy.project(parent)
+        inherited_title = (
+            f"Re: post #{parent.post_number}"
+            if parent_view is None or parent_view.is_placeholder
+            else f"Re: {parent.title}"
+        )
         Post.create_post(
             board=board,
             author=caller,
-            title=f"Re: {parent.title}",
+            title=inherited_title,
             content=content,
             parent_post=parent,
         )
@@ -294,7 +302,8 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
     # -----------------------------------------------------------------------
 
     def _list_boards(self):
-        from evennia_boards.models import Board, Subscription
+        from evennia_boards.models import Board, Post, Subscription
+        from evennia_boards.presentation import PolicyContext, visible_post_count
 
         caller = self.caller
         boards = list(Board.objects.all())
@@ -306,12 +315,19 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
         sub_board_ids = set(
             Subscription.objects.filter(account=account).values_list("board_id", flat=True)
         )
+        policy = PolicyContext(caller, staff=is_staff(caller))
+
+        def count_posts(board):
+            posts = Post.objects.filter(board=board).select_related(
+                "author", "board", "parent_post", "parent_post__author"
+            )
+            return visible_post_count(caller, posts, context=policy)
 
         if uses_screenreader(caller):
             count = len(boards)
             lines = [f"Bulletin Boards: {count} board{'s' if count != 1 else ''}"]
             for idx, board in enumerate(boards, start=1):
-                post_count = board.posts.count()
+                post_count = count_posts(board)
                 tags = []
                 if board.pk in sub_board_ids:
                     tags.append("subscribed")
@@ -330,7 +346,7 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
 
         lines = ["|wBulletin Boards|n", "-" * 60]
         for idx, board in enumerate(boards, start=1):
-            post_count = board.posts.count()
+            post_count = count_posts(board)
             sub_tag = "|g[sub]|n " if board.pk in sub_board_ids else "      "
             type_tag = " |c[IC]|n" if board.board_type == board.BoardType.IC else ""
             ro_tag = " |y[read-only]|n" if board.is_read_only else ""
@@ -346,9 +362,17 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
 
     def _read_board(self, board):
         from evennia_boards.models import Post
+        from evennia_boards.presentation import PolicyContext
 
         caller = self.caller
-        posts = Post.objects.filter(board=board).order_by("post_number")
+        rows = list(
+            Post.objects.filter(board=board)
+            .select_related("author", "board", "parent_post", "parent_post__author")
+            .order_by("post_number")
+        )
+        policy = PolicyContext(caller, staff=is_staff(caller))
+        projected = policy.project_many(rows)
+        posts = [projected[row.pk] for row in rows if projected[row.pk] is not None]
         type_tag = " |c[IC]|n" if board.board_type == board.BoardType.IC else ""
 
         if uses_screenreader(caller):
@@ -356,66 +380,109 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
             lines = [f"Board: {board.name}{sr_type}"]
             if board.description:
                 lines.append(f"  {board.description}")
-            if not posts.exists():
+            if not posts:
                 lines.append("  No posts yet.")
             else:
                 for post in posts:
-                    reply_str = (
-                        f" (reply to #{post.parent_post.post_number})"
-                        if post.parent_post_id
-                        else ""
-                    )
+                    if post.parent_post and post.parent_post.is_suppressed:
+                        reply_str = f" ({post.parent_post_label})"
+                    elif post.parent_post:
+                        reply_str = f" (reply to #{post.parent_post.post_number})"
+                    else:
+                        reply_str = ""
+                    author = "" if post.is_placeholder else f" — by {post.author_name}"
                     lines.append(
-                        f"  Post {post.post_number}: {post.title}{reply_str}"
-                        f" — by {post.author_name}"
+                        f"  Post {post.post_number}: {post.title}{reply_str}{author}"
                         f" ({post.created_at.strftime('%Y-%m-%d')})"
                     )
             caller.msg("\n".join(lines))
+            policy.commit_placeholders(post.pk for post in posts if post.is_placeholder)
             return
 
         lines = [f"|wBoard: {board.name}|n{type_tag}"]
         if board.description:
             lines.append(f"  {board.description}")
         lines.append("-" * 60)
-        if not posts.exists():
+        if not posts:
             lines.append("  No posts yet.")
         else:
             for post in posts:
-                reply_tag = "  Re: " if post.parent_post_id else ""
+                if post.parent_post and post.parent_post.is_suppressed:
+                    reply_tag = f"  {post.parent_post_label} "
+                else:
+                    reply_tag = "  Re: " if post.parent_post_id else ""
+                author = "" if post.is_placeholder else f" — {post.author_name}"
                 lines.append(
-                    f"  {post.post_number:3}. {reply_tag}|w{post.title}|n"
-                    f" — {post.author_name}"
+                    f"  {post.post_number:3}.{reply_tag}|w{post.title}|n{author}"
                     f" ({post.created_at.strftime('%Y-%m-%d')})"
                 )
         lines.append("-" * 60)
         lines.append(f"Use |w+bb {board.name}/<number>|n to read a post.")
         caller.msg("\n".join(lines))
+        policy.commit_placeholders(post.pk for post in posts if post.is_placeholder)
 
     def _read_post(self, board, post):
+        from evennia_boards.models import Post
+        from evennia_boards.presentation import HIDDEN_PARENT_LABEL, PolicyContext
+
         caller = self.caller
+        root = Post.objects.select_related(
+            "author", "board", "parent_post", "parent_post__author"
+        ).get(pk=post.pk)
+        replies = list(
+            Post.objects.filter(parent_post=root)
+            .select_related("author", "board", "parent_post", "parent_post__author")
+            .order_by("post_number")
+        )
+        policy = PolicyContext(caller, staff=is_staff(caller))
+        projected = policy.project_many([root, *replies])
+        root_view = projected[root.pk]
+        reply_views = [projected[row.pk] for row in replies if projected[row.pk] is not None]
+        if root_view is None:
+            if not reply_views:
+                caller.msg(f"No post #{root.post_number} on {board.name}.")
+                return
+            lines = [HIDDEN_PARENT_LABEL]
+            for reply in reply_views:
+                author = "" if reply.is_placeholder else f" — {reply.author_name}"
+                lines.append(
+                    f"  #{reply.post_number} {reply.title}{author}"
+                    f" ({reply.created_at.strftime('%Y-%m-%d')})"
+                )
+            caller.msg("\n".join(lines))
+            policy.commit_placeholders(reply.pk for reply in reply_views if reply.is_placeholder)
+            return
+
         lines = [
-            f"|wPost #{post.post_number} — {post.title}|n",
+            f"|wPost #{root_view.post_number} — {root_view.title}|n",
             f"  |wBoard:|n  {board.name}",
-            f"  |wAuthor:|n {post.author_name}",
-            f"  |wDate:|n   {post.created_at.strftime('%Y-%m-%d %H:%M')} UTC",
+            f"  |wDate:|n   {root_view.created_at.strftime('%Y-%m-%d %H:%M')} UTC",
         ]
-        if post.parent_post_id and post.parent_post:
+        if not root_view.is_placeholder:
+            lines.insert(2, f"  |wAuthor:|n {root_view.author_name}")
+        if root_view.parent_post and root_view.parent_post.is_suppressed:
+            lines.append(f"  |wReply to:|n {root_view.parent_post_label}")
+        elif root_view.parent_post:
             lines.append(
-                f"  |wReply to:|n #{post.parent_post.post_number} — {post.parent_post.title}"
+                f"  |wReply to:|n #{root_view.parent_post.post_number} — "
+                f"{root_view.parent_post.title}"
             )
         lines.append("-" * 60)
-        lines.append(post.content)
+        if not root_view.is_placeholder:
+            lines.append(root_view.content)
         lines.append("-" * 60)
-        replies = post.replies.filter(is_archived=False).order_by("post_number")
-        if replies.exists():
+        if reply_views:
             lines.append("|wReplies:|n")
-            for reply in replies:
+            for reply in reply_views:
+                author = "" if reply.is_placeholder else f" — {reply.author_name}"
                 lines.append(
-                    f"  #{reply.post_number} |w{reply.title}|n"
-                    f" — {reply.author_name}"
+                    f"  #{reply.post_number} |w{reply.title}|n{author}"
                     f" ({reply.created_at.strftime('%Y-%m-%d')})"
                 )
         caller.msg("\n".join(lines))
+        policy.commit_placeholders(
+            row.pk for row in [root_view, *reply_views] if row.is_placeholder
+        )
 
     # -----------------------------------------------------------------------
     # Write operations (require Character puppet)

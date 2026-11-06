@@ -1997,6 +1997,71 @@ class TestPresentWebSeams(SeededSandboxMixin, EvenniaTest):
         request.session = import_module(settings.SESSION_ENGINE).SessionStore()
         return request
 
+    def test_activity_feed_marks_only_rendered_board_placeholders_after_final_limit(self):
+        from datetime import timedelta
+
+        from django.apps import apps
+        from django.utils import timezone
+
+        if not apps.is_installed("evennia_social") or not apps.is_installed("evennia_boards"):
+            self.skipTest("requires the optional Social and Boards integrations")
+        from web.website.views.index import SandboxIndexView
+
+        from evennia_boards.models import Board, Post, PostReadSuppression
+        from evennia_social import ignore
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        self.account.save()
+        self.char1.permissions.clear()
+        ignore.clear(self.account)
+        ignore.set_entry(self.account, self.char2)
+        board = Board.objects.create(name="Feed privacy", board_type=Board.BoardType.OOC)
+        older = Post.create_post(
+            board=board,
+            author=self.char2,
+            title="FEED SECRET OUTSIDE LIMIT",
+            content="hidden feed body",
+        )
+        now = timezone.now()
+        Post.objects.filter(pk=older.pk).update(created_at=now - timedelta(hours=1))
+        for number in range(10):
+            post = Post.create_post(
+                board=board,
+                author=self.char1,
+                title=f"Feed item {number}",
+                content="visible feed body",
+            )
+            Post.objects.filter(pk=post.pk).update(created_at=now - timedelta(seconds=number))
+
+        response = SandboxIndexView.as_view()(self.request("/", self.account))
+        self.assertFalse(
+            PostReadSuppression.objects.filter(account=self.account, post=older).exists()
+        )
+        response.render()
+        self.assertNotIn("FEED SECRET OUTSIDE LIMIT", response.content.decode())
+        self.assertFalse(
+            PostReadSuppression.objects.filter(account=self.account, post=older).exists()
+        )
+
+        shown = Post.create_post(
+            board=board,
+            author=self.char2,
+            title="FEED SECRET SHOWN",
+            content="also hidden",
+        )
+        Post.objects.filter(pk=shown.pk).update(created_at=now + timedelta(hours=1))
+        response = SandboxIndexView.as_view()(self.request("/", self.account))
+        self.assertFalse(
+            PostReadSuppression.objects.filter(account=self.account, post=shown).exists()
+        )
+        response.render()
+        self.assertIn("[A post by an ignored player.]", response.content.decode())
+        self.assertNotIn("FEED SECRET SHOWN", response.content.decode())
+        self.assertTrue(
+            PostReadSuppression.objects.filter(account=self.account, post=shown).exists()
+        )
+
     def test_home_and_map_link_to_readable_seeded_live_scene(self):
         from django.urls import reverse
         from web.website.views.index import SandboxIndexView

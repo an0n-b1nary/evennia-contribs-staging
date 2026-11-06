@@ -4,6 +4,14 @@ This document records intentional divergences between `evennia-plots` and the
 source MUSH project from which it was extracted, along with guidance for
 downstream games adopting the contrib.
 
+## 0.8.1 — linked board post presentation (2026-11-06)
+
+The optional `PlotBoardLink` display resolves its post through the Boards safe
+presentation module when that version is available. Social and Boards remain
+optional partners; with an older Boards release, the existing linked-post
+display path remains available. Plot access rules and archived-link resolution
+are unchanged.
+
 ---
 
 ## 1. Fresh `0001_initial` replaces six incremental migrations

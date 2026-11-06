@@ -27,7 +27,7 @@ boards. IC boards integrate with [evennia-xp](../evennia_xp/) for cutscene XP aw
 
 ## Dependencies
 
-**Hard:** `evennia>=6.0`, `evennia-links>=0.5` (provides `AbstractArchived`, `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, and the shared web staff predicate)
+**Hard:** `evennia>=6.0`, `evennia-links>=0.8.14` (provides `AbstractArchived`, `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, the shared web staff predicate, and optional ignore signals)
 
 **Optional `[web]`:** `evennia-accessibility>=0.1`, `djangorestframework>=3.14`, `django-filter>=23`
 
@@ -225,12 +225,31 @@ BSD 3-Clause. See [LICENSE](LICENSE).
 
 ### Web read state
 
-The board index shows the latest non-archived post and author. Authenticated
-viewers also see unread counts. Successful full-board renders persist the
-highest displayed post number in the account Attribute `boards_web_read`, keyed
-by board ID. Reading with replies hidden does not mark unseen replies read.
-Anonymous browsing creates no read state. These markers are separate from
-subscription `last_notified_at`, so web reading never consumes login notifications.
+The board index shows the latest non-archived post visible under the reader's
+current ignore preference, with unread counts from the same visible candidate
+set. Successful full-board renders persist the highest covered post number in
+the account Attribute `boards_web_read`, keyed by board ID. Reading with replies
+hidden does not mark unseen replies read. These actual-read markers remain
+separate from subscription `last_notified_at`, which is only the login alert
+checkpoint.
+
+### Optional ignore filtering
+
+When `evennia-social` is installed, Boards uses its shared ignore service for
+both IC and OOC posts. The account preference `+ignore/boards show` (the
+default) displays `[A post by an ignored player.]`; `+ignore/boards hide`
+omits those posts. `show` never reveals ignored title, author, or content.
+Replies by other authors remain visible, with `[reply to a hidden post]` in
+place of a filtered parent reference. Staff senders and readers bypass the
+filter. Without Social, all posts remain visible.
+
+Sparse `PostReadSuppression` rows keep hidden posts and displayed placeholders
+out of later unread counts without becoming presentation filters. Existing
+activity-alert checkpoints and actual web-read markers are not moved by an
+ignore change. `evennia_boards.presentation.unread_post_count(viewer, posts)`
+is the shared candidate-set helper for future unread commands; it subtracts
+current hides and exact receipts while preserving unrelated visible unread
+posts.
 
 ## Disposable guests
 
