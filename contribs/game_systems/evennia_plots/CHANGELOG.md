@@ -13,6 +13,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+## 0.8.1 — 2026-11-06
+
+- Filter linked board post titles through the optional Boards presentation
+  projection, preserving existing plot access and archived-link behavior.
+
 ## 0.8.0 — 2026-10-22
 
 ### Breaking

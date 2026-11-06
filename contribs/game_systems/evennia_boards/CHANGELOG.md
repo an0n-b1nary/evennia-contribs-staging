@@ -13,6 +13,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+## 0.6.0 — 2026-11-06
+
+- Apply optional Social ignore preferences across command, web, API, unread,
+  homepage and linked Plots post appearances. Add sparse durable unread
+  suppression receipts without changing existing alert or web-read markers.
+
 ## 0.5.5 — 2026-10-20
 
 - Add the staff-only `boards-staff` guide: tasks and command permissions, safe changes, privacy and review queues. Package it for discovery by evennia-guides.

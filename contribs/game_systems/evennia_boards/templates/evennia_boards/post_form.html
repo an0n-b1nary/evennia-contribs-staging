@@ -26,11 +26,19 @@
 <div class="card mb-3 border-secondary">
   <div class="card-header text-muted small">
     Replying to #{{ parent_post.post_number }}: {{ parent_post.title }}
+    {% if not parent_post.is_placeholder %}
 &mdash; {{ parent_post.author_name|default:"Unattributed" }}
+    {% endif %}
   </div>
+  {% if not parent_post.is_placeholder %}
   <div class="card-body py-2">
     <p class="mb-0 small">{{ parent_post.content|truncatewords:40 }}</p>
   </div>
+  {% endif %}
+</div>
+{% elif parent_post_label %}
+<div class="card mb-3 border-secondary">
+  <div class="card-header text-muted small">Replying to #{{ parent_post_number }}: {{ parent_post_label }}</div>
 </div>
 {% endif %}
 

@@ -34,6 +34,7 @@ Authoring views:
 """
 
 import difflib
+from dataclasses import dataclass
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -75,6 +76,14 @@ from evennia_plots.models import (
 )
 from evennia_plots.permissions import can_manage_arc, get_character_id, is_staff_user
 from evennia_plots.signals import arc_currency_changed, arc_type_changed
+
+
+@dataclass(frozen=True)
+class _BoardPostLink:
+    """Only safe post display values cross the optional Boards view boundary."""
+
+    post: object
+    is_ic_post: bool
 
 
 def _character(character_id):
@@ -150,6 +159,22 @@ class PlotDetailView(DetailView):
     def get_queryset(self):
         return PlotThread.objects.exclude(privacy=PlotThread.Privacy.PRIVATE)
 
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        account = self.request.user
+        ids = tuple(getattr(self, "_board_placeholder_ids", ()))
+        if getattr(account, "is_authenticated", False) and ids:
+            try:
+                from evennia_boards.presentation import commit_rendered_state
+            except ImportError:
+                pass
+            else:
+                response.add_post_render_callback(
+                    lambda rendered: commit_rendered_state(account, placeholder_ids=ids)
+                )
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         thread = self.object
@@ -192,21 +217,42 @@ class PlotDetailView(DetailView):
 
         try:
             from evennia_boards.models import Post
-
-            board_links_qs = list(thread.board_links.order_by("created_at"))
-            post_manager = getattr(Post, "all_objects", Post.objects)
-            posts_by_id = post_manager.select_related("board").in_bulk(
-                lk.post_id for lk in board_links_qs
-            )
-            board_link_list = []
-            for lk in board_links_qs:
-                post = posts_by_id.get(lk.post_id)
-                if post:
-                    lk.post = post
-                    board_link_list.append(lk)
-            context["board_links"] = board_link_list
         except ImportError:
             context["board_links"] = []
+        else:
+            board_links_qs = list(thread.board_links.order_by("created_at"))
+            post_manager = getattr(Post, "all_objects", Post.objects)
+            try:
+                from evennia_boards.permissions import is_staff_user
+                from evennia_boards.presentation import PolicyContext, web_viewer
+            except ImportError:
+                # Older optional Boards versions have no projection module.
+                posts_by_id = post_manager.select_related("board").in_bulk(
+                    lk.post_id for lk in board_links_qs
+                )
+                context["board_links"] = [
+                    _BoardPostLink(post=posts_by_id[lk.post_id], is_ic_post=lk.is_ic_post)
+                    for lk in board_links_qs
+                    if lk.post_id in posts_by_id
+                ]
+            else:
+                posts_by_id = post_manager.select_related(
+                    "board", "author", "parent_post", "parent_post__author"
+                ).in_bulk(lk.post_id for lk in board_links_qs)
+                policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
+                posts = list(posts_by_id.values())
+                projected = policy.project_many(posts)
+                board_link_list = []
+                for link in board_links_qs:
+                    safe = projected.get(link.post_id)
+                    if safe is not None:
+                        board_link_list.append(
+                            _BoardPostLink(post=safe, is_ic_post=link.is_ic_post)
+                        )
+                context["board_links"] = board_link_list
+                self._board_placeholder_ids = tuple(
+                    link.post.pk for link in board_link_list if link.post.is_placeholder
+                )
 
         context["participants"] = thread.participants.filter(is_active=True).order_by(
             "character_name"

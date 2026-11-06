@@ -12,6 +12,8 @@ import logging
 
 from evennia.server.signals import SIGNAL_ACCOUNT_POST_LOGIN
 
+from evennia_links.ignoring import ignore_policy_changing
+
 logger = logging.getLogger("evennia")
 
 
@@ -34,8 +36,11 @@ def _notify_board_subscriptions(sender, session=None, **kwargs):
     lines = []
     now = timezone.now()
     pks = []
+    from evennia_boards.presentation import PolicyContext
+
+    policy = PolicyContext(account)
     for sub in subs:
-        count = sub.unread_count()
+        count = sub.unread_count(context=policy)
         if count:
             plural = "s" if count != 1 else ""
             lines.append(f"  |w{sub.board.name}|n: {count} new post{plural}")
@@ -64,3 +69,14 @@ def connect():
         _notify_board_subscriptions,
         dispatch_uid="evennia_boards.notify_board_subscriptions",
     )
+    ignore_policy_changing.connect(
+        _snapshot_policy_before_change,
+        dispatch_uid="evennia_boards.snapshot_ignore_policy",
+    )
+
+
+def _snapshot_policy_before_change(sender, viewer, kind=None, **kwargs):
+    """Save old-policy hidden posts before Social mutates a reader's policy."""
+    from evennia_boards.presentation import register_policy_snapshot
+
+    return register_policy_snapshot(sender, viewer, kind=kind, **kwargs)

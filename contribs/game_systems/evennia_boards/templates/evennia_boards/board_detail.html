@@ -46,13 +46,19 @@
   <div class="card-header d-flex justify-content-between align-items-center evennia-boards-post-header">
     <span class="evennia-boards-post-heading">
       <strong>#{{ post.post_number }}</strong>
-      {% if post.parent_post %}
+      {% if post.parent_post and post.parent_post.is_suppressed %}
+        <span class="text-muted">{{ post.parent_post_label }}</span>
+      {% elif post.parent_post %}
         <span class="text-muted">Re: #{{ post.parent_post.post_number }}</span>
       {% endif %}
+      {% if post.is_placeholder %}
+      <span class="evennia-boards-post-title">{{ post.title }}</span>
+      {% else %}
       <span class="evennia-boards-post-title" title="{{ post.title }}">{{ post.title }}</span>
+      {% endif %}
     </span>
     <span class="d-flex align-items-center evennia-boards-gap evennia-boards-post-actions flex-shrink-0">
-      <span class="text-muted small evennia-boards-post-byline text-nowrap flex-shrink-0">{{ post.author_name|default:"Unattributed" }} &mdash; {{ post.created_at|date:"Y-m-d" }}</span>
+      <span class="text-muted small evennia-boards-post-byline text-nowrap flex-shrink-0">{% if not post.is_placeholder %}{{ post.author_name|default:"Unattributed" }} &mdash; {% endif %}{{ post.created_at|date:"Y-m-d" }}</span>
       {% if character_id and not board.is_read_only or is_staff and not board.is_read_only %}
       <a href="{% url 'evennia_boards:post-reply' board.pk post.pk %}" class="btn btn-sm btn-outline-secondary">Reply</a>
       {% endif %}

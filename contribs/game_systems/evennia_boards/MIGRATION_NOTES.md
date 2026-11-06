@@ -4,6 +4,24 @@ This document records intentional divergences between `evennia_boards` and the
 source game installation it was extracted from. Games porting from the source
 should read this alongside CHANGELOG.md.
 
+## 0.6.0 — optional ignore presentation and unread receipts (2026-11-06)
+
+Additive migration `0002_postreadsuppression` creates the sparse
+`PostReadSuppression(account, post)` table. Its unique account/post rows preserve
+unread exclusions when a reader changes Social ignore policy; they never filter
+presentation. Existing board posts, web high-water Attributes, and subscription
+notification timestamps are unchanged. Existing ignore state cannot be
+reconstructed until a post is first evaluated under the new code or a policy
+changes, so installs should deploy this migration before relying on historical
+unread suppression.
+
+`+ignore/boards show` is the default and shows placeholders, never ignored
+content; `hide` omits filtered posts. Both apply equally to IC and OOC boards.
+Login alert checkpoints (`Subscription.last_notified_at`) remain separate from
+actual web read markers (`boards_web_read`); ignore changes do not advance
+either marker. The golden schema snapshot was regenerated from the synthetic
+builder after this migration.
+
 ## PostCalendarLink lives in the contrib (not world/links/)
 
 The source game stores `PostCalendarLink` in a dedicated cross-domain bridge
