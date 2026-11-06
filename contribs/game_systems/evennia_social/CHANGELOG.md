@@ -4,6 +4,12 @@ All notable changes to `evennia_social` are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-06
+
+- Add the account-shared `+ignore/boards hide|show` preference and Links
+  provider. `show` displays placeholders; the pre-change signal lets consumers
+  preserve suppression receipts when ignore policy changes.
+
 - Add character-mode `who` and staff-only visitor pages with private account reply pointers and masked page history. Keep account-mode listings and privileged `who`.
 - Add `SocialAccountMixin` for channel subscriber filtering; compose it on account and guest typeclasses in both modes.
 - **Breaking:** `+ignore` now hides one character; `/full` covers their account and `/except` shows posts while blocking contact. Shared `evennia_social.ignore` owns levels, named mutations, offline ownership and staff bypass across consumers. Lists and replies never infer unnamed alts. Earlier `ignore_list` entries remain unnamed full ignores removable only with `/clear`; external readers/writers must use the service. No schema migration.
