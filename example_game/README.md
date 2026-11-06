@@ -1850,13 +1850,13 @@ Social 0.7.2 uses the narrow mood provider so stewards receive no configure righ
 After `seed_sandbox`, `connect guest` enters the Guest Lounge. Five guest slots
 are available. `practice` leads to an OOC practice room; `+ooc` and `+home`
 return to the lounge. Guests may finalize/test/reset their own builds, practise
-posing, chat with `guest <message>`, page staff, and file `+request` or `+bug`.
-Players can enter through `guests` at Arrival and join the Guest channel.
+posing, chat with `welcome <message>` (`wel`), page staff, and file `+request` or `+bug`.
+Players can enter through `guests` at Arrival and join the Welcome channel.
 The channel carries the `welcome` tag in category `comms`, shared by guest
-login and the chat command. Re-running `seed_sandbox` re-tags an existing
-guest channel. The reference game remains in account communication mode;
-Links' character-mode channel mixin is available for hosts adopting the
-[communication identity integration](../contribs/base_systems/evennia_links/README.md#communication-identity).
+login and the chat command. Re-running `seed_sandbox` renames/re-tags the
+earlier Guest channel. Visitors without a puppet chat as "Newcomer" and may page
+staff only. The reference game uses the
+[character communication integration](../contribs/base_systems/evennia_links/README.md#communication-identity).
 
 Guests cannot enter player areas, use join/summon/teleport to escape, receive
 items, trade assets, post to boards, open scenes, or create shared challenges.
@@ -1887,9 +1887,11 @@ configures optional referrals with a game-wide allowance, uncapped intake,
 the application questionnaire, the replacement authentication backend and
 the middleware that rechecks existing website/API sessions. Staff use
 `+softban`, `+mute`, `+notes`, `+admissions` and audited stock bans. Account
-commands include a guarded stock page route so unpuppeting cannot bypass mutes.
+commands include Social's visitor page route and staff-only `apage`;
+unpuppeting cannot bypass mutes.
 
-`ModerationAccountMixin` precedes both account classes and `GuestAccountMixin`.
+`CharacterCommsAccountMixin` comes first on Account and Guest, before
+`SocialAccountMixin`, `ModerationAccountMixin` and `GuestAccountMixin`.
 `CommunicationCharacterMixin` precedes Social/Posing and DefaultCharacter;
 the existing Guest boundary remains first. The channel mixin precedes
 DefaultChannel; RPTracker's IC channel already includes it. The server-start
@@ -2045,6 +2047,33 @@ modes. `+ignore` hides a character, `/full` covers the whole player and
 `/except` permits posts while blocking contact; `/remove` acts only on a
 named entry and `/clear` also removes earlier unnamed full ignores. See
 [Social's policy and API](../contribs/game_systems/evennia_social/README.md#personal-boundaries).
-The reference host retains account mode until #223's final adoption PR;
-Social identity seams exercise character `who`, visitor paging and partner
-filtering without changing the production cmdsets yet.
+### Character communication
+
+`EVENNIA_COMMS_IDENTITY = "character"` makes `who`, ordinary channels,
+channel history and the channel website identify characters. Account names
+stay private to staff. Social's `page` and `+ignore` work at character select
+as well as in character; visitors page staff only. Staff use
+`apage <account>=<message>` for account contact, announced as their current
+character or "Staff" without one. Players reply with `page`. Channel
+creation and administration are staff-only in this mode: stock moderation
+addresses accounts, and custom channel typeclasses can bypass the identity
+policy. Owning a channel does not expose those lookups.
+
+New accounts join Welcome on creation and may leave it; logging in does not
+resubscribe them. Guests and newcomers use `welcome <message>` (`wel`). A guest
+with a puppet speaks under its generated character name. The server-start
+hook and Django checks call Links' `check_comms_identity()` and refuse mixed
+mode wiring. To adopt account mode, change the setting and remove the
+`CharacterCommsAccountMixin` and `CharacterCommsChannelMixin` bases; command
+composition reads the mode automatically. See
+[Links' communication identity guide](../contribs/base_systems/evennia_links/README.md#communication-identity).
+
+For an existing database, stop the server and run `evennia seed_sandbox`
+before restarting with character mode. It renames/re-tags Guest as Welcome,
+preserves subscriptions and personal aliases, and archives ordinary channels' old logs and
+rotated files under `server/logs/account-history-archive/`. Each channel gets
+a fresh active history filename once; subsequent seeds preserve new history.
+The archive is for staff filesystem access and is never the source of channel
+history or the channel website. Keep the server stopped during this cutover
+so pending threaded log writes cannot race the archival. Resolve duplicate
+Welcome names/tags before seeding. IC channel logs already use character names.

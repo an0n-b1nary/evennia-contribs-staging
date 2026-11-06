@@ -5,6 +5,7 @@
 from unittest.mock import patch
 
 from django.test import override_settings
+from evennia.comms.comms import DefaultChannel
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_channel
 from evennia.utils.test_resources import EvenniaCommandTest
@@ -13,11 +14,10 @@ from typeclasses.channels import Channel
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
-from evennia_links.identity import CharacterCommsAccountMixin
 from evennia_social.commands import CmdIgnore, CmdPage
 
 
-class SandboxSocialAccount(CharacterCommsAccountMixin, Account):
+class SandboxSocialAccount(Account):
     pass
 
 
@@ -34,11 +34,14 @@ class SocialIdentitySeams(EvenniaCommandTest):
     def test_named_boundary_filters_real_host_post_chain_and_account_channel_receiver(self):
         self.account.permissions.clear()
         self.account.is_superuser = False
-        channel = create_channel("Social boundary seam", typeclass=Channel)
-        channel.send_to_online_only = False
-        channel.connect(self.account2)
         for mode in ("account", "character"):
             with self.subTest(mode=mode), override_settings(EVENNIA_COMMS_IDENTITY=mode):
+                channel = create_channel(
+                    f"Social boundary {mode}",
+                    typeclass=DefaultChannel if mode == "account" else Channel,
+                )
+                channel.send_to_online_only = False
+                channel.connect(self.account2)
                 self.call(CmdIgnore(), f"/except {self.char1.key}", caller=self.char2)
                 with patch.object(DefaultCharacter, "msg") as sink:
                     self.char2.msg(("Room post", {"type": "ooc"}), from_obj=self.char1)
@@ -47,7 +50,10 @@ class SocialIdentitySeams(EvenniaCommandTest):
                     patch.object(self.account2, "msg") as hidden,
                     patch("evennia.utils.logger.log_file"),
                 ):
-                    channel.msg("Player channel line", senders=[self.account])
+                    channel.msg(
+                        "Player channel line",
+                        senders=[self.account if mode == "account" else self.char1],
+                    )
                 hidden.assert_not_called()
                 with patch.object(self.char2, "msg") as hidden:
                     self.call(CmdPage(), f"{self.char2.key}=Blocked contact")

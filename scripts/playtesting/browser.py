@@ -63,6 +63,9 @@ def run_browser(session, timeout=30):
                 ).first
                 field.fill(f"connect {spec['name']} {spec['password']}")
                 field.press("Enter")
+                expect(page.locator("body")).to_contain_text("enter the game as character")
+                field.fill(f"ic {spec['name']}")
+                field.press("Enter")
                 expect(page.locator("body")).to_contain_text("Playtest browser laboratory")
                 field.fill("")
             results.append(

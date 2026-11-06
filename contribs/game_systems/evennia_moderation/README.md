@@ -32,8 +32,16 @@ Guests browse the website anonymously; there is no guest login bridge.
 
 Add `CmdApply`, `CmdAdmissions`, `CmdSoftban`, `CmdMute`, `CmdNotes` and the
 audited `CmdBan`/`CmdUnban` to the character cmdset. Add `CmdReferral` and
-`CmdAccountPage` to the account cmdset, even when Social supplies character
-pages. Explicitly allow `CmdApply` in the host's restricted guest cmdset.
+`CmdAccountPage` to the account cmdset in account communication mode, even
+when Social supplies character pages. In character mode, replace account
+`page` with Social's `CmdPage` and add `CmdStaffAccountPage` (`apage`) for staff.
+`apage <account>=<message>` requires Builder and sends as the session's
+character or "Staff" without a puppet; its persistent Msg retains the account
+sender. Recipients can reply with Social's `page`. Moderation does not require
+Social to send `apage`; the reply shortcut is its optional integration.
+The commands carry mode markers, so Links' startup check rejects the wrong
+composition. See [Links' communication identity guide](../../base_systems/evennia_links/README.md#communication-identity)
+for the account/channel mixins and required startup check. Explicitly allow `CmdApply` in the host's restricted guest cmdset.
 With Social, set `SOCIAL_IGNORE_MUTE_ALIAS = False` so its personal filtering
 alias does not replace the staff `+mute` command. Personal filtering uses `+ignore`.
 

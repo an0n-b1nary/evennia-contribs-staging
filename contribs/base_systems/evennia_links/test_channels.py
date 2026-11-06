@@ -11,7 +11,7 @@ from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 from evennia.accounts.bots import Bot
 from evennia.comms.comms import DefaultChannel
 from evennia.utils.create import create_account, create_channel
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from evennia_links.communication import CharacterCommsChannelMixin, CommunicationChannelMixin
 from evennia_links.guests import welcome_channel
@@ -251,3 +251,43 @@ class TestLinksCharacterChannels(EvenniaTest):
         self.assertEqual(
             sending_character(self.account, SimpleNamespace(puppet=self.char1)), self.char1
         )
+
+
+class TestSessionChannelCommand(EvenniaCommandTest):
+    account_typeclass = ChannelPrivacyAccount
+
+    @override_settings(EVENNIA_COMMS_IDENTITY="character")
+    def test_session_keeps_visitor_send_separate_from_another_sessions_puppet(self):
+        from evennia_links.commands import CmdSessionChannel
+
+        self.account.permissions.clear()
+        self.account.is_superuser = False
+        welcome = create_channel("Session Welcome", typeclass=LinksCharacterChannel)
+        welcome.tags.add("welcome", category="comms")
+        channel = create_channel("Session Public", typeclass=LinksCharacterChannel)
+        channel.connect(self.account)
+        with (
+            patch(
+                "evennia.commands.default.comms.CHANNEL_DEFAULT_TYPECLASS", LinksCharacterChannel
+            ),
+            patch.object(self.account, "get_puppet", return_value=None),
+            patch.object(self.account, "get_all_puppets", return_value=[self.char1]),
+            patch("evennia.utils.logger.log_file") as logged,
+        ):
+            output = self.call(CmdSessionChannel(), "Session Public = Visitor", caller=self.account)
+        self.assertIn("Visitors may speak on the welcome channel only", output)
+        logged.assert_not_called()
+
+    @override_settings(EVENNIA_COMMS_IDENTITY="account")
+    def test_account_mode_retains_account_sender(self):
+        from evennia_links.commands import CmdSessionChannel
+
+        channel = create_channel("Session Account", typeclass=DefaultChannel)
+        channel.connect(self.account)
+        with (
+            patch("evennia.commands.default.comms.CHANNEL_DEFAULT_TYPECLASS", DefaultChannel),
+            patch.object(channel, "msg") as send,
+        ):
+            self.call(CmdSessionChannel(), "Session Account = Hello", caller=self.account)
+        self.assertEqual(send.call_args.kwargs["senders"], self.account)
+        self.assertIs(send.call_args.kwargs["session"], self.session)

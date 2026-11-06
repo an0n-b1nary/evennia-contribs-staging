@@ -12,7 +12,7 @@ from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
 from evennia_moderation import services
-from evennia_moderation.commands import CmdAccountPage, CmdApply, CmdMute
+from evennia_moderation.commands import CmdAccountPage, CmdApply, CmdMute, CmdStaffAccountPage
 from evennia_posing.commands import CmdEmit, CmdPose, CmdSemipose
 from evennia_social.commands.finger import CmdFinger
 from evennia_social.commands.messaging import CmdPage
@@ -70,7 +70,11 @@ class TestModerationSeams(EvenniaCommandTest):
         from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
         from commands.guests import GuestCharacterCmdSet
 
-        self.assertIsInstance(AccountCmdSet().get("page"), CmdAccountPage)
+        self.assertIsInstance(AccountCmdSet().get("page"), CmdPage)
+        self.assertIsInstance(AccountCmdSet().get("apage"), CmdStaffAccountPage)
+        with override_settings(EVENNIA_COMMS_IDENTITY="account"):
+            self.assertIsInstance(AccountCmdSet().get("page"), CmdAccountPage)
+            self.assertIsNone(AccountCmdSet().get("apage"))
         self.assertIsInstance(GuestCharacterCmdSet().get("+apply"), CmdApply)
         self.assertIsInstance(CharacterCmdSet().get("+mute"), CmdMute)
         self.assertEqual(CharacterCmdSet().get("+ignore").key, "+ignore")

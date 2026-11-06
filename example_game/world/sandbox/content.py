@@ -1056,7 +1056,7 @@ GUEST_ROOMS = (
     (
         "lounge",
         "Guest Lounge",
-        "Welcome. Chat with guest <message>, page staff, or visit practice. Players are welcome here too.",
+        "Welcome. Chat with welcome <message>, page staff, or visit practice. Players are welcome here too.",
     ),
     (
         "practice",
@@ -1064,4 +1064,4 @@ GUEST_ROOMS = (
         "Try +stats, +stats/finalize and +test. Use +stats/reset to rebuild. Nothing here earns rewards.",
     ),
 )
-GUEST_CHANNEL_DESC = "Guests and welcoming players; join Guest to say hello."
+WELCOME_CHANNEL_DESC = "Guests, newcomers and welcoming players; join Welcome to say hello."

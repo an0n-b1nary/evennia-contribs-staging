@@ -927,6 +927,7 @@ class TestMapOverlaySeam(SeededSandboxMixin, EvenniaTest):
 
         market = self._room("Market Row")
         self.char1.location = market
+        self.account.puppet_object(self.session, self.char1)
         self.assertEqual(self.session.get_puppet(), self.char1)
         url = reverse("api-plane-tiles", args=[self.plane.pk])
         for stored, public_names, staff_names in (

@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Staff controls for explicitly registered runtime settings."""
+"""Shared communication commands and staff runtime controls."""
 
 import json
 
 from django.conf import settings
+from evennia.commands.default.comms import CmdChannel
 from evennia.commands.default.muxcommand import MuxCommand
+from evennia.utils.utils import strip_unsafe_input
 
 from evennia_links.command_syntax import StrictSwitchMixin
 
@@ -58,3 +60,21 @@ class CmdRuntime(StrictSwitchMixin, MuxCommand):
                 )
         except (ValueError, TypeError) as exc:
             self.msg(str(exc))
+
+
+class CmdSessionChannel(StrictSwitchMixin, CmdChannel):
+    """Pass the originating session to channels, including without RP tracker.
+
+    Stock channel management and listings are retained. Character-mode
+    channels need the session to distinguish character select from a puppet
+    in another session belonging to the same account.
+    """
+
+    __doc__ = CmdChannel.__doc__
+
+    def msg_channel(self, channel, message, **kwargs):
+        if not channel.access(self.caller, "send", session=self.session):
+            self.msg(f"You are not allowed to send messages to channel {channel}")
+            return
+        message = strip_unsafe_input(message, self.session)
+        return channel.msg(message, senders=self.caller, session=self.session, **kwargs)

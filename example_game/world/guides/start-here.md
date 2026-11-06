@@ -36,7 +36,7 @@ The in-character world is through `grid`, the hall's one exit that isn't a works
 
 ## Visiting as a guest
 
-`connect guest` at the login screen gives you a disposable character in the **Guest Lounge**, with the **Guest Practice Room** next door. You can talk to other guests and welcoming players with `guest <message>`, and page staff. In the practice room, build a trial sheet with `+stats`, `+stats/finalize` it and try `+test`. `+stats/reset` starts again. Nothing a guest does earns rewards, and the character and its sheet are deleted when you disconnect. A request you sent staff still reaches them. To stay, apply with `+apply`, as [[joining]] explains.
+`connect guest` at the login screen gives you a disposable character in the **Guest Lounge**, with the **Guest Practice Room** next door. You can talk to other guests and welcoming players with `welcome <message>` (`wel`), and page staff. In the practice room, build a trial sheet with `+stats`, `+stats/finalize` it and try `+test`. `+stats/reset` starts again. Nothing a guest does earns rewards, and the character and its sheet are deleted when you disconnect. A request you sent staff still reaches them. To stay, apply with `+apply`, as [[joining]] explains.
 
 ## What do you want to do?
 

@@ -23,7 +23,8 @@ from commands.sandbox import CmdSandbox
 from evennia_boards.commands import CmdBoard
 from evennia_calendar.commands import CmdCalendar, CmdCluster, CmdRsvp
 from evennia_jobs.commands import CmdBug, CmdDiscuss, CmdIssue, CmdJobs, CmdRequest
-from evennia_links.commands import CmdRuntime
+from evennia_links.commands import CmdRuntime, CmdSessionChannel
+from evennia_links.identity import comms_identity
 from evennia_lore.commands import (
     CmdForget,
     CmdHint,
@@ -44,6 +45,7 @@ from evennia_moderation.commands import (
     CmdNotes,
     CmdReferral,
     CmdSoftban,
+    CmdStaffAccountPage,
     CmdUnban,
 )
 from evennia_plots.commands import CmdArc, CmdHook, CmdPlot, CmdThread
@@ -297,7 +299,15 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         super().at_cmdset_creation()
 
         self.add(CmdReferral)
-        self.add(CmdAccountPage)
+        if comms_identity() == "character":
+            from commands.guests import CmdWelcome
+
+            self.add(CmdPage)
+            self.add(CmdStaffAccountPage)
+            self.add(CmdWelcome)
+            self.add(CmdIgnore)
+        else:
+            self.add(CmdAccountPage)
 
         # Boards support account-level (pre-puppet) reading and subscription,
         # per evennia_boards' README — expose +bb without a puppet too.
@@ -312,7 +322,14 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         if apps.is_installed("evennia_rptracker"):
             from evennia_rptracker.channel_commands import CmdICChannel
 
-            self.add(CmdICChannel)
+            channel_command = CmdICChannel()
+        else:
+            channel_command = CmdSessionChannel()
+        if comms_identity() == "character":
+            # Stock moderation searches accounts; /create can choose a
+            # typeclass that logs account keys. Keep that wiring with staff.
+            channel_command.lockhandler.add("admin:perm(Builder);manage:perm(Builder)")
+        self.add(channel_command)
 
         # Presence (evennia_social): replaces Evennia's who, leaving unfindable
         # characters out of it for players. +unfindable is in-character.

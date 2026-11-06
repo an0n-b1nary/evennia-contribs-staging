@@ -78,6 +78,10 @@ TEST_SETTINGS = {
 class CraftingFixture:
     def setUp(self):
         super().setUp()
+        # Crafting exercises an in-character actor, including on hosts that
+        # deliberately start every login at character select.
+        if self.account.get_puppet(self.session) is None:
+            self.account.puppet_object(self.session, self.char1)
         override = override_settings(**TEST_SETTINGS)
         override.enable()
         self.addCleanup(override.disable)

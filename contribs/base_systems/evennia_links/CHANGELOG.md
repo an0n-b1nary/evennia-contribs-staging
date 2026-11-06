@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add `CmdSessionChannel` for session-aware sends without RP tracker, keeping
+  visitor restrictions local to the originating session. Document the complete
+  reference-game communication composition.
+
 - Add `CharacterCommsChannelMixin` for character-attributed ordinary channels,
   visitor sends restricted to Welcome, relay bots passed through, and public
   display names in logs shared by command history and web pages. Share `identity.sending_character` without

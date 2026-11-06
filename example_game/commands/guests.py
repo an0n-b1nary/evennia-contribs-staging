@@ -8,11 +8,11 @@ from evennia.utils.utils import class_from_module
 from evennia_links.guests import welcome_channel
 
 
-class CmdGuestChat(MuxCommand):
-    """Chat with guests and welcoming players: guest <message>."""
+class CmdWelcome(MuxCommand):
+    """Chat with guests and welcoming players: welcome <message>."""
 
-    key = "guest"
-    aliases = ["g"]  # noqa: RUF012
+    key = "welcome"
+    aliases = ["wel"]  # noqa: RUF012
     locks = "cmd:all()"
     help_category = "Communication"
 
@@ -28,10 +28,10 @@ class CmdGuestChat(MuxCommand):
             or not channel.has_connection(account)
             or not channel.access(account, "send")
         ):
-            self.msg("You cannot speak on the guest channel.")
+            self.msg("You cannot speak on the Welcome channel.")
             return
         if not self.args.strip():
-            self.msg("Use guest <message> to chat with guests and welcoming players.")
+            self.msg("Use welcome <message> to chat with guests and welcoming players.")
             return
         channel.msg(self.args.strip(), senders=account, session=self.session)
 
@@ -49,7 +49,10 @@ class GuestAccountCmdSet(CmdSet):
         self.add(default_cmds.CmdQuit)
         self.add(default_cmds.CmdHelp)
         self.add(CmdWho)
-        self.add(CmdGuestChat)
+        self.add(CmdWelcome)
+        from evennia_social.commands import CmdPage
+
+        self.add(CmdPage)
         from django.apps import apps
 
         if apps.is_installed("evennia_accessibility"):
