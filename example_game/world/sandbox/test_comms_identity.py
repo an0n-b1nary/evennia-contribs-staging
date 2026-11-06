@@ -346,6 +346,7 @@ class TestChannelLogCutover(EvenniaCommandTest):
 
         channel = create_channel("Guest", typeclass=Channel)
         channel.tags.add("chat", category="guest")
+        channel.attributes.remove("comms_log_version")  # As before this release.
         channel.connect(self.account2)
         channel.add_user_channel_alias(self.account2, "greeting")
         command = Command()
@@ -390,6 +391,35 @@ class TestChannelLogCutover(EvenniaCommandTest):
             self.assertEqual(channel.get_log_filename(), new_name)
             self.assertEqual(current.read_text(), "Alder: after cutover\n")
             self.assertEqual(len(list((log_dir / "account-history-archive").glob("*/*"))), 2)
+
+    def test_channels_created_after_cutover_keep_history_on_reseed(self):
+        from world.sandbox.management.commands.seed_sandbox import Command
+
+        with TemporaryDirectory() as directory, override_settings(LOG_DIR=directory):
+            Command()._archive_channel_logs()
+            channel = create_channel("Created later", typeclass=Channel)
+            filename = channel.get_log_filename()
+            current = Path(directory) / filename
+            current.write_text("Alder: character-era history\n")
+            Command()._archive_channel_logs()
+            self.assertEqual(channel.get_log_filename(), filename)
+            self.assertEqual(current.read_text(), "Alder: character-era history\n")
+            self.assertFalse((Path(directory) / "account-history-archive").exists())
+
+    def test_rotations_of_keys_with_glob_characters_are_archived(self):
+        from world.sandbox.management.commands.seed_sandbox import Command
+
+        channel = create_channel("[Old] chat", typeclass=Channel)
+        channel.attributes.remove("comms_log_version")  # As before this release.
+        with TemporaryDirectory() as directory, override_settings(LOG_DIR=directory):
+            log_dir = Path(directory)
+            old_name = channel.get_log_filename()
+            (log_dir / old_name).write_text("PrivateOldLogin: active\n")
+            (log_dir / (old_name + ".1")).write_text("PrivateOldLogin: rotated\n")
+            Command()._archive_channel_logs()
+            self.assertEqual(list(log_dir.glob("*.log*")), [])
+            archived = list((log_dir / "account-history-archive").glob("*/*"))
+            self.assertEqual(len(archived), 2)
 
     def test_ic_logs_and_disabled_logging_are_preserved(self):
         from world.sandbox.management.commands.seed_sandbox import Command

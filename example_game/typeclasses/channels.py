@@ -117,6 +117,15 @@ class Channel(CharacterCommsChannelMixin, CommunicationChannelMixin, DefaultChan
 
     """
 
+    def at_channel_creation(self):
+        super().at_channel_creation()
+        from evennia_links.identity import comms_identity
+
+        # A channel created in character mode has only ever logged character
+        # names; seed_sandbox's one-time cutover must not archive its history.
+        if comms_identity() == "character":
+            self.db.comms_log_version = "character"
+
     def post_join_channel(self, joiner, **kwargs):
         from evennia_links.guests import is_guest
 

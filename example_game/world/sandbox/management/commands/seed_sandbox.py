@@ -1716,6 +1716,7 @@ class Command(BaseCommand):
         account-named logs in a private archive and give each channel a fresh
         filename, so renaming Guest cannot resurrect an earlier Welcome log.
         """
+        from glob import escape
         from pathlib import Path
         from uuid import uuid4
 
@@ -1733,7 +1734,7 @@ class Command(BaseCommand):
                 path = (log_dir / filename).resolve()
                 if not path.is_relative_to(log_dir):
                     raise CommandError("Channel logs must be inside LOG_DIR before cutover.")
-                files = [path, *path.parent.glob(path.name + ".*")]
+                files = [path, *path.parent.glob(escape(path.name) + ".*")]
                 archive = log_dir / "account-history-archive" / uuid4().hex
                 for old in files:
                     if old.is_file():
