@@ -20,12 +20,15 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         +ignore <character>         - Hide this character's posts and contact
         +ignore/full <character>    - Hide the whole player, including alts
         +ignore/except <character>  - Show posts, but still block contact
+        +ignore/boards hide         - Hide ignored characters' board posts
+        +ignore/boards show         - Use a placeholder for ignored board posts
         +ignore/remove <character>  - Remove the entry made under this name
         +ignore/clear               - Remove every entry, including earlier ignores
         +mute <character>           - Alias for +ignore
 
-    Posts are room poses, says, OOC and crafting events. Hidden posts become
-    muted placeholders. Contact (pages, whispers, summons, joins, direct
+    Posts are room poses, says, OOC, crafting events and board posts. Hidden
+    posts become muted placeholders. For boards, ``show`` means placeholders,
+    never the ignored content. Contact (pages, whispers, summons, joins, direct
     combat and crafting proposals) is blocked even for an exception. OOC
     channel lines from an ignored player stay hidden, including exceptions.
     Staff always bypass filtering.
@@ -36,7 +39,7 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
     Earlier full ignores have no recorded name and require /clear.
     """
 
-    switch_options = ("full", "except", "remove", "clear")
+    switch_options = ("boards", "full", "except", "remove", "clear")
     key = "+ignore"
     aliases = ["+mute"]  # noqa: RUF012
     help_category = "Social"
@@ -53,8 +56,35 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         if not account:
             caller.msg("You must be logged in to use this command.")
             return
+        if "boards" in self.switches:
+            preference = self.args.strip().lower()
+            if preference not in (ignore.BOARDS_HIDE, ignore.BOARDS_SHOW):
+                caller.msg("Usage: +ignore/boards hide or +ignore/boards show")
+                return
+            try:
+                changed = ignore.set_boards_preference(account, preference)
+            except ignore.PolicyChangeError:
+                caller.msg("Ignore settings could not be saved. Please try again.")
+                return
+            except ValueError as exc:
+                caller.msg(str(exc))
+                return
+            if not changed:
+                if preference == ignore.BOARDS_HIDE:
+                    caller.msg("Your board preference is already set to hide ignored posts.")
+                else:
+                    caller.msg("Your board preference is already set to show placeholders.")
+            elif preference == ignore.BOARDS_HIDE:
+                caller.msg("Ignored board posts will now be hidden.")
+            else:
+                caller.msg("Ignored board posts will now use placeholders.")
+            return
         if "clear" in self.switches:
-            count = ignore.clear(account)
+            try:
+                count = ignore.clear(account)
+            except ignore.PolicyChangeError:
+                caller.msg("Ignore settings could not be saved. Please try again.")
+                return
             caller.msg(f"Ignore list cleared. Removed {count} entries.")
             return
         if not self.args.strip() and not self.switches:
@@ -65,7 +95,12 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
             caller.msg(error)
             return
         if "remove" in self.switches:
-            if ignore.remove_entry(account, target):
+            try:
+                removed = ignore.remove_entry(account, target)
+            except ignore.PolicyChangeError:
+                caller.msg("Ignore settings could not be saved. Please try again.")
+                return
+            if removed:
                 caller.msg(f"No longer ignoring |w{target.key}|n.")
             else:
                 caller.msg(f"{target.key} isn't on your list.")
@@ -77,6 +112,9 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         )
         try:
             changed = ignore.set_entry(caller, target, level)
+        except ignore.PolicyChangeError:
+            caller.msg("Ignore settings could not be saved. Please try again.")
+            return
         except ValueError as exc:
             caller.msg(str(exc))
             return

@@ -21,6 +21,12 @@ class EvenniaSocialConfig(AppConfig):
         from django.apps import apps
         from django.conf import settings
 
+        from evennia_social.integrations import ignoring
+
+        # Links is a hard dependency. Register the optional presentation
+        # provider without importing or depending on any presentation consumer.
+        ignoring.register()
+
         # --- maps: offer the who's-here tile overlay ---
         maps_label = getattr(settings, "SOCIAL_MAPS_APP_LABEL", "evennia_maps")
         if apps.is_installed(maps_label) or any(
