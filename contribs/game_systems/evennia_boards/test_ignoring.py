@@ -806,6 +806,15 @@ class TestBoardIgnoreCommands(EvenniaCommandTest):
         self.reader = self.char1
         self.author = self.char2
 
+    def test_board_listing_keeps_the_space_after_each_post_number(self):
+        from evennia_boards.commands import CmdBoard
+
+        root = _post(self.board, self.author, "Plain title", "Body")
+        _post(self.board, self.reader, "Re: Plain title", "Reply body", parent=root)
+        output = self.call(CmdBoard(), "Notices")
+        self.assertIn("  1. Plain title — ", output)
+        self.assertIn("  2.   Re: Re: Plain title — ", output)
+
     @requires_social
     def test_hide_counts_and_direct_root_read_keep_other_authors_replies(self):
         from evennia_boards.commands import CmdBoard

@@ -162,6 +162,13 @@ JOBS = {
         },
         ("scripts/ci_run_moderation_tests.py",),
     ),
+    "boards-partners": (
+        {"evennia_boards", "evennia_social"},
+        (
+            "scripts/ci_run_boards_without_social.py",
+            "scripts/ci_test_boards_populated_upgrade.py",
+        ),
+    ),
     "combat-independent": (
         {"evennia_rp_rules", "evennia_rp_combat", "evennia_npcs"},
         ("scripts/ci_run_combat_tests.py",),

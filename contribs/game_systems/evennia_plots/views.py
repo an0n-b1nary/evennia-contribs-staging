@@ -217,42 +217,26 @@ class PlotDetailView(DetailView):
 
         try:
             from evennia_boards.models import Post
+            from evennia_boards.permissions import is_staff_user
+            from evennia_boards.presentation import PolicyContext, web_viewer
         except ImportError:
             context["board_links"] = []
         else:
             board_links_qs = list(thread.board_links.order_by("created_at"))
-            post_manager = getattr(Post, "all_objects", Post.objects)
-            try:
-                from evennia_boards.permissions import is_staff_user
-                from evennia_boards.presentation import PolicyContext, web_viewer
-            except ImportError:
-                # Older optional Boards versions have no projection module.
-                posts_by_id = post_manager.select_related("board").in_bulk(
-                    lk.post_id for lk in board_links_qs
-                )
-                context["board_links"] = [
-                    _BoardPostLink(post=posts_by_id[lk.post_id], is_ic_post=lk.is_ic_post)
-                    for lk in board_links_qs
-                    if lk.post_id in posts_by_id
-                ]
-            else:
-                posts_by_id = post_manager.select_related(
-                    "board", "author", "parent_post", "parent_post__author"
-                ).in_bulk(lk.post_id for lk in board_links_qs)
-                policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
-                posts = list(posts_by_id.values())
-                projected = policy.project_many(posts)
-                board_link_list = []
-                for link in board_links_qs:
-                    safe = projected.get(link.post_id)
-                    if safe is not None:
-                        board_link_list.append(
-                            _BoardPostLink(post=safe, is_ic_post=link.is_ic_post)
-                        )
-                context["board_links"] = board_link_list
-                self._board_placeholder_ids = tuple(
-                    link.post.pk for link in board_link_list if link.post.is_placeholder
-                )
+            posts_by_id = Post.all_objects.select_related(
+                "board", "author", "parent_post", "parent_post__author"
+            ).in_bulk(lk.post_id for lk in board_links_qs)
+            policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
+            projected = policy.project_many(list(posts_by_id.values()))
+            board_link_list = []
+            for link in board_links_qs:
+                safe = projected.get(link.post_id)
+                if safe is not None:
+                    board_link_list.append(_BoardPostLink(post=safe, is_ic_post=link.is_ic_post))
+            context["board_links"] = board_link_list
+            self._board_placeholder_ids = tuple(
+                link.post.pk for link in board_link_list if link.post.is_placeholder
+            )
 
         context["participants"] = thread.participants.filter(is_active=True).order_by(
             "character_name"

@@ -284,11 +284,28 @@ def register_policy_snapshot(sender, viewer, kind=None, **kwargs):
     # Social calls this from inside its atomic Account lock. Refresh Attributes
     # before constructing the old-policy context, then include archived posts.
     account.attributes.reset_cache()
+    from evennia.objects.models import ObjectDB
+
     from evennia_boards.models import Post
 
     context = PolicyContext(account)
-    posts = Post.all_objects.only("pk", "author_id").select_related("author")
-    for post in posts.iterator():
-        if context.mode_for(post.author) == "hide":
-            context.hidden_ids.add(post.pk)
+    if context.staff:
+        return
+    # Policy is per author: ask once per distinct author, then collect their
+    # posts, rather than walking every post row inside the account lock.
+    author_ids = (
+        Post.all_objects.exclude(author_id=None)
+        .order_by()
+        .values_list("author_id", flat=True)
+        .distinct()
+    )
+    hidden_authors = [
+        author.pk
+        for author in ObjectDB.objects.filter(pk__in=author_ids)
+        if context.mode_for(author) == "hide"
+    ]
+    if hidden_authors:
+        context.hidden_ids.update(
+            Post.all_objects.filter(author_id__in=hidden_authors).values_list("pk", flat=True)
+        )
     context.persist_hidden(account_locked=True)

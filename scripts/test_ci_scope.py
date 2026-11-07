@@ -102,7 +102,7 @@ class SelectJobsTests(unittest.TestCase):
     def test_a_leaf_contrib_selects_its_family_and_the_whole_game_jobs(self):
         self.assertEqual(
             self.select("contribs/game_systems/evennia_boards/tests.py"),
-            ["sandbox", "live-playtest", "moderation-partners"],
+            ["sandbox", "live-playtest", "moderation-partners", "boards-partners"],
         )
 
     def test_contrib_docs_count_as_contrib_changes(self):

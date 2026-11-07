@@ -413,7 +413,7 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
                     reply_tag = "  Re: " if post.parent_post_id else ""
                 author = "" if post.is_placeholder else f" — {post.author_name}"
                 lines.append(
-                    f"  {post.post_number:3}.{reply_tag}|w{post.title}|n{author}"
+                    f"  {post.post_number:3}. {reply_tag}|w{post.title}|n{author}"
                     f" ({post.created_at.strftime('%Y-%m-%d')})"
                 )
         lines.append("-" * 60)
