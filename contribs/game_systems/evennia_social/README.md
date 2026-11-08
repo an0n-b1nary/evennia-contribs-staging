@@ -110,10 +110,13 @@ class Guest(SocialAccountMixin, DefaultGuest):
 ```
 
 It filters in `channel_msg`, preserving delivery to other subscribers.
-`SocialCharacterMixin` also covers channels subscribed to directly by characters.
+`SocialCharacterMixin` also filters custom character subscribers whose host
+supplies Evennia's channel receive hooks (stock characters lack those hooks).
 IC channel hosts should set `is_ic = True` on their channel typeclass; RP
 tracker's `ICChannel` already does. IC lines use the character's post level.
 Ordinary OOC channel lines use the player-level boundary even for exceptions.
+Ignored lines use a placeholder by default; `+ignore/channels hide` suppresses
+them entirely. No channel contrib or channel typeclass change is required.
 
 ### 2. Add the commands to your CharacterCmdSet
 
@@ -384,8 +387,8 @@ commands read the mode; they do not need different cmdsets per mode.
   Staff replies without a puppet use the public label `Staff`, and the
   paged player can answer them the same way.
 
-The reference game retains account mode until #223's final adoption PR;
-its focused seams exercise these commands in both modes meanwhile.
+The reference game uses character mode; its focused seams also exercise
+account mode.
 
 ## Personal boundaries
 
@@ -396,6 +399,8 @@ Both communication modes share these rules:
 | `+ignore <character>` | Hide this character's posts and block contact |
 | `+ignore/full <character>` | Hide every character on that player's account |
 | `+ignore/except <character>` | Show this character's posts, still block contact |
+| `+ignore/channels hide\|show` | Omit ignored live channel lines or show placeholders |
+| `+ignore/boards hide\|show` | Omit ignored board posts or show placeholders |
 | `+ignore/remove <character>` | Remove only the entry made under this name |
 | `+ignore/clear` | Remove all entries, including earlier unnamed full ignores |
 | `+ignore` | Show only your named entries, labelled full or except |
@@ -414,8 +419,9 @@ whispers, summon/join requests, direct combat and crafting service proposals.
 An exception shows posts and Companion objects but still blocks contact.
 A blocked page stays in the sender's history and is hidden from the
 recipient's, so neither history reveals the ignore to the sender.
-OOC channel lines from a player with any ignored character remain hidden,
-including for exceptions. Staff senders always bypass filtering.
+OOC channel lines from a player with any ignored character remain filtered,
+including for exceptions. Staff senders always bypass filtering; staff readers
+also see every board post and channel line.
 
 `/full` can reveal alts by how it filters. Use it to enforce boundaries,
 including when someone follows you onto alts; do not use it to discover who
@@ -433,6 +439,26 @@ gate imports on Social being installed.
 `hide` omits their posts; `show` is the default and uses a placeholder, never
 the ignored content. This account-shared preference also works without a
 selected character. Without Social, optional consumers leave posts visible.
+
+`+ignore/channels hide|show` controls live lines on both IC and OOC channels.
+The default `show` replaces ignored lines with
+`[<channel>] An ignored player said something.` without their content or
+sender names. `hide` suppresses them entirely. The preference is shared by
+the account, including across characters and account-only sessions, and is
+independent of the board preference. Other subscribers receive the original
+line. Senderless system announcements pass through.
+
+The Links `ignore_mode(viewer, sender, kind)` seam also serves channels:
+`channels` checks OOC player boundaries; `ic_channels` checks character post
+levels and exceptions. Both use the `channels` preference. Missing, invalid
+or failing providers leave content visible, as for boards. Full ignores
+also cover NPCs currently puppeted by an ignored account.
+
+**History limitation:** Evennia 6's `channel/history` command and website
+channel history read the shared channel log directly, bypassing subscriber
+receive hooks. They can show ignored content under either preference. The
+log stays complete for other readers and staff; this release filters live
+delivery only. Ignore is a comfort filter, not a privacy boundary.
 
 Data lives in `account.db.ignore_entries`, keyed by named character id,
 with level, fallback name and owner ids. Existing `account.db.ignore_list`

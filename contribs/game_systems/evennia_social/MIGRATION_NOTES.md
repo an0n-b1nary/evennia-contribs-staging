@@ -118,6 +118,21 @@ signal-based decoupling).
   callbacks, not the source's version-tracked editing mixin, so no editing
   framework was pulled in (confirmed during the scoping pass, `finger.py`).
 
+## 0.11.0 — live channel ignore presentation (2026-11-07)
+
+The existing account/character channel filters now use the Links presentation
+seam. Ignored live lines default to anonymous placeholders instead of being
+silently dropped; `+ignore/channels hide` restores full hiding and `show`
+restores placeholders. The account-shared `channels` key in
+`ignore_preferences` is independent of `boards`; existing entries and board
+preferences are preserved. No schema migration is required. Existing
+`SocialAccountMixin` wiring remains sufficient, and no channel contrib change
+is needed. IC channels use character post levels; ordinary OOC channels use
+player boundaries, including exceptions. Staff readers see unfiltered lines.
+
+Evennia 6's command and website channel histories read the shared log directly
+and remain unfiltered. The help, player guide and README document this limit.
+
 ## 0.10.0 — board ignore preference (2026-11-06)
 
 Social now stores the account-shared `boards` value in the namespaced

@@ -24,9 +24,9 @@ NONE = "none"
 POSTS = "posts"
 HIDDEN = "hidden"
 FULL = "full"
-BOARDS_PREFERENCES = "ignore_preferences"
-BOARDS_SHOW = "show"
-BOARDS_HIDE = "hide"
+PREFERENCES = "ignore_preferences"
+SHOW = "show"
+HIDE = "hide"
 
 
 class PolicyChangeError(Exception):
@@ -68,17 +68,26 @@ def earlier(viewer):
 
 
 def _preferences(account):
-    value = getattr(account.db, BOARDS_PREFERENCES)
+    value = getattr(account.db, PREFERENCES)
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _presentation_preference(viewer, kind):
+    account = account_for(viewer)
+    if not account:
+        return SHOW
+    value = _preferences(account).get(kind, SHOW)
+    return value if value in (SHOW, HIDE) else SHOW
 
 
 def boards_preference(viewer):
     """Return this account's board policy: ``show`` (placeholder) or ``hide``."""
-    account = account_for(viewer)
-    if not account:
-        return BOARDS_SHOW
-    value = _preferences(account).get("boards", BOARDS_SHOW)
-    return value if value in (BOARDS_SHOW, BOARDS_HIDE) else BOARDS_SHOW
+    return _presentation_preference(viewer, "boards")
+
+
+def channels_preference(viewer):
+    """Return the account-shared preference for both IC and OOC channels."""
+    return _presentation_preference(viewer, "channels")
 
 
 def _before_policy_change(account, kind=None):
@@ -90,21 +99,30 @@ def _before_policy_change(account, kind=None):
 
 
 @transaction.atomic
-def set_boards_preference(viewer, preference):
-    """Set the account-shared board preference, preserving other preference keys."""
-    if preference not in (BOARDS_SHOW, BOARDS_HIDE):
-        raise ValueError("Board preference must be 'show' or 'hide'.")
+def _set_presentation_preference(viewer, preference, kind):
+    if preference not in (SHOW, HIDE):
+        raise ValueError("Ignore preference must be 'show' or 'hide'.")
     account = account_for(viewer)
     if not account:
         raise ValueError("You must be logged in to use this command.")
     _locked(account)
     preferences = _preferences(account)
-    changed = boards_preference(account) != preference
+    changed = _presentation_preference(account, kind) != preference
     if changed:
-        _before_policy_change(account, "boards")
-    preferences["boards"] = preference
-    setattr(account.db, BOARDS_PREFERENCES, preferences)
+        _before_policy_change(account, kind)
+    preferences[kind] = preference
+    setattr(account.db, PREFERENCES, preferences)
     return changed
+
+
+def set_boards_preference(viewer, preference):
+    """Set the account-shared board preference, preserving other preference keys."""
+    return _set_presentation_preference(viewer, preference, "boards")
+
+
+def set_channels_preference(viewer, preference):
+    """Set the account-shared IC/OOC channel preference, preserving other keys."""
+    return _set_presentation_preference(viewer, preference, "channels")
 
 
 def named_entry(viewer, character):
@@ -137,7 +155,7 @@ def ignore_level(viewer, character):
 
 
 def blocks_channel(viewer, sender):
-    """OOC lines stay hidden even for characters whose posts are excepted.
+    """OOC lines stay filtered even for characters whose posts are excepted.
 
     Channels address the player: any named boundary on that player's
     characters covers their OOC channel lines in either communication mode.

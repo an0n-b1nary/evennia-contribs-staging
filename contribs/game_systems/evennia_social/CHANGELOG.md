@@ -4,6 +4,16 @@ All notable changes to `evennia_social` are documented here.
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-11-07
+
+- Default ignored live channel lines to anonymous placeholders; add the
+  account-shared `+ignore/channels hide|show` preference for IC and OOC
+  channels. Reuse the optional Links presentation seam, preserving character,
+  full and exception rules, staff sender/reader bypass and other subscribers'
+  delivery. Document that command/web channel history remains unfiltered.
+- Rename the board preference constants to `PREFERENCES`, `SHOW` and `HIDE`,
+  now shared by both preferences.
+
 ## [0.10.0] — 2026-11-06
 
 - Add the account-shared `+ignore/boards hide|show` preference and Links

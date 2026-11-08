@@ -188,8 +188,10 @@ class SocialCharacterMixin:
         super().msg(text=text, from_obj=from_obj, session=session, options=options, **kwargs)
 
     def channel_msg(self, message, channel, senders=None, **kwargs):
-        if _blocked_channel(self, channel, senders):
+        filtered = _filter_channel_message(self, message, channel, senders)
+        if filtered is None:
             return
+        message, senders = filtered
         return super().channel_msg(message, channel, senders=senders, **kwargs)
 
     def get_display_name(self, looker=None, **kwargs):
@@ -229,12 +231,20 @@ class SocialRoomMixin:
         return desc
 
 
-def _blocked_channel(viewer, channel, senders):
-    from evennia_social.ignore import HIDDEN, blocks_channel, ignore_level
+def _filter_channel_message(viewer, message, channel, senders):
+    """Project a whole line without changing the channel's other recipients."""
+    from evennia_links.ignoring import ignore_mode
 
-    if getattr(channel, "is_ic", False):
-        return any(ignore_level(viewer, sender) == HIDDEN for sender in senders or ())
-    return any(blocks_channel(viewer, sender) for sender in senders or ())
+    kind = "ic_channels" if getattr(channel, "is_ic", False) else "channels"
+    modes = [ignore_mode(viewer, sender, kind) for sender in senders or ()]
+    if "hide" in modes:
+        return None
+    if "placeholder" in modes:
+        # The incoming message already includes names, emotes and a prefix.
+        # Rebuild it completely, including safe attribution for later mixins.
+        # Muted like room placeholders, so no pose can imitate it exactly.
+        return f"{channel.channel_prefix()}|xAn ignored player said something.|n", []
+    return message, senders
 
 
 class SocialAccountMixin:
@@ -245,6 +255,8 @@ class SocialAccountMixin:
     """
 
     def channel_msg(self, message, channel, senders=None, **kwargs):
-        if _blocked_channel(self, channel, senders):
+        filtered = _filter_channel_message(self, message, channel, senders)
+        if filtered is None:
             return
+        message, senders = filtered
         return super().channel_msg(message, channel, senders=senders, **kwargs)

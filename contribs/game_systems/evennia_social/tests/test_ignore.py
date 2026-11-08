@@ -160,6 +160,7 @@ class TestNamedIgnores(SocialCommandTestCase):
             self.assertIn(f"To {self.char1.key}: Hidden page", sent)
 
     def test_ooc_channels_filter_account_subscribers_without_aborting_other_receivers(self):
+        ignore.set_channels_preference(self.account, "hide")
         channel = create_channel("Ignore seam", typeclass=DefaultChannel)
         channel.send_to_online_only = False
         channel.connect(self.account)
@@ -224,7 +225,7 @@ class TestNamedIgnores(SocialCommandTestCase):
 
         ignore.set_entry(self.char1, self.char2)
         self.assertEqual(ignore_mode(self.account, self.char2, "boards"), "placeholder")
-        self.assertEqual(ignore_mode(self.account, self.char2, "channels"), None)
+        self.assertEqual(ignore_mode(self.account, self.char2, "channels"), "placeholder")
         with self.assertNoLogs("evennia", level="ERROR"):
             self.assertIsNone(ignore_mode(AnonymousUser(), self.char2, "boards"))
         ignore.set_boards_preference(self.account, "hide")
