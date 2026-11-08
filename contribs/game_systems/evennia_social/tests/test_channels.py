@@ -70,6 +70,7 @@ class TestChannelIgnores(SocialCommandTestCase):
 
     def assert_placeholder(self, received, channel):
         received.assert_called_once()
+        self.assertIn("|xAn ignored player", received.call_args.kwargs["text"][0])
         message = strip_ansi(received.call_args.kwargs["text"][0])
         self.assertEqual(message, f"[{channel.key}] An ignored player said something.")
         self.assertNotIn(self.char2.key, message)

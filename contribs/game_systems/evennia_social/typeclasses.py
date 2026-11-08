@@ -242,7 +242,8 @@ def _filter_channel_message(viewer, message, channel, senders):
     if "placeholder" in modes:
         # The incoming message already includes names, emotes and a prefix.
         # Rebuild it completely, including safe attribution for later mixins.
-        return f"{channel.channel_prefix()}An ignored player said something.", []
+        # Muted like room placeholders, so no pose can imitate it exactly.
+        return f"{channel.channel_prefix()}|xAn ignored player said something.|n", []
     return message, senders
 
 

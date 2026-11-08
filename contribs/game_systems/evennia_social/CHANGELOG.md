@@ -11,6 +11,8 @@ All notable changes to `evennia_social` are documented here.
   channels. Reuse the optional Links presentation seam, preserving character,
   full and exception rules, staff sender/reader bypass and other subscribers'
   delivery. Document that command/web channel history remains unfiltered.
+- Rename the board preference constants to `PREFERENCES`, `SHOW` and `HIDE`,
+  now shared by both preferences.
 
 ## [0.10.0] — 2026-11-06
 

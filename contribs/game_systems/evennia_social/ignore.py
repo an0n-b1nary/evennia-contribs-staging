@@ -27,10 +27,6 @@ FULL = "full"
 PREFERENCES = "ignore_preferences"
 SHOW = "show"
 HIDE = "hide"
-# Names exposed by the board preference release.
-BOARDS_PREFERENCES = PREFERENCES
-BOARDS_SHOW = SHOW
-BOARDS_HIDE = HIDE
 
 
 class PolicyChangeError(Exception):
