@@ -429,6 +429,11 @@ an account or a character. Full coverage uses playable ownership, including
 offline characters; staff characters are exempt. Optional consumers must
 gate imports on Social being installed.
 
+`+ignore/boards hide|show` controls hidden authors on IC and OOC boards.
+`hide` omits their posts; `show` is the default and uses a placeholder, never
+the ignored content. This account-shared preference also works without a
+selected character. Without Social, optional consumers leave posts visible.
+
 Data lives in `account.db.ignore_entries`, keyed by named character id,
 with level, fallback name and owner ids. Existing `account.db.ignore_list`
 entries retain full protection and appear as “N earlier full ignores, made

@@ -118,6 +118,16 @@ signal-based decoupling).
   callbacks, not the source's version-tracked editing mixin, so no editing
   framework was pulled in (confirmed during the scoping pass, `finger.py`).
 
+## 0.10.0 — board ignore preference (2026-11-06)
+
+Social now stores the account-shared `boards` value in the namespaced
+`account.db.ignore_preferences` Attribute. The value is `show` by default;
+`+ignore/boards show` means ignored board posts use placeholders, while
+`+ignore/boards hide` omits them. This does not change existing ignore entries
+or require a data migration. The optional Links provider abstains when Social
+is not installed, and the preference can be changed from an account without a
+selected character.
+
 ---
 
 ## 0.2.0 — room mood (2026-10-07)

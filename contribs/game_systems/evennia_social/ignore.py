@@ -9,15 +9,28 @@ of earlier full ignores: it has no named removal path. Reading it lazily
 preserves protection without a database migration or an alt-name oracle.
 """
 
+import logging
+from collections.abc import Mapping
+
 from django.db import transaction
 from evennia.accounts.models import AccountDB
 
 from evennia_links.characters import account_ids
+from evennia_links.ignoring import notify_ignore_policy_changing
+
+logger = logging.getLogger("evennia")
 
 NONE = "none"
 POSTS = "posts"
 HIDDEN = "hidden"
 FULL = "full"
+BOARDS_PREFERENCES = "ignore_preferences"
+BOARDS_SHOW = "show"
+BOARDS_HIDE = "hide"
+
+
+class PolicyChangeError(Exception):
+    """Required pre-change bookkeeping failed; the policy transaction rolled back."""
 
 
 def account_for(actor):
@@ -52,6 +65,46 @@ def entries(viewer):
 def earlier(viewer):
     account = account_for(viewer)
     return set(account.db.ignore_list or []) if account else set()
+
+
+def _preferences(account):
+    value = getattr(account.db, BOARDS_PREFERENCES)
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def boards_preference(viewer):
+    """Return this account's board policy: ``show`` (placeholder) or ``hide``."""
+    account = account_for(viewer)
+    if not account:
+        return BOARDS_SHOW
+    value = _preferences(account).get("boards", BOARDS_SHOW)
+    return value if value in (BOARDS_SHOW, BOARDS_HIDE) else BOARDS_SHOW
+
+
+def _before_policy_change(account, kind=None):
+    try:
+        notify_ignore_policy_changing(account, kind)
+    except Exception as exc:
+        logger.exception("Social ignore policy bookkeeping failed")
+        raise PolicyChangeError from exc
+
+
+@transaction.atomic
+def set_boards_preference(viewer, preference):
+    """Set the account-shared board preference, preserving other preference keys."""
+    if preference not in (BOARDS_SHOW, BOARDS_HIDE):
+        raise ValueError("Board preference must be 'show' or 'hide'.")
+    account = account_for(viewer)
+    if not account:
+        raise ValueError("You must be logged in to use this command.")
+    _locked(account)
+    preferences = _preferences(account)
+    changed = boards_preference(account) != preference
+    if changed:
+        _before_policy_change(account, "boards")
+    preferences["boards"] = preference
+    setattr(account.db, BOARDS_PREFERENCES, preferences)
+    return changed
 
 
 def named_entry(viewer, character):
@@ -121,8 +174,12 @@ def set_entry(viewer, character, level=HIDDEN):
         raise ValueError("Could not determine that character's account.")
     _locked(account)
     named = entries(account)
-    changed = not named.get(character.pk) or named[character.pk]["level"] != level
-    named[character.pk] = {"name": character.key, "level": level, "accounts": sorted(ids)}
+    previous = named.get(character.pk)
+    current = {"name": character.key, "level": level, "accounts": sorted(ids)}
+    changed = previous != current
+    if previous is None or any(previous.get(key) != current[key] for key in ("level", "accounts")):
+        _before_policy_change(account)
+    named[character.pk] = current
     account.db.ignore_entries = named
     return changed
 
@@ -136,6 +193,8 @@ def remove_entry(viewer, character):
     _locked(account)
     named = entries(account)
     entry = named.pop(character.pk, None)
+    if entry is not None:
+        _before_policy_change(account)
     account.db.ignore_entries = named
     return entry
 
@@ -147,6 +206,8 @@ def clear(viewer):
         return 0
     _locked(account)
     count = len(entries(account)) + len(earlier(account))
+    if count:
+        _before_policy_change(account)
     account.db.ignore_entries = {}
     account.db.ignore_list = []
     return count
