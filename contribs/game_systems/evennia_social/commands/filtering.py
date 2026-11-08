@@ -22,16 +22,21 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         +ignore/except <character>  - Show posts, but still block contact
         +ignore/boards hide         - Hide ignored characters' board posts
         +ignore/boards show         - Use a placeholder for ignored board posts
+        +ignore/channels hide       - Hide ignored channel lines entirely
+        +ignore/channels show       - Use a placeholder for ignored channel lines
         +ignore/remove <character>  - Remove the entry made under this name
         +ignore/clear               - Remove every entry, including earlier ignores
         +mute <character>           - Alias for +ignore
 
-    Posts are room poses, says, OOC, crafting events and board posts. Hidden
-    posts become muted placeholders. For boards, ``show`` means placeholders,
-    never the ignored content. Contact (pages, whispers, summons, joins, direct
+    Posts are room poses, says, OOC, IC channel lines, crafting events and board
+    posts. Hidden posts become muted placeholders. For boards and channels,
+    ``show`` means placeholders, never the ignored content. Both preferences
+    are shared by your account. Contact (pages, whispers, summons, joins, direct
     combat and crafting proposals) is blocked even for an exception. OOC
-    channel lines from an ignored player stay hidden, including exceptions.
-    Staff always bypass filtering.
+    channel lines from an ignored player stay filtered, including exceptions;
+    IC channels show excepted characters' posts. Staff senders bypass filtering;
+    staff readers also see every board and channel message. Channel history
+    and web channel logs bypass the live filter and may show ignored content.
 
     A character entry overrides /full. /except also works without /full.
     /full can reveal alts through filtering: use it for boundaries, never
@@ -39,7 +44,7 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
     Earlier full ignores have no recorded name and require /clear.
     """
 
-    switch_options = ("boards", "full", "except", "remove", "clear")
+    switch_options = ("boards", "channels", "full", "except", "remove", "clear")
     key = "+ignore"
     aliases = ["+mute"]  # noqa: RUF012
     help_category = "Social"
@@ -56,13 +61,20 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
         if not account:
             caller.msg("You must be logged in to use this command.")
             return
-        if "boards" in self.switches:
+        if "boards" in self.switches or "channels" in self.switches:
+            kind = "boards" if "boards" in self.switches else "channels"
+            label = "board posts" if kind == "boards" else "channel lines"
             preference = self.args.strip().lower()
-            if preference not in (ignore.BOARDS_HIDE, ignore.BOARDS_SHOW):
-                caller.msg("Usage: +ignore/boards hide or +ignore/boards show")
+            if preference not in (ignore.HIDE, ignore.SHOW):
+                caller.msg(f"Usage: +ignore/{kind} hide or +ignore/{kind} show")
                 return
             try:
-                changed = ignore.set_boards_preference(account, preference)
+                setter = (
+                    ignore.set_boards_preference
+                    if kind == "boards"
+                    else ignore.set_channels_preference
+                )
+                changed = setter(account, preference)
             except ignore.PolicyChangeError:
                 caller.msg("Ignore settings could not be saved. Please try again.")
                 return
@@ -70,14 +82,16 @@ class CmdIgnore(StrictSwitchMixin, MuxCommand):
                 caller.msg(str(exc))
                 return
             if not changed:
-                if preference == ignore.BOARDS_HIDE:
-                    caller.msg("Your board preference is already set to hide ignored posts.")
+                if preference == ignore.HIDE:
+                    caller.msg(
+                        f"Your {kind[:-1]} preference is already set to hide ignored {label}."
+                    )
                 else:
-                    caller.msg("Your board preference is already set to show placeholders.")
-            elif preference == ignore.BOARDS_HIDE:
-                caller.msg("Ignored board posts will now be hidden.")
+                    caller.msg(f"Your {kind[:-1]} preference is already set to show placeholders.")
+            elif preference == ignore.HIDE:
+                caller.msg(f"Ignored {label} will now be hidden.")
             else:
-                caller.msg("Ignored board posts will now use placeholders.")
+                caller.msg(f"Ignored {label} will now use placeholders.")
             return
         if "clear" in self.switches:
             try:

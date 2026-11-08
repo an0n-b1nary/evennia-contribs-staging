@@ -1898,6 +1898,15 @@ the existing Guest boundary remains first. The channel mixin precedes
 DefaultChannel; RPTracker's IC channel already includes it. The server-start
 hook ensures the daily retention sweep exists.
 
+Social's `+ignore/channels hide|show` preference applies to live IC and OOC
+channel lines through those account mixins. `show` defaults to an anonymous
+placeholder; `hide` drops the line only for that reader. IC channels honor
+character exceptions; OOC channels retain the player boundary. Staff senders
+and readers bypass the filter. The preference is independent of
+`+ignore/boards hide|show`. Command and website channel history read shared
+logs directly and can still show ignored content. The Social identity seams
+exercise both preferences on the host's ordinary and RPTracker IC channels.
+
 The staff-run marker is enabled on terminal and website character displays.
 It uses current account roster status, including offline and quelled staff,
 and current NPC controllers. Repeated alt co-presence produces one advisory
