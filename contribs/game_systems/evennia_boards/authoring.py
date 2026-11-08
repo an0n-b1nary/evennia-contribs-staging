@@ -25,6 +25,11 @@ class BoardsAuthoringMixin(LoginRequiredMixin):
 
     login_url = "/accounts/login/"
 
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     def get_character(self) -> int:
         """Return the ObjectDB pk of the acting character (cached per request).
 

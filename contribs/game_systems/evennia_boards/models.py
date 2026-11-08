@@ -195,6 +195,32 @@ class Post(AbstractArchived):
         return post
 
 
+class PostReadSuppression(models.Model):
+    """Sparse per-account unread exclusions for posts suppressed by ignore.
+
+    Rows are durable across archive/unarchive and policy changes. They only
+    affect unread state; presentation always follows the current policy.
+    """
+
+    account = models.ForeignKey(
+        "accounts.AccountDB",
+        on_delete=models.CASCADE,
+        related_name="board_post_read_suppressions",
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name="read_suppressions",
+    )
+
+    class Meta:
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(
+                fields=("account", "post"), name="board_read_suppression_unique"
+            )
+        ]
+
+
 class Subscription(models.Model):
     """
     An account's subscription to a board for new-post login notifications.
@@ -230,7 +256,7 @@ class Subscription(models.Model):
     def __str__(self):
         return f"{self.account} → {self.board.name}"
 
-    def unread_count(self):
+    def unread_count(self, context=None):
         """Count posts on this board created after last_notified_at.
 
         Uses Post.objects (the ArchivedManager default) so archived posts
@@ -240,7 +266,10 @@ class Subscription(models.Model):
         qs = Post.objects.filter(board=self.board)
         if self.last_notified_at:
             qs = qs.filter(created_at__gt=self.last_notified_at)
-        return qs.count()
+        from evennia_boards.presentation import unread_post_count
+
+        qs = qs.select_related("author", "board", "parent_post", "parent_post__author")
+        return unread_post_count(self.account, qs, context=context)
 
 
 class PostVersion(AbstractVersion):

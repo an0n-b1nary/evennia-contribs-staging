@@ -631,6 +631,30 @@ jobs:
           python scripts/ci_run_moderation_tests.py {game}
           --absent evennia_npcs --absent evennia_rp_party
 
+  boards-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'boards-partners')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: no-social
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-social --
+          python scripts/ci_run_boards_without_social.py {game}
+      - name: populated-upgrade
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_test_boards_populated_upgrade.py {game}
+
   combat-independent:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'combat-independent')

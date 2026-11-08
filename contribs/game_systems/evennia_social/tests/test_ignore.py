@@ -4,15 +4,19 @@
 
 from unittest.mock import patch
 
-from django.test import override_settings
+from django.dispatch import Signal
+from django.test import SimpleTestCase, override_settings
 from evennia.accounts.accounts import DefaultAccount
+from evennia.accounts.models import AccountDB
 from evennia.comms.comms import DefaultChannel
 from evennia.objects.objects import DefaultCharacter
 from evennia.utils.create import create_account, create_channel, create_object
 
+from evennia_links.ignoring import ignore_mode
 from evennia_social import ignore
 from evennia_social.commands import CmdIgnore, CmdJoin, CmdPage, CmdSummon
 from evennia_social.commands.teleportation import _check_ignore_silent
+from evennia_social.integrations import ignoring as ignore_integration
 from evennia_social.tests.base import SocialCommandTestCase
 from evennia_social.typeclasses import SocialAccountMixin
 
@@ -193,3 +197,103 @@ class TestNamedIgnores(SocialCommandTestCase):
                 self.char1.pending_summon_requests = {}
                 self.call(command(), self.char1.key, caller=self.char2)
                 self.assertFalse(self.char1.pending_summon_requests)
+
+    def test_board_preference_persists_and_preserves_other_namespaced_keys(self):
+        self.account.db.ignore_preferences = {"future": "kept", "channels": "hide"}
+        self.assertEqual(ignore.boards_preference(self.account), "show")
+        self.assertTrue(ignore.set_boards_preference(self.char1, "hide"))
+        self.account.attributes.reset_cache()
+        fresh = AccountDB.objects.get(pk=self.account.pk)
+        stored = fresh.db.ignore_preferences
+        self.assertEqual(stored["boards"], "hide")
+        self.assertEqual(stored["channels"], "hide")
+        self.assertEqual(stored["future"], "kept")
+        self.assertEqual(ignore.boards_preference(fresh), "hide")
+        self.assertEqual(ignore.boards_preference(self.char1), "hide")
+
+    def test_board_preference_supports_account_without_characters(self):
+        account = create_account("BoardOnlyAccount", None, "test-password")
+        self.assertEqual(ignore.boards_preference(account), "show")
+        command_output = self.call(CmdIgnore(), "/boards hide", caller=account)
+        self.assertIn("will now be hidden", command_output)
+        account.attributes.reset_cache()
+        self.assertEqual(ignore.boards_preference(AccountDB.objects.get(pk=account.pk)), "hide")
+
+    def test_links_provider_maps_show_to_placeholder_and_respects_shared_ignore_levels(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        ignore.set_entry(self.char1, self.char2)
+        self.assertEqual(ignore_mode(self.account, self.char2, "boards"), "placeholder")
+        self.assertEqual(ignore_mode(self.account, self.char2, "channels"), None)
+        with self.assertNoLogs("evennia", level="ERROR"):
+            self.assertIsNone(ignore_mode(AnonymousUser(), self.char2, "boards"))
+        ignore.set_boards_preference(self.account, "hide")
+        self.assertEqual(ignore_mode(self.char1, self.char2, "boards"), "hide")
+        ignore.set_entry(self.char1, self.char2, ignore.POSTS)
+        self.assertIsNone(ignore_mode(self.account, self.char2, "boards"))
+
+    def test_board_provider_staff_bypass_applies_to_reader_and_sender(self):
+        ignore.set_entry(self.char1, self.char2)
+        self.account.permissions.add("Builder")
+        self.assertIsNone(ignore_mode(self.account, self.char2, "boards"))
+        self.account.permissions.clear()
+        self.account2.permissions.add("Builder")
+        self.assertIsNone(ignore_mode(self.account, self.char2, "boards"))
+
+    def test_boards_switch_handles_values_before_character_lookup(self):
+        from evennia_social.commands import filtering
+
+        with patch.object(filtering, "find_character") as lookup:
+            shown = self.call(CmdIgnore(), "/boards show")
+            self.assertIn("placeholders", shown)
+            hidden = self.call(CmdIgnore(), "/boards hide")
+            self.assertIn("will now be hidden", hidden)
+            invalid = self.call(CmdIgnore(), "/boards unknown")
+            self.assertIn("Usage: +ignore/boards hide or +ignore/boards show", invalid)
+        lookup.assert_not_called()
+        self.assertEqual(ignore.boards_preference(self.account), "hide")
+
+    def test_policy_bookkeeping_failure_rolls_back_entry_and_command_is_generic(self):
+        with patch("evennia_social.ignore.notify_ignore_policy_changing", side_effect=RuntimeError):
+            with self.assertRaises(ignore.PolicyChangeError):
+                ignore.set_entry(self.char1, self.char2)
+            output = self.call(CmdIgnore(), self.char2.key)
+        self.assertEqual(ignore.entries(self.account), {})
+        self.assertIn("Please try again", output)
+
+    def test_policy_prechange_sees_old_state_and_noops_do_not_notify(self):
+        observed = []
+
+        def inspect(viewer, kind=None):
+            observed.append((kind, ignore.entries(viewer), ignore.boards_preference(viewer)))
+
+        with patch("evennia_social.ignore.notify_ignore_policy_changing", side_effect=inspect):
+            ignore.set_entry(self.char1, self.char2)
+            ignore.set_entry(self.char1, self.char2)
+            ignore.remove_entry(self.char1, self.char2)
+            ignore.remove_entry(self.char1, self.char2)
+            ignore.set_entry(self.char1, self.char2)
+            ignore.clear(self.account)
+            ignore.clear(self.account)
+            ignore.set_boards_preference(self.account, "hide")
+            ignore.set_boards_preference(self.account, "hide")
+            ignore.set_boards_preference(self.account, "show")
+
+        self.assertEqual(len(observed), 6)
+        self.assertEqual(observed[0], (None, {}, "show"))
+        self.assertEqual(observed[1][0], None)
+        self.assertIn(self.char2.pk, observed[1][1])
+        self.assertEqual(observed[2], (None, {}, "show"))
+        self.assertEqual(observed[3][0], None)
+        self.assertIn(self.char2.pk, observed[3][1])
+        self.assertEqual(observed[4], ("boards", {}, "show"))
+        self.assertEqual(observed[5], ("boards", {}, "hide"))
+
+
+class TestIgnoreProviderRegistration(SimpleTestCase):
+    def test_register_is_idempotent(self):
+        signal = Signal()
+        with patch.object(ignore_integration, "ignore_mode_requested", signal):
+            ignore_integration.register()
+            ignore_integration.register()
+        self.assertEqual(len(signal.receivers), 1)

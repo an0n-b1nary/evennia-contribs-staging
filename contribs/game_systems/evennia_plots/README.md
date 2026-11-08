@@ -143,6 +143,11 @@ These settings are no-ops unless `evennia-xp` is installed.
 | `PLOTS_MAPS_APP_LABEL` | `"evennia_maps"` | When that app is installed (evennia-maps 0.9+), adds a "Plots here" section to the live map's room panel. See below. |
 | `SITE_URL` | `""` | When set, `+plot` output includes a clickable web URL link to the plot's detail page. |
 
+When Boards is installed, linked-post titles on the plot detail page use the
+same optional ignore projection as board pages. Hidden links are omitted;
+placeholders contain no post title or author. Plots keeps Boards and Social
+optional, and its detail page is private/no-store for each reader.
+
 ---
 
 ## Privacy model

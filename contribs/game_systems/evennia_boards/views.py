@@ -24,7 +24,6 @@ Wire into your game's URLconf::
 """
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, OuterRef, Subquery
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -35,6 +34,13 @@ from evennia_boards.authoring import BoardsAuthoringMixin
 from evennia_boards.forms import PostEditForm, PostForm
 from evennia_boards.models import Board, Post, PostVersion
 from evennia_boards.permissions import get_character_id, is_staff_user
+from evennia_boards.presentation import (
+    HIDDEN_PARENT_LABEL,
+    PolicyContext,
+    commit_rendered_state,
+    unread_post_count,
+    web_viewer,
+)
 
 
 class BoardListView(ListView):
@@ -45,13 +51,18 @@ class BoardListView(ListView):
     context_object_name = "boards"
 
     def get_queryset(self):
-        latest = Post.objects.filter(board_id=OuterRef("pk")).order_by("-post_number")
-        return Board.objects.annotate(
-            latest_title=Subquery(latest.values("title")[:1]),
-            latest_author=Subquery(latest.values("author_name")[:1]),
-            latest_number=Subquery(latest.values("post_number")[:1]),
-            latest_time=Subquery(latest.values("created_at")[:1]),
-        )
+        return Board.objects.all()
+
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        response["Cache-Control"] = "private, no-store"
+        account = self.request.user
+        if getattr(account, "is_authenticated", False):
+            ids = tuple(getattr(self, "_placeholder_ids", ()))
+            response.add_post_render_callback(
+                lambda rendered: commit_rendered_state(account, placeholder_ids=ids)
+            )
+        return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -63,22 +74,46 @@ class BoardListView(ListView):
             if account.is_authenticated
             else {}
         )
-        counts = {}
-        if account.is_authenticated:
-            # Group by board and read cutoff; query count stays flat in board count.
-            from django.db.models import Q
+        boards = list(context["boards"])
+        context["boards"] = boards
+        policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
+        rows = list(
+            Post.objects.filter(board_id__in=[board.pk for board in boards])
+            .select_related("author", "board", "parent_post", "parent_post__author")
+            .order_by("board_id", "-post_number")
+        )
+        projected = policy.project_many(rows)
+        latest_by_board = {}
+        for row in rows:
+            safe = projected[row.pk]
+            if safe is not None and row.board_id not in latest_by_board:
+                latest_by_board[row.board_id] = safe
 
-            unread = Q(pk__in=[])
-            for board in context["boards"]:
-                unread |= Q(board=board, post_number__gt=markers.get(str(board.pk), 0))
-            counts = dict(
-                Post.objects.filter(unread)
-                .values("board_id")
-                .annotate(count=Count("pk"))
-                .values_list("board_id", "count")
-            )
-        for board in context["boards"]:
-            board.unread_count = counts.get(board.pk, 0)
+        placeholder_ids = []
+        for board in boards:
+            latest = latest_by_board.get(board.pk)
+            board.latest_title = latest.title if latest else None
+            board.latest_author = latest.author_name if latest else ""
+            board.latest_number = latest.post_number if latest else None
+            board.latest_time = latest.created_at if latest else None
+            board.latest_placeholder = bool(latest and latest.is_placeholder)
+            board.has_posts = any(row.board_id == board.pk for row in rows)
+            if latest and latest.is_placeholder:
+                placeholder_ids.append(latest.pk)
+            if account.is_authenticated:
+                candidates = Post.objects.filter(
+                    board=board,
+                    post_number__gt=markers.get(str(board.pk), 0),
+                ).select_related("author", "board", "parent_post", "parent_post__author")
+                board.unread_count = unread_post_count(
+                    policy.viewer,
+                    candidates,
+                    context=policy,
+                    placeholder_ids=placeholder_ids,
+                )
+            else:
+                board.unread_count = 0
+        self._placeholder_ids = tuple(placeholder_ids)
         return context
 
 
@@ -93,17 +128,18 @@ class BoardDetailView(DetailView):
         response = super().render_to_response(context, **response_kwargs)
         response["Cache-Control"] = "private, no-store"
         account = self.request.user
-        posts = context["posts"]
-        if account.is_authenticated and context["show_replies"] and posts:
-            key = str(self.object.pk)
-            last_number = max(post.post_number for post in posts)
-
-            def mark_read(rendered_response):
-                markers = dict(account.attributes.get("boards_web_read", default={}))
-                markers[key] = max(markers.get(key, 0), last_number)
-                account.attributes.add("boards_web_read", markers)
-
-            response.add_post_render_callback(mark_read)
+        if getattr(account, "is_authenticated", False):
+            ids = tuple(getattr(self, "_placeholder_ids", ()))
+            board_id = self.object.pk if context["show_replies"] else None
+            high_water = self._board_high_water if board_id is not None else None
+            response.add_post_render_callback(
+                lambda rendered: commit_rendered_state(
+                    account,
+                    placeholder_ids=ids,
+                    board_id=board_id,
+                    high_water=high_water,
+                )
+            )
         return response
 
     def get_context_data(self, **kwargs):
@@ -114,8 +150,12 @@ class BoardDetailView(DetailView):
         show_replies = self.request.GET.get("show_replies", "1")
         if show_replies != "1":
             posts = posts.filter(parent_post__isnull=True)
-        posts = list(posts)
-        context["posts"] = posts
+        rows = list(posts.select_related("author", "board", "parent_post", "parent_post__author"))
+        self._board_high_water = max((row.post_number for row in rows), default=None)
+        policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
+        projected = policy.project_many(rows)
+        context["posts"] = [projected[row.pk] for row in rows if projected[row.pk] is not None]
+        self._placeholder_ids = tuple(post.pk for post in context["posts"] if post.is_placeholder)
         context["show_replies"] = show_replies == "1"
         context["is_staff"] = is_staff_user(self.request)
         context["character_id"] = get_character_id(self.request.user)
@@ -191,10 +231,32 @@ class PostReplyView(BoardsAuthoringMixin, FormView):
         board = self._get_board()
         parent = self._get_parent_post()
         context["board"] = board
-        context["parent_post"] = parent
-        context["page_title"] = f"Reply to #{parent.post_number}: {parent.title}"
+        policy = PolicyContext(web_viewer(self.request), staff=is_staff_user(self.request))
+        parent_view = policy.project(parent)
+        context["parent_post_number"] = parent.post_number
+        self._placeholder_parent_id = None
+        if parent_view is None:
+            context["parent_post"] = None
+            context["parent_post_label"] = HIDDEN_PARENT_LABEL
+            context["page_title"] = f"Reply to #{parent.post_number}: {HIDDEN_PARENT_LABEL}"
+        else:
+            context["parent_post"] = parent_view
+            context["parent_post_label"] = None
+            if parent_view.is_placeholder:
+                self._placeholder_parent_id = parent.pk
+            context["page_title"] = f"Reply to #{parent.post_number}: {parent_view.title}"
         context["cancel_url"] = reverse("evennia_boards:board-detail", kwargs={"pk": board.pk})
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        parent_id = getattr(self, "_placeholder_parent_id", None)
+        account = self.request.user
+        if parent_id and getattr(account, "is_authenticated", False):
+            response.add_post_render_callback(
+                lambda rendered: commit_rendered_state(account, placeholder_ids=(parent_id,))
+            )
+        return response
 
     def form_valid(self, form):
         character_id = self.get_character()
