@@ -203,9 +203,9 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'building-partners')
     runs-on: ubuntu-latest
-    # Seven profiles of about two minutes each: run in sequence they would
-    # take longer than the sandbox and live-playtest chain, so they stay a
-    # matrix, one fresh environment per cell.
+    # Seven profiles of two to three minutes each: run in sequence they would
+    # be the longest job in the run, so they stay a matrix, one fresh
+    # environment per cell.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -558,10 +558,13 @@ jobs:
           python scripts/ci_install_contribs.py ci_game
       - name: Driver protocol and failure tests
         run: python scripts/test_playtest.py < /dev/null
-      - name: Two fresh deterministic/browser and normal RNG passes
-        run: |
-          python scripts/playtest.py run --suite rp < /dev/null
-          python scripts/playtest.py run --suite rp < /dev/null
+      - name: Fresh deterministic/browser and normal RNG pass
+        run: python scripts/playtest.py run --suite rp < /dev/null
+      # The repeat only adds a second normal-RNG sample and another chance to
+      # surface a flaky case, so it runs nightly, where nobody is waiting (#247).
+      - name: Repeat RP pass on a fresh host (nightly)
+        if: github.event_name == 'schedule'
+        run: python scripts/playtest.py run --suite rp < /dev/null
       - name: Combat consent, reload and ordinary-player commands
         run: python scripts/playtest.py run --suite combat --profile normal --no-browser < /dev/null
       - name: Persistent exploratory JSONL session
