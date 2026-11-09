@@ -61,8 +61,10 @@ def main(argv=None):
     else:
         labels.extend(name for name in ("evennia_lore", "evennia_moderation") if find_spec(name))
     if find_spec("evennia_calendar") is not None:
-        labels.append(
-            "evennia_calendar.test_notice_adapter" if args.minimal_calendar else "evennia_calendar"
+        labels.extend(
+            ["evennia_calendar.test_notice_adapter", "evennia_calendar.test_notice_repairs"]
+            if args.minimal_calendar
+            else ["evennia_calendar"]
         )
     if find_spec("evennia_social") is not None:
         labels.extend(

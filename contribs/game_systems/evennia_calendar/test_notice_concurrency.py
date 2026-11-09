@@ -99,3 +99,24 @@ class CalendarWriterTests(TransactionTestCase):
         results = self.parallel(lambda: notices.route_notice(row.pk))
         self.assertEqual(sorted(results), ["duplicate", "inbox"])
         self.assertEqual(DeliveryReceipt.objects.filter(source="calendar").count(), 1)
+
+    def test_distinct_legacy_aliases_race_to_one_source_receipt(self):
+        from evennia_notices.models import DeliveryReceipt
+
+        rows = [
+            CalendarNotice.objects.create(
+                rsvp=self.rsvp,
+                character=self.rsvp.character,
+                kind="drawn",
+                status=self.rsvp.status,
+                message="Current legacy draw",
+            )
+            for _ in range(2)
+        ]
+        pending = iter([row.pk for row in rows])
+        results = self.parallel(lambda: notices.route_notice(next(pending)))
+        self.assertEqual(sorted(results), ["duplicate", "inbox"])
+        self.assertEqual(DeliveryReceipt.objects.filter(source="calendar").count(), 1)
+        rows = list(CalendarNotice.objects.order_by("pk"))
+        self.assertEqual(rows[0].envelope, rows[1].envelope)
+        self.assertEqual([row.route_state for row in rows], ["inbox", "inbox"])

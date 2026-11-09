@@ -12,7 +12,7 @@ from dataclasses import asdict
 from django.apps import apps
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
 from evennia_links.characters import account_ids
@@ -64,10 +64,55 @@ def _actor_refs(actor):
     raise ValueError("Calendar notice actor must be a saved character or account")
 
 
+def _system_transition_rows(rsvp, character_id, kind, status, actors, origin):
+    """Compatible source records for one provably current system transition."""
+    from .models import CalendarNotice
+
+    if (
+        origin != SYSTEM_ORIGINS.get(kind)
+        or status != rsvp.status
+        or character_id != rsvp.character_id
+    ):
+        return CalendarNotice.objects.none()
+    return (
+        CalendarNotice.objects.filter(
+            rsvp_id=rsvp.pk,
+            character_id=character_id,
+            kind=kind,
+            status=status,
+            actors=actors,
+        )
+        .filter(
+            Q(generation=rsvp.notice_generation, provenance_known=True, origin=origin)
+            | Q(event_key__isnull=True, generation__isnull=True, created_at__gte=rsvp.updated_at)
+        )
+        .order_by("pk")
+    )
+
+
 def _freeze(row):
-    """Bind a legacy row conservatively, then preserve its immutable envelope."""
+    """Choose/freeze one canonical source row independently of routing order.
+
+    The caller holds the RSVP writer lock. Pending legacy system duplicates
+    and their current producer callback share the earliest compatible source
+    row, including a source row already consumed by standalone delivery.
+    """
     if row.envelope:
-        return
+        canonical_id = row.envelope["payload"]["notice"]
+        if canonical_id == row.pk:
+            return row
+        canonical = (
+            type(row)
+            .objects.select_for_update()
+            .select_related("rsvp__event", "character")
+            .get(pk=canonical_id)
+        )
+        if any(
+            getattr(canonical, field) != getattr(row, field)
+            for field in ("rsvp_id", "character_id", "kind", "status", "actors")
+        ):
+            raise ValueError("Calendar source alias does not match its canonical event")
+        return canonical
     rsvp = row.rsvp
     if not row.event_key:
         row.origin = SYSTEM_ORIGINS.get(row.kind, "invitation")
@@ -78,29 +123,29 @@ def _freeze(row):
             and row.created_at >= rsvp.updated_at
         ):
             row.generation = rsvp.notice_generation
-        # Only provably current system duplicates can share an old transition.
-        previous = (
-            type(row)
-            .objects.filter(
-                rsvp_id=row.rsvp_id,
-                character_id=row.character_id,
-                kind=row.kind,
-                status=row.status,
-                generation=row.generation,
-                provenance_known=True,
-                envelope__isnull=False,
-                pk__lt=row.pk,
+    if (
+        row.provenance_known
+        and row.origin == SYSTEM_ORIGINS.get(row.kind)
+        and row.generation == rsvp.notice_generation
+    ):
+        compatible = (
+            _system_transition_rows(
+                rsvp,
+                row.character_id,
+                row.kind,
+                row.status,
+                row.actors,
+                row.origin,
             )
-            .exclude(envelope={})
-            .order_by("pk")
+            .select_related("rsvp__event", "character")
             .first()
-            if row.generation and row.provenance_known
-            else None
         )
-        if previous is not None:
-            row.envelope = previous.envelope
+        if compatible is not None and compatible.pk != row.pk:
+            canonical = _freeze(compatible)
+            row.origin, row.provenance_known = canonical.origin, canonical.provenance_known
+            row.generation, row.envelope = canonical.generation, canonical.envelope
             row.save(update_fields=["origin", "provenance_known", "generation", "envelope"])
-            return
+            return canonical
     event = NoticeEvent(
         row.event_key or f"legacy-calendar-{row.pk}",
         row.created_at,
@@ -120,6 +165,34 @@ def _freeze(row):
     row.envelope = asdict(event)
     row.envelope["occurred_at"] = event.occurred_at.isoformat()
     row.save(update_fields=["origin", "provenance_known", "generation", "envelope"])
+    return row
+
+
+def _record_disposition(row, state, *, acknowledged):
+    """The canonical source claim/disposition also governs its frozen aliases."""
+    now = timezone.now()
+    values = {"route_state": state, "routed_at": now}
+    if acknowledged:
+        values["delivered_at"] = now
+    for field, value in values.items():
+        setattr(row, field, value)
+    row.save(update_fields=list(values))
+    type(row).objects.filter(
+        rsvp_id=row.rsvp_id,
+        character_id=row.character_id,
+        envelope__payload__notice=row.pk,
+    ).exclude(pk=row.pk).update(**values)
+
+
+def _mirror_terminal(alias, canonical):
+    """A historical source receipt wins even when its backend has been removed."""
+    if canonical.delivered_at is not None or canonical.route_state in TERMINAL:
+        alias.route_state = (
+            canonical.route_state if canonical.route_state in TERMINAL else "fallback"
+        )
+        alias.delivered_at = canonical.delivered_at or canonical.routed_at
+        alias.routed_at = canonical.routed_at or canonical.delivered_at
+        alias.save(update_fields=["route_state", "delivered_at", "routed_at"])
 
 
 def _standalone():
@@ -152,9 +225,10 @@ def _finish_fallback(row_pk, character, message, sessions):
 
     row = CalendarNotice.objects.select_related("rsvp__event", "character").get(pk=row_pk)
     if currentness(row).status == "invalid":
-        CalendarNotice.objects.filter(pk=row_pk).update(
-            route_state="invalid", delivered_at=timezone.now()
-        )
+        _record_disposition(row, "invalid", acknowledged=True)
+        return
+    if is_guest(row.character):
+        _finish_guest_fallback(row, sessions)
         return
     source, event = CalendarNoticeSource(), _stored(row)
     eligible = []
@@ -166,19 +240,15 @@ def _finish_fallback(row_pk, character, message, sessions):
         ):
             eligible.append(session)
     if not eligible:
-        CalendarNotice.objects.filter(pk=row_pk).update(route_state="uncertain")
+        _record_disposition(row, "uncertain", acknowledged=False)
         return
     try:
         character.msg(message, session=eligible)
     except Exception:
-        CalendarNotice.objects.filter(pk=row_pk, route_state="attempting").update(
-            route_state="uncertain"
-        )
+        _record_disposition(row, "uncertain", acknowledged=False)
         logger.warning("Calendar standalone delivery uncertain; preserving source receipt")
     else:
-        CalendarNotice.objects.filter(pk=row_pk, route_state="attempting").update(
-            route_state="fallback", delivered_at=timezone.now(), routed_at=timezone.now()
-        )
+        _record_disposition(row, "fallback", acknowledged=True)
 
 
 def _fallback(row):
@@ -186,6 +256,8 @@ def _fallback(row):
 
     from .integrations.notices import CalendarNoticeSource
 
+    if is_guest(row.character):
+        return _guest_fallback(row)
     source, event = CalendarNoticeSource(), _stored(row)
     owners = list(AccountDB.objects.filter(pk__in=account_ids(row.character)))
     outcomes = [
@@ -223,17 +295,23 @@ def _fallback(row):
 def _route_locked(row, context=None, allow_fallback=True, new_event=False):
     from .integrations.notices import currentness, event_for
 
+    canonical = _freeze(row)
+    if canonical.pk != row.pk:
+        consumed = canonical.delivered_at is not None or canonical.route_state in TERMINAL
+        result = _route_locked(canonical, context=context, allow_fallback=allow_fallback)
+        canonical.refresh_from_db()
+        _mirror_terminal(row, canonical)
+        return "duplicate" if consumed else result
     if row.delivered_at is not None or row.route_state in TERMINAL:
         return "duplicate"
     if row.route_state in {"attempting", "uncertain"}:
         return "held"
-    _freeze(row)
     outcome = currentness(row)
     if outcome.status == "invalid":
         result = "invalid"
     elif outcome.status == "defer":
         return "held"
-    elif _standalone():
+    elif is_guest(row.character) or _standalone():
         result = _fallback(row) if allow_fallback else "pending"
     else:
         if new_event:
@@ -253,9 +331,7 @@ def _route_locked(row, context=None, allow_fallback=True, new_event=False):
         else:
             return "retry"
     if result in TERMINAL:
-        row.route_state = result
-        row.routed_at = row.delivered_at = timezone.now()
-        row.save(update_fields=["route_state", "routed_at", "delivered_at"])
+        _record_disposition(row, result, acknowledged=True)
     return result
 
 
@@ -283,30 +359,127 @@ def route_notice(pk, context=None, allow_fallback=True):
     return result
 
 
-def _guest_notify(rsvp, kind, origin, actor):
-    """Disposable guests never create a new source or inbox record."""
+def _guest_session_owned(session, character):
+    """Authorize this connected puppet directly; guests have no web roster."""
+    from evennia.accounts.models import AccountDB
+
+    account = session.get_account()
+    return (
+        isinstance(account, AccountDB)
+        and bool(account.pk)
+        and bool(account.is_authenticated)
+        and session.get_puppet() == character
+        and (account.pk in account_ids(character) or character.account == account)
+    )
+
+
+def _guest_actor_policy(account, actors):
+    """Resolve actual actors and apply the shared strict notice ignore policy."""
+    from evennia.accounts.models import AccountDB
+    from evennia.objects.models import ObjectDB
+
     from evennia_links.ignoring import notice_ignore_status
 
-    if origin is None or (origin in {"invitation", "waitlist_offer"} and actor is None):
+    for reference in actors:
+        model = {"account": AccountDB, "character": ObjectDB}.get(reference.get("kind"))
+        if model is None:
+            return "defer"
+        actor = model.objects.filter(pk=reference.get("id")).first()
+        if actor is None:
+            return "defer"
+        outcome = notice_ignore_status(account, actor)
+        if outcome != "allow":
+            return outcome
+    return "allow"
+
+
+def _guest_fallback(row):
+    """Claim only an existing guest history row; no new retained record is made."""
+    owned = [
+        s for s in _connected_sessions(row.character) if _guest_session_owned(s, row.character)
+    ]
+    if not owned:
+        return "pending"
+    policies = [_guest_actor_policy(s.get_account(), row.actors) for s in owned]
+    if all(policy == "suppress" for policy in policies):
+        return "suppressed"
+    sessions = [
+        session for session, policy in zip(owned, policies, strict=True) if policy == "allow"
+    ]
+    if not sessions:
+        return "pending"
+    row.route_state, row.routed_at = "attempting", timezone.now()
+    row.save(update_fields=["route_state", "routed_at"])
+    transaction.on_commit(lambda: _finish_fallback(row.pk, row.character, "", sessions))
+    return "attempting"
+
+
+def _finish_guest_fallback(row, sessions):
+    """Recheck authoritative source state immediately before every guest socket."""
+    from .integrations.notices import CalendarNoticeSource, currentness
+
+    delivered = invalid = False
+    for session in sessions:
+        live = type(row).objects.select_related("rsvp__event", "character").get(pk=row.pk)
+        outcome = currentness(live)
+        if outcome.status == "invalid":
+            invalid = True
+            continue
+        if (
+            outcome.status != "visible"
+            or not _guest_session_owned(session, live.character)
+            or _guest_actor_policy(session.get_account(), live.actors) != "allow"
+        ):
+            continue
+        text = normalize_rendered(
+            CalendarNoticeSource().render(
+                [_stored(live)], NoticeContext(session.get_account(), live.character)
+            )
+        ).text
+        try:
+            session.msg(text)
+        except Exception:
+            logger.warning("Calendar guest source delivery uncertain; preserving claim")
+        else:
+            delivered = True
+    state = "fallback" if delivered else "invalid" if invalid else "uncertain"
+    _record_disposition(row, state, acknowledged=delivered or invalid)
+
+
+def _guest_notify(rsvp, kind, origin, actor):
+    """Connected guest hints use fresh source truth and retain no new records."""
+    from .models import RSVP
+
+    expected = {
+        "lottery": ("drawn", RSVP.Status.LOTTERY_SELECTED),
+        "waitlist_offer": ("invited", RSVP.Status.INVITED),
+        "invitation": ("invited", RSVP.Status.INVITED),
+        "seated": ("seated", RSVP.Status.CONFIRMED),
+        "reminder": ("reminder", RSVP.Status.CONFIRMED),
+    }.get(origin)
+    if expected is None or (origin in {"invitation", "waitlist_offer"} and actor is None):
         return False
-    event = rsvp.event
-    if (
-        event.is_cancelled
-        or event.is_past
-        or (kind in {"drawn", "invited"} and event.confirmation_deadline <= timezone.now())
-    ):
-        return False
-    shown = False
+    actors, shown = _actor_refs(actor), False
     for session in _connected_sessions(rsvp.character):
-        account = session.get_account()
-        if session.get_puppet() != rsvp.character or (
-            actor and notice_ignore_status(account, actor) != "allow"
+        live = RSVP.objects.select_related("event", "character").filter(pk=rsvp.pk).first()
+        if (
+            live is None
+            or live.character_id is None
+            or live.character_id != rsvp.character_id
+            or live.event_id != rsvp.event_id
+            or live.notice_generation != rsvp.notice_generation
+            or expected != (kind, live.status)
+            or live.event.is_cancelled
+            or live.event.is_past
+            or (kind in {"drawn", "invited"} and live.event.confirmation_deadline <= timezone.now())
+            or not _guest_session_owned(session, live.character)
+            or _guest_actor_policy(session.get_account(), actors) != "allow"
         ):
             continue
         marker = (
-            f"{rsvp.pk}-reminder"
+            f"{live.pk}-reminder"
             if kind == "reminder"
-            else f"{rsvp.pk}-{rsvp.notice_generation}-{origin}"
+            else f"{live.pk}-{live.notice_generation}-{origin}"
         )
         seen = getattr(session, "_calendar_notice_hints", set())
         if marker in seen:
@@ -318,9 +491,13 @@ def _guest_notify(rsvp, kind, origin, actor):
             "invitation": invited_message,
             "seated": seated_message,
             "reminder": reminder_message,
-        }[origin](event)
-        session.msg(message)
-        shown = True
+        }[origin](live.event)
+        try:
+            session.msg(message)
+        except Exception:
+            logger.warning("Calendar guest hint uncertain; transient attempt retained")
+        else:
+            shown = True
     return shown
 
 
@@ -354,9 +531,22 @@ def notify(rsvp, kind, message, *, origin=None, actor=None):
             if kind == "reminder"
             else None
         )
+        existing_transition = (
+            existing_reminder
+            or _system_transition_rows(
+                live,
+                live.character_id,
+                kind,
+                live.status,
+                actors,
+                origin,
+            )
+            .select_related("rsvp__event", "character")
+            .first()
+        )
         row, created = (
-            (existing_reminder, False)
-            if existing_reminder is not None
+            (existing_transition, False)
+            if existing_transition is not None
             else CalendarNotice.objects.get_or_create(
                 event_key=key,
                 defaults=dict(
@@ -389,8 +579,14 @@ def transfer_pending(
     if context is not None and (character is None or not authorize_context(context, character)):
         raise ValueError("Transfer context must own exactly the supplied character")
     scope = f"character-{character.pk}" if character is not None else "all"
-    progress, _ = CalendarNoticeCursor.objects.get_or_create(scope=scope)
-    after = progress.last_pk if cursor is None else int(cursor)
+    guest_scope = character is not None and is_guest(character)
+    if guest_scope:
+        progress = None
+        previous = character.ndb.calendar_notice_cursor or 0
+    else:
+        progress, _ = CalendarNoticeCursor.objects.get_or_create(scope=scope)
+        previous = progress.last_pk
+    after = previous if cursor is None else int(cursor)
     query = CalendarNotice.objects.filter(delivered_at__isnull=True, pk__gt=after).order_by("pk")
     if character is not None:
         query = query.filter(character=character)
@@ -411,7 +607,10 @@ def transfer_pending(
         counts[name] += 1
     complete = len(ids) <= batch_size
     next_cursor = 0 if complete else ids[batch_size - 1]
-    CalendarNoticeCursor.objects.filter(pk=progress.pk).update(last_pk=next_cursor)
+    if guest_scope:
+        character.ndb.calendar_notice_cursor = next_cursor
+    else:
+        CalendarNoticeCursor.objects.filter(pk=progress.pk).update(last_pk=next_cursor)
     return {**counts, "next_cursor": next_cursor, "complete": complete}
 
 

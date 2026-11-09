@@ -72,6 +72,7 @@ class NoticeRunnerTests(unittest.TestCase):
             self.assertNotIn("evennia_notices", namespace["INSTALLED_APPS"])
             self.assertIn("calendar", namespace["LINKS_NOTICE_SOURCES"])
             self.assertIn("evennia_calendar.test_notice_adapter", run.call_args.args[0])
+            self.assertIn("evennia_calendar.test_notice_repairs", run.call_args.args[0])
 
     def test_calendar_suite_runs_when_inbox_is_present(self):
         with tempfile.TemporaryDirectory() as temporary:

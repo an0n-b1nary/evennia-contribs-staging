@@ -402,7 +402,8 @@ class CalendarInboxTests(EvenniaTest):
                 message="Draw",
             )
         result = notices.transfer_pending(self.char1)
-        self.assertEqual(result["transferred"], 2)
+        self.assertEqual(result["transferred"], 1)
+        self.assertEqual(result["duplicate"], 1)
         from evennia_notices.models import DeliveryReceipt
 
         self.assertEqual(DeliveryReceipt.objects.filter(source="calendar").count(), 1)

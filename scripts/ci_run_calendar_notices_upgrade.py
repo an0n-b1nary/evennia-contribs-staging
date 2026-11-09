@@ -21,7 +21,7 @@ from importlib import metadata
 from importlib.util import find_spec
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ci_install_contribs import pip_install_command
 from ci_run_notices_upgrade import ROOT, install, snapshot, source_columns
@@ -107,6 +107,31 @@ def worker(game, phase):
             message="Already delivered",
             delivered_at=timezone.now(),
         )
+        guest_account = create_account(
+            "Calendar upgrade guest",
+            None,
+            secrets.token_urlsafe(48),
+            typeclass="evennia.accounts.accounts.DefaultGuest",
+        )
+        guest_character = create_object(
+            "evennia.objects.objects.DefaultCharacter",
+            key="Calendar upgrade guest character",
+            nohome=True,
+        )
+        guest_account.characters.add(guest_character)
+        guest_event = CalendarEvent.objects.create(
+            title="Legacy guest selection", scheduled_time=timezone.now() + timedelta(days=4)
+        )
+        guest_rsvp = RSVP.objects.create(
+            event=guest_event, character=guest_character, status=RSVP.Status.LOTTERY_SELECTED
+        )
+        guest_notice = CalendarNotice.objects.create(
+            rsvp=guest_rsvp,
+            character=guest_character,
+            kind="drawn",
+            status=guest_rsvp.status,
+            message="Existing guest source history",
+        )
         character.db.last_xp_summary_week = "2026-11-02"
         state_path.write_text(
             json.dumps(
@@ -119,6 +144,9 @@ def worker(game, phase):
                     "receipt": receipt.pk,
                     "selected": selected.pk,
                     "confirmed": confirmed.pk,
+                    "guest_account": guest_account.pk,
+                    "guest_character": guest_character.pk,
+                    "guest_notice": guest_notice.pk,
                     "sources": snapshot(),
                     "columns": source_columns(),
                 },
@@ -126,7 +154,7 @@ def worker(game, phase):
             )
         )
         print(
-            "Created populated Calendar0004 fixture: 2 duplicate pending selections, 2 provenance holds, delivered reminder"
+            "Created populated Calendar0004 fixture: 2 duplicate pending selections, 2 provenance holds, offline guest source history, delivered reminder"
         )
         return
     state = json.loads(state_path.read_text())
@@ -143,7 +171,7 @@ def worker(game, phase):
         ), "Original source columns changed during additive migration"
         assert character.db.last_xp_summary_week == "2026-11-02"
         first = notices.transfer_pending()
-        assert first["transferred"] == 2 and first["held"] == 2, first
+        assert first["transferred"] == 1 and first["duplicate"] == 1 and first["held"] == 3, first
         from evennia_links.notices import NoticeContext
         from evennia_notices.models import DeliveryReceipt, NoticeEvent
         from evennia_notices.services import mutate, project
@@ -168,8 +196,18 @@ def worker(game, phase):
         assert (
             CalendarNotice.objects.filter(rsvp_id=state["confirmed"], kind="reminder").count() == 1
         )
+        # Leave an alias pending until AFTER actual Inbox removal; the source
+        # canonical receipt must prevent fallback without consulting Inbox models.
+        state["late_alias"] = CalendarNotice.objects.create(
+            rsvp=RSVP.objects.get(pk=state["selected"]),
+            character=character,
+            kind="drawn",
+            status=RSVP.Status.LOTTERY_SELECTED,
+            message="Deferred legacy alias",
+        ).pk
+        state_path.write_text(json.dumps(state))
         print(
-            "Populated Calendar upgrade preserved source IDs/history/reminder receipt; imported one canonical event and held2 uncertain rows"
+            "Populated Calendar upgrade preserved source IDs/history/reminder receipt; imported1 event, acknowledged1 alias, held2 uncertain and1 offline guest rows"
         )
     elif phase == "absent":
         assert find_spec("evennia_notices") is None
@@ -185,6 +223,33 @@ def worker(game, phase):
         for pk in state["pending"]:
             assert notices.route_notice(pk) == "duplicate"
         assert notices.route_notice(state["held"]) == "held"
+        no_replay_session = SimpleNamespace(
+            get_account=lambda: account, get_puppet=lambda: character, msg=Mock()
+        )
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[no_replay_session]),
+            patch.object(type(character), "msg") as old_message,
+        ):
+            assert notices.route_notice(state["late_alias"]) == "duplicate"
+        old_message.assert_not_called()
+        no_replay_session.msg.assert_not_called()
+        guest_account = AccountDB.objects.get(pk=state["guest_account"])
+        guest_character = ObjectDB.objects.get(pk=state["guest_character"])
+        guest_session = SimpleNamespace(
+            get_account=lambda: guest_account, get_puppet=lambda: guest_character, msg=Mock()
+        )
+        with patch.object(notices, "_connected_sessions", return_value=[]):
+            notices.route_notice(state["guest_notice"])
+        assert CalendarNotice.objects.get(pk=state["guest_notice"]).delivered_at is None
+        with patch.object(notices, "_connected_sessions", return_value=[guest_session]):
+            assert notices.route_notice(state["guest_notice"]) == "fallback"
+            assert notices.route_notice(state["guest_notice"]) == "duplicate"
+        assert guest_session.msg.call_count == 1
+        from evennia_calendar.models import CalendarNoticeCursor
+
+        cursor_count = CalendarNoticeCursor.objects.count()
+        notices.deliver_pending(guest_character)
+        assert CalendarNoticeCursor.objects.count() == cursor_count
         event = CalendarEvent.objects.create(
             title="Standalone post-upgrade", scheduled_time=timezone.now() + timedelta(days=4)
         )
@@ -202,12 +267,17 @@ def worker(game, phase):
         state["fallback"] = CalendarNotice.objects.get(rsvp=rsvp).pk
         state_path.write_text(json.dumps(state))
         print(
-            "Inbox distribution/import/app physically absent; old transfers did not replay, new fallback delivered once"
+            "Inbox distribution/import/app physically absent; pending alias did not replay, legacy real guest and new fallback each delivered once"
         )
     else:
         from evennia_notices.models import DeliveryReceipt
 
-        for pk in [*state["pending"], state["fallback"]]:
+        for pk in [
+            *state["pending"],
+            state["fallback"],
+            state["late_alias"],
+            state["guest_notice"],
+        ]:
             assert notices.route_notice(pk) == "duplicate"
         assert notices.transfer_pending()["transferred"] == 0
         assert DeliveryReceipt.objects.filter(source="calendar").count() == 1

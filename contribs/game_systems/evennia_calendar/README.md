@@ -319,3 +319,15 @@ only to pages this contrib or its required dependencies ship. With
 evennia-guides installed they appear on its web guide; without it they're
 ignored. To restate one for your game, add a page with the same key to
 `GUIDES_DIRS`.
+
+Compatible legacy duplicates and a replay of their current system producer use
+one deterministic canonical source record, independent of migration order.
+Its delivery, suppression or uncertain-attempt receipt governs every alias
+even after Inbox removal. Source-row counts can therefore include duplicate
+alias acknowledgements while retaining one Inbox event.
+
+New guest notices and per-guest continuation cursors remain transient. Existing
+pre-upgrade guest source rows are preserved and can be acknowledged once by
+connected-only delivery, with fresh RSVP/event/recipient/generation and ignore
+checks. An offline guest is never falsely acknowledged; an uncertain socket
+attempt stays recorded on the existing canonical source row without replay.
