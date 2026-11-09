@@ -1448,7 +1448,7 @@ class TestNavCoversEveryWebSurface(EvenniaTest):
 
         self.assertEqual(
             [item["label"] for item in menu["account"]["personal"]],
-            ["My Building", "My XP", "My Tickets", "My Lore"],
+            ["My Notices", "My Building", "My XP", "My Tickets", "My Lore"],
         )
         self.assertEqual(menu["account"]["staff"], [])
 
