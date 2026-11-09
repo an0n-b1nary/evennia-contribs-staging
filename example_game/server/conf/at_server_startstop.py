@@ -87,6 +87,13 @@ def at_server_start():
 
         ensure_xp_batch_script_running()
 
+    if apps.is_installed("evennia_notices"):
+        from evennia_notices.checks import validate_configuration
+        from evennia_notices.scripts import ensure_notice_maintenance
+
+        validate_configuration()
+        ensure_notice_maintenance()
+
 
 def at_server_stop():
     """

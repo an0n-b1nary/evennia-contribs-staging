@@ -46,6 +46,8 @@ def audit(snapshot):
 
 def build(scratch):
     """Worker: initialize Evennia without starting a portal/server."""
+    if scratch.parent != ROOT / "ci_game" or not scratch.name.startswith("golden-"):
+        raise ValueError("Golden fixtures require an isolated local builder directory")
     os.chdir(scratch)
     sys.path.insert(0, str(scratch))
     os.environ["DJANGO_SETTINGS_MODULE"] = "server.conf.settings"
@@ -63,11 +65,24 @@ def build(scratch):
 
     credentials = json.loads((scratch / "credentials.json").read_text(encoding="utf-8"))
     call_command("migrate", interactive=False, verbosity=0)
-    AccountDB.objects.create_superuser(**credentials)
+    admin = AccountDB.objects.create_superuser(**credentials)
     initial_setup.create_objects()
     initial_setup.at_initial_setup()
     ServerConfig.objects.conf("last_initial_setup_step", "done")
     call_command("seed_sandbox", verbosity=0)
+    from world.sandbox.notices_seed import emit_demo_notices
+
+    character = next(iter(admin.characters.all()), None)
+    if character is None:
+        raise ValueError("Golden builder requires its explicitly created admin character")
+    from evennia.objects.models import ObjectDB
+
+    for kind in ("account", "character", "history", "offer"):
+        if not ObjectDB.objects.filter(
+            db_tags__db_key=f"notice-template-{kind}", db_tags__db_category="sandbox"
+        ).exists():
+            raise ValueError("Golden notices require exact synthetic subject templates")
+    emit_demo_notices(admin, character)
     connections.close_all()
 
 

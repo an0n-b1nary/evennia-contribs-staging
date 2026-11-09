@@ -4,6 +4,10 @@ All notable changes to `evennia_social` are documented here.
 
 ## [Unreleased]
 
+## 0.11.1 — 2026-11-08
+
+- Apply the existing OOC contact boundary to notices, independently of presentation preferences.
+
 ## [0.11.0] — 2026-11-07
 
 - Default ignored live channel lines to anonymous placeholders; add the

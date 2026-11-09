@@ -26,10 +26,10 @@ together in their own game.
 The bridge-ownership convention in the README is the generalizable pattern
 those models embody.
 
-**NotificationDispatcher** — the source game's `world/notifications/` app is
-an empty stub (Phase 8 work); the dispatcher architecture is planned but not
-yet implemented. It will be extracted in a future release once built and
-battle-tested in the source game.
+**NotificationDispatcher** — Links now supplies a model-free optional notice
+source/routing contract. The separately installable `evennia-notices` package
+provides durable inbox delivery. Production source adapters and pending-store
+migration remain deferred; existing source queues are unchanged.
 
 ## Rename map
 

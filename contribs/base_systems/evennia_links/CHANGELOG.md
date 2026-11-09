@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.8.15 — 2026-11-08
+
+- Add the model-free optional notices routing/source contract and strict notice ignore evaluation.
+
 ## 0.8.14 — 2026-11-06
 
 - Add optional, fail-open presentation filtering and a transaction-aware

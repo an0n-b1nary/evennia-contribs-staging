@@ -62,3 +62,10 @@ The [[glossary-coin|coin]] is this sandbox's currency. The [glossary](/guide/glo
 ## How these pages work
 
 Each page here is a Markdown file in `world/guides/`. Some pages come from the contribs themselves; a page in this folder with the same key replaces a contrib's page.
+
+## Personal alerts
+
+[[notices]] explains the **My Notices** inbox and `+notices`. Try
+`+sandbox/notices` while playing your own character to opt in to synthetic
+examples. Simulated offers have their own confirm/decline commands; reading an
+alert never resolves an offer or reads its underlying source.

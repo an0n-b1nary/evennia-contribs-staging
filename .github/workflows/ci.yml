@@ -67,6 +67,7 @@ jobs:
           python scripts/test_ci_install_contribs.py
           python scripts/test_ci_profile.py
           python scripts/test_ci_run_partner_tests.py
+          python -m unittest discover -s scripts -p test_ci_run_notices_tests.py
           python scripts/test_ci_scope.py
 
   scope:
@@ -739,3 +740,44 @@ jobs:
           python scripts/ci_run_party_tests.py ci_game --phase contest-absent --absent evennia_rp_contest
           pip install wheels/evennia_rp_contest-*.whl
           python scripts/ci_run_party_tests.py ci_game --phase contest-restored
+
+  notices-partners:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'notices-partners')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
+      - name: All real partners
+        if: ${{ !cancelled() }}
+        run: python scripts/ci_profile.py -- python scripts/ci_run_notices_tests.py {game}
+      - name: Physically absent inbox
+        if: ${{ !cancelled() }}
+        run: python scripts/ci_profile.py --exclude evennia-notices -- python scripts/ci_run_notices_tests.py {game} --absent evennia_notices
+      - name: Inbox without Social
+        if: ${{ !cancelled() }}
+        run: python scripts/ci_profile.py --exclude evennia-social -- python scripts/ci_run_notices_tests.py {game} --absent evennia_social
+      - name: Minimal independent inbox
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_notices --
+          python scripts/ci_run_notices_tests.py {game} --minimal
+          --absent evennia_social --absent evennia_calendar
+          --absent evennia_lore --absent evennia_boards
+          --absent evennia_accessibility
+      - name: Populated pre-foundation upgrade
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_notices_upgrade.py {game}
+          --base 1c6f18a04971d59bc2b8859d167e0f74804de7f7

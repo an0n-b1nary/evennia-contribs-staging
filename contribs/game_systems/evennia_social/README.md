@@ -496,3 +496,11 @@ without Crafting; its room sensory commands append fixture lines when installed.
 Tuple-tagged `crafting_event` messages from hidden ordinary players are fully
 suppressed, without a pose placeholder or header. Staff keep existing bypass
 semantics. Item events never enter Social/Posing's ordinary pose processing.
+
+## Personal notice ignores
+
+When Links requests `kind="notices"`, Social uses its existing OOC contact
+boundary (`blocks_channel`): hidden/full named and legacy full ignores, including
+posts exceptions, suppress notice text and counts. Boards/channel placeholder
+preferences do not change this boundary. Existing staff sender/viewer bypasses
+apply. Social does not require the optional Inbox package.

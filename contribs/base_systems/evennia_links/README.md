@@ -762,3 +762,14 @@ Unknown, ambiguous and stacked switches stop before parsing and lookups. Exact
 matches and unique prefixes are case-insensitive. Use an empty tuple for a
 command with no switches. `whole_number(value)` raises a readable `ValueError`
 for invalid numeric input; catch it at the command boundary as a refusal.
+
+## Optional personal notices
+
+`evennia_links.notices` is model-free and safe before app readiness. Register
+source adapters in `LINKS_NOTICE_SOURCES` and call `notify` with a stable
+`NoticeEvent` and explicit `NoticeContext`. If the separately installed
+`evennia-notices` app is unavailable, a source-owned fallback preserves its
+pending work; the default sends only safely evaluated connected messages and
+returns `fallback_pending` offline. Backend uncertainty never fans out to
+fallback. See the Notices README for the atomic transfer and source receipt
+protocol; existing production source queues are unaffected.

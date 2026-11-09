@@ -311,6 +311,9 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
 
         # Boards support account-level (pre-puppet) reading and subscription,
         # per evennia_boards' README — expose +bb without a puppet too.
+        for command in _optional_commands("evennia_notices", "CmdNotices"):
+            self.add(command)
+
         self.add(CmdBoard)
 
         # Accessibility (evennia_accessibility). Account-level so the toggle is

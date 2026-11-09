@@ -13,6 +13,7 @@ import logging
 from collections.abc import Mapping
 
 from django.db import transaction
+from django.db.models import F
 from evennia.accounts.models import AccountDB
 
 from evennia_links.characters import account_ids
@@ -173,6 +174,7 @@ def blocks_channel(viewer, sender):
 
 
 def _locked(account):
+    AccountDB.objects.filter(pk=account.pk).update(last_login=F("last_login"))
     AccountDB.objects.select_for_update().get(pk=account.pk)
     account.attributes.reset_cache()
 

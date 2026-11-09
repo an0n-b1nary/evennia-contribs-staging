@@ -1,0 +1,14 @@
+{% extends "evennia_notices/base.html" %}
+{% block notice_content %}
+<h2>{% if history %}Notice history{% else %}Your inbox{% endif %}</h2>
+{% if not selected_character %}<p>Choose a character on the website to see that character's notices. Account notices appear here.</p>{% endif %}
+{% if not history %}
+<h3>Awaiting your decision</h3>
+<ul class="evennia-notices-list">{% for item in pending %}{% include "evennia_notices/item.html" %}{% empty %}<li>No outstanding decisions.</li>{% endfor %}</ul>
+<h3>Routine alerts</h3>
+{% endif %}
+<ul class="evennia-notices-list">
+{% for item in notices %}{% include "evennia_notices/item.html" %}{% empty %}<li>No notices. Source activity will appear here. Use +notices in game to check your inbox.</li>{% endfor %}
+</ul>
+{% if next_cursor %}<a href="?cursor={{ next_cursor|urlencode }}">Next page</a>{% endif %}
+{% endblock %}
