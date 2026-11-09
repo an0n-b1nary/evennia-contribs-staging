@@ -223,12 +223,6 @@ def route(recipient, *, source, event, context=None, transfer_id=None):
                     raise RetryRouting
                 viewer_outcomes[account.pk] = (outcome, current, mode)
             suppressed = len(viewer_suppressed) == len(policy_accounts)
-            eligible = [
-                value for aid, value in viewer_outcomes.items() if aid not in viewer_suppressed
-            ]
-            outcome, current, mode = (
-                eligible[0] if eligible else next(iter(viewer_outcomes.values()))
-            )
             row = None
             if not suppressed:
                 sources = set(
@@ -272,6 +266,16 @@ def route(recipient, *, source, event, context=None, transfer_id=None):
                             notice_id=parent_id, inactive_at__isnull=True
                         ).exists():
                             Notice.objects.filter(pk=parent_id).update(retired_at=now)
+                if event.replacement_key:
+                    # A slot whose constituents all went inactive (e.g. a decision that
+                    # maintenance resolved) still holds the active-slot key; free it.
+                    Notice.objects.filter(
+                        recipient=owner,
+                        source=source,
+                        replacement_key=event.replacement_key,
+                        retired_at__isnull=True,
+                        is_compacted=False,
+                    ).exclude(events__inactive_at__isnull=True).update(retired_at=timezone.now())
                 for collision_attempt in range(3):
                     try:
                         with transaction.atomic():
@@ -369,7 +373,7 @@ def project(
     envelopes = Notice.objects.filter(recipient__in=owners).order_by("created_at", "pk")
     if source:
         envelopes = envelopes.filter(source=source)
-    if public_ref:
+    if public_ref is not None:
         envelopes = envelopes.filter(public_ref=public_ref)
     if status not in {"history", "all"}:
         envelopes = envelopes.filter(

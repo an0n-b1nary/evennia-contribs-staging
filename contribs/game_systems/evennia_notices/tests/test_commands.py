@@ -49,3 +49,8 @@ class CommandTests(EvenniaCommandTest):
         self.assertIn("Routine alerts", output)
         for args in ("/unknown", "/read/clear missing"):
             self.assertIn("usage", self.call(CmdNotices(), args).lower())
+
+    def test_read_or_clear_without_notice_shows_usage(self):
+        for switch in ("read", "clear"):
+            self.assertIn(f"Usage: +notices/{switch}", self.call(CmdNotices(), f"/{switch}"))
+        self.assertIsNone(Notice.objects.get().events.get().read_at)

@@ -20,6 +20,8 @@ import tempfile
 from datetime import timedelta
 from pathlib import Path
 
+from ci_install_contribs import pip_install_command
+
 ROOT = Path(__file__).resolve().parent.parent
 PREFIXES = ("evennia_calendar_", "evennia_lore_", "evennia_moderation_", "evennia_boards_")
 
@@ -29,10 +31,7 @@ def install(tree):
     packages = sorted((tree / "contribs").glob("*/*/pyproject.toml"))
     subprocess.run(
         [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
+            *pip_install_command(),
             "--no-deps",
             "--no-build-isolation",
             *[part for p in packages for part in ("-e", str(p.parent))],

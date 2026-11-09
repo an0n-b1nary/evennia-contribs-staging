@@ -38,6 +38,9 @@ class CmdNotices(StrictSwitchMixin, MuxCommand):
             context = from_command(self.caller, self.session)
             switch = self.switches[0] if self.switches else ""
             if switch in {"read", "clear"}:
+                if not self.args.strip():
+                    self.msg(f"Usage: +notices/{switch} <notice>")
+                    return
                 item = mutate(context, self.args.strip(), switch)
                 if switch == "read":
                     instructions = "\n".join(

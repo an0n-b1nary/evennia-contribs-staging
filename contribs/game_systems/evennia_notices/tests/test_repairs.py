@@ -274,3 +274,20 @@ class ReviewRepairs(ServicesTests):
         self.assertEqual(result.status, "retained")
         self.assertEqual(project(self.context), [])
         self.assertEqual(len(project(NoticeContext(self.account2, self.char1))), 1)
+
+    def test_resolved_decision_slot_accepts_replacement(self):
+        self.emit(
+            self.event(
+                replacement_key="slot", action_kind="waitlist_offer", payload={"pending": False}
+            )
+        )
+        maintain()
+        self.assertEqual(self.emit(self.event("two", replacement_key="slot")).status, "retained")
+        self.assertEqual(Notice.objects.filter(retired_at__isnull=True).count(), 1)
+
+    def test_blank_reference_never_selects_a_notice(self):
+        self.emit()
+        for operation in ("read", "clear"):
+            with self.assertRaises(ValueError):
+                mutate(self.context, "", operation)
+        self.assertIsNone(Stored.objects.get().read_at)
