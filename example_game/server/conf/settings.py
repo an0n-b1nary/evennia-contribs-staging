@@ -54,6 +54,7 @@ EVENNIA_COMMS_IDENTITY = "character"
 # base models are imported at their app-load time).
 INSTALLED_APPS += [
     "evennia_links",
+    "evennia_notices",
     "evennia_building",
     "evennia_economy",
     "evennia_rp_resources",
@@ -920,3 +921,11 @@ try:
     from server.conf.secret_settings import *
 except ImportError:
     print("secret_settings.py file not found or failed to import.")
+
+######################################################################
+# Personal notices — source-owned privacy; existing queues stay independent
+######################################################################
+LINKS_NOTICE_SOURCES = {"sandbox-notices": "world.sandbox.notices.SandboxNoticeSource"}
+NOTICES_ENABLED = True
+NOTICES_RETENTION_DAYS = 30
+NOTICES_ROUTINE_LIMIT = 500

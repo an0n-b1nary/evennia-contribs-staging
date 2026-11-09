@@ -34,6 +34,15 @@ EVERY_CONTRIB = None
 # reads). EVERY_CONTRIB marks jobs that load the whole example game. Partners
 # a job only verifies as absent aren't listed: their changes can't reach it.
 JOBS = {
+    "notices-partners": (
+        EVERY_CONTRIB,
+        (
+            "scripts/ci_run_notices_tests.py",
+            "scripts/ci_notices_partner_tests.py",
+            "scripts/ci_run_notices_upgrade.py",
+            "example_game/",
+        ),
+    ),
     "lore-items-partners": (
         {"evennia_lore", "evennia_rp_crafting", "evennia_rp_resources", "evennia_rp_equipment"},
         ("scripts/ci_run_lore_item_tests.py", "example_game/"),

@@ -1,0 +1,2 @@
+<li><a href="{% url 'evennia_notices:detail' item.notice.public_ref %}">{{ item.text }}</a>
+<dl><dt>Source</dt><dd>{{ item.label }}</dd><dt>Date</dt><dd>{{ item.notice.created_at }}</dd><dt>Status</dt><dd>{% if item.outstanding %}<span class="badge badge-warning">Pending decision</span>{% elif item.cleared %}<span class="badge badge-secondary">Cleared</span>{% elif item.unread %}<span class="badge badge-primary">Unread</span>{% else %}<span class="badge badge-secondary">Read</span>{% endif %}</dd></dl></li>

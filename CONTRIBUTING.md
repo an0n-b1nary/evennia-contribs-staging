@@ -502,3 +502,13 @@ retained Party data/build hashes, resolution without its modifiers, restored
 old modifiers, unmodified packets created absent, and shelving. No live host
 or production database belongs in this recipe. The full sandbox gate and
 live combat suite also exercise Party with actual optional partners.
+
+## Notice partner profiles
+
+`python scripts/ci_profile.py -- python scripts/ci_run_notices_tests.py {game}`
+checks installed routing. Add `--exclude evennia-notices` before `--` and
+`--absent evennia_notices` after the game to prove physical Inbox absence.
+The notices-partners CI job also covers Social absence and a fresh Links/Inbox
+only package selection. Missing distributions, import failure, absent app
+registration and positive test counts are asserted. Sources remain responsible
+for durable route receipts across Inbox removal; foundation adds no adapters.

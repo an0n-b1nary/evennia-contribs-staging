@@ -69,3 +69,24 @@ def notify_ignore_policy_changing(viewer, kind=None):
     return ignore_policy_changing.send(
         sender=notify_ignore_policy_changing, viewer=viewer, kind=kind
     )
+
+
+def notice_ignore_status(viewer, sender, policy_cache=None):
+    """Return allow/suppress/defer for strict OOC notice policy.
+
+    Unlike presentation filtering, provider errors must never expose activity.
+    Both masking and hiding suppress a notice's text and count completely.
+    """
+    suppressed = False
+    for _, result in ignore_mode_requested.send_robust(
+        sender=notice_ignore_status,
+        viewer=viewer,
+        sender_object=sender,
+        kind="notices",
+        notice_cache=policy_cache,
+    ):
+        if isinstance(result, Exception) or result not in (None, "hide", "placeholder"):
+            logger.warning("Notice ignore provider unavailable; deferring activity")
+            return "defer"
+        suppressed = suppressed or result is not None
+    return "suppress" if suppressed else "allow"

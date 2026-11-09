@@ -1,0 +1,11 @@
+{% extends "website/base.html" %}
+{% load static %}
+{% block titleblock %}My Notices{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'evennia_notices/css/evennia_notices.css' %}">
+<div class="evennia-notices-page">
+<h1>My Notices</h1>
+<nav aria-label="Notice navigation"><a href="{% url 'evennia_notices:inbox' %}">Inbox</a> · <a href="{% url 'evennia_notices:history' %}">History</a> · <a href="{% url 'evennia_notices:preferences' %}">Preferences</a></nav>
+{% block notice_content %}{% endblock %}
+</div>
+{% endblock %}

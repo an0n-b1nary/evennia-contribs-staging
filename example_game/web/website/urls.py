@@ -97,5 +97,8 @@ if apps.is_installed("evennia_scenes"):
 if apps.is_installed("evennia_xp"):
     urlpatterns.append(path("xp/", include("evennia_xp.urls")))
 
+if apps.is_installed("evennia_notices"):
+    urlpatterns.append(path("notices/", include("evennia_notices.urls")))
+
 # read by Django
 urlpatterns = urlpatterns + evennia_website_urlpatterns

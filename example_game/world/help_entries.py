@@ -26,6 +26,11 @@ Each dict is on the form
 
 HELP_ENTRY_DICTS = [
     {
+        "key": "personal notices",
+        "category": "Communication",
+        "text": "Use +notices for personal alerts and +notices/settings for account-wide preferences. Reading does not resolve a source decision. The website My Notices and guide /guide/notices/ share the same state. Try +sandbox/notices for synthetic examples.",
+    },
+    {
         "key": "evennia",
         "aliases": ["ev"],
         "category": "General",

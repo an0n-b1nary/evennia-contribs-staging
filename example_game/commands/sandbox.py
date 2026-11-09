@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """
 Self-service sandbox controls for the demo game.
 
@@ -15,6 +17,8 @@ feature surface, not less.
 
 from evennia.commands.default.muxcommand import MuxCommand
 from evennia.utils import logger
+
+from evennia_links.command_syntax import StrictSwitchMixin
 
 BUILDER_PERM = "Builder"
 
@@ -57,7 +61,7 @@ def _stray_rooms():
     return [room for room in DefaultRoom.objects.all_family() if room.id not in known]
 
 
-class CmdSandbox(MuxCommand):
+class CmdSandbox(StrictSwitchMixin, MuxCommand):
     """
     Sandbox controls: promote yourself, and rebuild the world.
 
@@ -65,6 +69,9 @@ class CmdSandbox(MuxCommand):
         +sandbox                  - Status, and what each level unlocks
         +sandbox/builder on       - Grant yourself the Builder permission
         +sandbox/builder off      - Drop it again
+        +sandbox/notices          - Opt in your own account and character to examples
+        +sandbox/notice-confirm <offer> - Confirm a simulated offer
+        +sandbox/notice-decline <offer> - Decline a simulated offer
         +sandbox/reset            - (Admin) Rebuild the seeded world
         +sandbox/transplant       - (Builder) Preview the two-floor draft on the world map
 
@@ -81,6 +88,14 @@ class CmdSandbox(MuxCommand):
     off the Sandbox Plaza is there to show exactly that.
     """
 
+    switch_options = (
+        "builder",
+        "reset",
+        "transplant",
+        "notices",
+        "notice-confirm",
+        "notice-decline",
+    )
     key = "+sandbox"
     aliases = []  # noqa: RUF012
     help_category = "Sandbox"
@@ -92,7 +107,32 @@ class CmdSandbox(MuxCommand):
             return
 
         switch = self.switches[0].lower()
-        if switch == "builder":
+        if switch in {"notices", "notice-confirm", "notice-decline"}:
+            from django.apps import apps
+
+            if not apps.is_installed("evennia_notices"):
+                self.msg("The example inbox is unavailable.")
+                return
+            from world.sandbox.notices_seed import emit_demo_notices, resolve_demo_offer
+
+            from evennia_notices.context import from_command
+
+            try:
+                context = from_command(self.caller, self.session)
+                if switch == "notices":
+                    emit_demo_notices(context.account, context.character)
+                    self.msg("Example notices ready. Use +notices; offers are simulations.")
+                else:
+                    state = resolve_demo_offer(
+                        context.account,
+                        context.character,
+                        self.args.strip(),
+                        switch == "notice-confirm",
+                    )
+                    self.msg(f"Simulated offer {state}.")
+            except ValueError as exc:
+                self.msg(str(exc))
+        elif switch == "builder":
             self._do_builder()
         elif switch == "transplant":
             self._do_transplant()

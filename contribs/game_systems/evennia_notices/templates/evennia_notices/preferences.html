@@ -1,0 +1,5 @@
+{% extends "evennia_notices/base.html" %}
+{% block notice_content %}
+<h2>Notice preferences</h2><p>These settings apply to your account across characters and sessions. Summary stores routine alerts quietly. Immediate also sends a connected hint. Off suppresses new routine alerts; outstanding decisions remain in summaries. Reading a notice does not read its source.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary" type="submit">Save preference</button></form>
+{% endblock %}

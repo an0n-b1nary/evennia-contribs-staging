@@ -2087,3 +2087,19 @@ The archive is for staff filesystem access and is never the source of channel
 history or the channel website. Keep the server stopped during this cutover
 so pending threaded log writes cannot race the archival. Resolve duplicate
 Welcome names/tags before seeding. IC channel logs already use character names.
+
+### Personal notices
+
+Install `contribs/game_systems/evennia_notices` after Links. The reference game
+registers its app, account command, My Notices navigation, website and daily
+maintenance. `+notices` works at character select and while playing; the website
+uses only its explicitly selected owned character. `+sandbox/notices` opts only
+your own account/current character into labelled synthetic examples, including
+a simulated pending offer. `+sandbox/notice-confirm <offer>` and
+`+sandbox/notice-decline <offer>` resolve that simulation. Generic seeding creates
+subjects only and never chooses recipients. Golden building explicitly opts in
+its one purpose-made admin. Production source delivery queues are unchanged.
+
+Read/clear and account-wide immediate/summary/off preferences are explained in
+the packaged Personal notices guide. Read alerts do not read their underlying
+source or resolve outstanding decisions.

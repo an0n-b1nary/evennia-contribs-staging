@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evennia-notices"
+version = "0.1.0"
+description = "Durable personal notices with source-owned privacy and action state."
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+authors = [{name = "an0n-b1nary"}]
+requires-python = ">=3.12"
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.15"]
+classifiers = ["Framework :: Django", "License :: OSI Approved :: BSD License", "Programming Language :: Python :: 3.12", "Programming Language :: Python :: 3.13", "Programming Language :: Python :: 3.14"]
+
+[tool.setuptools]
+packages = ["evennia_notices", "evennia_notices.migrations", "evennia_notices.tests", "evennia_notices.management", "evennia_notices.management.commands"]
+
+[tool.setuptools.package-dir]
+evennia_notices = "."
+
+[tool.setuptools.package-data]
+evennia_notices = ["templates/evennia_notices/*.html", "static/evennia_notices/css/*.css", "guides/*.md"]

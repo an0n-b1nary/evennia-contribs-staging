@@ -1,0 +1,8 @@
+{% extends "evennia_notices/base.html" %}
+{% block notice_content %}
+<h2>Notice</h2><p>{{ item.text }}</p>
+<dl><dt>Source</dt><dd>{{ item.label }}</dd><dt>Date</dt><dd>{{ item.notice.created_at }}</dd><dt>Status</dt><dd>{% if item.outstanding %}Pending decision{% elif item.cleared %}Cleared{% elif item.unread %}Unread{% else %}Read{% endif %}</dd></dl>
+<form method="post" action="{% url 'evennia_notices:read' item.notice.public_ref %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Mark read</button></form>
+{% if item.outstanding %}<p>Reading does not resolve this decision. Follow the source instructions.</p>{% else %}<form method="post" action="{% url 'evennia_notices:clear' item.notice.public_ref %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Clear notice</button></form>{% endif %}
+<ul>{% for label, command, url in item.actions %}<li>{% if url %}<a href="{{ url }}">{{ label }}</a>{% else %}{{ label }}{% endif %}{% if command %}: <code>{{ command }}</code>{% endif %}</li>{% empty %}<li>No source action is required.</li>{% endfor %}</ul>
+{% endblock %}

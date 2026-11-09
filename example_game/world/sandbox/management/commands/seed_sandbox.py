@@ -147,6 +147,9 @@ class Command(BaseCommand):
             return
 
         created = self._rebuild()
+        from world.sandbox.notices_seed import seed_subject_templates
+
+        seed_subject_templates(reset=True)
         self._say(self.style.SUCCESS(f"Created: {created}"))
 
     def _say(self, message):
