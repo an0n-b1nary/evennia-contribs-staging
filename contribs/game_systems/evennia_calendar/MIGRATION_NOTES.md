@@ -122,3 +122,17 @@ The source registered `ensure_calendar_script_running()` via a project-level
 server-start hook. The contrib cannot auto-register this because Evennia has no
 server-start signal. Adopters must add the call to `at_server_start()` manually.
 See `README.md` for the snippet.
+
+## Shared Inbox adapter (0.6.1)
+
+Migration0005 is additive and preserves all source rows and reminder receipts.
+Calendar's source queue holds immutable event envelopes plus durable route
+receipts; none of these metadata fields is exposed through the public Calendar
+API. RSVP lifecycle saves rotate a generation token so status cycles cannot
+revive an old notice. Bulk status/recipient writes bypass this contract.
+Legacy human authors or ambiguous pre-upgrade generations remain held rather
+than inferred from display strings. Management tooling reports the holds.
+Adapter behavior and file-backed concurrent writers are in the separate
+`test_notice_adapter.py` and `test_notice_concurrency.py` modules, while existing
+Calendar behavior remains in `tests.py`. Physical absence and populated upgrade
+runners live in `scripts/`; no deployed database belongs in those tests.

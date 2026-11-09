@@ -40,8 +40,11 @@ No AbstractArchived (use is_cancelled — events have a point in time).
 No AbstractVersion (descriptions are not version-tracked at this layer).
 """
 
+import uuid
+
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, router, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from evennia_links import AbstractAuthoredLink
@@ -581,6 +584,8 @@ class RSVP(models.Model):
             "that produced this concrete RSVP row."
         ),
     )
+    notice_generation = models.UUIDField(default=uuid.uuid4, editable=False)
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -593,6 +598,59 @@ class RSVP(models.Model):
 
     def __str__(self):
         return f"RSVP: {self.character_name} → {self.event.title} [{self.get_status_display()}]"
+
+    def save(self, *args, force_insert=False, force_update=False, using=None, update_fields=None):
+        """Serialize lifecycle changes and keep old alerts invalid across status cycles.
+
+        Programmatic bulk updates bypass this contract; use save/confirm/release.
+        Partial saves compare only fields they actually persist. A stale instance
+        cannot restore a prior status or recipient over a newer transition.
+        """
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
+            if not update_fields:
+                return
+        database = using or router.db_for_write(type(self), instance=self)
+        options = dict(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=database,
+            update_fields=update_fields,
+        )
+        if self._state.adding or self.pk is None:
+            return super().save(*args, **options)
+        original_generation = self.notice_generation
+        try:
+            with transaction.atomic(using=database):
+                rows = type(self).objects.using(database).filter(pk=self.pk)
+                rows.update(notice_generation=F("notice_generation"))
+                current = rows.select_for_update().first()
+                if current is None:
+                    return super().save(*args, **options)
+                lifecycle = {"status", "character", "character_id"}
+                fields = lifecycle if update_fields is None else lifecycle & update_fields
+                status = self.status if "status" in fields else current.status
+                character = (
+                    self.character_id
+                    if fields & {"character", "character_id"}
+                    else current.character_id
+                )
+                if not isinstance(status, str) or (
+                    character is not None and type(character) is not int
+                ):
+                    raise ValueError("RSVP lifecycle fields require concrete values")
+                changed = status != current.status or character != current.character_id
+                if changed and original_generation != current.notice_generation:
+                    raise ValueError(
+                        "RSVP changed; reload it before changing its status or character"
+                    )
+                self.notice_generation = uuid.uuid4() if changed else current.notice_generation
+                if update_fields is not None:
+                    options["update_fields"] = update_fields | {"notice_generation"}
+                return super().save(*args, **options)
+        except Exception:
+            self.notice_generation = original_generation
+            raise
 
     def confirm(self):
         """Confirm this RSVP (INVITED or LOTTERY_SELECTED → CONFIRMED)."""
@@ -805,15 +863,15 @@ class CalendarNotice(models.Model):
     """
     A notice to a player about one of their RSVPs.
 
-    Written by ``evennia_calendar.notices.notify``. A connected character is
-    told at once and the row is marked delivered; otherwise it waits for the
-    character's next puppet. ``status`` is the RSVP's status when the notice
-    was written: a waiting notice is dropped unread if the RSVP has moved on
-    since, or the event was cancelled or has started, so nobody is asked to
-    confirm a place they've already lost.
+    The immutable envelope identifies one RSVP lifecycle transition; origin
+    and typed actors let the source recheck current validity and ignore policy.
+    Source routing receipts survive removal of the optional shared Inbox.
+    ``delivered_at`` also acknowledges Inbox retention or safe suppression;
+    ``route_state`` records which path consumed the event. Unknown legacy
+    actors/generations stay pending without rendering historical text.
 
-    Delivered rows are kept: a reminder is sent at most once per RSVP, and the
-    conditional unique constraint enforces that even if two sweeps overlap.
+    Delivered rows are kept: the conditional unique constraint still limits
+    reminders to one per RSVP, even across overlapping sweeps and upgrades.
     Rows go with their RSVP.
     """
 
@@ -843,6 +901,15 @@ class CalendarNotice(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     delivered_at = models.DateTimeField(null=True, blank=True)
 
+    event_key = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    generation = models.UUIDField(null=True, blank=True, editable=False)
+    origin = models.CharField(max_length=20, blank=True, default="")
+    actors = models.JSONField(default=list, blank=True)
+    provenance_known = models.BooleanField(default=False)
+    envelope = models.JSONField(default=dict, blank=True)
+    route_state = models.CharField(max_length=20, default="pending", db_index=True)
+    routed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["created_at", "pk"]  # noqa: RUF012
         indexes = [  # noqa: RUF012
@@ -858,6 +925,13 @@ class CalendarNotice(models.Model):
 
     def __str__(self):
         return f"CalendarNotice [{self.kind}] for RSVP #{self.rsvp_id}"
+
+
+class CalendarNoticeCursor(models.Model):
+    """Bounded transfer continuation; held rows never starve later pending work."""
+
+    scope = models.CharField(max_length=64, unique=True)
+    last_pk = models.PositiveBigIntegerField(default=0)
 
 
 # ---------------------------------------------------------------------------

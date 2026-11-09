@@ -13,7 +13,7 @@ Event calendar system for Evennia games. Provides in-game commands (`+calendar`,
 - **Web UI:** month grid, list view (with filters), detail, cluster, and all authoring views
 - **REST API:** `CalendarEventViewSet` with date/emphasis/staff-event filters
 - **Accessibility-aware commands:** optional `evennia-accessibility` integration for screenreader mode
-- **Shared web staff policy:** HTTP staff checks use `evennia-links>=0.5`; `CALENDAR_STAFF_LOCK` remains for in-game authoring.
+- **Shared web staff policy:** HTTP staff checks use `evennia-links>=0.8.15`; `CALENDAR_STAFF_LOCK` remains for in-game authoring.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ Event calendar system for Evennia games. Provides in-game commands (`+calendar`,
 
 ```
 evennia>=6.0
-evennia-links>=0.5
+evennia-links>=0.8.15
 ```
 
 ### Web + API (`[web]` extra)
@@ -199,16 +199,58 @@ The calendar tells players about their own RSVPs, with no wiring:
 - **Reminded** of an event they're confirmed for, once per RSVP, when the sweep
   fires `event_starting_soon`.
 
-`evennia_calendar.notices.notify()` messages a connected character at once.
-Otherwise it keeps a `CalendarNotice` row and delivers it the next time the
-character is puppeted, through Evennia's `SIGNAL_OBJECT_POST_PUPPET`. A waiting
-notice is dropped unread if the RSVP's status has changed since, or the event
-has been cancelled or has started. A conditional unique constraint holds
-reminders to one per RSVP, however often the sweep runs. Receivers are
-connected in `CalendarConfig.ready()` with `dispatch_uid`s, and a failing
-notice is logged without interrupting a draw or a command. Game code that
-wants to send its own notice about an RSVP can call `notify(rsvp, kind,
-message)` with a `CalendarNotice.Kind` value.
+With Inbox installed, register the production source in host settings:
+
+```python
+LINKS_NOTICE_SOURCES = {
+    "calendar": "evennia_calendar.integrations.notices.CalendarNoticeSource",
+}
+```
+
+Install `evennia-calendar[inbox]` (Inbox>=0.1.1) and wire Inbox's own commands,
+URLs and maintenance as its README describes. Routine notices arrive quietly;
+source preferences support immediate, login summary and off. Lottery selections
+and sought waitlist offers default immediate and cannot be disabled entirely.
+They remain in **awaiting your decision** after reading until confirmation,
+decline, expiry or cancellation. Ordinary invitations are clearable. Reading or
+clearing an alert never changes its RSVP. Text and counts recheck current
+ownership, status, deadline and ignore policy; only the selected character's
+notices appear on the website. Display text uses current event data and does not
+copy historical sender/account names into the inbox.
+
+Without Inbox, when disabled, or when the Calendar source is omitted from the
+registry, standalone delivery remains immediate when connected and pending until
+puppet otherwise. A configured but broken backend/source remains pending rather
+than delivering twice. Each reminder still has one persistent RSVP receipt.
+Source receipts survive clearing/pruning Inbox, disabling it, uninstalling it,
+and reinstalling it. Already delivered/transferred events never replay.
+
+### Upgrade and pending notices
+
+Run migrations, then `evennia transfer_calendar_notices`. It processes one
+bounded page (default100) and reports transferred, held, invalid, retry and
+continuation counts. Repeat to finish a pass; the Calendar maintenance sweep and
+an optional Inbox preparation hook continue it automatically. The hook transfers
+only the actual selected character before their summary. No database access
+occurs in app startup registration.
+
+Migration0005 preserves source row IDs, message history, and reminder receipts.
+Legacy system notices bind only when timestamp/status/recipient evidence proves
+the current generation. Old human invitations/offers lack reliable sender IDs;
+ambiguous generations and unknown actors remain held without text, counts or
+acknowledgement, even if Inbox is disabled or absent. Source history is retained;
+held records retire safely when their subject becomes invalid. Hosts must not
+infer their sender from a current event owner or stored display name.
+
+The positional API `notify(rsvp, kind, message)` remains available. Shipped human
+producers additionally pass `origin="invitation"` or `"waitlist_offer"` and the
+actual `actor`. Custom human callers without provenance remain pending for
+privacy. New system origins are `lottery`, `seated` and `reminder`. Use RSVP's
+`save`, `confirm` and `release`; bulk status/character updates bypass generation
+tracking. A stale instance cannot overwrite a newer transition; reload and retry.
+A standalone socket failure is recorded as uncertain and does not automatically
+retry; the content and receipt stay available for host diagnosis. Disposable
+guests receive only connected hints and create no retained notice records.
 
 ## Map tile overlay (optional partner: evennia-maps)
 

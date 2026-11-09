@@ -113,7 +113,11 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
             if not apps.is_installed("evennia_notices"):
                 self.msg("The example inbox is unavailable.")
                 return
-            from world.sandbox.notices_seed import emit_demo_notices, resolve_demo_offer
+            from world.sandbox.notices_seed import (
+                emit_calendar_demo_notices,
+                emit_demo_notices,
+                resolve_demo_offer,
+            )
 
             from evennia_notices.context import from_command
 
@@ -121,7 +125,10 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
                 context = from_command(self.caller, self.session)
                 if switch == "notices":
                     emit_demo_notices(context.account, context.character)
-                    self.msg("Example notices ready. Use +notices; offers are simulations.")
+                    emit_calendar_demo_notices(context.account, context.character)
+                    self.msg(
+                        "Example notices ready. Use +notices. Calendar examples use +rsvp; simulated offers use +sandbox/notice-confirm or /notice-decline."
+                    )
                 else:
                     state = resolve_demo_offer(
                         context.account,

@@ -70,7 +70,7 @@ def build(scratch):
     initial_setup.at_initial_setup()
     ServerConfig.objects.conf("last_initial_setup_step", "done")
     call_command("seed_sandbox", verbosity=0)
-    from world.sandbox.notices_seed import emit_demo_notices
+    from world.sandbox.notices_seed import emit_calendar_demo_notices, emit_demo_notices
 
     character = next(iter(admin.characters.all()), None)
     if character is None:
@@ -83,6 +83,7 @@ def build(scratch):
         ).exists():
             raise ValueError("Golden notices require exact synthetic subject templates")
     emit_demo_notices(admin, character)
+    emit_calendar_demo_notices(admin, character)
     connections.close_all()
 
 

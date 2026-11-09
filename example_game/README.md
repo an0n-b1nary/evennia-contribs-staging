@@ -2103,3 +2103,9 @@ its one purpose-made admin. Production source delivery queues are unchanged.
 Read/clear and account-wide immediate/summary/off preferences are explained in
 the packaged Personal notices guide. Read alerts do not read their underlying
 source or resolve outstanding decisions.
+
+Calendar is registered as a real Inbox source. `+sandbox/notices` also opts your
+current character into labelled synthetic Calendar selection and invitation
+examples, using the normal `+rsvp/confirm` and `/cancel` controls. No generic seed
+chooses a real player's notice recipient. The earlier simulated offer examples
+continue to use `+sandbox/notice-confirm` and `/notice-decline`.

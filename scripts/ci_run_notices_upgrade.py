@@ -41,7 +41,7 @@ def install(tree):
     )
 
 
-def snapshot():
+def snapshot(columns=None):
     """Serialize complete source rows, including receipts and source-owned history."""
     from django.db import connection
 
@@ -49,9 +49,28 @@ def snapshot():
         names = [n for n in connection.introspection.table_names() if n.startswith(PREFIXES)]
         result = {}
         for name in names:
-            cursor.execute(f'SELECT * FROM "{name}" ORDER BY rowid')
+            if columns is not None and name not in columns:
+                continue
+            selected = (
+                "*" if columns is None else ", ".join(f'"{column}"' for column in columns[name])
+            )
+            cursor.execute(f'SELECT {selected} FROM "{name}" ORDER BY rowid')
             result[name] = cursor.fetchall()
     return result
+
+
+def source_columns():
+    """Record original columns so additive metadata is checked without false drift."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        return {
+            name: [
+                field.name for field in connection.introspection.get_table_description(cursor, name)
+            ]
+            for name in connection.introspection.table_names()
+            if name.startswith(PREFIXES)
+        }
 
 
 def worker(game, phase):
@@ -134,6 +153,7 @@ def worker(game, phase):
                     "account": account.pk,
                     "character": character.pk,
                     "sources": snapshot(),
+                    "source_columns": source_columns(),
                     "markers": markers,
                     "board_read": deserialize(account.db.boards_web_read),
                 },
@@ -144,9 +164,9 @@ def worker(game, phase):
         return
     state = json.loads(state_path.read_text())
     call_command("migrate", interactive=False, verbosity=0)
-    assert json.loads(json.dumps(snapshot(), default=str)) == state["sources"], (
-        "Source rows changed during upgrade"
-    )
+    assert (
+        json.loads(json.dumps(snapshot(state["source_columns"]), default=str)) == state["sources"]
+    ), "Source rows changed during upgrade"
     account = AccountDB.objects.get(pk=state["account"])
     character = ObjectDB.objects.get(pk=state["character"])
     assert deserialize(account.db.boards_web_read) == state["board_read"]
@@ -174,7 +194,9 @@ def worker(game, phase):
     maintain()
     maintain()
     assert DeliveryReceipt.objects.count() == 1
-    assert json.loads(json.dumps(snapshot(), default=str)) == state["sources"]
+    assert (
+        json.loads(json.dumps(snapshot(state["source_columns"]), default=str)) == state["sources"]
+    )
     # Legacy delivery remains active and exactly one pass consumes its own pending rows.
     from unittest.mock import patch
 
@@ -184,11 +206,12 @@ def worker(game, phase):
     from evennia_moderation.models import Notice as ModerationNotice
 
     with patch.object(type(character), "msg") as msg:
-        assert calendar_delivery(character) == 1
+        # Unknown legacy human authors are held, never guessed from rendered text.
+        assert calendar_delivery(character) == 0
         assert calendar_delivery(character) == 0
         assert lore_delivery(character) == 1
         assert lore_delivery(character) == 0
-        assert msg.call_count == 2
+        assert msg.call_count == 1
     with (
         patch.object(type(account), "msg") as msg,
         patch.object(type(account.sessions), "count", return_value=1),
@@ -198,7 +221,7 @@ def worker(game, phase):
         assert msg.call_count == 1
     assert ModerationNotice.objects.filter(delivered_at__isnull=True).count() == 0
     print(
-        "Populated upgrade preserved all source rows/markers; legacy hooks and inbox lifecycle passed"
+        "Populated upgrade preserved all source rows/markers; unknown Calendar inviter held; legacy hooks and inbox lifecycle passed"
     )
 
 

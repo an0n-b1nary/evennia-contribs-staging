@@ -18,7 +18,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("game_dir", type=Path)
     parser.add_argument("--absent", action="append", default=[])
-    parser.add_argument("--minimal", action="store_true")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--minimal", action="store_true")
+    selection.add_argument("--minimal-calendar", action="store_true")
     args = parser.parse_args(argv)
     for name in args.absent:
         if find_spec(name) is not None:
@@ -40,22 +42,27 @@ def main(argv=None):
     extras = ""
     if args.minimal:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_notices']\n"
+    elif args.minimal_calendar:
+        extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_calendar']\n"
+    sources = {"fixture": "ci_notices_partner_tests.FixtureSource"}
+    if find_spec("evennia_calendar") is not None:
+        sources["calendar"] = "evennia_calendar.integrations.notices.CalendarNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
         + f"NOTICES_ABSENT_PARTNERS = {args.absent!r}\n"
         + LINKS_TEST_RUNNER
         + "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
-        + "LINKS_NOTICE_SOURCES = {'fixture': 'ci_notices_partner_tests.FixtureSource'}\n"
+        + f"LINKS_NOTICE_SOURCES = {sources!r}\n"
     )
     labels = ["ci_notices_partner_tests", "evennia_links.test_notices"]
     if find_spec("evennia_notices") is not None:
         labels.append("evennia_notices")
     else:
-        labels.extend(
-            name
-            for name in ("evennia_calendar", "evennia_lore", "evennia_moderation")
-            if find_spec(name)
+        labels.extend(name for name in ("evennia_lore", "evennia_moderation") if find_spec(name))
+    if find_spec("evennia_calendar") is not None:
+        labels.append(
+            "evennia_calendar.test_notice_adapter" if args.minimal_calendar else "evennia_calendar"
         )
     if find_spec("evennia_social") is not None:
         labels.extend(

@@ -121,3 +121,44 @@ def resolve_demo_offer(account, character, token, accepted):
             raise ValueError("Example offer is no longer available")
         subject.db.notice_state = "confirmed" if accepted else "declined"
         return subject.db.notice_state
+
+
+def emit_calendar_demo_notices(account, character):
+    """Explicit self opt-in to real Calendar alerts on labelled synthetic events."""
+    if is_guest(account) or character not in web_roster(account):
+        raise ValueError("Choose your own playable character before opting in")
+    from evennia_calendar import notices as calendar_notices
+    from evennia_calendar.models import RSVP, CalendarEvent
+
+    rows = []
+    for kind, status in (
+        ("selection", RSVP.Status.LOTTERY_SELECTED),
+        ("invitation", RSVP.Status.INVITED),
+    ):
+        event, _ = CalendarEvent.objects.get_or_create(
+            creator=character,
+            title=f"Example Calendar {kind}",
+            defaults={
+                "scheduled_time": timezone.now() + timedelta(days=7),
+                "description": "Synthetic personal inbox example; no live event or real seat.",
+                "participant_cap": 1,
+                "is_staff_event": kind == "selection",
+            },
+        )
+        rsvp, _ = RSVP.objects.get_or_create(
+            event=event,
+            character=character,
+            defaults={"status": status, "character_name": character.key},
+        )
+        if kind == "selection":
+            calendar_notices.on_lottery_selected(None, event=event, rsvp=rsvp)
+        else:
+            calendar_notices.notify(
+                rsvp,
+                "invited",
+                calendar_notices.invited_message(event),
+                origin="invitation",
+                actor=character,
+            )
+        rows.append(rsvp)
+    return rows

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-"""Explicitly synthetic reference source; no production source adapters."""
+"""Explicitly synthetic reference source; production adapters belong to their contribs."""
 
 from django.utils import timezone
 from evennia.objects.models import ObjectDB

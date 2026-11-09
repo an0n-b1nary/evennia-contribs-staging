@@ -1682,8 +1682,14 @@ class TestClusterPageWithoutLiveSession(EvenniaTest):
 # ---------------------------------------------------------------------------
 
 
+@override_settings(NOTICES_ENABLED=False, LINKS_NOTICE_SOURCES={})
 class TestNotices(EvenniaTest):
     """Each notice reaches a connected player now and an offline one at next puppet."""
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
 
     def _waiting(self, character, kind=None):
         from evennia_calendar.models import CalendarNotice
@@ -1693,16 +1699,44 @@ class TestNotices(EvenniaTest):
 
     def _deliver(self, character):
         """Puppet *character* through Evennia's signal and return what it was told."""
+        from types import SimpleNamespace
+
         from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET
 
-        with patch.object(character, "msg") as msg:
+        account = self.account if character == self.char1 else self.account2
+        session = SimpleNamespace(get_account=lambda: account, get_puppet=lambda: character)
+        with (
+            patch.object(character, "msg") as msg,
+            patch("evennia_calendar.notices._connected_sessions", return_value=[session]),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             SIGNAL_OBJECT_POST_PUPPET.send(sender=character, session=None)
         return "\n".join(str(call.args[0]) for call in msg.call_args_list)
 
     def _online(self, *characters):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+
         from evennia_calendar import notices
 
-        return patch.object(notices, "is_online", side_effect=lambda char: char in characters)
+        @contextmanager
+        def connections():
+            def sessions(character):
+                account = self.account if character == self.char1 else self.account2
+                return (
+                    [SimpleNamespace(get_account=lambda: account, get_puppet=lambda: character)]
+                    if character in characters
+                    else []
+                )
+
+            with (
+                patch.object(notices, "is_online", side_effect=lambda char: char in characters),
+                patch.object(notices, "_connected_sessions", side_effect=sessions),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                yield
+
+        return connections()
 
     def _waitlisted(self, ev, character, position=1):
         return RSVP.objects.create(
@@ -1729,7 +1763,7 @@ class TestNotices(EvenniaTest):
     def test_a_connected_player_is_told_at_once(self):
         ev = _make_staff_event(self.char1, cap=2, hours=96)
         _rsvp_lottery(ev, self.char2)
-        with self._online(self.char2), patch.object(self.char2, "msg") as msg:
+        with patch.object(self.char2, "msg") as msg, self._online(self.char2):
             run_lottery(ev, rng=_seeded_rng())
         msg.assert_called_once()
         self.assertIn("You were drawn for", msg.call_args.args[0])
@@ -1777,11 +1811,11 @@ class TestNotices(EvenniaTest):
     def test_a_host_ping_offers_the_place_once(self):
         from evennia_calendar.commands import CmdRsvp
 
-        ev = _make_event(self.char1, participant_cap=1)
+        ev = _make_event(self.char1, hours=96, participant_cap=1)
         self._waitlisted(ev, self.char2)
         cmd = CmdRsvp()
         cmd.caller, cmd.switches, cmd.args = self.char1, ["ping"], str(ev.pk)
-        with self._online(self.char2), patch.object(self.char2, "msg") as msg:
+        with patch.object(self.char2, "msg") as msg, self._online(self.char2):
             cmd.func()
         msg.assert_called_once()
         self.assertIn("A place has opened", msg.call_args.args[0])
@@ -1790,7 +1824,7 @@ class TestNotices(EvenniaTest):
     def test_a_host_invite_names_the_host_and_waits_for_an_offline_guest(self):
         from evennia_calendar.commands import CmdRsvp
 
-        ev = _make_event(self.char1, participant_cap=3)
+        ev = _make_event(self.char1, hours=96, participant_cap=3)
         cmd = CmdRsvp()
         cmd.caller, cmd.switches, cmd.args = self.char1, ["invite"], f"{ev.pk}={self.char2.key}"
         with self._online():
@@ -1801,7 +1835,7 @@ class TestNotices(EvenniaTest):
 
     @override_settings(ROOT_URLCONF=__name__)
     def test_a_web_invite_tells_the_guest(self):
-        ev = _make_event(self.char1, participant_cap=3)
+        ev = _make_event(self.char1, hours=96, participant_cap=3)
         view = EventInviteView()
         view.request = RequestFactory().post("/")
         view.kwargs = {"pk": ev.pk}

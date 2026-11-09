@@ -775,6 +775,20 @@ jobs:
           --absent evennia_social --absent evennia_calendar
           --absent evennia_lore --absent evennia_boards
           --absent evennia_accessibility
+      - name: Minimal independent Calendar source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_calendar --
+          python scripts/ci_run_notices_tests.py {game} --minimal-calendar
+          --absent evennia_notices --absent evennia_social
+      - name: Populated Calendar source upgrade and inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_calendar_notices_upgrade.py {game}
+          --base 65bcd5f6ba0568097f5058bc36b41d5ccbed66d0
       - name: Populated pre-foundation upgrade
         if: ${{ !cancelled() }}
         run: >-
