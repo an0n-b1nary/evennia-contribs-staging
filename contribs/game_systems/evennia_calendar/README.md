@@ -331,3 +331,10 @@ pre-upgrade guest source rows are preserved and can be acknowledged once by
 connected-only delivery, with fresh RSVP/event/recipient/generation and ignore
 checks. An offline guest is never falsely acknowledged; an uncertain socket
 attempt stays recorded on the existing canonical source row without replay.
+
+Any proven member's completed or uncertain source receipt governs the compatible
+transition, including mixed pre-upgrade queues where a later duplicate was
+already delivered. Original delivered timestamps and frozen envelopes remain
+unchanged. A configured-source failure preserves the pending outbox while its
+backend savepoint rolls back partial Inbox data and immediate hints; repair the
+configuration and repeat transfer to resume delivery.

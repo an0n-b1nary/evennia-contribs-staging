@@ -482,8 +482,8 @@ class CalendarInboxTests(EvenniaTest):
                 raise RuntimeError("Interrupted before source acknowledgement")
             return original(instance, *args, **kwargs)
 
-        with patch.object(CalendarNotice, "save", fail_ack), self.assertRaises(RuntimeError):
-            notices.route_notice(row.pk)
+        with patch.object(CalendarNotice, "save", fail_ack):
+            self.assertEqual(notices.route_notice(row.pk), "retry")
         row.refresh_from_db()
         self.assertIsNone(row.delivered_at)
         self.assertFalse(DeliveryReceipt.objects.filter(source="calendar").exists())

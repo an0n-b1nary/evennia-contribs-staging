@@ -168,6 +168,56 @@ def _freeze(row):
     return row
 
 
+def _reconcile_disposition(row):
+    """Honor completed/uncertain work from every proven current group member.
+
+    The RSVP writer lock serializes this reconciliation with source producers.
+    Already consumed members keep their original timestamps and envelopes.
+    """
+    if not row.provenance_known or row.generation != row.rsvp.notice_generation:
+        return
+    members = list(
+        _system_transition_rows(
+            row.rsvp,
+            row.character_id,
+            row.kind,
+            row.status,
+            row.actors,
+            row.origin,
+        ).select_for_update()
+    )
+    completed = [
+        member
+        for member in members
+        if member.delivered_at is not None or member.route_state in TERMINAL
+    ]
+    uncertain = [member for member in members if member.route_state == "uncertain"]
+    attempted = [member for member in members if member.route_state == "attempting"]
+    receipts = completed or uncertain or attempted
+    if not receipts:
+        return
+    receipt = receipts[0]
+    if row.delivered_at is not None or row.route_state in TERMINAL:
+        return
+    state = (
+        receipt.route_state
+        if receipt.route_state in TERMINAL | {"uncertain", "attempting"}
+        else "fallback"
+    )
+    fields = []
+    if row.route_state != state:
+        row.route_state = state
+        fields.append("route_state")
+    if row.routed_at is None:
+        row.routed_at = receipt.routed_at or receipt.delivered_at or timezone.now()
+        fields.append("routed_at")
+    if completed:
+        row.delivered_at = receipt.delivered_at or receipt.routed_at or timezone.now()
+        fields.append("delivered_at")
+    if fields:
+        row.save(update_fields=fields)
+
+
 def _record_disposition(row, state, *, acknowledged):
     """The canonical source claim/disposition also governs its frozen aliases."""
     now = timezone.now()
@@ -181,11 +231,15 @@ def _record_disposition(row, state, *, acknowledged):
         rsvp_id=row.rsvp_id,
         character_id=row.character_id,
         envelope__payload__notice=row.pk,
-    ).exclude(pk=row.pk).update(**values)
+    ).exclude(pk=row.pk).filter(delivered_at__isnull=True).exclude(route_state__in=TERMINAL).update(
+        **values
+    )
 
 
 def _mirror_terminal(alias, canonical):
     """A historical source receipt wins even when its backend has been removed."""
+    if alias.delivered_at is not None or alias.route_state in TERMINAL:
+        return
     if canonical.delivered_at is not None or canonical.route_state in TERMINAL:
         alias.route_state = (
             canonical.route_state if canonical.route_state in TERMINAL else "fallback"
@@ -224,6 +278,14 @@ def _finish_fallback(row_pk, character, message, sessions):
     from .models import CalendarNotice
 
     row = CalendarNotice.objects.select_related("rsvp__event", "character").get(pk=row_pk)
+    with transaction.atomic():
+        from .models import RSVP
+
+        RSVP.objects.filter(pk=row.rsvp_id).update(notice_generation=F("notice_generation"))
+        row = CalendarNotice.objects.select_related("rsvp__event", "character").get(pk=row_pk)
+        _reconcile_disposition(row)
+    if row.delivered_at is not None or row.route_state != "attempting":
+        return
     if currentness(row).status == "invalid":
         _record_disposition(row, "invalid", acknowledged=True)
         return
@@ -296,6 +358,7 @@ def _route_locked(row, context=None, allow_fallback=True, new_event=False):
     from .integrations.notices import currentness, event_for
 
     canonical = _freeze(row)
+    _reconcile_disposition(canonical)
     if canonical.pk != row.pk:
         consumed = canonical.delivered_at is not None or canonical.route_state in TERMINAL
         result = _route_locked(canonical, context=context, allow_fallback=allow_fallback)
@@ -335,6 +398,24 @@ def _route_locked(row, context=None, allow_fallback=True, new_event=False):
     return result
 
 
+class _RetryRoute(Exception):
+    """Roll back an uncertain backend savepoint while retaining source work."""
+
+
+def _attempt_route(row, **options):
+    """Keep the outbox envelope outside the atomic backend/acknowledgement attempt."""
+    _freeze(row)
+    try:
+        with transaction.atomic():
+            result = _route_locked(row, **options)
+            if result == "retry":
+                raise _RetryRoute
+        return result
+    except Exception:
+        logger.warning("Calendar source routing uncertain; preserving pending outbox")
+        return "retry"
+
+
 def route_notice(pk, context=None, allow_fallback=True):
     """Lock before reading mutable routing state and acknowledge only durable results."""
     from .models import RSVP, CalendarNotice
@@ -352,7 +433,7 @@ def route_notice(pk, context=None, allow_fallback=True):
         )
         if row.rsvp_id != rsvp_id:
             raise ValueError("Calendar notice subject changed during transfer")
-        result = _route_locked(row, context=context, allow_fallback=allow_fallback)
+        result = _attempt_route(row, context=context, allow_fallback=allow_fallback)
     if result == "attempting":
         row.refresh_from_db()
         return "fallback" if row.route_state == "fallback" else "held"
@@ -476,6 +557,16 @@ def _guest_notify(rsvp, kind, origin, actor):
             or _guest_actor_policy(session.get_account(), actors) != "allow"
         ):
             continue
+        existing = _system_transition_rows(
+            live,
+            live.character_id,
+            kind,
+            live.status,
+            actors,
+            origin,
+        ).first()
+        if existing is not None:
+            return route_notice(existing.pk) == "fallback"
         marker = (
             f"{live.pk}-reminder"
             if kind == "reminder"
@@ -563,7 +654,7 @@ def notify(rsvp, kind, message, *, origin=None, actor=None):
                 ),
             )
         )
-        result = _route_locked(row, new_event=created)
+        result = _attempt_route(row, new_event=created)
     row.refresh_from_db()
     return result == "attempting" and row.route_state == "fallback"
 

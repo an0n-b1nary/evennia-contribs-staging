@@ -132,6 +132,28 @@ def worker(game, phase):
             status=guest_rsvp.status,
             message="Existing guest source history",
         )
+        mixed_event = CalendarEvent.objects.create(
+            title="Mixed legacy consumption", scheduled_time=timezone.now() + timedelta(days=4)
+        )
+        mixed_rsvp = RSVP.objects.create(
+            event=mixed_event, character=character, status=RSVP.Status.LOTTERY_SELECTED
+        )
+        mixed_pending = CalendarNotice.objects.create(
+            rsvp=mixed_rsvp,
+            character=character,
+            kind="drawn",
+            status=mixed_rsvp.status,
+            message="Earlier pending duplicate",
+        )
+        mixed_delivered = CalendarNotice.objects.create(
+            rsvp=mixed_rsvp,
+            character=character,
+            kind="drawn",
+            status=mixed_rsvp.status,
+            message="Later already delivered duplicate",
+        )
+        mixed_stamp = timezone.now()
+        CalendarNotice.objects.filter(pk=mixed_delivered.pk).update(delivered_at=mixed_stamp)
         character.db.last_xp_summary_week = "2026-11-02"
         state_path.write_text(
             json.dumps(
@@ -147,6 +169,9 @@ def worker(game, phase):
                     "guest_account": guest_account.pk,
                     "guest_character": guest_character.pk,
                     "guest_notice": guest_notice.pk,
+                    "mixed_pending": mixed_pending.pk,
+                    "mixed_delivered": mixed_delivered.pk,
+                    "mixed_stamp": mixed_stamp.isoformat(),
                     "sources": snapshot(),
                     "columns": source_columns(),
                 },
@@ -171,12 +196,17 @@ def worker(game, phase):
         ), "Original source columns changed during additive migration"
         assert character.db.last_xp_summary_week == "2026-11-02"
         first = notices.transfer_pending()
-        assert first["transferred"] == 1 and first["duplicate"] == 1 and first["held"] == 3, first
+        assert first["transferred"] == 1 and first["duplicate"] == 2 and first["held"] == 3, first
         from evennia_links.notices import NoticeContext
         from evennia_notices.models import DeliveryReceipt, NoticeEvent
         from evennia_notices.services import mutate, project
 
         assert DeliveryReceipt.objects.filter(source="calendar").count() == 1
+        assert CalendarNotice.objects.get(pk=state["mixed_pending"]).route_state == "fallback"
+        assert (
+            CalendarNotice.objects.get(pk=state["mixed_delivered"]).delivered_at.isoformat()
+            == state["mixed_stamp"]
+        )
         context = NoticeContext(account, character)
         item = project(context)[0]
         assert item.outstanding
@@ -207,7 +237,7 @@ def worker(game, phase):
         ).pk
         state_path.write_text(json.dumps(state))
         print(
-            "Populated Calendar upgrade preserved source IDs/history/reminder receipt; imported1 event, acknowledged1 alias, held2 uncertain and1 offline guest rows"
+            "Populated Calendar upgrade preserved source IDs/history/reminder receipt; imported1 event, acknowledged2 duplicates (pending alias and mixed consumed generation), held2 uncertain and1 offline guest rows"
         )
     elif phase == "absent":
         assert find_spec("evennia_notices") is None
@@ -220,7 +250,7 @@ def worker(game, phase):
         from django.apps import apps
 
         assert not apps.is_installed("evennia_notices")
-        for pk in state["pending"]:
+        for pk in [*state["pending"], state["mixed_pending"], state["mixed_delivered"]]:
             assert notices.route_notice(pk) == "duplicate"
         assert notices.route_notice(state["held"]) == "held"
         no_replay_session = SimpleNamespace(
@@ -282,6 +312,10 @@ def worker(game, phase):
         assert notices.transfer_pending()["transferred"] == 0
         assert DeliveryReceipt.objects.filter(source="calendar").count() == 1
         assert CalendarNotice.objects.get(pk=state["receipt"]).message == "Already delivered"
+        assert (
+            CalendarNotice.objects.get(pk=state["mixed_delivered"]).delivered_at.isoformat()
+            == state["mixed_stamp"]
+        )
         assert CalendarNotice.objects.get(pk=state["held"]).delivered_at is None
         assert CalendarNotice.objects.get(pk=state["ambiguous"]).delivered_at is None
         print(
