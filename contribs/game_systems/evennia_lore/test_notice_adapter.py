@@ -143,6 +143,35 @@ class LoreRoutingTests(EvenniaTest):
         self.assertEqual(self.entry.ooc_notes.count("Private truth"), 1)
         self.assertEqual(LoreNotice.objects.count(), 1)
 
+    def test_restricted_author_sees_own_decision_without_acquisition(self):
+        from evennia_links.notices import StoredEvent
+        from evennia_lore.integrations.notices import LoreNoticeSource, event_for
+
+        self.entry.privacy = LoreEntry.Privacy.RESTRICTED
+        self.entry.save(update_fields=["privacy"])
+        row = self._decision()
+        event = StoredEvent(
+            **event_for(row).__dict__, recipient_kind="character", recipient_id=self.char2.pk
+        )
+        status = LoreNoticeSource().evaluate([event], self.context)[event.event_id].status
+        self.assertEqual(status, "visible")
+
+    def test_failing_row_does_not_abort_puppet_page(self):
+        from evennia_lore.models import LoreNoticeCursor
+
+        first = self._decision()
+        self.entry.affirm(affirmed_by=self.char1)
+        second = LoreNotice.objects.latest("pk")
+        LoreNotice.objects.filter(pk__in=[first.pk, second.pk]).update(route_state="pending")
+        with patch.object(
+            notices, "route_notice", side_effect=[RuntimeError("poison"), "pending"]
+        ) as route:
+            counts = notices.transfer_pending(self.char2, context=self.context, limit=2)
+        self.assertEqual(route.call_count, 2)
+        self.assertEqual((counts["retry"], counts["pending"]), (1, 1))
+        cursor = LoreNoticeCursor.objects.get(scope=f"character-{self.char2.pk}")
+        self.assertEqual(cursor.last_pk, second.pk)
+
     def test_held_legacy_does_not_starve_new_work(self):
         LoreNotice.objects.create(character=self.char2, message="Unknown provenance")
         row = self._decision()

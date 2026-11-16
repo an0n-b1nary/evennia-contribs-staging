@@ -253,9 +253,9 @@ def notify(character, message, entry=None, *, kind=None, actor=None, advisory=No
     return row.route_state == "fallback"
 
 
-def _safe_route(pk, fresh=False):
+def _safe_route(pk, fresh=False, context=None):
     try:
-        return route_notice(pk, fresh=fresh)
+        return route_notice(pk, fresh=fresh, context=context)
     except Exception:
         logger.warning("Lore notice routing deferred", exc_info=True)
         return "retry"
@@ -404,8 +404,8 @@ def transfer_pending(character=None, *, context=None, limit=None):
         )
     }
     for pk in ids:
-        # Global cursor must never create a separate guest cursor.
-        outcome = _safe_route(pk) if context is None else route_notice(pk, context=context)
+        # One failing row is retried later; it must not abort the page or stall the cursor.
+        outcome = _safe_route(pk, context=context)
         counts[outcome] = counts.get(outcome, 0) + 1
     if ids:
         if guest:

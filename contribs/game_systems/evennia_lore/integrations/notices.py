@@ -27,9 +27,13 @@ def event_for(row):
     )
 
 
-def subject_status(entry, character, payload, *, held=None, staff=None):
-    """Check live subject and original recipient role independently of transport."""
-    from evennia_lore.commands import is_staff
+def subject_status(entry, character, payload, *, held=None):
+    """Check live subject and original recipient role independently of transport.
+
+    Decisions go to the entry's current author, who may always see their own
+    entry's title and decision even when it is restricted and not acquired.
+    Unsealing goes only to current holders.
+    """
     from evennia_lore.models import LoreAcquisition, LoreEntry
 
     if (
@@ -40,22 +44,16 @@ def subject_status(entry, character, payload, *, held=None, staff=None):
         or payload.get("recipient") != character.pk
     ):
         return Evaluation("invalid")
-    if held is None:
-        held = LoreAcquisition.objects.filter(entry=entry, character=character).exists()
     if payload.get("kind") in {"affirmed", "declined"}:
         if payload.get("author") != character.pk or entry.author_id != character.pk:
             return Evaluation("invalid")
     elif payload.get("kind") == "unsealed":
+        if held is None:
+            held = LoreAcquisition.objects.filter(entry=entry, character=character).exists()
         if not held:
             return Evaluation("invalid")
     else:
         return Evaluation("defer", reason="provenance")
-    if (
-        entry.privacy != LoreEntry.Privacy.PUBLIC
-        and not held
-        and not (is_staff(character) if staff is None else staff)
-    ):
-        return Evaluation("invalid")
     return Evaluation("visible")
 
 
@@ -99,7 +97,6 @@ class LoreNoticeSource:
         from evennia.accounts.models import AccountDB
         from evennia.objects.models import ObjectDB
 
-        from evennia_lore.commands import is_staff
         from evennia_lore.models import LoreAcquisition, LoreNotice
 
         ids = {e.payload.get("notice") for e in events if type(e.payload.get("notice")) is int}
@@ -135,7 +132,6 @@ class LoreNoticeSource:
             if selected is not None
             else set()
         )
-        staff = is_staff(selected) if selected is not None else False
         outcomes = {}
         for event in events:
             row = rows.get(event.payload.get("notice"))
@@ -175,7 +171,6 @@ class LoreNoticeSource:
                             row.character,
                             event.payload,
                             held=row.entry_id in held,
-                            staff=staff,
                         )
             except (KeyError, ValueError, TypeError):
                 outcome = Evaluation("defer", reason="provenance")

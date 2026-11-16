@@ -27,10 +27,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Serializes source decisions and stale unsealing; repeated unchanged decisions
   reuse identity, while genuine later transitions remain separate events.
 
-
+### Fixed
 - Preserve editor buffers and their save context across reloads and restarts.
-
-- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+- Reject unknown, ambiguous and stacked switches before command lookups or
+  changes, including stock command replacements.
 
 ## 0.10.3 — 2026-10-25
 
