@@ -46,3 +46,45 @@ class NoticeRunnerTests(unittest.TestCase):
             namespace = {"INSTALLED_APPS": []}
             exec(settings.partition("\n")[2], namespace)
             self.assertEqual(namespace["TEST_RUNNER"], "evennia_links.testing.TestRunner")
+
+    def test_minimal_calendar_settings_use_actual_source_and_no_inbox(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            completed = Mock(returncode=0, stdout="Ran 12 tests\nOK")
+            with (
+                patch.object(
+                    runner,
+                    "find_spec",
+                    side_effect=lambda name: (
+                        object() if name in {"evennia_calendar", "evennia_links"} else None
+                    ),
+                ),
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(runner.subprocess, "run", return_value=completed) as run,
+            ):
+                self.assertEqual(runner.main([str(game), "--minimal-calendar"]), 0)
+            settings = (game / "server/conf/notices_test_settings.py").read_text()
+            namespace = {"INSTALLED_APPS": []}
+            exec(settings.partition("\n")[2], namespace)
+            self.assertIn("evennia_calendar", namespace["INSTALLED_APPS"])
+            self.assertNotIn("evennia_notices", namespace["INSTALLED_APPS"])
+            self.assertIn("calendar", namespace["LINKS_NOTICE_SOURCES"])
+            self.assertIn("evennia_calendar.test_notice_adapter", run.call_args.args[0])
+            self.assertIn("evennia_calendar.test_notice_repairs", run.call_args.args[0])
+
+    def test_calendar_suite_runs_when_inbox_is_present(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            completed = Mock(returncode=0, stdout="Ran 12 tests\nOK")
+            with (
+                patch.object(runner, "find_spec", return_value=object()),
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(runner.subprocess, "run", return_value=completed) as run,
+            ):
+                self.assertEqual(runner.main([str(game)]), 0)
+            self.assertIn("evennia_calendar", run.call_args.args[0])
+            self.assertIn("evennia_notices", run.call_args.args[0])

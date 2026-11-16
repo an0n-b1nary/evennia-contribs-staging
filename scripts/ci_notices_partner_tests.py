@@ -89,3 +89,33 @@ class NoticePartnerTests(EvenniaTest):
             self.assertEqual(source_delivery().status, "delivered")
         self.assertEqual(source_delivery().status, "duplicate")
         fallback.assert_called_once()
+
+    def test_real_calendar_routes_or_falls_back_without_optional_inbox(self):
+        if not apps.is_installed("evennia_calendar"):
+            self.skipTest("Calendar physically absent in this profile")
+        from datetime import timedelta
+        from unittest.mock import patch
+
+        from evennia_calendar import notices
+        from evennia_calendar.models import RSVP, CalendarEvent, CalendarNotice
+
+        self.account.characters.add(self.char1)
+        event = CalendarEvent.objects.create(
+            title="Calendar partner fixture", scheduled_time=timezone.now() + timedelta(days=4)
+        )
+        rsvp = RSVP.objects.create(
+            event=event, character=self.char1, status=RSVP.Status.LOTTERY_SELECTED
+        )
+        with patch.object(notices, "is_online", return_value=False):
+            notices.on_lottery_selected(None, event=event, rsvp=rsvp)
+        row = CalendarNotice.objects.get(rsvp=rsvp)
+        if apps.is_installed("evennia_notices"):
+            from evennia_notices.services import project
+
+            self.assertEqual(row.route_state, "inbox")
+            self.assertIn(
+                "Calendar partner fixture", project(NoticeContext(self.account, self.char1))[0].text
+            )
+        else:
+            self.assertIsNone(row.delivered_at)
+            self.assertEqual(row.route_state, "pending")

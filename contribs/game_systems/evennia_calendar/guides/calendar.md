@@ -51,3 +51,14 @@ sees their own event. Pending ranked applications have no event RSVP yet:
 check them with `+cluster/mine <group>`, or withdraw before the draw with
 `+cluster/withdraw <group>`. Once seated, confirm or cancel the assigned event
 with `+rsvp/confirm` or `+rsvp/cancel`.
+
+## Personal notices
+
+When the shared inbox is installed, Calendar updates appear in `+notices` and
+My Notices on the website. Reading or clearing an alert does not change your
+RSVP. A lottery selection or a place offered from a waitlist stays awaiting
+your decision after reading; confirm or decline through the Calendar controls
+before its deadline. Ordinary invitations can be cleared. Your Calendar source
+preference can use immediate messages, login summaries, or off for routine
+activity; outstanding seat decisions remain available. Without the inbox you
+are told while connected, or next time you play that character.

@@ -5,7 +5,7 @@
 import logging
 
 from evennia_links.ignoring import ignore_policy_changing
-from evennia_links.notices import session_context
+from evennia_links.notices import authorize_context, session_context, source_registry
 
 logger = logging.getLogger("evennia")
 
@@ -17,7 +17,17 @@ def session_summary(sender, session=None, **kwargs):
     from .services import summarize
 
     try:
-        summarize(session_context(session))
+        context = session_context(session)
+        if not authorize_context(context):
+            return
+        for source in source_registry().values():
+            prepare = getattr(source, "prepare", None)
+            if callable(prepare):
+                try:
+                    prepare(context)
+                except Exception:
+                    logger.warning("Notice source preparation unavailable; summary continues")
+        summarize(context)
     except Exception:
         logger.warning("Notice summary unavailable; login continues")
 

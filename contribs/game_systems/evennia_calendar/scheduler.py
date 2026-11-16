@@ -561,6 +561,14 @@ def _sweep_events():
 
     now = timezone.now()
 
+    # Recover pending source transfers in bounded pages before normal lifecycle.
+    from evennia_calendar.notices import transfer_pending
+
+    try:
+        transfer_pending()
+    except Exception:
+        logger.warning("Calendar pending transfer deferred", exc_info=True)
+
     # --- Cluster draws ---
     for cluster in EventCluster.objects.filter(is_locked=True):
         if cluster.has_run:
@@ -633,6 +641,13 @@ def ensure_calendar_script_running():
     """
     from evennia.utils.search import search_script
 
+    from evennia_calendar.notices import transfer_pending
+
+    # Never abort the host's at_server_start(); the sweep retries the transfer.
+    try:
+        transfer_pending()
+    except Exception:
+        logger.warning("Calendar pending transfer deferred at startup", exc_info=True)
     existing = search_script("calendar_maintenance")
     if not existing:
         from evennia.utils.create import create_script

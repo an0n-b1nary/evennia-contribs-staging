@@ -6,7 +6,8 @@ Social and all source contribs are optional. Add `evennia_notices` to
 `evennia_notices.urls` under the `evennia_notices` namespace.
 
 Sources register through `LINKS_NOTICE_SOURCES` and own current visibility,
-rendering and action resolution. No production source adapters are installed.
+rendering and action resolution. Calendar supplies the first production source adapter; register it as described
+in Calendar's README.
 See the packaged [guide](guides/notices.md) for player commands and preferences.
 
 ## Host and source integration
@@ -25,6 +26,9 @@ command/route instructions. Batches are scoped by source **and recipient**;
 account and character transitions may legitimately share an event ID. Sources
 own current permissions, action status, deadlines and safe viewer-relative names.
 Only `lottery_selection` and `waitlist_offer` are outstanding action kinds.
+Sources may supply `prepare(context)` to recover their pending work before a
+login/puppet summary; the authorized actual context is passed once per source,
+and failures are isolated. Do not scan or import another character's work.
 
 Call `evennia_links.notices.notify(recipient, source=slug, event=event,
 context=context, fallback=fallback)`. Use stable transition event IDs; replacement
@@ -35,7 +39,11 @@ returns retry without invoking fallback. Inbox absence/clean disable invokes
 only the supplied pending-store fallback, or the default safe connected renderer.
 Offline default delivery returns `fallback_pending`, never a false acknowledgement.
 
-For a future pending-store adapter, lock its source row and call `transfer` with
+Backlog `transfer` imports never emit immediate hints; login summaries stay
+short even when many old must-act decisions are imported. New source events
+use `notify` and retain their configured immediate behavior.
+
+For a pending-store adapter, lock its source row and call `transfer` with
 a stable transfer ID **inside the same database transaction**. Mark the source's
 durable route receipt inbox-owned only after retained/duplicate/suppressed, and
 roll back on retry. Preserve source history and reminder receipts. Old delivery
@@ -44,7 +52,8 @@ Source receipts must survive inbox disable or physical removal: the removed
 inbox cannot prove an old event was already consumed. Re-enabling must not replay
 it. Socket hints are at most one attempt; the durable inbox survives hint failure.
 
-This foundation installs no production adapters. Existing Calendar, Lore,
-Moderation, Boards, Social page and payout queues keep their current behavior.
+Calendar can now route through this Inbox with source-owned transfer receipts.
+Lore, Moderation, Boards, Social page and payout queues retain their current
+behavior pending their separate adapters.
 The reference game's `+sandbox/notices` is an explicit self opt-in to labelled
 synthetic examples; confirm/decline commands simulate an offer for that player.

@@ -772,4 +772,5 @@ source adapters in `LINKS_NOTICE_SOURCES` and call `notify` with a stable
 pending work; the default sends only safely evaluated connected messages and
 returns `fallback_pending` offline. Backend uncertainty never fans out to
 fallback. See the Notices README for the atomic transfer and source receipt
-protocol; existing production source queues are unaffected.
+protocol. Calendar supplies a production adapter; other production source queues
+remain unchanged until their respective adapters are installed.

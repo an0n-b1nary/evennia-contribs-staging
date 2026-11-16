@@ -40,6 +40,7 @@ JOBS = {
             "scripts/ci_run_notices_tests.py",
             "scripts/ci_notices_partner_tests.py",
             "scripts/ci_run_notices_upgrade.py",
+            "scripts/ci_run_calendar_notices_upgrade.py",
             "example_game/",
         ),
     ),

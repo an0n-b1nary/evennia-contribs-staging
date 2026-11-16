@@ -569,7 +569,11 @@ class EventInviteView(CalendarAuthoringMixin, FormView):
 
             host = ObjectDB.objects.filter(pk=self.get_character()).first()
             notices.notify(
-                rsvp, "invited", notices.invited_message(event, host=host.key if host else None)
+                rsvp,
+                "invited",
+                notices.invited_message(event, host=host.key if host else None),
+                origin="invitation",
+                actor=host,
             )
         return HttpResponseRedirect(
             reverse("evennia_calendar:calendar-event-invite", kwargs={"pk": event.pk})

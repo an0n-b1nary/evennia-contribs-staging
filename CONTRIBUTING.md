@@ -511,4 +511,7 @@ checks installed routing. Add `--exclude evennia-notices` before `--` and
 The notices-partners CI job also covers Social absence and a fresh Links/Inbox
 only package selection. Missing distributions, import failure, absent app
 registration and positive test counts are asserted. Sources remain responsible
-for durable route receipts across Inbox removal; foundation adds no adapters.
+for durable route receipts across Inbox removal. Calendar's adapter is covered
+with Inbox present/absent, a minimal Links/Calendar install, and a populated
+upgrade that physically removes and restores Inbox. Legacy unknown inviter or
+generation rows are held without disclosure.

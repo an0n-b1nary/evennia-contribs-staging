@@ -1190,7 +1190,13 @@ class CmdRsvp(StrictSwitchMixin, MuxCommand):
         self.caller.msg(f"|g{target.key} has been invited to '{event.title}'.|n")
         from evennia_calendar import notices
 
-        notices.notify(rsvp, "invited", notices.invited_message(event, host=self.caller.key))
+        notices.notify(
+            rsvp,
+            "invited",
+            notices.invited_message(event, host=self.caller.key),
+            origin="invitation",
+            actor=self.caller,
+        )
 
     # ------------------------------------------------------------------
     # Host: ping
@@ -1217,7 +1223,9 @@ class CmdRsvp(StrictSwitchMixin, MuxCommand):
         next_up.waitlist_position = None
         next_up.save(update_fields=["status", "waitlist_position", "updated_at"])
         with contextlib.suppress(Exception):
-            waitlist_promoted.send(sender=next_up.__class__, event=event, rsvp=next_up)
+            waitlist_promoted.send(
+                sender=next_up.__class__, event=event, rsvp=next_up, actor=self.caller
+            )
         # The waitlist_promoted receiver in notices tells them, now or at next login.
         self.caller.msg(
             f"|g{next_up.character_name} has been offered the next spot "

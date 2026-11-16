@@ -298,7 +298,7 @@ def route(recipient, *, source, event, context=None, transfer_id=None):
                     payload=event.payload,
                     action_kind=event.action_kind,
                 )
-                if any(
+                if transfer_id is None and any(
                     o.status == "visible" and mode == "immediate"
                     for aid, (o, _, mode) in viewer_outcomes.items()
                     if aid not in viewer_suppressed

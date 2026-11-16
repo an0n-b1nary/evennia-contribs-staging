@@ -925,7 +925,10 @@ except ImportError:
 ######################################################################
 # Personal notices — source-owned privacy; existing queues stay independent
 ######################################################################
-LINKS_NOTICE_SOURCES = {"sandbox-notices": "world.sandbox.notices.SandboxNoticeSource"}
+LINKS_NOTICE_SOURCES = {
+    "sandbox-notices": "world.sandbox.notices.SandboxNoticeSource",
+    "calendar": "evennia_calendar.integrations.notices.CalendarNoticeSource",
+}
 NOTICES_ENABLED = True
 NOTICES_RETENTION_DAYS = 30
 NOTICES_ROUTINE_LIMIT = 500
