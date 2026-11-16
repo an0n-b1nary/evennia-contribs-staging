@@ -40,6 +40,8 @@ class ItemUpgradeTests(EvenniaTestMixin, TransactionTestCase):
             MigrationExecutor(connection).migrate(target)
         from .models import LoreAcquisition, LoreEntry, LoreTomeRecord
 
-        self.assertEqual(LoreEntry.objects.filter(pk=lore.pk).values().get(), before)
+        self.assertEqual(LoreEntry.objects.filter(pk=lore.pk).values(*before).get(), before)
+        upgraded = LoreEntry.objects.get(pk=lore.pk)
+        self.assertEqual((upgraded.notice_sequence, upgraded.notice_fingerprint), (0, ""))
         self.assertEqual(LoreAcquisition.objects.get(pk=row.pk).source, "shared")
         self.assertFalse(LoreTomeRecord.objects.exists())

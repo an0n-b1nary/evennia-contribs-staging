@@ -18,7 +18,7 @@ legends can be, and an **OOC layer** (accuracy and OOC notes) that never is. See
 | Component | Purpose |
 |---|---|
 | `LoreTag`, `LoreEntry`, `LoreVersion` | Core models |
-| `LoreNotice` | OOC notices kept for offline characters, delivered at their next puppet |
+| `LoreNotice` | Immutable decision history and source-owned delivery receipts |
 | `evennia_lore.layers` | Kinds, accuracy and the rules that keep the OOC layer honest |
 | `LoreAcquisition`, `PlotLoreLink`, `LoreSceneLink`, `LoreRegionLink` | Bridge models (integer soft-refs) |
 | `select_passive_lore()` | Weighted-random trickle acquisition engine |
@@ -158,10 +158,53 @@ again. `affirmed_version` records the highest body version at the time, so
 
 Staff seal notes with `+lore/seal` and publish them with `+lore/unseal <id>=<accuracy>`,
 which appends them to the OOC notes and settles the accuracy in one step. Unsealing
-is never automatic. Every holder is told: at once if they're in the game, otherwise
-at their next puppet (a `LoreNotice`, delivered through Evennia's
-`SIGNAL_OBJECT_POST_PUPPET`, with no typeclass wiring). Authors are told the same
-way when staff affirm or decline.
+is never automatic. Each holder receives a character-owned dismissible notice;
+authors receive affirmation and decline decisions. Historical decisions stay
+separate: a later affirmation never rewrites an earlier private decline reason.
+
+### Optional shared Inbox
+
+Install `evennia-lore[inbox]`, add `evennia_notices` to `INSTALLED_APPS`, and
+register the source beside your other sources:
+
+```python
+LINKS_NOTICE_SOURCES = {
+    "lore": "evennia_lore.integrations.notices.LoreNoticeSource",
+}
+```
+
+Lore 0.10.4 requires Links 0.8.15; the optional Inbox extra requires Inbox 0.1.1.
+New decisions quietly enter `+notices` and its website by default. Account-wide
+Lore preferences choose immediate, login summary, or off. Reading or clearing
+an alert never reads the entry, acquires lore, changes a decision, or unseals notes.
+Lore alerts are always dismissible and never outstanding actions. The original
+character owns them; another character on that account cannot read or count them.
+Entry publication, archive state, current access and original recipient role are
+rechecked before text or counts. Actual source actor references use the shared
+ignore policy. Declines remain private to their original/current author.
+
+Without Inbox, with it disabled, or with the Lore source unconfigured, the same
+validated source delivers online and keeps offline events for the next puppet.
+Durable source receipts prevent replay when Inbox is removed or restored. An
+uncertain socket attempt is held for diagnosis rather than automatically resent.
+Only disposable guests use connected-only delivery and retain no new notice,
+receipt or import cursor. Ordinary visitor accounts still retain notices.
+
+Run migrations, then `evennia transfer_lore_notices` for one bounded page
+(default 100, `--limit` 1 through 1000). Repeat while continuation remains;
+the selected character's puppet/summary hooks also transfer bounded pages.
+Backlog imports are quiet even when immediate delivery is selected. Source rows,
+original messages and IDs remain as history after transfer or fallback delivery.
+**All pre-0.10.4 pending rows lack typed event and actor provenance.** They remain
+held and preserved, without text/count disclosure or acknowledgement. Custom
+positional `notify(character, message, entry=None)` calls remain accepted as held
+history; do not infer provenance from rendered names or messages. Hosts should
+use typed source operations for new decisions. Management output reports only
+bounded disposition counts, never private notice text.
+
+The sealed-lore advisory and staff review jobs stay outside Inbox. Passive lore
+acquisition feedback also stays in its existing flow. Source-only advisories
+refresh linked still-sealed entries before delivery and follow guest no-retention.
 
 When a plot concludes with linked lore still sealed, whoever concluded it
 (evennia-plots 0.4.0 sends `concluded_by`; older versions fall back to the thread's

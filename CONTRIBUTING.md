@@ -515,3 +515,10 @@ for durable route receipts across Inbox removal. Calendar's adapter is covered
 with Inbox present/absent, a minimal Links/Calendar install, and a populated
 upgrade that physically removes and restores Inbox. Legacy unknown inviter or
 generation rows are held without disclosure.
+
+Lore's notices profiles also cover a minimal Links/Lore install, actual Inbox
+absence, and populated upgrade/removal/restoration. Pre-adapter Lore rows have
+no safe typed provenance and are verified as preserved held. Typed decisions
+retain source receipts so read/clear, reconnect and package restoration cannot
+replay them. Build wheels from a copied source outside the checkout so build
+copies do not add duplicate editor save sites to the source inventory sweep.

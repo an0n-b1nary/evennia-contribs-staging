@@ -60,6 +60,26 @@ class LayerTestMixin:
         patcher = patch("evennia_lore.notices.is_online", return_value=False)
         self.is_online = patcher.start()
         self.addCleanup(patcher.stop)
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        self.notice_sessions = {}
+        from evennia_links.notices import NoticeContext
+
+        def contexts(character):
+            if not self.is_online(character):
+                return []
+            account = self.account if character == self.char1 else self.account2
+            session = self.notice_sessions.setdefault(character.pk, MagicMock())
+            session.get_account.return_value = account
+            session.get_puppet.return_value = character
+            return [NoticeContext(account, character, session)]
+
+        live_patcher = patch("evennia_lore.notices.connected_contexts", side_effect=contexts)
+        live_patcher.start()
+        self.addCleanup(live_patcher.stop)
+        config = override_settings(NOTICES_ENABLED=False)
+        config.enable()
+        self.addCleanup(config.disable)
 
 
 # ---------------------------------------------------------------------------
@@ -237,20 +257,22 @@ class TestAffirmation(LayerTestMixin, EvenniaTest):
         entry.decline(declined_by=self.char1, note="Needs a source.")
         entry.affirm(affirmed_by=self.char1)
         self.assertEqual(LoreNotice.objects.filter(character=self.char2).count(), 2)
-        with patch.object(self.char2, "msg") as msg:
+        self.is_online.return_value = True
+        with self.captureOnCommitCallbacks(execute=True):
             SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char2, account=self.account2, session=None)
-        text = msg.call_args[0][0]
+        calls = self.notice_sessions[self.char2.pk].msg.call_args_list
+        text = "\n".join(call.args[0] for call in calls)
         self.assertLess(text.index("declined"), text.index("affirmed"))
         self.assertIn("Needs a source.", text)
-        self.assertFalse(LoreNotice.objects.filter(character=self.char2).exists())
+        self.assertEqual(LoreNotice.objects.filter(route_state="fallback").count(), 2)
 
     def test_an_online_author_is_told_at_once(self):
         self.is_online.return_value = True
         entry = _entry(author=self.char2)
-        with patch.object(self.char2, "msg") as msg:
+        with self.captureOnCommitCallbacks(execute=True):
             entry.affirm(affirmed_by=self.char1)
-        self.assertIn("affirmed", msg.call_args[0][0])
-        self.assertFalse(LoreNotice.objects.exists())
+        self.assertIn("affirmed", self.notice_sessions[self.char2.pk].msg.call_args.args[0])
+        self.assertEqual(LoreNotice.objects.get().route_state, "fallback")
 
     def test_staff_affirming_their_own_entry_get_no_notice(self):
         entry = _entry(author=self.char1)
@@ -313,15 +335,15 @@ class TestSealedNotes(LayerTestMixin, EvenniaTest):
 
         lore_unsealed.connect(_receiver, weak=False)
         self.addCleanup(lore_unsealed.disconnect, _receiver)
-        with patch.object(self.char1, "msg") as msg:
+        with self.captureOnCommitCallbacks(execute=True):
             told = entry.unseal("partly", unsealed_by=self.char1)
 
         entry.refresh_from_db()
         self.assertEqual(told, 2)
         self.assertEqual(entry.ooc_notes, "Told in every camp.\n\nIt was the Shadow all along.")
         self.assertEqual((entry.accuracy, entry.sealed_notes), ("partly", ""))
-        self.assertIn("New light on", msg.call_args[0][0])
-        self.assertEqual(LoreNotice.objects.get().character, self.char2)
+        self.assertIn("New light on", self.notice_sessions[self.char1.pk].msg.call_args.args[0])
+        self.assertEqual(LoreNotice.objects.get(route_state="pending").character, self.char2)
         self.assertEqual(received, [(entry.pk, self.char1)])
 
     def test_unseal_keeps_a_current_affirmation(self):

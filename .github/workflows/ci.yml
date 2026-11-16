@@ -783,6 +783,21 @@ jobs:
           --package contribs/game_systems/evennia_calendar --
           python scripts/ci_run_notices_tests.py {game} --minimal-calendar
           --absent evennia_notices --absent evennia_social
+      - name: Minimal independent Lore source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_lore --
+          python scripts/ci_run_notices_tests.py {game} --minimal-lore
+          --absent evennia_notices --absent evennia_social
+          --absent evennia_accessibility
+      - name: Populated Lore source upgrade and inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_lore_notices_upgrade.py {game}
+          --base 6ee4f3454fcb8238cb88ddefc5bb317fe86b6137
       - name: Populated Calendar source upgrade and inbox removal
         if: ${{ !cancelled() }}
         run: >-

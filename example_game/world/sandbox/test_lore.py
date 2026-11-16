@@ -202,3 +202,83 @@ class SeededLoreSeams(SeededSandboxMixin, EvenniaTest):
         self.assertEqual(pages.get_page("ic-may-mislead").kind, "principle")
         problems = [item for item in pages.validate() if item[0] == "error"]
         self.assertEqual(problems, [])
+
+
+class LoreNoticeSeams(EvenniaTest):
+    """Real Lore decisions render privately in the host's Inbox."""
+
+    character_typeclass = Character
+    room_typeclass = Room
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+
+    def test_real_opt_in_is_idempotent_and_selected_character_scoped(self):
+        from django.test import override_settings
+
+        from evennia_links.notices import NoticeContext
+        from evennia_notices import views
+        from evennia_notices.services import project
+        from world.sandbox.notices_seed import emit_lore_demo_notices
+
+        with override_settings(ROOT_URLCONF="web.urls"):
+            entry = emit_lore_demo_notices(self.account, self.char1)
+            emit_lore_demo_notices(self.account, self.char1)
+            self.assertEqual(LoreNotice.objects.filter(entry=entry).count(), 1)
+            self.assertEqual(len(project(NoticeContext(self.account, self.char1))), 1)
+            request = RequestFactory().get("/notices/")
+            request.user = self.account
+            request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+            request.session["puppet"] = self.char1.pk
+            response = views.inbox(request).render()
+            self.assertContains(response, "Staff affirmed your lore entry")
+            item = project(NoticeContext(self.account, self.char1))[0]
+            detail = views.detail(request, item.notice.public_ref).render()
+            self.assertContains(detail, f"/lore/{entry.pk}/")
+            request.session["puppet"] = self.char2.pk
+            response = views.inbox(request).render()
+            self.assertNotContains(response, "Staff affirmed your lore entry")
+
+    def test_first_summary_imports_known_pending_without_reading_content(self):
+        from unittest.mock import patch
+
+        from evennia_links.notices import NoticeContext
+        from evennia_lore import notices
+        from evennia_notices.listeners import session_summary
+        from evennia_notices.services import project
+
+        self.account.puppet_object(self.session, self.char1)
+        entry = LoreEntry.create_entry("Private author fixture", author=self.char1, body="Content")
+        with patch.object(notices, "_safe_route", return_value="retry"):
+            entry.decline(note="Original private reason")
+        with patch.object(self.session, "msg") as message:
+            session_summary(self.char1, session=self.session)
+        self.assertEqual(LoreNotice.objects.get(entry=entry).route_state, "inbox")
+        self.assertIn(
+            "Original private reason", project(NoticeContext(self.account, self.char1))[0].text
+        )
+        self.assertTrue(message.called)
+        self.assertNotIn("Original private reason", str(message.call_args_list))
+
+    def test_missing_optional_lore_web_route_keeps_alert_readable(self):
+        from django.test import override_settings
+
+        from evennia_links.notices import NoticeContext
+        from evennia_notices import views
+        from evennia_notices.services import project
+        from world.sandbox.notices_seed import emit_lore_demo_notices
+
+        emit_lore_demo_notices(self.account, self.char1)
+        with override_settings(ROOT_URLCONF="evennia_notices.tests.test_web"):
+            request = RequestFactory().get("/notices/")
+            request.user = self.account
+            request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+            request.session["puppet"] = self.char1.pk
+            response = views.inbox(request).render()
+            self.assertContains(response, "Staff affirmed your lore entry")
+            item = project(NoticeContext(self.account, self.char1))[0]
+            detail = views.detail(request, item.notice.public_ref).render()
+            self.assertContains(detail, "+lore/read")
+            self.assertNotContains(detail, "/lore/")

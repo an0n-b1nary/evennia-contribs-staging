@@ -87,3 +87,19 @@ Lore can be linked to scenes, plots, regions and objects: `+lore/scene`, `+lore/
 
 `+lore/plot <entry>=<plot>` links the whole plot (`+plot #N`). Questions inside
 it use `+thread #N.T`; those references are not plot IDs.
+
+
+### Personal Lore notices
+
+Affirmation decisions and unsealing changes appear in your personal Inbox when
+installed. Use `+notices` or the Notices website. Reading acknowledges the alert;
+clearing dismisses it. Neither learns lore, reads an entry, changes a decision,
+nor publishes sealed notes. Lore alerts are dismissible. An earlier private
+decline keeps its original reason after a later affirmation.
+
+Your account-wide Lore preference chooses immediate, login summary, or off.
+Only the addressed character sees these alerts; changing characters does not
+borrow another character's access. Notices disappear from active views when
+current source access or validity no longer permits them. Without Inbox, Lore
+continues delivering online or at the next puppet. In the reference game,
+`+sandbox/notices` opts your own character into labelled examples.

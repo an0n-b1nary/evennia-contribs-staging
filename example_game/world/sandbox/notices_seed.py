@@ -162,3 +162,23 @@ def emit_calendar_demo_notices(account, character):
             )
         rows.append(rsvp)
     return rows
+
+
+def emit_lore_demo_notices(account, character):
+    """Opt in to an idempotent, harmless actual Lore decision for this character."""
+    if is_guest(account) or character not in web_roster(account):
+        raise ValueError("Choose your own playable character before opting in")
+    from evennia_lore.models import LoreEntry
+    from evennia_lore.notices import transfer_pending
+
+    title = f"Example Lore decision: {character.key}"
+    entry = LoreEntry.objects.filter(author=character, title=title).first()
+    if entry is None:
+        entry = LoreEntry.create_entry(
+            title,
+            author=character,
+            body="A labelled synthetic example used only to explore personal notices.",
+        )
+    entry.affirm()
+    transfer_pending(character)
+    return entry

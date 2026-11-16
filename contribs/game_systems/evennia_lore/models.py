@@ -49,6 +49,7 @@ from django.utils import timezone
 from evennia_links import AbstractArchived, AbstractAuthoredLink, AbstractVersion
 from evennia_lore import layers
 from evennia_lore.layers import LoreLayerError
+from evennia_lore.notice_operations import decision_operation
 
 # Bounded retries for allocating a unique entry_number under concurrent creation.
 _CREATE_ENTRY_MAX_RETRIES = 5
@@ -236,6 +237,9 @@ class LoreEntry(AbstractArchived):
         default=Accuracy.ACCURATE,
         help_text="Whether the IC content is true. Fact kinds are always accurate.",
     )
+    notice_sequence = models.PositiveBigIntegerField(default=0, editable=False)
+    notice_fingerprint = models.CharField(max_length=64, blank=True, editable=False)
+
     affirmation = models.CharField(
         max_length=12,
         choices=Affirmation.choices,
@@ -550,6 +554,7 @@ class LoreEntry(AbstractArchived):
             ),
         )
 
+    @decision_operation("affirmed", "affirmed_by")
     def affirm(self, affirmed_by=None, notify=True):
         """Affirm the entry as it stands now, and tell its author.
 
@@ -587,8 +592,11 @@ class LoreEntry(AbstractArchived):
                 f"|y[Lore]|n Staff affirmed your lore entry |w{self.title}|n "
                 f"(#{self.entry_number}).",
                 entry=self,
+                kind="affirmed",
+                actor=affirmed_by,
             )
 
+    @decision_operation("declined", "declined_by")
     def decline(self, declined_by=None, note=""):
         """Decline to affirm the entry, with a note only its author (and staff) see."""
         from evennia_lore import signals as lore_signals
@@ -623,6 +631,8 @@ class LoreEntry(AbstractArchived):
                 f"|y[Lore]|n Staff declined to affirm |w{self.title}|n "
                 f"(#{self.entry_number}): {self.affirmation_note}",
                 entry=self,
+                kind="declined",
+                actor=declined_by,
             )
 
     # ------------------------------------------------------------------
@@ -640,6 +650,7 @@ class LoreEntry(AbstractArchived):
         self.sealed_notes = notes
         self.save(update_fields=["sealed_notes", "updated_at"])
 
+    @decision_operation("unsealed", "unsealed_by")
     def unseal(self, accuracy, unsealed_by=None):
         """Publish the sealed notes and settle the accuracy in one step.
 
@@ -680,7 +691,7 @@ class LoreEntry(AbstractArchived):
         )
         holders = 0
         for acquisition in self.acquisitions.select_related("character"):
-            notify(acquisition.character, message, entry=self)
+            notify(acquisition.character, message, entry=self, kind="unsealed", actor=unsealed_by)
             holders += 1
         return holders
 
@@ -962,11 +973,11 @@ class LoreInspirationCredit(models.Model):
 
 class LoreNotice(models.Model):
     """
-    An OOC lore notice kept for a character who was offline when it was sent.
+    A character-owned historical event and durable source routing receipt.
 
-    Created by ``evennia_lore.notices.notify`` and delivered (then deleted)
-    the next time the character is puppeted. Unseal notices to holders and
-    affirmation decisions to authors use it.
+    Created by ``evennia_lore.notices.notify``. Typed decisions route through
+    the optional Inbox or validated standalone delivery. Consumed history is
+    retained so removing the Inbox cannot replay it; untyped legacy rows hold.
     """
 
     character = models.ForeignKey(
@@ -986,8 +997,22 @@ class LoreNotice(models.Model):
     message = models.TextField(help_text="The notice, formatted for the game.")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
+    kind = models.CharField(max_length=16, default="unknown")
+    event_key = models.CharField(max_length=255, null=True, unique=True, editable=False)
+    envelope = models.JSONField(default=dict, editable=False)
+    provenance_known = models.BooleanField(default=False, editable=False)
+    route_state = models.CharField(max_length=16, default="pending", db_index=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True, editable=False)
+
     class Meta:
         ordering = ["created_at"]  # noqa: RUF012
 
     def __str__(self):
         return f"LoreNotice for #{self.character_id} ({self.created_at:%Y-%m-%d})"
+
+
+class LoreNoticeCursor(models.Model):
+    """Bounded source import position, never created for disposable guests."""
+
+    scope = models.CharField(max_length=80, unique=True)
+    last_pk = models.PositiveBigIntegerField(default=0)

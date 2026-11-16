@@ -75,6 +75,14 @@ def _on_plot_thread_concluded(sender, thread, concluded_by=None, **kwargs):
                 recipient,
                 f"|y[Lore]|n Linked lore still sealed: {numbers}. "
                 "Staff can unseal with |w+lore/unseal <id>=<accuracy>|n.",
+                kind="advisory",
+                actor=concluded_by or recipient,
+                advisory={
+                    "thread": thread.pk,
+                    "origin": "concluded_by" if concluded_by else "creator",
+                    "entries": [entry.pk for entry in sealed],
+                    "concluded_at": thread.concluded_at.isoformat(),
+                },
             )
 
         from evennia_lore.commands import is_staff
