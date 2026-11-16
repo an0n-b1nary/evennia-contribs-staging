@@ -96,11 +96,34 @@ class LoreNoticeSource:
 
     def evaluate(self, events, context):
         """Reject forged envelopes and denied subjects before text or counts."""
+        from evennia.accounts.models import AccountDB
+        from evennia.objects.models import ObjectDB
+
         from evennia_lore.commands import is_staff
         from evennia_lore.models import LoreAcquisition, LoreNotice
 
         ids = {e.payload.get("notice") for e in events if type(e.payload.get("notice")) is int}
         rows = LoreNotice.objects.filter(pk__in=ids).select_related("entry", "character").in_bulk()
+        actor_ids = {"account": set(), "character": set()}
+        for row in rows.values():
+            actors = row.envelope.get("actors", []) if isinstance(row.envelope, dict) else []
+            if not isinstance(actors, list):
+                continue
+            for actor in actors:
+                if (
+                    isinstance(actor, dict)
+                    and actor.get("kind") in actor_ids
+                    and type(actor.get("id")) is int
+                ):
+                    actor_ids[actor["kind"]].add(actor["id"])
+        existing_actors = {
+            "account": set(
+                AccountDB.objects.filter(pk__in=actor_ids["account"]).values_list("pk", flat=True)
+            ),
+            "character": set(
+                ObjectDB.objects.filter(pk__in=actor_ids["character"]).values_list("pk", flat=True)
+            ),
+        }
         selected = context.character
         authorized = selected is not None and authorize_context(context, selected)
         held = (
@@ -137,6 +160,13 @@ class LoreNoticeSource:
                     )
                     if not same:
                         outcome = Evaluation("invalid")
+                    elif any(
+                        actor.id not in existing_actors.get(actor.kind, set())
+                        for actor in expected.actors
+                    ):
+                        # Deferring only this constituent keeps Links' batch-level
+                        # fail-closed wrapper from hiding unrelated valid events.
+                        outcome = Evaluation("defer", reason="provenance")
                     elif context.character != row.character or not authorized:
                         outcome = Evaluation("defer", reason="context")
                     else:

@@ -450,3 +450,48 @@ class LoreRoutingTests(EvenniaTest):
         with self.captureOnCommitCallbacks(execute=True):
             thread.conclude(concluded_by=self.char2)
         self.assertFalse(LoreNotice.objects.filter(character=self.char2).exists())
+
+    def _deleted_actor_mixed_batch(self, actor):
+        from django.apps import apps
+
+        if not apps.is_installed("evennia_notices"):
+            self.skipTest("Inbox physically absent")
+        from evennia_links.notices import StoredEvent
+        from evennia_lore.integrations.notices import LoreNoticeSource, event_for
+        from evennia_notices.services import mutate, project, summarize
+
+        self.entry.decline(declined_by=actor, note="Historical actor-private reason")
+        broken = LoreNotice.objects.get(kind="declined")
+        self.entry.affirm()
+        for row in LoreNotice.objects.order_by("pk"):
+            self.assertEqual(notices.route_notice(row.pk), "inbox")
+        self.assertEqual(sum(len(item.events) for item in project(self.context)), 2)
+        actor.delete()
+        projected = project(self.context)
+        self.assertEqual(len(projected), 1)
+        self.assertEqual(len(projected[0].events), 1)
+        self.assertIn("affirmed", projected[0].text)
+        self.assertNotIn("Historical actor-private reason", projected[0].text)
+        self.assertEqual(summarize(self.context), (1, 0))
+        event = StoredEvent(
+            **event_for(broken).__dict__, recipient_kind="character", recipient_id=self.char2.pk
+        )
+        outcome = LoreNoticeSource().evaluate([event], self.context)[event.event_id]
+        self.assertEqual((outcome.status, outcome.reason), ("defer", "provenance"))
+        mutate(self.context, projected[0].notice.public_ref, "read")
+        self.assertEqual(summarize(self.context), (0, 0))
+
+    def test_deleted_character_actor_does_not_poison_valid_peer(self):
+        self._deleted_actor_mixed_batch(self.char1)
+
+    def test_deleted_account_actor_does_not_poison_valid_peer(self):
+        import secrets
+
+        from evennia.utils.create import create_account
+
+        actor = create_account("Deleted Lore actor fixture", None, secrets.token_urlsafe(32))
+        self._deleted_actor_mixed_batch(actor)
+
+    @override_settings(NOTICES_ROUTINE_LIMIT=1)
+    def test_deleted_actor_does_not_poison_compacted_peer(self):
+        self._deleted_actor_mixed_batch(self.char1)

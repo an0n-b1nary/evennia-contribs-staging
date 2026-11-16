@@ -7,7 +7,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.test import RequestFactory, override_settings
+from django.test import RequestFactory, TransactionTestCase, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
@@ -282,3 +282,92 @@ class LoreNoticeSeams(EvenniaTest):
             detail = views.detail(request, item.notice.public_ref).render()
             self.assertContains(detail, "+lore/read")
             self.assertNotContains(detail, "/lore/")
+
+    def test_lore_opt_in_refuses_existing_real_title_without_mutating_it(self):
+        from world.sandbox.notices_seed import emit_lore_demo_notices
+
+        title = f"Example Lore decision: {self.char1.key}"
+        entry = LoreEntry.create_entry(
+            title, author=self.char1, body="Actual player-authored content"
+        )
+        before = LoreEntry.objects.filter(pk=entry.pk).values().get()
+        with self.assertRaises(ValueError):
+            emit_lore_demo_notices(self.account, self.char1)
+        self.assertEqual(LoreEntry.objects.filter(pk=entry.pk).values().get(), before)
+        self.assertFalse(LoreNotice.objects.filter(entry=entry).exists())
+
+    def test_lore_opt_in_never_reaffirms_edited_demo_content(self):
+        from world.sandbox.notices_seed import emit_lore_demo_notices
+
+        entry = emit_lore_demo_notices(self.account, self.char1)
+        entry.edit_body("Actual replacement content", editor=self.char1)
+        before = LoreEntry.objects.filter(pk=entry.pk).values().get()
+        with self.assertRaises(ValueError):
+            emit_lore_demo_notices(self.account, self.char1)
+        self.assertEqual(LoreEntry.objects.filter(pk=entry.pk).values().get(), before)
+        self.assertEqual(LoreNotice.objects.filter(entry=entry).count(), 1)
+
+
+class LoreNoticeDemoConcurrencyTests(TransactionTestCase):
+    """Two simultaneous opt-ins allocate one trusted synthetic source event."""
+
+    def test_concurrent_opt_in_keeps_one_provenance_row_and_event(self):
+        import secrets
+        import sqlite3
+        import tempfile
+        from concurrent.futures import ThreadPoolExecutor
+        from pathlib import Path
+
+        from django.db import connections
+        from django.db.backends.sqlite3.base import DatabaseWrapper
+        from evennia.accounts.models import AccountDB
+        from evennia.objects.models import ObjectDB
+        from evennia.server.models import ServerConfig
+        from evennia.utils.create import create_account, create_object
+
+        from world.sandbox.notices_seed import emit_lore_demo_notices
+
+        original = connections["default"]
+        original.ensure_connection()
+        config = connections.databases["default"].copy()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "lore-demo-writers.sqlite3"
+            with sqlite3.connect(path) as target:
+                target.executescript("\n".join(original.connection.iterdump()))
+            cloned = {**config, "NAME": str(path), "OPTIONS": {"timeout": 10}}
+            connections.databases["default"] = cloned
+            connections["default"] = DatabaseWrapper(cloned, "default")
+            try:
+                account = create_account("Concurrent demo fixture", None, secrets.token_urlsafe(48))
+                character = create_object(
+                    "evennia.objects.objects.DefaultCharacter",
+                    key="Concurrent demo character",
+                    nohome=True,
+                )
+                account.characters.add(character)
+                account_pk, character_pk = account.pk, character.pk
+
+                def opt_in(_):
+                    connections.close_all()
+                    try:
+                        return emit_lore_demo_notices(
+                            AccountDB.objects.get(pk=account_pk),
+                            ObjectDB.objects.get(pk=character_pk),
+                        ).pk
+                    finally:
+                        connections.close_all()
+
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    results = list(pool.map(opt_in, range(2)))
+                self.assertEqual(len(set(results)), 1)
+                self.assertEqual(LoreNotice.objects.filter(character_id=character_pk).count(), 1)
+                self.assertEqual(
+                    ServerConfig.objects.filter(
+                        db_key=f"sandbox_lore_notice_example_{character_pk}"
+                    ).count(),
+                    1,
+                )
+            finally:
+                connections.close_all()
+                connections.databases["default"] = config
+                connections["default"] = original

@@ -3,6 +3,7 @@
 """Subject-only generic seed and explicit self opt-in notice fixtures."""
 
 import uuid
+from collections.abc import Mapping
 from datetime import timedelta
 
 from django.apps import apps
@@ -164,21 +165,101 @@ def emit_calendar_demo_notices(account, character):
     return rows
 
 
+def _lore_demo_content(entry):
+    """Snapshot only content/ownership invariants; the server owns provenance."""
+    return {
+        field: getattr(entry, field)
+        for field in (
+            "author_id",
+            "title",
+            "body",
+            "summary",
+            "kind",
+            "accuracy",
+            "ooc_notes",
+            "sealed_notes",
+            "privacy",
+            "status",
+            "is_archived",
+        )
+    }
+
+
 def emit_lore_demo_notices(account, character):
-    """Opt in to an idempotent, harmless actual Lore decision for this character."""
-    if is_guest(account) or character not in web_roster(account):
-        raise ValueError("Choose your own playable character before opting in")
+    """Opt in only trusted unchanged synthetic Lore, never title-matched content."""
+    from django.db.models import F
+    from evennia.accounts.models import AccountDB
+
     from evennia_lore.models import LoreEntry
     from evennia_lore.notices import transfer_pending
 
-    title = f"Example Lore decision: {character.key}"
-    entry = LoreEntry.objects.filter(author=character, title=title).first()
-    if entry is None:
-        entry = LoreEntry.create_entry(
-            title,
-            author=character,
-            body="A labelled synthetic example used only to explore personal notices.",
-        )
-    entry.affirm()
+    if is_guest(account) or is_guest(character) or character not in web_roster(account):
+        raise ValueError("Choose your own playable character before opting in")
+    key = f"sandbox_lore_notice_example_{character.pk}"
+    provenance = ServerConfig.objects.conf(key, default=None)
+    if provenance is None:
+        with transaction.atomic():
+            # Serialize first allocation before any provenance/row creation.
+            # Only a new, unexposed synthetic entry is mutated under this lock;
+            # existing entries are never row-locked or affirmed in this path.
+            AccountDB.objects.filter(pk=account.pk).update(username=F("username"))
+            AccountDB.objects.select_for_update().get(pk=account.pk)
+            provenance = ServerConfig.objects.conf(key, default=None)
+            if provenance is None:
+                if character not in web_roster(account):
+                    raise ValueError("Choose your own playable character before opting in")
+                expected = {
+                    "author_id": character.pk,
+                    "title": f"Example Lore decision: {character.key}",
+                    "body": "A labelled synthetic example used only to explore personal notices.",
+                    "summary": "",
+                    "kind": "fact",
+                    "accuracy": "accurate",
+                    "ooc_notes": "",
+                    "sealed_notes": "",
+                    "privacy": LoreEntry.Privacy.PUBLIC.value,
+                    "status": LoreEntry.Status.PUBLISHED.value,
+                    "is_archived": False,
+                }
+                if LoreEntry.all_objects.filter(title=expected["title"]).exists():
+                    raise ValueError(
+                        "That example title is already in use; existing lore was left unchanged"
+                    )
+                entry = LoreEntry.create_entry(
+                    expected["title"],
+                    author=character,
+                    body=expected["body"],
+                    kind="fact",
+                    accuracy="accurate",
+                    privacy=LoreEntry.Privacy.PUBLIC,
+                )
+                entry.refresh_from_db()
+                if (
+                    _lore_demo_content(entry) != expected
+                    or entry.affirmation != LoreEntry.Affirmation.NONE
+                ):
+                    raise ValueError(
+                        "The example could not be prepared; your lore was left unchanged"
+                    )
+                entry.affirm()
+                provenance = {"entry": entry.pk, "character": character.pk, "content": expected}
+                ServerConfig.objects.conf(key, provenance)
+    if (
+        not isinstance(provenance, Mapping)
+        or type(provenance.get("entry")) is not int
+        or provenance.get("character") != character.pk
+        or not isinstance(provenance.get("content"), Mapping)
+    ):
+        raise ValueError("This example is unavailable; your lore was left unchanged")
+    entry = LoreEntry.all_objects.filter(pk=provenance["entry"]).first()
+    if (
+        entry is None
+        or entry.author_id != character.pk
+        or _lore_demo_content(entry) != provenance["content"]
+        or entry.affirmation != LoreEntry.Affirmation.AFFIRMED
+        or entry.edited_since_affirmation
+    ):
+        raise ValueError("The example has changed; lore was left unchanged")
+    # Repeats never affirm again, and routing starts after allocation commits.
     transfer_pending(character)
     return entry
