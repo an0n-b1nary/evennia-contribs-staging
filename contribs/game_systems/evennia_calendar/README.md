@@ -228,13 +228,13 @@ and reinstalling it. Already delivered/transferred events never replay.
 ### Upgrade and pending notices
 
 Run migrations, then `evennia transfer_calendar_notices`. It processes one
-bounded page (default100) and reports transferred, held, invalid, retry and
+bounded page (default 100) and reports transferred, held, invalid, retry and
 continuation counts. Repeat to finish a pass; the Calendar maintenance sweep and
 an optional Inbox preparation hook continue it automatically. The hook transfers
 only the actual selected character before their summary. No database access
 occurs in app startup registration.
 
-Migration0005 preserves source row IDs, message history, and reminder receipts.
+Migration 0005 preserves source row IDs, message history, and reminder receipts.
 Legacy system notices bind only when timestamp/status/recipient evidence proves
 the current generation. Old human invitations/offers lack reliable sender IDs;
 ambiguous generations and unknown actors remain held without text, counts or

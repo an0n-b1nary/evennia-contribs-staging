@@ -567,7 +567,7 @@ def _sweep_events():
     try:
         transfer_pending()
     except Exception:
-        logger.warning("Calendar pending transfer deferred")
+        logger.warning("Calendar pending transfer deferred", exc_info=True)
 
     # --- Cluster draws ---
     for cluster in EventCluster.objects.filter(is_locked=True):
@@ -643,7 +643,11 @@ def ensure_calendar_script_running():
 
     from evennia_calendar.notices import transfer_pending
 
-    transfer_pending()
+    # Never abort the host's at_server_start(); the sweep retries the transfer.
+    try:
+        transfer_pending()
+    except Exception:
+        logger.warning("Calendar pending transfer deferred at startup", exc_info=True)
     existing = search_script("calendar_maintenance")
     if not existing:
         from evennia.utils.create import create_script

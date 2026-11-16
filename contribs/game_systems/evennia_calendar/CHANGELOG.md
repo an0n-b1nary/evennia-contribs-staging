@@ -9,17 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- Preserve editor buffers and their save context across reloads and restarts.
-
-- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
-
 ## 0.6.1 — 2026-11-09
 
 ### Added
 - Optional shared Inbox adapter for RSVP transitions and reminders. Lottery
   selections and sought waitlist offers remain outstanding after reading until
   resolved or expired; ordinary invitations remain dismissible.
-- Additive migration0005 records source event identity, lifecycle generations,
+- Additive migration 0005 records source event identity, lifecycle generations,
   durable routing receipts and bounded pending-transfer progress. Source history
   and the one-reminder-per-RSVP receipt are preserved.
 - `evennia transfer_calendar_notices` imports one bounded page, reporting held
@@ -27,11 +23,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retain their source text but never disclose it through fallback or the Inbox.
 
 ### Changed
-- Requires Links0.8.15. The optional `inbox` extra requires Inbox0.1.1 for
+- Requires Links 0.8.15. The optional `inbox` extra requires Inbox 0.1.1 for
   source preparation before the first login/puppet summary.
 - Standalone delivery keeps its pending queue, with live lifecycle and ignore
   checks. Socket delivery follows a committed one-attempt claim; uncertain
   attempts remain recorded and do not automatically replay.
+
+### Fixed
+- Preserve editor buffers and their save context across reloads and restarts.
+- Reject unknown, ambiguous and stacked switches before command lookups or
+  changes, including stock command replacements.
 
 ## 0.6.0 — 2026-10-22
 

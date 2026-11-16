@@ -125,7 +125,7 @@ See `README.md` for the snippet.
 
 ## Shared Inbox adapter (0.6.1)
 
-Migration0005 is additive and preserves all source rows and reminder receipts.
+Migration 0005 is additive and preserves all source rows and reminder receipts.
 Calendar's source queue holds immutable event envelopes plus durable route
 receipts; none of these metadata fields is exposed through the public Calendar
 API. RSVP lifecycle saves rotate a generation token so status cycles cannot

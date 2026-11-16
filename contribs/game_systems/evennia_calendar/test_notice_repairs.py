@@ -564,3 +564,18 @@ class SourceRetryTests(EvenniaTest):
         self.assertFalse(NoticeEvent.objects.exists())
         self.assertEqual(notices.route_notice(row.pk), "inbox")
         self.assertEqual(DeliveryReceipt.objects.count(), 1)
+
+
+class StartupTransferTests(EvenniaTest):
+    """A failing startup transfer never aborts the host's server-start hook."""
+
+    def test_startup_transfer_failure_still_starts_maintenance(self):
+        from evennia_calendar import scheduler
+
+        with (
+            patch.object(notices, "transfer_pending", side_effect=RuntimeError("unmigrated")),
+            patch("evennia.utils.search.search_script", return_value=[]),
+            patch("evennia.utils.create.create_script") as create_script,
+        ):
+            scheduler.ensure_calendar_script_running()
+        create_script.assert_called_once()
