@@ -609,7 +609,9 @@ def notify(rsvp, kind, message, *, origin=None, actor=None):
     actors = _actor_refs(actor)
     with transaction.atomic():
         RSVP.objects.filter(pk=rsvp.pk).update(notice_generation=F("notice_generation"))
-        live = RSVP.objects.select_for_update().select_related("event", "character").get(pk=rsvp.pk)
+        # Lock only the RSVP: PostgreSQL cannot lock the nullable character
+        # side of a select_related() outer join. Relations load after this lock.
+        live = RSVP.objects.select_for_update().get(pk=rsvp.pk)
         if live.notice_generation != rsvp.notice_generation:
             return False
         key = (
