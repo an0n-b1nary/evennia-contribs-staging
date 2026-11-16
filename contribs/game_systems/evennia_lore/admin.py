@@ -131,8 +131,16 @@ class LoreAcquisitionAdmin(admin.ModelAdmin):
 
 @admin.register(LoreNotice)
 class LoreNoticeAdmin(admin.ModelAdmin):
-    list_display = ["pk", "character", "entry", "created_at"]  # noqa: RUF012
-    readonly_fields = ["created_at"]  # noqa: RUF012
+    list_display = ["pk", "character", "entry", "kind", "route_state", "created_at"]  # noqa: RUF012
+    readonly_fields = (
+        "created_at",
+        "kind",
+        "event_key",
+        "envelope",
+        "provenance_known",
+        "route_state",
+        "acknowledged_at",
+    )
     raw_id_fields = ["character", "entry"]  # noqa: RUF012
 
 

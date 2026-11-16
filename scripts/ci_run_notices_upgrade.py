@@ -209,9 +209,9 @@ def worker(game, phase):
         # Unknown legacy human authors are held, never guessed from rendered text.
         assert calendar_delivery(character) == 0
         assert calendar_delivery(character) == 0
-        assert lore_delivery(character) == 1
         assert lore_delivery(character) == 0
-        assert msg.call_count == 1
+        assert lore_delivery(character) == 0
+        assert msg.call_count == 0
     with (
         patch.object(type(account), "msg") as msg,
         patch.object(type(account.sessions), "count", return_value=1),
@@ -221,7 +221,7 @@ def worker(game, phase):
         assert msg.call_count == 1
     assert ModerationNotice.objects.filter(delivered_at__isnull=True).count() == 0
     print(
-        "Populated upgrade preserved all source rows/markers; unknown Calendar inviter held; legacy hooks and inbox lifecycle passed"
+        "Populated upgrade preserved all source rows/markers; unknown Calendar inviter held; unknown Lore and Calendar rows held; inbox lifecycle passed"
     )
 
 

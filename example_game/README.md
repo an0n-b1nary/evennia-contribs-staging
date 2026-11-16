@@ -2109,3 +2109,10 @@ current character into labelled synthetic Calendar selection and invitation
 examples, using the normal `+rsvp/confirm` and `/cancel` controls. No generic seed
 chooses a real player's notice recipient. The earlier simulated offer examples
 continue to use `+sandbox/notice-confirm` and `/notice-decline`.
+
+Lore decision alerts use the real `lore` Inbox source. `+sandbox/notices` opts
+only your account/selected character into labelled Calendar and Lore examples;
+repeating it does not recreate an unchanged Lore decision. Reading/clearing
+alerts never changes Lore knowledge or decisions. Staff review advisories stay
+in their existing job and standalone flows. Legacy untyped Lore queues remain
+preserved held; use `evennia transfer_lore_notices` to inspect bounded counts.

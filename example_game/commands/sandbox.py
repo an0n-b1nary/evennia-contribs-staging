@@ -116,6 +116,7 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
             from world.sandbox.notices_seed import (
                 emit_calendar_demo_notices,
                 emit_demo_notices,
+                emit_lore_demo_notices,
                 resolve_demo_offer,
             )
 
@@ -126,8 +127,9 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
                 if switch == "notices":
                     emit_demo_notices(context.account, context.character)
                     emit_calendar_demo_notices(context.account, context.character)
+                    emit_lore_demo_notices(context.account, context.character)
                     self.msg(
-                        "Example notices ready. Use +notices. Calendar examples use +rsvp; simulated offers use +sandbox/notice-confirm or /notice-decline."
+                        "Example notices ready. Use +notices. Lore examples use +lore/read; Calendar examples use +rsvp; simulated offers use +sandbox/notice-confirm or /notice-decline."
                     )
                 else:
                     state = resolve_demo_offer(

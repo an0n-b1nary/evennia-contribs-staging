@@ -9,9 +9,28 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- Preserve editor buffers and their save context across reloads and restarts.
+## 0.10.4 — 2026-11-15
 
-- Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
+### Added
+- Optional shared Inbox adapter for character-owned affirmation, decline and
+  unsealing events, with immutable historical snapshots, live access/ignore
+  checks, quiet backlog transfer and dismissible alerts.
+- Additive migration 0006 retains source history and durable routing/uncertainty
+  receipts. Unknown legacy provenance is preserved held without disclosure.
+- Bounded `transfer_lore_notices` management command, optional `inbox` extra,
+  reference-game opt-in examples and populated upgrade/removal verification.
+
+### Changed
+- Requires Links 0.8.15; optional Inbox 0.1.1. Standalone routing remains available
+  when Inbox is absent, disabled or unconfigured, without consumed-event replay.
+- Guest ordinary alerts and source-only advisories retain no new queue records.
+- Serializes source decisions and stale unsealing; repeated unchanged decisions
+  reuse identity, while genuine later transitions remain separate events.
+
+### Fixed
+- Preserve editor buffers and their save context across reloads and restarts.
+- Reject unknown, ambiguous and stacked switches before command lookups or
+  changes, including stock command replacements.
 
 ## 0.10.3 — 2026-10-25
 

@@ -102,3 +102,17 @@ so the batch is idempotent across re-runs.
   `INSTALLED_APPS` with a lazy import.
 
 ## v0.1.0 extracted from source MUSH project at commit: _see git tag in private repo_
+
+
+## Shared Inbox adapter (0.10.4)
+
+Migration 0006 is additive and preserves published migrations, source IDs,
+messages, timestamps, acquisitions and versions. Old rows have no trustworthy
+kind/actor provenance and remain held, never guessed from formatted text.
+New source operations record typed immutable events atomically with decisions.
+Transfer once through `evennia transfer_lore_notices` or selected-character
+hooks; source receipts persist across actual Inbox removal/restoration.
+Read/clear affects only alerts. Standalone attempts claimed before socket I/O
+remain held if delivery is uncertain. No new source/Inbox/cursor retention is
+created for disposable guests, including source-only advisory delivery.
+Staff jobs, advisory audiences and passive acquisition feedback remain separate.
