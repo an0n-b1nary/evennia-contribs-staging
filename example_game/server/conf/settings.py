@@ -929,6 +929,7 @@ LINKS_NOTICE_SOURCES = {
     "sandbox-notices": "world.sandbox.notices.SandboxNoticeSource",
     "calendar": "evennia_calendar.integrations.notices.CalendarNoticeSource",
     "lore": "evennia_lore.integrations.notices.LoreNoticeSource",
+    "moderation": "evennia_moderation.integrations.notices.ModerationNoticeSource",
 }
 NOTICES_ENABLED = True
 NOTICES_RETENTION_DAYS = 30

@@ -22,6 +22,7 @@ def main(argv=None):
     selection.add_argument("--minimal", action="store_true")
     selection.add_argument("--minimal-calendar", action="store_true")
     selection.add_argument("--minimal-lore", action="store_true")
+    selection.add_argument("--minimal-moderation", action="store_true")
     args = parser.parse_args(argv)
     for name in args.absent:
         if find_spec(name) is not None:
@@ -47,11 +48,15 @@ def main(argv=None):
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_calendar']\n"
     elif args.minimal_lore:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_lore']\n"
+    elif args.minimal_moderation:
+        extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_jobs', 'evennia_moderation']\n"
     sources = {"fixture": "ci_notices_partner_tests.FixtureSource"}
     if find_spec("evennia_calendar") is not None:
         sources["calendar"] = "evennia_calendar.integrations.notices.CalendarNoticeSource"
     if find_spec("evennia_lore") is not None:
         sources["lore"] = "evennia_lore.integrations.notices.LoreNoticeSource"
+    if find_spec("evennia_moderation") is not None:
+        sources["moderation"] = "evennia_moderation.integrations.notices.ModerationNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
@@ -63,8 +68,8 @@ def main(argv=None):
     labels = ["ci_notices_partner_tests", "evennia_links.test_notices"]
     if find_spec("evennia_notices") is not None:
         labels.append("evennia_notices")
-    else:
-        labels.extend(name for name in ("evennia_moderation",) if find_spec(name))
+    if find_spec("evennia_moderation") is not None:
+        labels.append("evennia_moderation")
     if find_spec("evennia_lore") is not None:
         labels.append("evennia_lore.test_notice_adapter" if args.minimal_lore else "evennia_lore")
     if find_spec("evennia_calendar") is not None:

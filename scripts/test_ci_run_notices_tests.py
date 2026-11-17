@@ -112,3 +112,41 @@ class NoticeRunnerTests(unittest.TestCase):
             self.assertIn("evennia_lore.integrations.notices.LoreNoticeSource", settings)
             self.assertIn("evennia_lore.test_notice_adapter", run.call_args.args[0])
             self.assertNotIn("evennia_lore", run.call_args.args[0])
+
+    def test_moderation_suite_runs_with_inbox_and_minimal_independent_settings(self):
+        for minimal in (False, True):
+            with self.subTest(minimal=minimal), tempfile.TemporaryDirectory() as temporary:
+                game = Path(temporary)
+                (game / "server/conf").mkdir(parents=True)
+                (game / "server/conf/settings.py").write_text("")
+                installed = {"evennia_links", "evennia_jobs", "evennia_moderation"}
+                if not minimal:
+                    installed.add("evennia_notices")
+                with (
+                    patch.object(
+                        runner,
+                        "find_spec",
+                        side_effect=lambda name, installed=installed: (
+                            object() if name in installed else None
+                        ),
+                    ),
+                    patch.object(runner.shutil, "which", return_value="evennia"),
+                    patch.object(
+                        runner.subprocess,
+                        "run",
+                        return_value=Mock(returncode=0, stdout="Ran 12 tests\nOK"),
+                    ) as run,
+                ):
+                    self.assertEqual(
+                        runner.main([str(game), *(["--minimal-moderation"] if minimal else [])]), 0
+                    )
+                self.assertIn("evennia_moderation", run.call_args.args[0])
+                content = (game / "server/conf/notices_test_settings.py").read_text()
+                self.assertIn("ModerationNoticeSource", content)
+                if minimal:
+                    namespace = {"INSTALLED_APPS": []}
+                    exec(content.partition("\n")[2], namespace)
+                    self.assertEqual(
+                        namespace["INSTALLED_APPS"],
+                        ["evennia_links", "evennia_jobs", "evennia_moderation"],
+                    )

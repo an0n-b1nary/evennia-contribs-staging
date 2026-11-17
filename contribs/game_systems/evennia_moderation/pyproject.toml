@@ -4,24 +4,30 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-moderation"
-version = "0.2.0"
+version = "0.2.1"
 description = "Account moderation, staff notes, and reviewed guest admissions for Evennia."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "an0n-b1nary" }]
 requires-python = ">=3.12"
-dependencies = ["evennia>=6.0", "evennia-links>=0.8.13", "evennia-jobs>=0.7.2"]
+dependencies = ["evennia>=6.0", "evennia-links>=0.8.15,<0.9", "evennia-jobs>=0.7.2"]
+
+[project.optional-dependencies]
+inbox = ["evennia-notices>=0.1.1,<0.2"]
 
 [project.urls]
 Repository = "https://github.com/an0n-b1nary/evennia-contribs-staging"
 Issues = "https://github.com/an0n-b1nary/evennia-contribs-staging/issues"
 
 [tool.setuptools]
-packages = ["evennia_moderation", "evennia_moderation.migrations"]
+packages = ["evennia_moderation", "evennia_moderation.migrations", "evennia_moderation.integrations", "evennia_moderation.management", "evennia_moderation.management.commands"]
 
 [tool.setuptools.package-dir]
 evennia_moderation = "."
 "evennia_moderation.migrations" = "migrations"
+"evennia_moderation.integrations" = "integrations"
+"evennia_moderation.management" = "management"
+"evennia_moderation.management.commands" = "management/commands"
 
 [tool.setuptools.package-data]
 evennia_moderation = ["guides/*.md"]

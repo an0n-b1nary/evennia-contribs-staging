@@ -38,6 +38,7 @@ from world.sandbox.test_frontier import FrontierSeams
 from world.sandbox.test_interiors import BuildingInteriorSeams
 from world.sandbox.test_jobs import JobsSeams
 from world.sandbox.test_moderation import TestModerationSeams
+from world.sandbox.test_moderation_notices import ModerationNoticeSeams
 from world.sandbox.test_notices import NoticeSeams
 from world.sandbox.test_npcs import NPCCommandSeams, NPCSeams
 

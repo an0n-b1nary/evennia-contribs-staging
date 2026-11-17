@@ -3,7 +3,6 @@
 
 import hashlib
 import ipaddress
-import logging
 import secrets
 from datetime import timedelta
 
@@ -26,7 +25,6 @@ from evennia_moderation.models import (
     AdmissionsState,
     Application,
     ApplicationThrottle,
-    Notice,
     Referral,
     ReferralCode,
     RetiredSeat,
@@ -38,8 +36,6 @@ from evennia_moderation.policy import (
     staff_accounts,
 )
 from evennia_moderation.signals import account_admitted
-
-logger = logging.getLogger("evennia")
 
 
 def state_lock():
@@ -121,28 +117,20 @@ def throttle(address):
 
 
 def notice(account, text):
-    if account:
-        saved = Notice.objects.create(account=account, text=text)
-        transaction.on_commit(lambda: deliver_notices(account, only=saved.pk))
+    """Preserve untyped custom history held; typed admissions use source provenance."""
+    from evennia_moderation.notices import record_unknown
+
+    return record_unknown(account, text)
 
 
-def deliver_notices(account, only=None):
-    if not account.sessions.count():
-        return
-    qs = Notice.objects.filter(account=account, delivered_at__isnull=True)
-    if only:
-        qs = qs.filter(pk=only)
-    for saved in qs.order_by("pk"):
-        try:
-            account.msg(saved.text)
-        except Exception:
-            logger.exception("Unable to deliver moderation notice #%s", saved.pk)
-        else:
-            saved.delivered_at = timezone.now()
-            saved.save(update_fields=["delivered_at"])
+def deliver_notices(account, only=None, *, context=None):
+    """Route a bounded pending page without replaying acknowledged source history."""
+    from evennia_moderation.notices import deliver_notices as deliver
+
+    return deliver(account, only=only, context=context)
 
 
-def _release(application, status, reason=""):
+def _release(application, status, reason="", *, submission=None, actor=None):
     now = timezone.now()
     application.status = status
     application.decided_at = now
@@ -154,8 +142,27 @@ def _release(application, status, reason=""):
         code.invalidated_at = now
         code.code = ""
         code.save(update_fields=["invalidated_at", "code"])
-        detail = f" Reason: {reason}" if reason and application.share_decline_reason else ""
-        notice(code.owner, f"{application.account_name}'s application was not approved.{detail}")
+        from evennia_moderation.notices import record_outcome
+
+        if submission is None:
+            candidates = list(application.job.submissions.all()[:2])
+            submission = candidates[0] if len(candidates) == 1 else None
+        if submission is None or submission.job_id != application.job_id:
+            # Preserve ambiguous historical/custom provenance; never infer from text.
+            detail = f" Reason: {reason}" if reason and application.share_decline_reason else ""
+            notice(
+                code.owner, f"{application.account_name}'s application was not approved.{detail}"
+            )
+        else:
+            record_outcome(
+                code.owner,
+                kind=status,
+                submission_id=submission.pk,
+                applicant_name=application.account_name,
+                actor=actor,
+                reason=reason,
+                shared_reason=application.share_decline_reason,
+            )
 
 
 def expire_locked():
@@ -319,7 +326,9 @@ def review_admission(sender, *, submission, decision, **kwargs):
                 raise ValidationError("Sharing a decline reason must be a boolean choice.")
             application.share_decline_reason = options["share_decline_reason"]
             application.save(update_fields=["share_decline_reason"])
-        _release(application, "declined", decision.reason)
+        _release(
+            application, "declined", decision.reason, submission=submission, actor=decision.reviewer
+        )
         return
     if decision.outcome != RequestOutcome.APPROVED:
         raise ValidationError("Applications may only be approved or declined.")
@@ -360,9 +369,14 @@ def review_admission(sender, *, submission, decision, **kwargs):
     account_admitted.send(
         sender=Referral, account=account, submission=submission, referral=referral
     )
-    notice(
+    from evennia_moderation.notices import record_outcome
+
+    record_outcome(
         referrer,
-        f"{account.key}'s application was approved. Their account name and password now work.",
+        kind="approved",
+        submission_id=submission.pk,
+        applicant_name=account.key,
+        actor=decision.reviewer,
     )
 
 

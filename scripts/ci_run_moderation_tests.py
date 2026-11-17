@@ -44,7 +44,10 @@ def main(argv=None):
     )
     for settings_file, labels in (
         ("moderation_test_settings.py", ["evennia_moderation"]),
-        ("moderation_race_settings.py", ["evennia_moderation.test_concurrency"]),
+        (
+            "moderation_race_settings.py",
+            ["evennia_moderation.test_concurrency", "evennia_moderation.test_notice_concurrency"],
+        ),
     ):
         if "race" in settings_file:
             (game / "server/conf" / settings_file).write_text(

@@ -2116,3 +2116,9 @@ repeating it does not recreate an unchanged Lore decision. Reading/clearing
 alerts never changes Lore knowledge or decisions. Staff review advisories stay
 in their existing job and standalone flows. Legacy untyped Lore queues remain
 preserved held; use `evennia transfer_lore_notices` to inspect bounded counts.
+
+Moderation's referral outcomes use the shared Inbox as account-owned alerts.
+`+sandbox/notices` opts your account into one labelled simulated outcome without
+reviewing an application or changing referral allowances. Read/clear is shared
+across characters; the source retains standalone delivery and conservative
+legacy provenance handling described in its README.
