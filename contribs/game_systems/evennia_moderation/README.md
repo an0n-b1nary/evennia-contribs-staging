@@ -2,7 +2,7 @@
 
 Account-wide timed bans, mutes, moderation history, private staff notes, and
 reviewed guest admissions with caps and referral codes. Requires Evennia 6.0,
-evennia-links 0.8.5 and evennia-jobs 0.7.2. No website dependency is required.
+evennia-links 0.8.15 and evennia-jobs 0.7.2. No website dependency is required.
 
 ## Install
 
@@ -98,6 +98,53 @@ private unless staff select the web checkbox or use
 Hosts requiring reviewed admission must disable ordinary signup on both
 telnet and the direct website registration endpoint. The public reference
 game deliberately retains ordinary signup as a separate demonstration.
+
+## Personal outcome notices
+
+Approval, decline and lapse of an application using your referral create one
+account-owned outcome. With the optional `inbox` extra and Inbox installed,
+register the source in your host settings:
+
+```python
+LINKS_NOTICE_SOURCES["moderation"] = "evennia_moderation.integrations.notices.ModerationNoticeSource"
+```
+
+Routine outcomes enter quietly by default. Inbox's account-wide Moderation
+preference chooses immediate delivery, login summary or off. Importing pending
+outcomes stays quiet. `+notices` and the Inbox website share one read/clear
+state across all your characters, sessions and character-select. Reading or
+clearing acknowledges only the alert; it never decides an application, changes
+referrals or allowances, or opens a staff review job. Staff queues remain separate.
+
+The source rechecks ownership, provenance and shared ignore policy before text
+or counts. Character communication mode uses neutral referral wording without
+another account's name or a guessed character; account mode retains the
+applicant-name snapshot. A decline reason is included only if staff explicitly
+shared it at the original decision. The inbox stores a reference to the
+Moderation snapshot and reads the text from that snapshot after checking access.
+Other private application data and staff review links never enter the notice.
+
+Without Inbox, or when it is disabled, new outcomes keep the source's online
+or next-login delivery. Consumed source receipts survive Inbox removal and
+restoration. Socket delivery is claimed before sending; an uncertain attempt
+is held without acknowledgement and is never automatically replayed. Repeated
+reviews, imports and logins cannot recreate a consumed outcome.
+
+Run `evennia transfer_moderation_notices --limit 100` for one bounded retry/import
+page; optionally use `--account <id>`. Login and Inbox's login/puppet preparation
+also retry pending pages. Commands and web pages project already retained Inbox
+rows; they do not themselves import pending source work. The batch size defaults
+to `MODERATION_NOTICE_TRANSFER_BATCH = 100` (1–1000). Failed or held rows do not
+starve later rows.
+
+Upgrade adds migration 0003 without rewriting 0001/0002 or deleting source history.
+**Old text-only notices and custom `admissions.notice(account, text)` calls lack
+safe typed provenance and remain preserved but held:** no text, count or
+acknowledgement is inferred from their prose. Previously delivered timestamps
+remain consumed. Integrations emitting new admissions outcomes should use the
+typed source producer with the original submission, reviewer and sharing fact;
+unknown/custom messages must not fabricate those facts. Disposable guests retain
+no new source/Inbox records and receive only live, owned-session delivery.
 
 ## Runtime settings
 

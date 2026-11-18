@@ -107,4 +107,14 @@ class ModerationAccountMixin:
         from evennia_moderation.admissions import deliver_notices
 
         super().at_post_login(session=session, **kwargs)
-        deliver_notices(self)
+        try:
+            from evennia_links.notices import session_context
+
+            context = session_context(session) if session is not None else None
+            deliver_notices(self, context=context)
+        except Exception:
+            import logging
+
+            logging.getLogger("evennia").warning(
+                "Moderation pending transfer deferred; login continues"
+            )

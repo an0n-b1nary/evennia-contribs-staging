@@ -74,6 +74,7 @@ def build(scratch):
         emit_calendar_demo_notices,
         emit_demo_notices,
         emit_lore_demo_notices,
+        emit_moderation_demo_notices,
     )
 
     character = next(iter(admin.characters.all()), None)
@@ -89,6 +90,7 @@ def build(scratch):
     emit_demo_notices(admin, character)
     emit_calendar_demo_notices(admin, character)
     emit_lore_demo_notices(admin, character)
+    emit_moderation_demo_notices(admin, character)
     connections.close_all()
 
 

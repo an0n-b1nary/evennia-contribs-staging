@@ -792,6 +792,22 @@ jobs:
           python scripts/ci_run_notices_tests.py {game} --minimal-lore
           --absent evennia_notices --absent evennia_social
           --absent evennia_accessibility
+      - name: Minimal independent Moderation source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_jobs
+          --package contribs/game_systems/evennia_moderation --
+          python scripts/ci_run_notices_tests.py {game} --minimal-moderation
+          --absent evennia_notices --absent evennia_social
+          --absent evennia_accessibility
+      - name: Populated Moderation source upgrade and inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_moderation_notices_upgrade.py {game}
+          --base 6fb125fa3bbbd4666355744f5ce1ba6ffed66c74
       - name: Populated Lore source upgrade and inbox removal
         if: ${{ !cancelled() }}
         run: >-

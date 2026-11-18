@@ -263,3 +263,47 @@ def emit_lore_demo_notices(account, character):
     # Repeats never affirm again, and routing starts after allocation commits.
     transfer_pending(character)
     return entry
+
+
+def emit_moderation_demo_notices(account, character=None):
+    """Opt in the owning account to one simulation, never review real admissions."""
+    from django.db.models import F
+    from evennia.accounts.models import AccountDB
+
+    from evennia_moderation.integrations.notices import event_for
+    from evennia_moderation.models import Notice
+    from evennia_moderation.notices import record_example, transfer_pending
+
+    if is_guest(account) or not getattr(account, "is_authenticated", False):
+        raise ValueError("Choose an ordinary account before opting in")
+    if character is not None and character not in web_roster(account):
+        raise ValueError("Choose your own playable character before opting in")
+    key = f"sandbox_moderation_notice_example_{account.pk}"
+    with transaction.atomic():
+        AccountDB.objects.filter(pk=account.pk).update(last_login=F("last_login"))
+        AccountDB.objects.select_for_update().get(pk=account.pk)
+        marker = ServerConfig.objects.conf(key, default=None)
+        if marker is None:
+            row = record_example(account, uuid.uuid4().hex)
+            row.refresh_from_db(fields=["envelope"])
+            marker = {"notice": row.pk, "account": account.pk, "envelope": row.envelope}
+            ServerConfig.objects.conf(key, marker)
+        if (
+            not isinstance(marker, Mapping)
+            or type(marker.get("notice")) is not int
+            or marker.get("account") != account.pk
+            or not isinstance(marker.get("envelope"), Mapping)
+        ):
+            raise ValueError("The example has changed; admissions were left unchanged")
+        row = Notice.objects.filter(pk=marker["notice"]).first()
+        if (
+            row is None
+            or row.account_id != account.pk
+            or row.kind != "example"
+            or not row.provenance_known
+            or row.envelope != marker["envelope"]
+        ):
+            raise ValueError("The example has changed; admissions were left unchanged")
+    event_for(row)  # Refuse malformed synthetic provenance before reporting success.
+    transfer_pending(account)
+    return row

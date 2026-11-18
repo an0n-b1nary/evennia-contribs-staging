@@ -30,6 +30,19 @@ If the game uses referrals, an existing player can invite you with a code from `
 
 Each account can have only so many invitations out in a period, shared across all of its characters. An invitation that's declined or lapses is given back.
 
+When someone uses your referral, an outcome alert belongs to your account.
+If your game uses the shared Inbox, use `+notices` or My Notices on the website.
+Reading it as one character leaves it read as your next character too. Clearing
+an alert does not change the application, your codes, or your allowance. In the
+Inbox preferences you can choose immediate alerts, a login summary, or off for
+Moderation. Staff review queues remain private. Without Inbox, outcomes arrive
+online or at your next login.
+
+Character-based communication uses neutral referral wording, so outcome alerts
+do not reveal another player's account name or link their characters. Staff
+share a decline reason only when they choose to. Older alerts whose provenance
+cannot be established safely may be held rather than displayed.
+
 ## If staff restrict an account
 
 Restrictions apply to the whole account, so every character on it is affected.

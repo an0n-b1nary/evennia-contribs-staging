@@ -176,7 +176,7 @@ def worker(game, phase):
         ), key
     from evennia_links.notices import NoticeContext, NoticeEvent
     from evennia_notices.models import DeliveryReceipt
-    from evennia_notices.services import maintain, mutate, route
+    from evennia_notices.services import maintain, mutate, project, route
 
     assert not DeliveryReceipt.objects.exists(), "Foundation must not import production queues"
     context = NoticeContext(account, character)
@@ -218,10 +218,17 @@ def worker(game, phase):
     ):
         deliver_notices(account)
         deliver_notices(account)
-        assert msg.call_count == 1
-    assert ModerationNotice.objects.filter(delivered_at__isnull=True).count() == 0
+        assert msg.call_count == 0
+    assert (
+        ModerationNotice.objects.filter(
+            delivered_at__isnull=True, provenance_known=False, route_state="pending"
+        ).count()
+        == 1
+    )
+    assert not ModerationNotice.objects.exclude(acknowledged_at=None).exists()
+    assert not any(item.notice.source == "moderation" for item in project(context))
     print(
-        "Populated upgrade preserved all source rows/markers; unknown Calendar inviter held; unknown Lore and Calendar rows held; inbox lifecycle passed"
+        "Populated upgrade preserved all source rows/markers; unknown Calendar inviter held; unknown Lore, Calendar and Moderation rows held; inbox lifecycle passed"
     )
 
 

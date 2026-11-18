@@ -130,6 +130,24 @@ class Notice(models.Model):
     text = models.TextField()
     created_at = models.DateTimeField(default=timezone.now)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    event_key = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    kind = models.CharField(max_length=16, default="unknown")
+    provenance_known = models.BooleanField(default=False)
+    envelope = models.JSONField(default=dict)
+    route_state = models.CharField(max_length=16, default="pending", db_index=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [  # noqa: RUF012
+            models.Index(fields=["account", "route_state", "id"], name="moderation_notice_pending")
+        ]
+
+
+class NoticeCursor(models.Model):
+    """Bounded per-account/global transfer progress, independent of receipts."""
+
+    scope = models.CharField(max_length=64, unique=True)
+    last_pk = models.PositiveBigIntegerField(default=0)
 
 
 class ApplicationThrottle(models.Model):

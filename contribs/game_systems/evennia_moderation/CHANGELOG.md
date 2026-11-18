@@ -2,12 +2,31 @@
 
 ## [Unreleased]
 
-- Mark `CmdAccountPage` as account-mode only; character-mode hosts mount
-  Social's page instead. Add Builder-locked `CmdStaffAccountPage` (`apage`)
-  with character/Staff public sender labels and private account attribution.
+## [0.2.1] - 2026-11-16
 
+### Breaking
+
+- Use `ban <target>=<reason>`; reasons may contain colons. Keep invalid admissions numbers readable.
+
+### Added
+
+- Route referral approval, decline and lapse through the optional shared Inbox
+  with account-wide read/clear state, identity-safe rendering and source-owned
+  historical provenance. Staff review jobs remain separate.
+- Add generated migration 0003, bounded retry/import command and durable routing
+  receipts that survive Inbox disable/removal/restoration without replay.
+- Add reference opt-in simulation, rendered integration, actual package-absence,
+  populated-upgrade and committed concurrency coverage.
+- Add Builder-locked `CmdStaffAccountPage` (`apage`) with character/Staff public
+  sender labels and private account attribution.
+
+### Changed
+
+- Keep independent source delivery; preserve unknown text-only history held
+  rather than infer recipients, subjects, actors or reason-sharing from prose.
+- Mark `CmdAccountPage` as account-mode only; character-mode hosts mount
+  Social's page instead.
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
-- **Breaking:** use `ban <target>=<reason>`; reasons may contain colons. Keep invalid admissions numbers readable.
 
 ## [0.2.0] - 2026-10-21
 
