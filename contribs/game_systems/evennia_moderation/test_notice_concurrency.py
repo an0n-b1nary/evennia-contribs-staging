@@ -67,8 +67,14 @@ class OutcomeRaces(EvenniaTestMixin, TransactionTestCase):
         session.get_puppet.return_value = None
         context = NoticeContext(self.account, None, session)
         with patch.object(notices, "connected_contexts", side_effect=[[context], []]):
-            self.assertEqual(notices.route_notice(row.pk), "uncertain")
+            # Nothing reached a socket, so the committed claim returns to pending.
+            self.assertEqual(notices.route_notice(row.pk), "pending")
         session.msg.assert_not_called()
+        row.refresh_from_db()
+        self.assertIsNone(row.acknowledged_at)
+        with patch.object(notices, "connected_contexts", return_value=[context]):
+            self.assertEqual(notices.route_notice(row.pk), "fallback")
+        session.msg.assert_called_once()
 
     def test_failed_acknowledgement_does_not_interrupt_commit_callbacks(self):
         with patch.object(notices, "_safe_route", return_value="retry"):
