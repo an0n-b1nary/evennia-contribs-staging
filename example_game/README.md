@@ -2104,6 +2104,12 @@ Read/clear and account-wide immediate/summary/off preferences are explained in
 the packaged Personal notices guide. Read alerts do not read their underlying
 source or resolve outstanding decisions.
 
+Boards activity uses account-owned Inbox alerts. Try it by subscribing to a
+sandbox board with `+bb/subscribe <board>` and adding a new post. The Inbox
+shows one alert for that board, with the same read and clear state at character
+select and while playing. Turn Boards off, choose immediate, or use the
+default login summary under Notices preferences.
+
 Calendar is registered as a real Inbox source. `+sandbox/notices` also opts your
 current character into labelled synthetic Calendar selection and invitation
 examples, using the normal `+rsvp/confirm` and `/cancel` controls. No generic seed

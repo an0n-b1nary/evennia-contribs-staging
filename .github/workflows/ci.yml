@@ -775,6 +775,15 @@ jobs:
           --absent evennia_social --absent evennia_calendar
           --absent evennia_lore --absent evennia_boards
           --absent evennia_accessibility
+      - name: Minimal independent Boards source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_boards --
+          python scripts/ci_run_notices_tests.py {game} --minimal-boards
+          --absent evennia_notices --absent evennia_social
+          --absent evennia_accessibility
       - name: Minimal independent Calendar source
         if: ${{ !cancelled() }}
         run: >-
@@ -802,6 +811,12 @@ jobs:
           python scripts/ci_run_notices_tests.py {game} --minimal-moderation
           --absent evennia_notices --absent evennia_social
           --absent evennia_accessibility
+      - name: Populated Boards source upgrade and Inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_boards_notices_upgrade.py {game}
+          --base df6e4a8b7b3e27d79bdcbaf0ea0c2368763e4f72
       - name: Populated Moderation source upgrade and inbox removal
         if: ${{ !cancelled() }}
         run: >-

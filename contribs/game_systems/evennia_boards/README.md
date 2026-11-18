@@ -166,12 +166,37 @@ BOARDS_CALENDAR_APP_LABEL = "evennia_calendar"  # the app_label of your calendar
 
 ---
 
-## Login notifications
+## Subscription alerts
 
-No game-side code is required. `BoardsConfig.ready()` connects
-`_notify_board_subscriptions` to `SIGNAL_ACCOUNT_POST_LOGIN` with a
-`dispatch_uid` for idempotence across server reloads. Accounts see a summary
-of unread posts on their subscribed boards each time they log in.
+With Boards and Links installed, accounts see one login message with unread
+counts for their subscribed boards. The login signal is wired automatically.
+A subscription belongs to the account across characters and sessions.
+
+To use the shared Inbox, install `evennia-notices>=0.1.1`, migrate, and add
+Boards to the host's `LINKS_NOTICE_SOURCES`:
+
+```python
+LINKS_NOTICE_SOURCES["boards"] = "evennia_boards.integrations.notices.BoardNoticeSource"
+```
+
+The default is a quiet Inbox alert and a short login summary. Players can choose
+immediate or off in Notices preferences. A newly eligible post renews the board's
+alert. Each alert shows the public board name and a link or `+bb` navigation.
+Reading or clearing it leaves the board's web read marker and unread receipts
+alone. The strict Links notice policy uses the Social provider when installed.
+
+Existing subscriptions import their eligible outstanding activity quietly, using
+their last-notified timestamp. A null timestamp considers all active posts.
+New subscriptions start Inbox activity with posts added after subscribing.
+Pre-upgrade posts without a live author have ambiguous provenance and remain
+available through Boards history and its standalone presentation. Use
+`Post.create_post(author=None, ...)` to record genuine system provenance.
+
+Disabling, uninstalling, or leaving Inbox unconfigured uses the standalone
+login message for future activity. Acknowledged ranges stay consumed through
+those changes. A backend or configuration failure leaves work available for an
+Inbox retry. A connected disposable guest uses ephemeral session delivery.
+
 
 ---
 
@@ -192,7 +217,7 @@ from evennia_boards.signals import post_created, board_unread_notified
 # post_created(sender=Post, post=Post, board=Board)
 post_created.connect(my_handler)
 
-# Login listener: one signal per subscribed board with new posts.
+# Standalone delivery: one signal per board in an attempted login message.
 # sender=Subscription, account=AccountDB, board=Board, unread_count=int
 board_unread_notified.connect(my_handler)
 ```

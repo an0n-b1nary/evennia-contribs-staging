@@ -11,7 +11,7 @@ Boards hold posts that stay up: announcements, notices, discussion and in-charac
 - `+bb <board>` lists a board's posts, and `+bb <board>/<post>` reads one.
 - `+bb/post <board>=<title>` writes a post, and `+bb/reply <board>/<post>` replies to one.
 - `+bb/edit <board>/<post>` edits your own post.
-- `+bb/subscribe <board>` tells you about new posts when you log in.
+- `+bb/subscribe <board>` turns on new activity alerts for your account.
 
 Boards can be named or numbered: `+bb 2/5` and `+bb General/5` work alike. Post numbers belong to each board, and replies are numbered along with the posts they answer. `+bb/unsubscribe <board>` stops the notices.
 
@@ -40,3 +40,10 @@ visible. Without Social, board posts remain visible.
 ## On the website
 
 The website shows each board's newest post and, when you're logged in, how many you haven't read. Reading a board on the website marks it read there, but it doesn't use up the notice you'd get in game when you log in.
+
+
+In games with My Notices, subscribing starts alerts for future posts. New
+activity updates the board's alert. You can choose immediate, summary, or off
+in Notices preferences. Reading or clearing the alert leaves your place on the
+board unchanged. In games using standalone alerts, Boards shows unread counts
+when you log in.

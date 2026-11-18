@@ -84,3 +84,21 @@ XP_ANTIGAMING_SWEEPS += ["evennia_boards.integrations.xp.sweep_cutscene_spam"]
 In the source game `_find_burst` was accessible from `world.xp.antigaming`.
 It is now a private helper inside `evennia_boards.integrations.xp`. There is
 no public API for it; do not import it from outside the module.
+
+
+## Subscription alert state (0.6.1)
+
+Apply migration `0003_activity_notice_state` on standalone and Inbox hosts.
+Existing subscription timestamps, web read markers and post suppression rows
+are preserved. Discovery starts with the legacy timestamp, then tracks Post
+insertion IDs to keep activity accounted for through backend changes and hard
+deletes. A new subscription snapshots its Inbox start using the same board lock
+as `Post.create_post`. For serial imports, use newly allocated primary keys.
+Use the public creator for concurrent writes and immediate discovery.
+
+Pre-upgrade authorless posts may be genuine system posts or posts whose author
+was deleted. Their provenance remains ambiguous for Inbox. The public creator
+records system provenance on new authorless posts. A standalone delivery claim
+stores only its subscription generations, ranges and attempt state. A claim
+with no started writes can retry, including through quiet Inbox transfer. An
+uncertain socket outcome is fenced to avoid replay.

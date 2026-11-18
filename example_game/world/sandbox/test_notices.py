@@ -130,3 +130,50 @@ class NoticeSeams(EvenniaTest):
         self.assertNotIn(
             "My Notices", [i["label"] for i in build_menu(request)["account"]["personal"]]
         )
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class BoardNoticeSeam(EvenniaTest):
+    """Use the normal post creator, Social, and both Inbox ownership modes."""
+
+    def test_subscribed_activity_is_generic_and_account_owned(self):
+        from evennia_boards.models import Board, Post, PostReadSuppression, Subscription
+        from evennia_links.notices import NoticeContext
+        from evennia_notices import views
+        from evennia_social import ignore
+
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        for account in (self.account, self.account2):
+            account.permissions.clear()
+            account.is_superuser = False
+            account.save(update_fields=["is_superuser"])
+        self.char2.permissions.clear()
+        board = Board.objects.create(name="Sandbox Board", is_read_only=True)
+        subscription = Subscription.objects.create(account=self.account, board=board)
+        with self.captureOnCommitCallbacks(execute=True):
+            visible = Post.create_post(board, None, "spoiler title", "spoiler body")
+        ignore.set_entry(self.account, self.char2)
+        with self.captureOnCommitCallbacks(execute=True):
+            Post.create_post(board, self.char2, "hidden title", "hidden body")
+
+        [entry] = project(NoticeContext(self.account))
+        self.assertEqual(entry.events[0].payload["post"], visible.pk)
+        self.assertEqual(entry.text, "New activity on Sandbox Board")
+        self.assertFalse(project(NoticeContext(self.account2, self.char2)))
+        request = RequestFactory().get("/notices/")
+        request.user = self.account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        response = views.inbox(request).render()
+        self.assertContains(response, "New activity on Sandbox Board")
+        detail = views.detail(request, entry.notice.public_ref).render()
+        self.assertContains(detail, f"/boards/{board.pk}/")
+        self.assertNotContains(detail, "spoiler title")
+        self.assertNotContains(detail, "hidden title")
+        request.session["puppet"] = self.char1.pk
+        self.assertEqual(from_web(request).character, self.char1)
+        mutate(from_web(request), entry.notice.public_ref, "clear")
+        self.assertFalse(project(NoticeContext(self.account)))
+        self.assertIsNone(self.account.attributes.get("boards_web_read"))
+        self.assertTrue(Subscription.objects.filter(pk=subscription.pk).exists())
+        self.assertFalse(PostReadSuppression.objects.exists())

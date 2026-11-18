@@ -392,10 +392,17 @@ class TestLoginNotification(EvenniaTest):
         super().setUp()
         self.board = _make_board("News", board_type=Board.BoardType.OOC, order=1)
 
-    def _fire_login_signal(self, account, session=None):
+    def _fire_login_signal(self, account):
         from evennia.server.signals import SIGNAL_ACCOUNT_POST_LOGIN
 
-        SIGNAL_ACCOUNT_POST_LOGIN.send(sender=account, session=session)
+        from evennia_boards.notice_test_helpers import connected_session
+
+        with (
+            connected_session(account) as session,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            SIGNAL_ACCOUNT_POST_LOGIN.send(sender=account, session=session)
+        return session.msg
 
     def test_unread_notification_sent(self):
         Subscription.objects.create(account=self.account, board=self.board)
@@ -407,8 +414,7 @@ class TestLoginNotification(EvenniaTest):
             author=self.char1,
             author_name=self.char1.key,
         )
-        with patch.object(self.account, "msg") as mock_msg:
-            self._fire_login_signal(self.account)
+        mock_msg = self._fire_login_signal(self.account)
         mock_msg.assert_called_once()
         call_args = mock_msg.call_args[0][0]
         self.assertIn("New board posts", call_args)
@@ -420,20 +426,17 @@ class TestLoginNotification(EvenniaTest):
             board=self.board,
             last_notified_at=timezone.now(),
         )
-        with patch.object(self.account, "msg") as mock_msg:
-            self._fire_login_signal(self.account)
+        mock_msg = self._fire_login_signal(self.account)
         mock_msg.assert_not_called()
 
     def test_no_notification_when_no_subscriptions(self):
-        with patch.object(self.account, "msg") as mock_msg:
-            self._fire_login_signal(self.account)
+        mock_msg = self._fire_login_signal(self.account)
         mock_msg.assert_not_called()
 
     def test_last_notified_at_updated_after_login(self):
         sub = Subscription.objects.create(account=self.account, board=self.board)
         self.assertIsNone(sub.last_notified_at)
-        with patch.object(self.account, "msg"):
-            self._fire_login_signal(self.account)
+        self._fire_login_signal(self.account)
         sub.refresh_from_db()
         self.assertIsNotNone(sub.last_notified_at)
 
@@ -445,8 +448,7 @@ class TestLoginNotification(EvenniaTest):
             last_notified_at=timezone.now() - timedelta(hours=1),
         )
         before = sub.last_notified_at
-        with patch.object(self.account, "msg"):
-            self._fire_login_signal(self.account)
+        self._fire_login_signal(self.account)
         sub.refresh_from_db()
         self.assertGreater(sub.last_notified_at, before)
 
@@ -463,8 +465,7 @@ class TestLoginNotification(EvenniaTest):
                 author=self.char1,
                 author_name=self.char1.key,
             )
-        with patch.object(self.account, "msg") as mock_msg:
-            self._fire_login_signal(self.account)
+        mock_msg = self._fire_login_signal(self.account)
         mock_msg.assert_called_once()
         call_args = mock_msg.call_args[0][0]
         self.assertIn("News", call_args)
@@ -943,9 +944,12 @@ class TestWebPagesRender(EvenniaTest):
 
         board_unread_notified.connect(receiver, weak=False)
         try:
-            with patch.object(self.account, "msg"):
-                _notify_board_subscriptions(self.account)
-                _notify_board_subscriptions(self.account)
+            from evennia_boards.notice_test_helpers import connected_session
+
+            with connected_session(self.account) as session:
+                for _ in range(2):
+                    with self.captureOnCommitCallbacks(execute=True):
+                        _notify_board_subscriptions(self.account, session=session)
             self.assertEqual(seen, [(Subscription, self.account, self.board, 2)])
         finally:
             board_unread_notified.disconnect(receiver)

@@ -150,3 +150,33 @@ class NoticeRunnerTests(unittest.TestCase):
                         namespace["INSTALLED_APPS"],
                         ["evennia_links", "evennia_jobs", "evennia_moderation"],
                     )
+
+    def test_minimal_boards_collects_only_standalone_core_without_web_partners(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            with (
+                patch.object(
+                    runner,
+                    "find_spec",
+                    side_effect=lambda name: (
+                        object() if name in {"evennia_boards", "evennia_links"} else None
+                    ),
+                ),
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(
+                    runner.subprocess,
+                    "run",
+                    return_value=Mock(returncode=0, stdout="Ran 12 tests\nOK"),
+                ) as run,
+            ):
+                self.assertEqual(runner.main([str(game), "--minimal-boards"]), 0)
+            settings = (game / "server/conf/notices_test_settings.py").read_text()
+            namespace = {"INSTALLED_APPS": []}
+            exec(settings.partition("\n")[2], namespace)
+            self.assertEqual(namespace["INSTALLED_APPS"], ["evennia_links", "evennia_boards"])
+            self.assertIn("BoardNoticeSource", namespace["LINKS_NOTICE_SOURCES"]["boards"])
+            self.assertIn(
+                "evennia_boards.test_notice_adapter.StandaloneActivityTests", run.call_args.args[0]
+            )
