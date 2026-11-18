@@ -8,55 +8,27 @@ unread posts on subscribed boards. The notification fires automatically
 on every login — no game-side wiring required.
 """
 
-import logging
-
+from django.db import transaction
 from evennia.server.signals import SIGNAL_ACCOUNT_POST_LOGIN
 
+from evennia_boards.signals import post_created
 from evennia_links.ignoring import ignore_policy_changing
-
-logger = logging.getLogger("evennia")
 
 
 def _notify_board_subscriptions(sender, session=None, **kwargs):
-    """Notify *sender* (an Account) of unread posts on their subscriptions.
+    """Run the legacy login receiver with the supplied connection."""
+    from evennia_boards.notices import notify_login
 
-    Fires on every login via SIGNAL_ACCOUNT_POST_LOGIN. Degrades to a
-    no-op when the account has no subscriptions. Bulk-updates
-    last_notified_at for all subscriptions in a single query after notify.
-    """
-    from django.utils import timezone
+    notify_login(sender, session)
 
-    from evennia_boards.models import Subscription
 
-    account = sender
-    subs = Subscription.objects.filter(account=account).select_related("board")
-    if not subs.exists():
-        return
+def _queue_board_activity(sender, post, board, **kwargs):
+    """Discover subscribers only after the normal post writer commits."""
+    from evennia_boards.notices import post_committed
 
-    lines = []
-    now = timezone.now()
-    pks = []
-    from evennia_boards.presentation import PolicyContext
-
-    policy = PolicyContext(account)
-    for sub in subs:
-        count = sub.unread_count(context=policy)
-        if count:
-            plural = "s" if count != 1 else ""
-            lines.append(f"  |w{sub.board.name}|n: {count} new post{plural}")
-            from evennia_boards.signals import board_unread_notified
-
-            board_unread_notified.send(
-                sender=Subscription, account=account, board=sub.board, unread_count=count
-            )
-        pks.append(sub.pk)
-
-    if lines:
-        msg = "|wNew board posts:|n\n" + "\n".join(lines)
-        msg += "\nUse |w+bb <board>|n to read."
-        account.msg(msg, session=session)
-
-    Subscription.objects.filter(pk__in=pks).update(last_notified_at=now)
+    transaction.on_commit(
+        lambda: post_committed(board.pk, post.pk), using=post._state.db, robust=True
+    )
 
 
 def connect():
@@ -69,6 +41,7 @@ def connect():
         _notify_board_subscriptions,
         dispatch_uid="evennia_boards.notify_board_subscriptions",
     )
+    post_created.connect(_queue_board_activity, dispatch_uid="evennia_boards.queue_activity")
     ignore_policy_changing.connect(
         _snapshot_policy_before_change,
         dispatch_uid="evennia_boards.snapshot_ignore_policy",

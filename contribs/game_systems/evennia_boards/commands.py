@@ -238,7 +238,7 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
     Boards can be referenced by number (1, 2, 3…) or by name.
     Post numbers are per-board (e.g. +bb General/1).
 
-    Subscribed boards notify you of new posts on login.
+    Subscribing turns on account alerts for new board activity.
     IC boards (marked [IC]) hold narrative posts that may earn XP.
     """
 
@@ -622,9 +622,7 @@ class CmdBoard(StrictSwitchMixin, MuxCommand):
         account = _resolve_account(caller)
         _, created = Subscription.objects.get_or_create(account=account, board=board)
         if created:
-            caller.msg(
-                f"|gSubscribed to {board.name}.|n You will be notified of new posts on login."
-            )
+            caller.msg(f"|gSubscribed to {board.name}.|n Boards will alert you to new activity.")
         else:
             caller.msg(f"You are already subscribed to {board.name}.")
 

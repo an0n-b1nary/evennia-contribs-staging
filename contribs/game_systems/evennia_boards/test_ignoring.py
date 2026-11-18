@@ -23,6 +23,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from evennia_boards.api.serializers import BoardSerializer, PostSerializer
 from evennia_boards.api.views import PostViewSet
 from evennia_boards.models import Board, Post, PostReadSuppression, Subscription
+from evennia_boards.notice_test_helpers import connected_session
 from evennia_boards.presentation import PolicyContext, visible_post_count
 from evennia_boards.views import BoardDetailView, BoardListView, PostReplyView
 
@@ -273,9 +274,12 @@ class TestBoardIgnoreProjection(EvenniaTest):
         self.assertEqual(sub.last_notified_at, cutoff)
         from evennia_boards.listeners import _notify_board_subscriptions
 
-        with patch.object(self.reader_account, "msg") as message:
-            _notify_board_subscriptions(self.reader_account)
-        self.assertIn("3 new posts", message.call_args.args[0])
+        with (
+            connected_session(self.reader_account) as session,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            _notify_board_subscriptions(self.reader_account, session=session)
+        self.assertIn("3 new posts", session.msg.call_args.args[0])
         sub.refresh_from_db()
         self.assertGreater(sub.last_notified_at, cutoff)
 
@@ -488,9 +492,12 @@ class TestBoardIgnoreProjection(EvenniaTest):
         Subscription.objects.create(account=self.reader_account, board=self.board)
         with override_settings(BOARDS_STAFF_LOCK="cmd:true()"):
             self.assertEqual(Subscription.objects.get().unread_count(), 1)
-            with patch.object(self.reader_account, "msg") as message:
-                _notify_board_subscriptions(self.reader_account)
-            self.assertIn("1 new post", message.call_args.args[0])
+            with (
+                connected_session(self.reader_account) as session,
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                _notify_board_subscriptions(self.reader_account, session=session)
+            self.assertIn("1 new post", session.msg.call_args.args[0])
 
     @requires_social
     def test_login_with_only_hidden_posts_sends_no_unread_alert(self):
@@ -510,9 +517,12 @@ class TestBoardIgnoreProjection(EvenniaTest):
 
         board_unread_notified.connect(receive, weak=False)
         try:
-            with patch.object(self.reader_account, "msg") as message:
-                _notify_board_subscriptions(self.reader_account)
-            message.assert_not_called()
+            with (
+                connected_session(self.reader_account) as session,
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                _notify_board_subscriptions(self.reader_account, session=session)
+            session.msg.assert_not_called()
         finally:
             board_unread_notified.disconnect(receive)
         self.assertEqual(notifications, [])

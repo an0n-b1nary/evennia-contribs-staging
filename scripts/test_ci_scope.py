@@ -88,6 +88,9 @@ class SelectJobsTests(unittest.TestCase):
     def test_a_job_runner_selects_only_its_job(self):
         self.assertEqual(self.select("scripts/ci_run_npc_tests.py"), ["npc-partners"])
         self.assertEqual(self.select("scripts/ci_run_combat_tests.py"), ["combat-independent"])
+        self.assertEqual(
+            self.select("scripts/ci_run_boards_notices_upgrade.py"), ["notices-partners"]
+        )
 
     def test_example_game_selects_the_jobs_that_copy_it(self):
         self.assertEqual(

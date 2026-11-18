@@ -250,7 +250,9 @@ def visible_post_count(viewer, posts, *, context=None):
     return sum(value is not None for value in projection.values())
 
 
-def unread_post_count(viewer, posts, *, context=None, placeholder_ids=()):
+def unread_post_count(
+    viewer, posts, *, context=None, placeholder_ids=(), persist_hidden=True, account_locked=False
+):
     """Count candidates minus exact receipts and posts hidden by current policy."""
     from evennia_boards.models import PostReadSuppression
 
@@ -258,7 +260,9 @@ def unread_post_count(viewer, posts, *, context=None, placeholder_ids=()):
     if not rows:
         return 0
     context = context or PolicyContext(viewer)
-    projection = context.project_many(rows)
+    projection = context.project_many(rows, persist_hidden=False)
+    if persist_hidden:
+        context.persist_hidden(account_locked=account_locked)
     account = context.account
     read_ids = set()
     if account:

@@ -20,6 +20,7 @@ def main(argv=None):
     parser.add_argument("--absent", action="append", default=[])
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--minimal", action="store_true")
+    selection.add_argument("--minimal-boards", action="store_true")
     selection.add_argument("--minimal-calendar", action="store_true")
     selection.add_argument("--minimal-lore", action="store_true")
     selection.add_argument("--minimal-moderation", action="store_true")
@@ -44,6 +45,8 @@ def main(argv=None):
     extras = ""
     if args.minimal:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_notices']\n"
+    elif args.minimal_boards:
+        extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_boards']\n"
     elif args.minimal_calendar:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_calendar']\n"
     elif args.minimal_lore:
@@ -51,6 +54,8 @@ def main(argv=None):
     elif args.minimal_moderation:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_jobs', 'evennia_moderation']\n"
     sources = {"fixture": "ci_notices_partner_tests.FixtureSource"}
+    if find_spec("evennia_boards") is not None:
+        sources["boards"] = "evennia_boards.integrations.notices.BoardNoticeSource"
     if find_spec("evennia_calendar") is not None:
         sources["calendar"] = "evennia_calendar.integrations.notices.CalendarNoticeSource"
     if find_spec("evennia_lore") is not None:
@@ -70,6 +75,13 @@ def main(argv=None):
         labels.append("evennia_notices")
     if find_spec("evennia_moderation") is not None:
         labels.append("evennia_moderation")
+    if find_spec("evennia_boards") is not None:
+        if find_spec("evennia_notices") is None:
+            labels.append("evennia_boards.test_notice_adapter.StandaloneActivityTests")
+        else:
+            labels.extend(
+                ["evennia_boards.test_notice_adapter", "evennia_boards.test_notice_concurrency"]
+            )
     if find_spec("evennia_lore") is not None:
         labels.append("evennia_lore.test_notice_adapter" if args.minimal_lore else "evennia_lore")
     if find_spec("evennia_calendar") is not None:

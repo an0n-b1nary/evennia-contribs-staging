@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.6.1 — 2026-11-18
+
+- Added optional account-owned Inbox alerts for subscribed boards and preserved the
+  aggregated login message for standalone hosts.
+- Posts by the subscribing account's own characters do not raise Inbox alerts.
+- Preserved Boards read markers, ignore receipts, subscriptions and history on
+  upgrade. New subscriptions start their Inbox activity at enrollment.
+
 ## 0.6.0 — 2026-11-06
 
 - Apply optional Social ignore preferences across command, web, API, unread,

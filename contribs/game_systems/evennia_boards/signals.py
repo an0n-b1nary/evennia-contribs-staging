@@ -6,7 +6,7 @@ Signals for evennia_boards.
 post_created         — fired by Post.create_post() after a new post is saved.
                        kwargs: post (Post), board (Board)
 
-board_unread_notified — fired by the login listener for each subscribed board with new posts.
+board_unread_notified — fired per board in an attempted standalone login message.
                         kwargs: account (AccountDB), board (Board),
                                 unread_count (int)
 """
