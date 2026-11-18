@@ -3,10 +3,11 @@
 """Discovery and transport for account-owned subscribed Boards activity."""
 
 import logging
+import time
 
 from django.apps import apps
 from django.conf import settings
-from django.db import transaction
+from django.db import OperationalError, connection, transaction
 from django.db.models import F, Max, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -346,50 +347,76 @@ def _stage_standalone(account):
     return StandaloneNoticeClaim.objects.create(account=account, ranges=ranges) if ranges else None
 
 
+def _start_standalone(claim_id, account_id, session):
+    with transaction.atomic():
+        account = _account_lock(account_id)
+        if _inbox_enabled() or is_guest(account) or not _live_session(session, account):
+            return False
+        return bool(
+            StandaloneNoticeClaim.objects.filter(
+                pk=claim_id, account=account, status=Status.PENDING
+            ).update(status=Status.ATTEMPTING, updated_at=timezone.now())
+        )
+
+
+def _standalone_delivery(claim_id, account_id, session):
+    # Re-evaluate after the durable reservation commits. The frozen range
+    # still needs live source, policy, receipt, and connection checks.
+    with transaction.atomic():
+        account = _account_lock(account_id)
+        if _inbox_enabled() or is_guest(account) or not _live_session(session, account):
+            return None
+        claim = StandaloneNoticeClaim.objects.get(pk=claim_id, account=account)
+        activity = _legacy_activity(account, claim.ranges)
+        if activity:
+            return account, activity, _legacy_text(activity)
+
+
 def _attempt_standalone(claim_id, account_id, sessions):
-    attempted = delivered = False
-    for session in sessions:
-        reserved = False
-        try:
-            with transaction.atomic():
-                account = _account_lock(account_id)
-                if _inbox_enabled() or is_guest(account) or not _live_session(session, account):
+    reserved = attempted = delivered = False
+    try:
+        for session in sessions:
+            try:
+                if not reserved:
+                    reserved = _start_standalone(claim_id, account_id, session)
+                if not reserved:
                     continue
-                claim = StandaloneNoticeClaim.objects.get(pk=claim_id, account=account)
-                expected = Status.ATTEMPTING if attempted else Status.PENDING
-                if claim.status != expected:
-                    return
-                activity = _legacy_activity(account, claim.ranges)
-                if not activity:
+                delivery = _standalone_delivery(claim_id, account_id, session)
+                if delivery is None:
                     continue
-                message = _legacy_text(activity)
+                account, activity, message = delivery
                 send = session.msg
                 if not callable(send) or not _live_session(session, account):
                     continue
-                if not attempted:
-                    _set_status(claim, Status.ATTEMPTING)
-            reserved = not attempted
-            # Stay outside the transaction for socket I/O. The committed claim
-            # fences other logins and transfers while assessing write outcomes.
-            if not _live_session(session, account):
-                continue
-            first = not attempted
-            attempted = True
-            try:
-                send(message)
-                delivered = True
-            finally:
-                if first:
-                    _legacy_signal(account, activity)
-        except Exception:
-            logger.warning("Boards standalone delivery interrupted", exc_info=True)
-        finally:
-            if reserved and not attempted:
-                _finish_standalone(claim_id, account_id, Status.PENDING)
-    if attempted:
-        _finish_standalone(
-            claim_id, account_id, Status.DELIVERED if delivered else Status.UNCERTAIN
-        )
+                first = not attempted
+                attempted = True
+                try:
+                    send(message)
+                    delivered = True
+                finally:
+                    if first:
+                        _legacy_signal(account, activity)
+            except Exception:
+                logger.warning("Boards standalone delivery interrupted", exc_info=True)
+    finally:
+        if reserved:
+            state = (
+                Status.DELIVERED if delivered else Status.UNCERTAIN if attempted else Status.PENDING
+            )
+            _finalize_standalone(claim_id, account_id, state)
+
+
+def _finalize_standalone(claim_id, account_id, state):
+    # A SQLite writer conflict can occur before releasing an unused claim.
+    # Retry the idempotent state update without retrying any socket writes.
+    for attempt in range(3):
+        try:
+            _finish_standalone(claim_id, account_id, state)
+            return
+        except OperationalError as exc:
+            if connection.vendor != "sqlite" or "locked" not in str(exc).lower() or attempt == 2:
+                raise
+            time.sleep(0.025 * (attempt + 1))
 
 
 def _finish_standalone(claim_id, account_id, state):

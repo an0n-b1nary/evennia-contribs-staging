@@ -177,3 +177,38 @@ class BoardNoticeSeam(EvenniaTest):
         self.assertIsNone(self.account.attributes.get("boards_web_read"))
         self.assertTrue(Subscription.objects.filter(pk=subscription.pk).exists())
         self.assertFalse(PostReadSuppression.objects.exists())
+
+    @override_settings(NOTICES_ROUTINE_LIMIT=1)
+    def test_real_social_policy_keeps_an_independent_compacted_witness(self):
+        from evennia_boards.models import Board, Post, Subscription
+        from evennia_links.notices import NoticeContext
+        from evennia_notices.services import summarize
+        from evennia_social import ignore
+
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+        for account in (self.account, self.account2):
+            account.permissions.clear()
+            account.is_superuser = False
+            account.save(update_fields=["is_superuser"])
+        self.char2.permissions.clear()
+        public = Board.objects.create(name="Visible board")
+        ignored = Board.objects.create(name="Hidden activity board")
+        for board in (public, ignored):
+            Subscription.objects.create(account=self.account, board=board)
+        with self.captureOnCommitCallbacks(execute=True):
+            visible = Post.create_post(public, None, "visible title", "visible body")
+            hidden = Post.create_post(ignored, self.char2, "hidden title", "hidden body")
+        context = NoticeContext(self.account)
+        [envelope] = project(context)
+        self.assertTrue(envelope.notice.is_compacted)
+        self.assertEqual(len(envelope.events), 2)
+        ignore.set_entry(self.account, self.char2)
+        self.assertTrue(Post.objects.filter(pk=hidden.pk).exists())
+        [remaining] = project(context)
+        self.assertEqual([event.payload["post"] for event in remaining.events], [visible.pk])
+        self.assertEqual(remaining.text, "New activity on Visible board")
+        self.assertEqual(summarize(context), (1, 0))
+        ignore.clear(self.account)
+        [remaining] = project(context)
+        self.assertEqual([event.payload["post"] for event in remaining.events], [visible.pk])

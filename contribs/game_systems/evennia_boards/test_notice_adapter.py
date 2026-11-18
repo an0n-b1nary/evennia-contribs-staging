@@ -6,7 +6,7 @@ from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from django.apps import apps
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -157,6 +157,71 @@ class BoardsActivityTests(EvenniaTest):
         self.assertFalse(StandaloneNoticeClaim.objects.exists())
         prepare_account(self.account.pk)
         self.assertEqual(self.alerts()[0].events[0].payload["post"], post.pk)
+
+    def test_real_summary_and_immediate_listeners_use_one_owned_transport(self):
+        from evennia.server.signals import SIGNAL_ACCOUNT_POST_LOGIN, SIGNAL_OBJECT_POST_PUPPET
+
+        from evennia_notices.services import set_preference
+
+        self.account.characters.add(self.char1)
+        with connected_session(self.account) as session:
+            session._notice_summaries = {}
+            self.post()
+            session.msg.assert_not_called()
+            SIGNAL_ACCOUNT_POST_LOGIN.send(sender=self.account, session=session)
+            session.get_puppet.return_value = self.char1
+            SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=session)
+            self.assertEqual(session.msg.call_count, 1)
+            self.assertIn("Notices: 1 unread alerts", session.msg.call_args.args[0])
+            set_preference(self.context, "boards", "immediate")
+            with self.captureOnCommitCallbacks(execute=True), transaction.atomic():
+                Post.create_post(self.board, None, "Private title", "Private prose")
+                self.assertEqual(session.msg.call_count, 1)
+            self.assertEqual(session.msg.call_count, 2)
+            self.assertEqual(
+                session.msg.call_args.args[0],
+                "New activity on Activity\nUse +notices to read or manage this alert.",
+            )
+            set_preference(self.context, "boards", "off")
+            self.post()
+            self.assertEqual(session.msg.call_count, 2)
+
+    def test_guest_disconnect_after_render_retries_without_durable_or_ephemeral_ack(self):
+        from evennia.utils.create import create_account
+
+        from evennia_boards.integrations.notices import BoardNoticeSource
+
+        guest = create_account(
+            "Disconnecting Boards Guest",
+            None,
+            "synthetic-password",
+            typeclass="evennia.accounts.accounts.DefaultGuest",
+        )
+        subscription = Subscription.objects.create(account=guest, board=self.board)
+        self.post(live=False)
+        render = BoardNoticeSource.render
+        with connected_session(guest) as session:
+            session._boards_notice_positions = (None, {})
+
+            def render_then_disconnect(source, events, context):
+                value = render(source, events, context)
+                session.get_account.return_value = None
+                return value
+
+            with patch.object(
+                BoardNoticeSource, "render", autospec=True, side_effect=render_then_disconnect
+            ):
+                notify_login(guest, session)
+            session.msg.assert_not_called()
+            self.assertEqual(session._boards_notice_positions, (None, {}))
+            session.get_account.return_value = guest
+            notify_login(guest, session)
+            session.msg.assert_called_once_with("New activity on Activity")
+            notify_login(guest, session)
+            session.msg.assert_called_once()
+        subscription.refresh_from_db()
+        self.assertIsNone(subscription.discovery_post_id)
+        self.assertFalse(StandaloneNoticeClaim.objects.filter(account=guest).exists())
 
     def test_connected_guest_receives_strict_fresh_activity_ephemerally(self):
         from evennia.utils.create import create_account
@@ -333,6 +398,76 @@ class StandaloneActivityTests(EvenniaTest):
                 notify_login(self.account, session)
             session.msg.assert_not_called()
             self.assertEqual(StandaloneNoticeClaim.objects.get().status, "pending")
+
+    def test_post_claim_mutations_prevent_stale_standalone_counts(self):
+        from evennia_boards import notices
+
+        changes = {
+            "archive": self.post.archive,
+            "unsubscribe": lambda: Subscription.objects.filter(pk=self.subscription.pk).delete(),
+            "receipt": lambda: PostReadSuppression.objects.create(
+                account=self.account, post=self.post
+            ),
+        }
+        live = notices._live_session
+        for name, mutate in changes.items():
+            with self.subTest(change=name), transaction.atomic():
+                changed = False
+
+                def revoke_after_reservation(session, account, mutate=mutate):
+                    nonlocal changed
+                    if (
+                        not changed
+                        and StandaloneNoticeClaim.objects.filter(status="attempting").exists()
+                    ):
+                        changed = True
+                        mutate()
+                    return live(session, account)
+
+                with (
+                    patch.object(notices, "_live_session", side_effect=revoke_after_reservation),
+                    connected_session(self.account) as session,
+                    self.captureOnCommitCallbacks(execute=True),
+                ):
+                    notify_login(self.account, session)
+                self.assertTrue(changed)
+                session.msg.assert_not_called()
+                self.assertEqual(StandaloneNoticeClaim.objects.get().status, "pending")
+                transaction.set_rollback(True)
+
+    def test_prewrite_render_failure_and_locked_reset_recover_without_duplicate(self):
+        from evennia_boards import notices
+
+        finish = notices._finish_standalone
+        attempts = []
+
+        def finish_after_contention(*args):
+            attempts.append(args[-1])
+            if len(attempts) == 1:
+                raise OperationalError("database is locked")
+            finish(*args)
+
+        def broken_render(_activity):
+            self.assertEqual(StandaloneNoticeClaim.objects.get().status, "attempting")
+            raise ValueError("render unavailable")
+
+        with connected_session(self.account) as session:
+            with (
+                patch.object(notices, "_legacy_text", side_effect=broken_render),
+                patch.object(notices, "_finish_standalone", side_effect=finish_after_contention),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                notify_login(self.account, session)
+            session.msg.assert_not_called()
+            self.assertEqual(attempts, ["pending", "pending"])
+            self.assertEqual(StandaloneNoticeClaim.objects.get().status, "pending")
+            self.subscription.refresh_from_db()
+            self.assertIsNone(self.subscription.last_notified_at)
+            for _ in range(2):
+                with self.captureOnCommitCallbacks(execute=True):
+                    notify_login(self.account, session)
+            session.msg.assert_called_once()
+        self.assertEqual(StandaloneNoticeClaim.objects.get().status, "delivered")
 
     def test_socket_failure_leaves_uncertainty_without_replay(self):
         with connected_session(self.account) as session:
