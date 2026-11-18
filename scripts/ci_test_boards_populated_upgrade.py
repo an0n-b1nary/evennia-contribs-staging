@@ -28,6 +28,7 @@ def worker(game: Path, settings_name: str) -> int:
 
     from django.core.management import call_command
     from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
     from django.utils import timezone
     from evennia.accounts.models import AccountDB
     from evennia.server import initial_setup
@@ -45,7 +46,13 @@ def worker(game: Path, settings_name: str) -> int:
     initial_setup.create_objects()
     initial_setup.at_initial_setup()
     ServerConfig.objects.conf("last_initial_setup_step", "done")
-    call_command("migrate", "evennia_boards", "0001_initial", interactive=False, verbosity=0)
+    initial_target = [("evennia_boards", "0001_initial")]
+    executor = MigrationExecutor(connection)
+    executor.migrate(initial_target)
+    initial_apps = executor.loader.project_state(initial_target).apps
+    LegacyBoard = initial_apps.get_model("evennia_boards", "Board")
+    LegacyPost = initial_apps.get_model("evennia_boards", "Post")
+    LegacySubscription = initial_apps.get_model("evennia_boards", "Subscription")
     assert "evennia_boards_postreadsuppression" not in connection.introspection.table_names()
 
     reader_account = create.create_account("UpgradeReader", None, "upgrade-test-password")
@@ -70,31 +77,56 @@ def worker(game: Path, settings_name: str) -> int:
     ignore.set_entry(reader_account, named_author)
     reader_account.attributes.add("ignore_list", [legacy_account.pk])
     ignore.set_boards_preference(reader_account, "hide")
-    board = Board.objects.create(name="Upgrade board")
-    visible_a = Post.create_post(board, reader, "A", "visible A")
-    hidden_named = Post.create_post(board, named_author, "B", "named hidden")
-    visible_reply = Post.create_post(
-        board, reader, "Visible reply", "reply stays unread", parent_post=hidden_named
-    )
-    visible_c = Post.create_post(board, reader, "C", "visible C")
-    hidden_legacy = Post.create_post(board, legacy_author, "D", "legacy hidden")
-    hidden_legacy.archive(editor=legacy_author)
-    cutoff = timezone.now() - timedelta(hours=1)
-    subscription = Subscription.objects.create(
-        account=reader_account, board=board, last_notified_at=cutoff
-    )
-    reader_account.attributes.add("boards_web_read", {str(board.pk): visible_a.post_number})
+    legacy_board = LegacyBoard.objects.create(name="Upgrade board")
 
-    # The existing named and legacy policy has been stored under the old
-    # schema. Migration only adds an empty table; the first policy mutation
-    # then snapshots both forms before they are cleared.
-    call_command(
-        "migrate", "evennia_boards", "0002_postreadsuppression", interactive=False, verbosity=0
+    def create_legacy_post(number, author, title, content, **fields):
+        return LegacyPost.all_objects.create(
+            board=legacy_board,
+            post_number=number,
+            author_id=author.pk,
+            author_name=author.key,
+            title=title,
+            content=content,
+            **fields,
+        )
+
+    visible_a = create_legacy_post(1, reader, "A", "visible A")
+    hidden_named = create_legacy_post(2, named_author, "B", "named hidden")
+    visible_reply = create_legacy_post(
+        3, reader, "Visible reply", "reply stays unread", parent_post=hidden_named
     )
-    assert not PostReadSuppression.objects.exists()
+    visible_c = create_legacy_post(4, reader, "C", "visible C")
+    hidden_legacy = create_legacy_post(
+        5,
+        legacy_author,
+        "D",
+        "legacy hidden",
+        is_archived=True,
+        archived_at=timezone.now(),
+        archived_by_id=legacy_author.pk,
+        archived_by_name=legacy_author.key,
+    )
+    cutoff = timezone.now() - timedelta(hours=1)
+    legacy_subscription = LegacySubscription.objects.create(
+        account_id=reader_account.pk, board=legacy_board, last_notified_at=cutoff
+    )
+    reader_account.attributes.add("boards_web_read", {str(legacy_board.pk): visible_a.post_number})
+
+    # Both ignore forms predate the suppression table. On the current
+    # schema, the first policy mutation snapshots both before clearing them.
+    suppression_target = [("evennia_boards", "0002_postreadsuppression")]
+    executor = MigrationExecutor(connection)
+    executor.migrate(suppression_target)
+    suppression_apps = executor.loader.project_state(suppression_target).apps
+    assert not suppression_apps.get_model("evennia_boards", "PostReadSuppression").objects.exists()
+    call_command("migrate", "evennia_boards", interactive=False, verbosity=0)
+
+    board = Board.objects.get(pk=legacy_board.pk)
+    subscription = Subscription.objects.get(pk=legacy_subscription.pk)
+    hidden_legacy = Post.all_objects.get(pk=hidden_legacy.pk)
+    assert hidden_legacy.is_archived
     assert ignore.clear(reader_account) == 2
 
-    hidden_legacy = Post.all_objects.get(pk=hidden_legacy.pk)
     hidden_legacy.unarchive()
     new_post = Post.create_post(board, named_author, "New B", "new after clear")
     reader_account.attributes.reset_cache()
@@ -112,7 +144,7 @@ def worker(game: Path, settings_name: str) -> int:
         == 3
     )  # Reply, C, and the genuinely new B; the web marker did not move.
     assert not PostReadSuppression.objects.filter(
-        account=reader_account, post=visible_reply
+        account=reader_account, post_id=visible_reply.pk
     ).exists()
     assert new_post.post_number > visible_c.post_number
     subscription.refresh_from_db()
