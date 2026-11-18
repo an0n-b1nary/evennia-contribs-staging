@@ -181,9 +181,9 @@ LINKS_NOTICE_SOURCES["boards"] = "evennia_boards.integrations.notices.BoardNotic
 
 The default is a quiet Inbox alert and a short login summary. Players can choose
 immediate or off in Notices preferences. A newly eligible post renews the board's
-alert. Each alert shows the public board name and a link or `+bb` navigation.
-Reading or clearing it leaves the board's web read marker and unread receipts
-alone. The strict Links notice policy uses the Social provider when installed.
+alert. Posts by the account's own characters do not create or renew an alert.
+Each alert shows the public board name and a link or `+bb` navigation. Reading
+or clearing it leaves the board's web read marker and unread receipts alone. The strict Links notice policy uses the Social provider when installed.
 
 Existing subscriptions import their eligible outstanding activity quietly, using
 their last-notified timestamp. A null timestamp considers all active posts.

@@ -43,7 +43,7 @@ The website shows each board's newest post and, when you're logged in, how many 
 
 
 In games with My Notices, subscribing starts alerts for future posts. New
-activity updates the board's alert. You can choose immediate, summary, or off
-in Notices preferences. Reading or clearing the alert leaves your place on the
-board unchanged. In games using standalone alerts, Boards shows unread counts
+activity from others updates the board's alert. Your own posts do not. You can
+choose immediate, summary, or off in Notices preferences. Reading or clearing
+the alert leaves your place on the board unchanged. In games using standalone alerts, Boards shows unread counts
 when you log in.

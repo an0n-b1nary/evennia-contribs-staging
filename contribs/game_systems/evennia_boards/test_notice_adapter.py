@@ -71,6 +71,16 @@ class BoardsActivityTests(EvenniaTest):
         self.assertFalse(PostReadSuppression.objects.exists())
         self.assertIsNone(self.account.attributes.get("boards_web_read"))
 
+    def test_own_posts_do_not_alert_or_renew_the_board_alert(self):
+        self.account.characters.add(self.char1)
+        self.post(author=self.char1)
+        prepare_account(self.account.pk)
+        self.assertEqual(self.alerts(), [])
+        other = self.post(author=self.char2)
+        self.post(author=self.char1)
+        prepare_account(self.account.pk)
+        self.assertEqual([row.events[0].payload["post"] for row in self.alerts()], [other.pk])
+
     def test_resubscribe_requires_fresh_inbox_activity(self):
         self.post()
         self.subscription.delete()

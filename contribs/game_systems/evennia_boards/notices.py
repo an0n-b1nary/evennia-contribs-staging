@@ -14,7 +14,7 @@ from django.utils.dateparse import parse_datetime
 from evennia.accounts.models import AccountDB
 from evennia.objects.models import ObjectDB
 
-from evennia_boards.integrations.notices import POST_FIELDS, SOURCE, event_for
+from evennia_boards.integrations.notices import POST_FIELDS, SOURCE, event_for, own_character_ids
 from evennia_boards.models import Post, StandaloneNoticeClaim, Subscription
 from evennia_links.guests import is_guest
 from evennia_links.ignoring import notice_ignore_status
@@ -86,6 +86,7 @@ class _StrictPolicy:
         self.account = account
         self.cache = {}
         self.statuses = {}
+        self.own = own_character_ids(account)
 
     def load(self, rows):
         ids = {row[2] for row in rows if row[2] is not None and row[2] not in self.statuses}
@@ -97,6 +98,8 @@ class _StrictPolicy:
             self.statuses[author_id] = "suppress"
 
     def status(self, row):
+        if row[2] in self.own:
+            return "suppress"
         return "allow" if row[2] is None else self.statuses[row[2]]
 
 

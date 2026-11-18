@@ -39,6 +39,14 @@ def event_for(subscription, post):
     )
 
 
+def own_character_ids(account):
+    """Characters on the account's playable list; their posts are not new to it."""
+    try:
+        return {obj.pk for obj in account.characters.all() if obj and obj.pk}
+    except AttributeError:
+        return set()
+
+
 def _ids(events, field):
     return {value for event in events if type(value := event.payload.get(field)) is int}
 
@@ -56,7 +64,7 @@ class BoardNoticeSource:
             prepare_account(context.account.pk)
 
     def evaluate(self, events, context):
-        """Verify immutable provenance and live subscription ownership in batches."""
+        """Verify provenance and live subscription ownership; skip the account's own posts."""
         if not authorize_context(NoticeContext(context.account, session=context.session)):
             return {event.event_id: Evaluation("invalid") for event in events}
         subscriptions = (
@@ -71,6 +79,7 @@ class BoardNoticeSource:
             for row in Post.objects.filter(pk__in=_ids(events, "post")).values_list(*POST_FIELDS)
         }
 
+        own = own_character_ids(context.account)
         outcomes = {}
         for event in events:
             payload = event.payload
@@ -81,7 +90,12 @@ class BoardNoticeSource:
             ):
                 subscription = subscriptions.get(payload["subscription"])
                 post = posts.get(payload["post"])
-                if subscription and post and post[0] > (subscription.inbox_start_post_id or 0):
+                if (
+                    subscription
+                    and post
+                    and post[0] > (subscription.inbox_start_post_id or 0)
+                    and post[2] not in own
+                ):
                     expected = event_for(subscription, post)
             valid = expected is not None and event == StoredEvent(
                 **expected.__dict__, recipient_kind="account", recipient_id=context.account.pk
