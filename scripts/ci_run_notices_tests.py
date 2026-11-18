@@ -24,6 +24,7 @@ def main(argv=None):
     selection.add_argument("--minimal-calendar", action="store_true")
     selection.add_argument("--minimal-lore", action="store_true")
     selection.add_argument("--minimal-moderation", action="store_true")
+    selection.add_argument("--minimal-social", action="store_true")
     args = parser.parse_args(argv)
     for name in args.absent:
         if find_spec(name) is not None:
@@ -53,6 +54,8 @@ def main(argv=None):
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_lore']\n"
     elif args.minimal_moderation:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_jobs', 'evennia_moderation']\n"
+    elif args.minimal_social:
+        extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_posing', 'evennia_social']\n"
     sources = {"fixture": "ci_notices_partner_tests.FixtureSource"}
     if find_spec("evennia_boards") is not None:
         sources["boards"] = "evennia_boards.integrations.notices.BoardNoticeSource"
@@ -62,6 +65,8 @@ def main(argv=None):
         sources["lore"] = "evennia_lore.integrations.notices.LoreNoticeSource"
     if find_spec("evennia_moderation") is not None:
         sources["moderation"] = "evennia_moderation.integrations.notices.ModerationNoticeSource"
+    if find_spec("evennia_social") is not None:
+        sources["social-pages"] = "evennia_social.integrations.notices.SocialPageNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
@@ -97,6 +102,15 @@ def main(argv=None):
                 "evennia_social.tests.test_notice_ownership",
             ]
         )
+        if find_spec("evennia_notices") is None:
+            labels.append("evennia_social.tests.test_page_notices.StandalonePageTests")
+        else:
+            labels.extend(
+                [
+                    "evennia_social.tests.test_page_notices",
+                    "evennia_social.tests.test_page_notice_concurrency",
+                ]
+            )
     result = subprocess.run(
         [shutil.which("evennia"), "test", "--settings=notices_test_settings.py", *labels],
         cwd=game,

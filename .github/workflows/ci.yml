@@ -811,6 +811,21 @@ jobs:
           python scripts/ci_run_notices_tests.py {game} --minimal-moderation
           --absent evennia_notices --absent evennia_social
           --absent evennia_accessibility
+      - name: Minimal independent Social source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/base_systems/evennia_posing
+          --package contribs/game_systems/evennia_social --
+          python scripts/ci_run_notices_tests.py {game} --minimal-social
+          --absent evennia_notices --absent evennia_accessibility
+      - name: Populated Social source upgrade and Inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_social_notices_upgrade.py {game}
+          --base 053915f2535d8c026ef55c5ed32fc38d5027198c
       - name: Populated Boards source upgrade and Inbox removal
         if: ${{ !cancelled() }}
         run: >-
