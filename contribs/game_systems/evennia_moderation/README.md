@@ -137,7 +137,7 @@ rows; they do not themselves import pending source work. The batch size defaults
 to `MODERATION_NOTICE_TRANSFER_BATCH = 100` (1–1000). Failed or held rows do not
 starve later rows.
 
-Upgrade adds migration0003 without rewriting0001/0002 or deleting source history.
+Upgrade adds migration 0003 without rewriting 0001/0002 or deleting source history.
 **Old text-only notices and custom `admissions.notice(account, text)` calls lack
 safe typed provenance and remain preserved but held:** no text, count or
 acknowledgement is inferred from their prose. Previously delivered timestamps

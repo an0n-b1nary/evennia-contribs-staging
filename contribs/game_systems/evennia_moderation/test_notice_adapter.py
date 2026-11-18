@@ -488,7 +488,7 @@ class StandaloneOutcomeTests(OutcomeFixture, EvenniaTest):
         self.assertEqual(notices.route_notice(row.pk), "uncertain")
         self.assertEqual(session.msg.call_count, 1)
 
-    def test_session_loses_account_before_send_so_no_output(self):
+    def test_session_loses_account_before_send_so_no_output_and_later_retry(self):
         row = self.outcome()
         session = self.make_session()
         with (
@@ -499,7 +499,18 @@ class StandaloneOutcomeTests(OutcomeFixture, EvenniaTest):
             session.get_account.return_value = self.account
         session.msg.assert_not_called()
         row.refresh_from_db()
-        self.assertEqual(row.route_state, "uncertain")
+        # Nothing reached a socket, so the outcome is not uncertain or consumed.
+        self.assertEqual(row.route_state, "pending")
+        self.assertIsNone(row.acknowledged_at)
+        later = self.make_session()
+        with (
+            patch("evennia.server.sessionhandler.SESSIONS.get_sessions", return_value=[later]),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            notices.route_notice(row.pk)
+        later.msg.assert_called_once()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "fallback")
 
     def test_malformed_registry_or_backend_error_never_falls_back(self):
         row = self.outcome()

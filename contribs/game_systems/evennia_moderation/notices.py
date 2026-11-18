@@ -295,7 +295,7 @@ def _safe_deliver_claim(pk, contexts):
 def _deliver_claim(pk, contexts):
     """Recheck each current account session after the durable transport claim."""
     row = Notice.objects.get(pk=pk)
-    delivered = False
+    delivered = attempted = False
     for context in contexts:
         try:
             row.refresh_from_db()
@@ -303,11 +303,14 @@ def _deliver_claim(pk, contexts):
                 continue
             text = normalize_rendered(render_payload(row.envelope["payload"])).text
             if _live_context(context, row.account):
+                attempted = True
                 context.session.msg(text)
                 delivered = True
         except Exception:
             logger.warning("Moderation delivery uncertain; source attempt retained")
-    _ack(row, "fallback" if delivered else "uncertain")
+    # Only a started socket write is uncertain. When every session went away
+    # or became ineligible first, nothing was sent, so later logins retry it.
+    _ack(row, "fallback" if delivered else "uncertain" if attempted else "pending")
     return row.route_state
 
 
