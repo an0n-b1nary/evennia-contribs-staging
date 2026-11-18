@@ -14,11 +14,12 @@ from evennia.utils.test_resources import EvenniaCommandTest
 from typeclasses.characters import Character
 from typeclasses.rooms import Room
 
-from evennia_links.notices import NoticeContext
+from evennia_links.notices import NoticeContext, RouteResult
 from evennia_notices import views
 from evennia_notices.commands import CmdNotices
 from evennia_notices.models import DeliveryReceipt
 from evennia_notices.services import mutate, project
+from evennia_social import notices as social_notices
 from evennia_social.commands.messaging import CmdPage
 from evennia_social.models import PageDelivery
 from world.sandbox.notices_seed import emit_social_demo_notice
@@ -110,8 +111,11 @@ class SocialPageNoticeSeams(EvenniaCommandTest):
             locks=f"read:id({self.char1.pk})",
             tags=[("page", "comms")],
         )
-        with patch(
-            "evennia.server.sessionhandler.SESSIONS.get_sessions", return_value=[guest_session]
+        with (
+            patch(
+                "evennia.server.sessionhandler.SESSIONS.get_sessions", return_value=[guest_session]
+            ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             self.char1._notify_unread_pages()
             self.char1._notify_unread_pages()
@@ -125,15 +129,42 @@ class SocialPageNoticeSeams(EvenniaCommandTest):
         session = Mock()
         session.get_account.return_value = self.account
         session.get_puppet.return_value = self.char1
-        with self.assertRaises(ValueError):
-            emit_social_demo_notice(self.account, self.char2, session=session)
-        own_page = create_message(self.char2, "[Sandbox example]", receivers=[self.char1])
-        with self.captureOnCommitCallbacks(execute=True):
-            first = emit_social_demo_notice(self.account, self.char1, session=session)
-        second = emit_social_demo_notice(self.account, self.char1, session=session)
+        own_page = create_message(
+            self.char2,
+            "[Sandbox example]",
+            receivers=[self.char1],
+            locks=f"read:id({self.char1.pk})",
+            tags=[("page", "comms")],
+        )
+        session_list = "evennia.server.sessionhandler.SESSIONS.get_sessions"
+        with patch(session_list, return_value=[session]) as sessions:
+            with self.assertRaises(ValueError):
+                emit_social_demo_notice(self.account, self.char2, session=session)
+            with (
+                patch.object(social_notices, "transfer", return_value=RouteResult("retry")),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
+                first = emit_social_demo_notice(self.account, self.char1, session=session)
+            self.assertFalse(DeliveryReceipt.objects.filter(source="social-pages").exists())
+            self.assertEqual(PageDelivery.objects.get(message_id=first).state, "pending")
+            with self.captureOnCommitCallbacks(execute=True):
+                second = emit_social_demo_notice(self.account, self.char1, session=session)
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertEqual(
+                    emit_social_demo_notice(self.account, self.char1, session=session), first
+                )
+            sessions.return_value = []
+            with self.assertRaises(ValueError):
+                emit_social_demo_notice(self.account, self.char1, session=session)
+            sessions.return_value = [session]
+            session.get_puppet.return_value = self.char2
+            with self.assertRaises(ValueError):
+                emit_social_demo_notice(self.account, self.char1, session=session)
         self.assertEqual(first, second)
         self.assertNotEqual(first, own_page.pk)
+        self.assertEqual(Msg.objects.count(), 2)
         self.assertEqual(Msg.objects.get(pk=own_page.pk).db_message, "[Sandbox example]")
+        self.assertFalse(PageDelivery.objects.filter(message=own_page).exists())
         self.assertEqual(DeliveryReceipt.objects.filter(source="social-pages").count(), 1)
         self.assertFalse(project(NoticeContext(self.account2, self.char2), source="social-pages"))
         session.msg.assert_not_called()

@@ -42,10 +42,10 @@ class PageFixture(SocialTestCase):
             command._send_page(self.char1, list(targets) or [self.char2], body)
         return Msg.objects.latest("pk")
 
-    def legacy(self, *, timestamp=None, body="Older private text", receiver=None):
+    def legacy(self, *, timestamp=None, body="Older private text", receiver=None, sender=None):
         receiver = receiver or self.char2
         page = create_message(
-            self.char1,
+            sender or self.char1,
             body,
             receivers=[receiver],
             locks=f"read:id({receiver.pk})",
@@ -104,6 +104,78 @@ class StandalonePageTests(PageFixture):
         )
         self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
 
+    def test_ownership_loss_releases_unused_claim(self):
+        page = self.page()
+        session = self.login_session()
+
+        def lose_ownership(count):
+            self.account2.characters.remove(self.char2)
+            return "Rendered reminder"
+
+        with patch(SESSION_LIST, return_value=[session]):
+            with patch.object(notices, "_render_reminder", side_effect=lose_ownership):
+                notices._standalone(self.char2)
+            session.msg.assert_not_called()
+            self.assertEqual(PageDelivery.objects.get(message=page).state, "pending")
+            self.account2.characters.add(self.char2)
+            notices._standalone(self.char2)
+            notices._standalone(self.char2)
+        session.msg.assert_called_once()
+        self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
+
+    def test_puppet_dispatch_waits_for_outer_commit_including_guest(self):
+        guest = create_account(
+            "GuestRollbackFixture", None, None, typeclass="evennia.accounts.accounts.DefaultGuest"
+        )
+        for account, guest_mode in ((self.account2, False), (guest, True)):
+            with self.subTest(guest=guest_mode):
+                self.char2.account = account
+                session = self.login_session(account=account)
+                with (
+                    patch(SESSION_LIST, return_value=[session]),
+                    self.captureOnCommitCallbacks(execute=True),
+                    transaction.atomic(),
+                ):
+                    self.legacy(body="Rollback-only page")
+                    notices.puppet_reminder(self.char2)
+                    session.msg.assert_not_called()
+                    transaction.set_rollback(True)
+                session.msg.assert_not_called()
+                self.assertFalse(PageDelivery.objects.exists())
+                self.assertFalse(Msg.objects.filter(db_message="Rollback-only page").exists())
+                self.assertIsNone(self.char2.last_page_seen)
+                self.assertIsNone(self.char2.ndb.social_page_claim)
+
+    def test_broken_session_lookups_do_not_block_healthy_siblings(self):
+        page = self.page()
+        bad, good = self.login_session(), self.login_session()
+        bad.get_account.side_effect = RuntimeError
+        with patch(SESSION_LIST, return_value=[bad, good]):
+            notices._standalone(self.char2)
+        bad.msg.assert_not_called()
+        good.msg.assert_called_once()
+        self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
+
+    def test_writer_lookup_failure_leaves_claim_pending(self):
+        page = self.page()
+        bad, good = self.login_session(), self.login_session()
+
+        class BadWriter:
+            get_account = bad.get_account
+            get_puppet = bad.get_puppet
+
+            @property
+            def msg(self):
+                raise RuntimeError
+
+        with patch(SESSION_LIST, return_value=[BadWriter()]) as sessions:
+            notices._standalone(self.char2)
+            self.assertEqual(PageDelivery.objects.get(message=page).state, "pending")
+            sessions.return_value = [good]
+            notices._standalone(self.char2)
+        good.msg.assert_called_once()
+        self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
+
     def test_fallback_socket_attempt_uncertain_and_delivers_other_sessions(self):
         page = self.page()
         first, second = self.login_session(), self.login_session()
@@ -145,6 +217,46 @@ class StandalonePageTests(PageFixture):
         self.assertEqual(PageDelivery.objects.get(message=live).origin, "live")
         self.assertEqual(PageDelivery.objects.filter(state="fallback").count(), 2)
 
+    def test_fallback_retires_invalid_and_all_owner_suppressed_but_keeps_deferral(self):
+        visible = self.legacy()
+        invalid = self.legacy()
+        invalid.locks.add("read:false()")
+        blocked_account = create_account("Blocked Page Fixture", None, None)
+        blocked = create_object(self.character_typeclass, key="Blocked Page Sender")
+        blocked_account.characters.add(blocked)
+        ignore.set_entry(self.account2, blocked)
+        hidden = self.legacy(sender=blocked)
+        temporary = create_object(self.character_typeclass, key="Temporary Page Sender")
+        deferred = self.legacy(sender=temporary)
+        session = self.login_session()
+
+        from evennia_links.ignoring import notice_ignore_status
+
+        def policy(viewer, sender, **kwargs):
+            if sender == temporary:
+                return "defer"
+            return notice_ignore_status(viewer, sender, **kwargs)
+
+        with patch(SESSION_LIST, return_value=[session]):
+            with patch("evennia_links.ignoring.notice_ignore_status", side_effect=policy):
+                notices._standalone(self.char2)
+                notices._standalone(self.char2)
+                session.msg.assert_called_once()
+                self.assertEqual(
+                    dict(PageDelivery.objects.values_list("message_id", "state")),
+                    {
+                        visible.pk: "fallback",
+                        invalid.pk: "suppressed",
+                        hidden.pk: "suppressed",
+                        deferred.pk: "pending",
+                    },
+                )
+            ignore.remove_entry(self.account2, blocked)
+            notices._standalone(self.char2)
+        self.assertEqual(session.msg.call_count, 2)
+        self.assertEqual(PageDelivery.objects.get(message=deferred).state, "fallback")
+        self.assertEqual(PageDelivery.objects.get(message=hidden).state, "suppressed")
+
     def test_standalone_counts_more_than_one_preparation_batch(self):
         for _ in range(101):
             self.legacy()
@@ -182,15 +294,20 @@ class StandalonePageTests(PageFixture):
                 sessions.return_value = []
                 return "Rendered guest reminder"
 
-            with patch.object(notices, "_render_reminder", side_effect=disconnect):
+            with (
+                patch.object(notices, "_render_reminder", side_effect=disconnect),
+                self.captureOnCommitCallbacks(execute=True),
+            ):
                 notices.puppet_reminder(self.char2)
             session.msg.assert_not_called()
             sessions.return_value = [session]
-            notices.puppet_reminder(self.char2)
-            notices.puppet_reminder(self.char2)
+            with self.captureOnCommitCallbacks(execute=True):
+                notices.puppet_reminder(self.char2)
+                notices.puppet_reminder(self.char2)
             reconnected = self.login_session(account=guest)
             sessions.return_value = [reconnected]
-            notices.puppet_reminder(self.char2)
+            with self.captureOnCommitCallbacks(execute=True):
+                notices.puppet_reminder(self.char2)
             reconnected.msg.assert_called_once()
         session.msg.assert_called_once_with(
             "|wYou have 1 unread page.|n Use |wpage/last 1|n to view."
@@ -263,6 +380,23 @@ class InboxPageTests(PageFixture):
         self.assertEqual(DeliveryReceipt.objects.count(), 1)
         self.assertEqual(self.char2.last_page_seen, cutoff.isoformat())
 
+    def test_clean_prepare_fallback_waits_for_outer_commit(self):
+        session = self.login_session()
+        with (
+            patch(SESSION_LIST, return_value=[session]),
+            patch.object(notices, "transfer", return_value=RouteResult("fallback_pending")),
+            self.captureOnCommitCallbacks(execute=True),
+            transaction.atomic(),
+        ):
+            self.legacy(body="Rollback-only prepared page")
+            counts, _ = notices.prepare(self.context(), allow_fallback=True)
+            self.assertEqual(counts["fallback_pending"], 1)
+            session.msg.assert_not_called()
+            transaction.set_rollback(True)
+        session.msg.assert_not_called()
+        self.assertFalse(PageDelivery.objects.exists())
+        self.assertFalse(Msg.objects.filter(db_message="Rollback-only prepared page").exists())
+
     def test_explicit_character_bounded_transfer_resumes(self):
         from evennia_notices.models import DeliveryReceipt
 
@@ -330,6 +464,30 @@ class InboxPageTests(PageFixture):
         self.assertEqual(
             sorted(item.status for item in outcomes.values()), ["hidden"] * 5 + ["visible"]
         )
+
+    def test_added_and_removed_ignore_snapshots_existing_pending_owner(self):
+        from evennia_notices.models import DeliveryReceipt
+        from evennia_notices.services import project
+
+        self.account.permissions.clear()
+        co_owner = create_account("Pending Co-Owner Fixture", None, None)
+        co_owner.characters.add(self.char2)
+        with patch.object(notices, "notify", return_value=RouteResult("retry")):
+            page = self.page()
+        row = PageDelivery.objects.get(message=page)
+        self.assertEqual(row.suppressed_owners, [])
+        self.assertFalse(DeliveryReceipt.objects.exists())
+        ignore.set_entry(self.account2, self.char1, ignore.HIDDEN)
+        self.assertFalse(DeliveryReceipt.objects.exists())
+        ignore.remove_entry(self.account2, self.char1)
+        row.refresh_from_db()
+        self.assertEqual(row.suppressed_owners, [self.account2.pk])
+        self.assertFalse(DeliveryReceipt.objects.exists())
+        self.assertEqual(notices.prepare(self.context())[0]["inbox"], 1)
+        self.assertEqual(project(self.context()), [])
+        self.assertEqual(len(project(NoticeContext(co_owner, self.char2))), 1)
+        self.assertTrue(page.db_receivers_objects.filter(pk=self.char2.pk).exists())
+        self.assertFalse(page.db_hide_from_objects.filter(pk=self.char2.pk).exists())
 
     def test_pending_ignored_before_receipt_does_not_revive(self):
         from evennia_notices.services import project

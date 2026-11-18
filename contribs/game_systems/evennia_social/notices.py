@@ -3,7 +3,7 @@
 """Durable routing and connected standalone delivery for Social page alerts."""
 
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 
 from django.apps import apps
@@ -22,7 +22,6 @@ from evennia_links.notices import (
     NoticeContext,
     RouteResult,
     authorize_context,
-    connected_contexts,
     evaluate,
     notify,
     source_registry,
@@ -112,10 +111,29 @@ class _CurrentPagePolicy:
 
 
 def _statuses(rows, pages, context):
-    policy = _CurrentPagePolicy(rows, pages)
-    events = [stored_event(row) for row in rows]
-    outcomes = evaluate(policy, events, context)
-    return {row.message_id: outcomes[event_for(row).event_id].status for row in rows}
+    policy_cache = {}
+
+    def evaluate_rows(group):
+        policy = _CurrentPagePolicy(group, pages)
+        events = [stored_event(row) for row in group]
+        outcomes = evaluate(policy, events, context, policy_cache=policy_cache)
+        return {
+            row.message_id: outcomes[event.event_id].status
+            for row, event in zip(group, events, strict=True)
+        }
+
+    statuses = evaluate_rows(rows)
+    if len(statuses) < 2 or set(statuses.values()) != {"defer"}:
+        return statuses
+    # Links defers the whole batch on provider failure. Isolate actors only
+    # on that exceptional path so other pages can still be delivered.
+    by_actor = defaultdict(list)
+    for row in rows:
+        by_actor[row.actor_kind, row.actor_id].append(row)
+    if len(by_actor) > 1:
+        for group in by_actor.values():
+            statuses.update(evaluate_rows(group))
+    return statuses
 
 
 def _snapshot(rows, pages, account, character, *, strict=False):
@@ -221,6 +239,19 @@ def _safe_route(character, row_id, *, fresh=False, context=None):
         return "retry"
 
 
+def retry_recorded_page(character, page_id):
+    """Quietly retry only an existing pending offline page for this recipient."""
+    row_id = (
+        PageDelivery.objects.filter(
+            character=character, message_id=page_id, origin=Origin.OFFLINE, state=State.PENDING
+        )
+        .values_list("pk", flat=True)
+        .first()
+    )
+    if row_id is not None:
+        transaction.on_commit(lambda: _safe_route(character, row_id))
+
+
 def _pending(character):
     return (
         PageDelivery.objects.select_for_update()
@@ -315,26 +346,42 @@ def register():
     ignore_policy_changing.connect(_snapshot_ignore, dispatch_uid="evennia_social.page_notices")
 
 
-def _sessions(character, *, guest=False):
-    if not guest:
-        return list(connected_contexts(character))
+def _registered_sessions():
     from evennia.server.sessionhandler import SESSIONS
 
+    return SESSIONS.get_sessions()
+
+
+def _session_for_character(session, character, *, guest):
+    """Resolve one connection without letting broken siblings affect it."""
+    try:
+        if session.get_puppet() != character:
+            return None
+        account = session.get_account()
+        if account is None:
+            return None
+        context = NoticeContext(account, character, session)
+        if guest:
+            return context if is_guest(account) and character.account == account else None
+        return context if authorize_context(context) else None
+    except Exception:
+        logger.warning("Social page reminder skipped an unavailable connection")
+        return None
+
+
+def _sessions(character, *, guest=False):
     return [
-        NoticeContext(account, character, session)
-        for session in SESSIONS.get_sessions()
-        if (account := session.get_account()) is not None
-        and is_guest(account)
-        and session.get_puppet() == character
-        and character.account == account
+        context
+        for session in _registered_sessions()
+        if (context := _session_for_character(session, character, guest=guest)) is not None
     ]
 
 
 def _still_connected(context, *, guest):
-    return any(
-        current.session is context.session and current.account == context.account
-        for current in _sessions(context.character, guest=guest)
-    )
+    if not any(session is context.session for session in _registered_sessions()):
+        return False
+    current = _session_for_character(context.session, context.character, guest=guest)
+    return current is not None and current.account == context.account
 
 
 def _render_reminder(count):
@@ -364,15 +411,48 @@ def _send_reminder(rows, character, contexts, attempted, delivered, *, guest=Fal
             if not visible:
                 continue
             text = _render_reminder(len(visible))
+            writer = context.session.msg
+            if not callable(writer):
+                continue
             if visible != _visible_reminder_pages(
                 rows, character, context, guest=guest
             ) or not _still_connected(context, guest=guest):
                 continue
             attempted.update(visible)
-            context.session.msg(text)
+            writer(text)
             delivered.update(visible)
         except Exception:
             logger.warning("Social page reminder did not complete on one connection")
+
+
+def _classify_fallback_rows(rows, character, owners, contexts):
+    pages = {
+        page.pk: page
+        for page in page_subjects(character.pk).filter(pk__in=[row.message_id for row in rows])
+    }
+    by_owner = {owner.pk: _snapshot(rows, pages, owner, character) for owner in owners}
+    owner_ids = set(by_owner)
+    connected_ids = {context.account.pk for context in contexts}
+    eligible = []
+    unresolved = False
+    for row in rows:
+        if owner_ids.issubset(row.suppressed_owners):
+            row.state = State.SUPPRESSED
+            continue
+        try:
+            status = subject_status(row, pages.get(row.message_id), character)
+        except Exception:
+            unresolved = True
+            continue
+        if status != "visible":
+            row.state = State.SUPPRESSED
+        elif any(by_owner[pk][row.message_id] == "visible" for pk in connected_ids):
+            row.state = State.CLAIMED
+            eligible.append(row)
+        else:
+            unresolved = True
+    PageDelivery.objects.bulk_update(rows, ["state", "suppressed_owners"])
+    return eligible, unresolved
 
 
 @transaction.atomic
@@ -386,7 +466,7 @@ def _claim_fallback(character, contexts, *, discover):
     contexts = [
         context
         for context in contexts
-        if context.account.pk in owner_ids and authorize_context(context)
+        if context.account.pk in owner_ids and _still_connected(context, guest=False)
     ]
     if not contexts:
         return [], None
@@ -405,23 +485,8 @@ def _claim_fallback(character, contexts, *, discover):
         elif result == "retry":
             unresolved = True
     if eligible:
-        pages = {
-            page.pk: page
-            for page in page_subjects(character.pk).filter(
-                pk__in=[row.message_id for row in eligible]
-            )
-        }
-        visible = set()
-        for context in contexts:
-            for pk, status in _statuses(eligible, pages, context).items():
-                if status == "visible":
-                    visible.add(pk)
-                elif status == "defer":
-                    unresolved = True
-        eligible = [row for row in eligible if row.message_id in visible]
-    for row in eligible:
-        row.state = State.CLAIMED
-    PageDelivery.objects.bulk_update(eligible, ["state"])
+        eligible, unresolved_policy = _classify_fallback_rows(eligible, character, owners, contexts)
+        unresolved = unresolved or unresolved_policy
     if discover and not eligible and not unresolved:
         character.last_page_seen = boundary
     return eligible, boundary if discover else None
@@ -429,8 +494,7 @@ def _claim_fallback(character, contexts, *, discover):
 
 @transaction.atomic
 def _finish_fallback(character, rows, attempted, delivered, boundary):
-    if not lock_recipient_owners([character]).get(character.pk):
-        return
+    owners = lock_recipient_owners([character]).get(character.pk)
     for row in rows:
         state = (
             State.FALLBACK
@@ -440,7 +504,7 @@ def _finish_fallback(character, rows, attempted, delivered, boundary):
             else State.PENDING
         )
         PageDelivery.objects.filter(pk=row.pk, state=State.CLAIMED).update(state=state)
-    if attempted and boundary is not None:
+    if owners and attempted and boundary is not None:
         previous = _cutoff(character)
         if previous is None or previous < datetime.fromisoformat(boundary):
             character.last_page_seen = boundary
@@ -465,16 +529,18 @@ def _guest_reminder(character):
         return
     if character.ndb.social_page_claim is not None:
         return
-    from evennia.server.sessionhandler import SESSIONS
-
     account = contexts[0].account
-    current_sessions = {
-        session for session in SESSIONS.get_sessions() if session.get_account() == account
-    }
-    previous_sessions = character.ndb.social_page_sessions or set()
-    if not previous_sessions.intersection(current_sessions):
+    previous_sessions = (
+        (character.ndb.social_page_sessions or set())
+        if character.ndb.social_page_account == account.pk
+        else set()
+    )
+    remaining_sessions = previous_sessions.intersection(_registered_sessions())
+    current_sessions = remaining_sessions | {context.session for context in contexts}
+    if not remaining_sessions:
         character.ndb.social_page_attempts = set()
         character.ndb.social_page_cutoff = _cutoff(character)
+    character.ndb.social_page_account = account.pk
     character.ndb.social_page_sessions = current_sessions
     seen = character.ndb.social_page_attempts
     cutoff = character.ndb.social_page_cutoff
@@ -500,7 +566,7 @@ def puppet_reminder(character):
     """Preserve the standalone aggregate and connected-only guest reminders."""
     try:
         if is_guest(character):
-            _guest_reminder(character)
+            transaction.on_commit(lambda: _guest_reminder(character), robust=True)
         elif not _active():
             transaction.on_commit(lambda: _standalone(character), robust=True)
     except Exception:

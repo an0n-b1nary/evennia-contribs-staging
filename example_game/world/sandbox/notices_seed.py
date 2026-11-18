@@ -312,26 +312,31 @@ def emit_moderation_demo_notices(account, character=None):
 def emit_social_demo_notice(account, character, *, session=None, golden=False):
     """Allocate one labelled, quietly transferred page for the exact opted-in character."""
     from evennia.comms.models import Msg
+    from evennia.server.sessionhandler import SESSIONS
     from evennia.utils.create import create_message
 
     from evennia_links.notices import authorize_context
     from evennia_social.integrations.notices import GENERATION_TAG, page_actor, page_subjects
-    from evennia_social.notices import lock_recipient_owners, record_offline
+    from evennia_social.notices import lock_recipient_owners, record_offline, retry_recorded_page
 
-    valid_audience = session is not None or (
-        golden and getattr(account, "pk", None) == 1 and account.is_superuser
-    )
-    if (
-        not valid_audience
-        or character is None
-        or is_guest(character)
-        or not authorize_context(NoticeContext(account, character, session))
-    ):
+    def eligible():
+        if session is None:
+            if not (golden and getattr(account, "pk", None) == 1 and account.is_superuser):
+                return False
+        elif not any(current is session for current in SESSIONS.get_sessions()):
+            return False
+        return (
+            character is not None
+            and not is_guest(character)
+            and authorize_context(NoticeContext(account, character, session))
+        )
+
+    if not eligible():
         raise ValueError("Choose your own playable character before opting in")
 
     with transaction.atomic():
         owners = lock_recipient_owners([character])
-        if account.pk not in {owner.pk for owner in owners.get(character.pk, ())}:
+        if not eligible() or account.pk not in {owner.pk for owner in owners.get(character.pk, ())}:
             raise ValueError("Choose your own playable character before opting in")
         generation = seed_subject_templates()
         marker = f"social-page-{generation}-{character.pk}"
@@ -350,6 +355,7 @@ def emit_social_demo_notice(account, character, *, session=None, golden=False):
                     db_tags__db_key="example-social-page-sender",
                 ).exists()
             ):
+                retry_recorded_page(character, page.pk)
                 return page.pk
             raise ValueError("The example page identity is unavailable")
         if Msg.objects.filter(db_tags__db_category=CATEGORY, db_tags__db_key=marker).exists():
