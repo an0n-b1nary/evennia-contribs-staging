@@ -9,7 +9,7 @@ from unittest import skipUnless
 from unittest.mock import Mock, patch
 
 from django.core.management import call_command
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -103,6 +103,57 @@ class StandalonePageTests(PageFixture):
             "|wYou have 1 unread page.|n Use |wpage/last 1|n to view."
         )
         self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
+
+    def test_finalizer_retries_unused_claim_before_next_connection(self):
+        page = self.page()
+        session = self.login_session()
+        finish = notices._finish_fallback
+
+        def disconnect(count):
+            sessions.return_value = []
+            return "Rendered reminder"
+
+        def retry(*args):
+            if finalizer.call_count == 1:
+                raise OperationalError("database is locked")
+            return finish(*args)
+
+        with patch(SESSION_LIST, return_value=[session]) as sessions:
+            with (
+                patch.object(notices, "_render_reminder", side_effect=disconnect),
+                patch.object(notices, "_finish_fallback", side_effect=retry) as finalizer,
+            ):
+                notices._standalone(self.char2)
+            self.assertEqual(finalizer.call_count, 2)
+            session.msg.assert_not_called()
+            self.assertEqual(PageDelivery.objects.get(message=page).state, "pending")
+            sessions.return_value = [session]
+            notices._standalone(self.char2)
+            notices._standalone(self.char2)
+        session.msg.assert_called_once()
+        self.assertEqual(PageDelivery.objects.get(message=page).state, "fallback")
+
+    def test_finalizer_retry_preserves_uncertain_socket_without_replay(self):
+        page = self.page()
+        session = self.login_session()
+        session.msg.side_effect = RuntimeError
+        finish = notices._finish_fallback
+
+        def retry(*args):
+            if finalizer.call_count == 1:
+                raise OperationalError("database is locked")
+            return finish(*args)
+
+        with (
+            patch(SESSION_LIST, return_value=[session]),
+            patch.object(notices, "_finish_fallback", side_effect=retry) as finalizer,
+        ):
+            notices._standalone(self.char2)
+            self.assertEqual(PageDelivery.objects.get(message=page).state, "uncertain")
+            notices._standalone(self.char2)
+        self.assertEqual(finalizer.call_count, 2)
+        session.msg.assert_called_once()
+        self.assertEqual(PageDelivery.objects.get(message=page).state, "uncertain")
 
     def test_ownership_loss_releases_unused_claim(self):
         page = self.page()

@@ -3,12 +3,13 @@
 """Durable routing and connected standalone delivery for Social page alerts."""
 
 import logging
+import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
 from django.apps import apps
 from django.conf import settings
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
 from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from evennia.accounts.models import AccountDB
@@ -492,6 +493,19 @@ def _claim_fallback(character, contexts, *, discover):
     return eligible, boundary if discover else None
 
 
+def _finalize_fallback(character, rows, attempted, delivered, boundary):
+    # Match the standalone Boards retry for SQLite writer contention. Only
+    # retry the state transition; the socket outcome is already fixed.
+    for attempt in range(3):
+        try:
+            _finish_fallback(character, rows, attempted, delivered, boundary)
+            return
+        except OperationalError as exc:
+            if connection.vendor != "sqlite" or "locked" not in str(exc).lower() or attempt == 2:
+                raise
+            time.sleep(0.025 * (attempt + 1))
+
+
 @transaction.atomic
 def _finish_fallback(character, rows, attempted, delivered, boundary):
     owners = lock_recipient_owners([character]).get(character.pk)
@@ -520,7 +534,7 @@ def _standalone(character, *, discover=True):
         try:
             _send_reminder(rows, character, contexts, attempted, delivered)
         finally:
-            _finish_fallback(character, rows, attempted, delivered, boundary)
+            _finalize_fallback(character, rows, attempted, delivered, boundary)
 
 
 def _guest_reminder(character):
