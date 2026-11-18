@@ -2098,7 +2098,7 @@ your own account/current character into labelled synthetic examples, including
 a simulated pending offer. `+sandbox/notice-confirm <offer>` and
 `+sandbox/notice-decline <offer>` resolve that simulation. Generic seeding creates
 subjects only and never chooses recipients. Golden building explicitly opts in
-its one purpose-made admin. Production source delivery queues are unchanged.
+its one purpose-made admin.
 
 Read/clear and account-wide immediate/summary/off preferences are explained in
 the packaged Personal notices guide. Read alerts do not read their underlying
@@ -2128,3 +2128,5 @@ Moderation's referral outcomes use the shared Inbox as account-owned alerts.
 reviewing an application or changing referral allowances. Read/clear is shared
 across characters; the source retains standalone delivery and conservative
 legacy provenance handling described in its README.
+
+Social’s `social-pages` source gives a generic Inbox alert to the exact character that received an offline page. The sample from `+sandbox/notices` uses a synthetic sender and appears in `page/last`. Reading or clearing its alert leaves the sample page in Social history. You can change Social pages delivery in Inbox preferences.

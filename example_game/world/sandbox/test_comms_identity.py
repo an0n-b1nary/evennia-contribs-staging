@@ -178,7 +178,10 @@ class TestCommunicationAudit(EvenniaCommandTest):
             self.staff.puppet_object(self.staff_session, self.staff_char)
             self.command("page", "Steward=Visitor help", self.account, self.session)
             self.assertEqual(self.staff_char.db.last_pager_account, self.account.pk)
-            self.command("page", "Welcome aboard", self.staff, self.staff_session, character=True)
+            with self.captureOnCommitCallbacks(execute=True):
+                self.command(
+                    "page", "Welcome aboard", self.staff, self.staff_session, character=True
+                )
             self.assertIn("Steward pages: Welcome aboard", "\n".join(text for text, _ in outputs))
             self.account.puppet_object(self.session, self.char1)
             self.account.puppet_object(self.alt_session, self.alt)
