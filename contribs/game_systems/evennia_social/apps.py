@@ -2,7 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Django AppConfig for evennia_social.
 
-No models, so no migrations. ``ready()`` wires one optional partner: when
+``ready()`` wires shared notice and ignore policy. When
 evennia_maps is installed, the live map's who's-here overlay
 (``integrations/maps.py``). The accessibility soft-import happens lazily in
 commands/*.py instead.
@@ -21,11 +21,13 @@ class EvenniaSocialConfig(AppConfig):
         from django.apps import apps
         from django.conf import settings
 
+        from evennia_social import notices
         from evennia_social.integrations import ignoring
 
         # Links is a hard dependency. Register the optional presentation
         # provider without importing or depending on any presentation consumer.
         ignoring.register()
+        notices.register()
 
         # --- maps: offer the who's-here tile overlay ---
         maps_label = getattr(settings, "SOCIAL_MAPS_APP_LABEL", "evennia_maps")

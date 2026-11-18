@@ -66,7 +66,7 @@ Add to `INSTALLED_APPS` in `server/conf/settings.py`:
 INSTALLED_APPS += ["evennia_posing", "evennia_social"]
 ```
 
-No migrations to run — this contrib has no models.
+Run `evennia migrate` to create Social’s page delivery tables.
 
 ---
 
@@ -504,3 +504,30 @@ boundary (`blocks_channel`): hidden/full named and legacy full ignores, includin
 posts exceptions, suppress notice text and counts. Boards/channel placeholder
 preferences do not change this boundary. Existing staff sender/viewer bypasses
 apply. Social does not require the optional Inbox package.
+
+### Offline page alerts
+
+Social retains page history in Evennia's messages. When the optional Inbox is
+installed, add this source to `LINKS_NOTICE_SOURCES`:
+
+```python
+"social-pages": "evennia_social.integrations.notices.SocialPageNoticeSource",
+```
+
+Install the `inbox` extra or install `evennia-notices` separately and follow its
+setup. Offline alerts belong to the exact playable character. The account-wide
+`social-pages` preference controls summary, immediate or off delivery. Alerts
+contain a generic message and the `page/last` command. Reading or clearing an
+alert leaves the page in Social history.
+
+After an upgrade, Social can import eligible pages newer than a character's old
+`last_page_seen` cutoff, or all eligible pages when the cutoff is unset. The old
+history did not distinguish delivered live pages from offline pages, so a
+historic live page can have an unread alert. Newly sent pages record that
+distinction. Inbox collection runs on puppet, or staff can quietly transfer a
+batch using `evennia transfer_social_page_notices --character '#42' --limit 100`.
+
+While Inbox is unavailable or deliberately disabled, Social gives its aggregate
+page reminder on puppet. Restoring Inbox can recover pending offline activity.
+Previously acknowledged or attempted reminders do not replay. Disposable guests
+receive connected reminders only.
