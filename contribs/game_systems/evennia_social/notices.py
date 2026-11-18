@@ -186,6 +186,8 @@ def _route(row, *, fresh=False, context=None):
     binding = _binding()
     if binding != "configured":
         return binding
+    if not apps.is_installed("evennia_notices"):
+        return "fallback_pending"
     if row.origin == Origin.LIVE:
         return "retry" if _active() else "fallback_pending"
     event = event_for(row)
@@ -275,7 +277,7 @@ def prepare(context, *, limit=100, allow_fallback=False):
         progress.save(update_fields=["legacy_position", "retry_position"])
     outcomes = Counter(_safe_route(character, row.pk, context=context) for row in rows)
     if allow_fallback and outcomes["fallback_pending"]:
-        _standalone(character, discover=False)
+        transaction.on_commit(lambda: _standalone(character, discover=False), robust=True)
     more = (
         len(pages) == limit
         or PageDelivery.objects.filter(character=character, state=State.PENDING)
@@ -341,6 +343,7 @@ def _render_reminder(count):
 
 
 def _visible_reminder_pages(rows, character, context, *, guest):
+    context.account.attributes.reset_cache()
     if not guest:
         rows = list(
             PageDelivery.objects.filter(pk__in=[row.pk for row in rows], state=State.CLAIMED)
@@ -462,10 +465,19 @@ def _guest_reminder(character):
         return
     if character.ndb.social_page_claim is not None:
         return
-    seen = character.ndb.social_page_attempts or set()
+    from evennia.server.sessionhandler import SESSIONS
+
+    account = contexts[0].account
+    current_sessions = {
+        session for session in SESSIONS.get_sessions() if session.get_account() == account
+    }
+    previous_sessions = character.ndb.social_page_sessions or set()
+    if not previous_sessions.intersection(current_sessions):
+        character.ndb.social_page_attempts = set()
+        character.ndb.social_page_cutoff = _cutoff(character)
+    character.ndb.social_page_sessions = current_sessions
+    seen = character.ndb.social_page_attempts
     cutoff = character.ndb.social_page_cutoff
-    if cutoff is None:
-        cutoff = character.ndb.social_page_cutoff = _cutoff(character) or False
     pages = page_subjects(character.pk).exclude(pk__in=seen)
     if cutoff:
         pages = pages.filter(db_date_created__gt=cutoff)

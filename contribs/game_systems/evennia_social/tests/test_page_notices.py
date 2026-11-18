@@ -145,6 +145,18 @@ class StandalonePageTests(PageFixture):
         self.assertEqual(PageDelivery.objects.get(message=live).origin, "live")
         self.assertEqual(PageDelivery.objects.filter(state="fallback").count(), 2)
 
+    def test_standalone_counts_more_than_one_preparation_batch(self):
+        for _ in range(101):
+            self.legacy()
+        session = self.login_session()
+        with patch(SESSION_LIST, return_value=[session]):
+            notices._standalone(self.char2)
+            notices._standalone(self.char2)
+        session.msg.assert_called_once_with(
+            "|wYou have 101 unread pages.|n Use |wpage/last 101|n to view."
+        )
+        self.assertEqual(PageDelivery.objects.filter(state="fallback").count(), 101)
+
     def test_game_without_registry_preserves_broken_binding_for_retry(self):
         page = self.page()
         session = self.login_session()
@@ -176,6 +188,10 @@ class StandalonePageTests(PageFixture):
             sessions.return_value = [session]
             notices.puppet_reminder(self.char2)
             notices.puppet_reminder(self.char2)
+            reconnected = self.login_session(account=guest)
+            sessions.return_value = [reconnected]
+            notices.puppet_reminder(self.char2)
+            reconnected.msg.assert_called_once()
         session.msg.assert_called_once_with(
             "|wYou have 1 unread page.|n Use |wpage/last 1|n to view."
         )
@@ -294,9 +310,10 @@ class InboxPageTests(PageFixture):
         from evennia_notices.services import project
 
         visible = self.page()
-        revoked = self.page()
+        revoked_pages = [self.page() for _ in range(5)]
         self.assertEqual(project(self.context())[0].text, "You received pages while offline.")
-        revoked.locks.add("read:false()")
+        for revoked in revoked_pages:
+            revoked.locks.add("read:false()")
         self.assertEqual(len(project(self.context())), 1)
         self.assertEqual(project(self.context())[0].text, "You received a page while offline.")
         self.assertEqual(Msg.objects.get(pk=visible.pk).db_message, "Sample private text")
@@ -308,9 +325,11 @@ class InboxPageTests(PageFixture):
         batch = [stored_event(row) for row in PageDelivery.objects.all()]
         with CaptureQueriesContext(connection) as queries:
             outcomes = source.evaluate(batch, self.context())
-        self.assertLessEqual(len(queries), 7)
+        self.assertLessEqual(len(queries), 10)
         self.assertTrue(all('"db_message"' not in query["sql"] for query in queries))
-        self.assertEqual(sorted(item.status for item in outcomes.values()), ["hidden", "visible"])
+        self.assertEqual(
+            sorted(item.status for item in outcomes.values()), ["hidden"] * 5 + ["visible"]
+        )
 
     def test_pending_ignored_before_receipt_does_not_revive(self):
         from evennia_notices.services import project
