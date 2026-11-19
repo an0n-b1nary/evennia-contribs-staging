@@ -34,6 +34,7 @@ from evennia_plots.views import (
     StoryThreadActionView,
     StoryThreadCreateView,
 )
+from world.sandbox.management.commands.seed_sandbox import Command as SeedSandbox
 from world.sandbox.notices_seed import emit_plot_demo_notice
 
 urlpatterns = [path("", include("web.urls"))]
@@ -175,3 +176,23 @@ class PlotNoticeSeams(EvenniaCommandTest):
             call_command("seed_sandbox", dry_run=True, verbosity=0)
         self.assertFalse(PlotThread.objects.filter(name="Example Plot Inbox").exists())
         self.assertFalse(PlotNoticeReceipt.objects.exists())
+
+    def test_reset_purges_the_demo_plot_but_not_a_namesake(self):
+        session = Mock(logged_in=True)
+        session.get_account.return_value = self.account
+        session.get_puppet.return_value = self.char1
+        sessions = "evennia.server.sessionhandler.SESSIONS.get_sessions"
+        with patch(sessions, return_value=[session]), self.captureOnCommitCallbacks(execute=True):
+            emit_plot_demo_notice(self.account, self.char1, session=session)
+        demo = PlotNoticeReceipt.objects.get().plot
+        namesake = PlotThread.create_thread(
+            "Example Plot Inbox", self.char2, thread_policy=PlotThread.ThreadPolicy.REQUEST
+        )
+        namesake.activate()
+
+        self.assertEqual(SeedSandbox()._purge(dry_run=True).get("plot_notice_examples"), 1)
+        self.assertTrue(PlotThread.objects.filter(pk=demo.pk).exists())
+        SeedSandbox()._purge(dry_run=False)
+        self.assertFalse(PlotThread.objects.filter(pk=demo.pk).exists())
+        self.assertFalse(PlotNoticeReceipt.objects.exists())
+        self.assertTrue(PlotThread.objects.filter(pk=namesake.pk).exists())

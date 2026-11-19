@@ -207,6 +207,15 @@ class Command(BaseCommand):
             counts["rp_challenges"] = challenges.count()
             if not dry_run:
                 challenges.delete()
+        from evennia_plots.models import PlotThread
+        from world.sandbox.notices_seed import plot_demo_ids
+
+        # Find opt-in example plots while their tagged requester still exists.
+        # Deleting a plot cascades to its owners, threads and notice receipts.
+        demo_plots = PlotThread.objects.filter(pk__in=plot_demo_ids())
+        counts["plot_notice_examples"] = demo_plots.count()
+        if not dry_run:
+            demo_plots.delete()
         counts["evennia_objects"] = len(objs)
         if not dry_run:
             # Deleting a room cascades to its contents (exits, plain

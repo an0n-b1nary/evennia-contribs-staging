@@ -2131,9 +2131,9 @@ legacy provenance handling described in its README.
 
 Social’s `social-pages` source gives a generic Inbox alert to the exact character that received an offline page. The sample from `+sandbox/notices` uses a synthetic sender and appears in `page/last`. Reading or clearing its alert leaves the sample page in Social history. You can change Social pages delivery in Inbox preferences.
 
-
 Plots' `plots` source sends character Inbox notices for new thread requests,
 explicit decisions and owner grants. `+sandbox/notices` creates a labelled
 private example with a pending thread for your selected character. Open its
 thread with the command in the notice. Reading or clearing it leaves the
 example thread pending, and repeating the opt-in keeps the same example.
+`+sandbox/reset` deletes the example plot with the rest of the seeded world.

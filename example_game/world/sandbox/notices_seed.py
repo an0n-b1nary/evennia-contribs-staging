@@ -19,6 +19,9 @@ from evennia_links.notices import NoticeContext, NoticeEvent, SubjectRef, notify
 
 from .notices import CATEGORY, TAG
 
+PLOT_DEMO_NAME = "Example Plot Inbox"
+PLOT_DEMO_REQUESTER_TAG = "example-plot-requester"
+
 
 def seed_subject_templates(reset=False):
     """Create synthetic templates only; never choose a recipient or emit an alert."""
@@ -418,9 +421,9 @@ def emit_plot_demo_notice(account, character, *, session=None, golden=False):
             key="Example Plot Requester",
             nohome=True,
         )
-        sender.tags.add(["example-plot-requester", "sandbox_default"], category=CATEGORY)
+        sender.tags.add([PLOT_DEMO_REQUESTER_TAG, "sandbox_default"], category=CATEGORY)
         plot = PlotThread.create_thread(
-            "Example Plot Inbox",
+            PLOT_DEMO_NAME,
             creator=character,
             description="Synthetic example for exploring personal notices.",
             thread_policy=PlotThread.ThreadPolicy.REQUEST,
@@ -432,3 +435,17 @@ def emit_plot_demo_notice(account, character, *, session=None, golden=False):
         plot.privacy = PlotThread.Privacy.PRIVATE
         plot.save(update_fields=["privacy"])
         ServerConfig.objects.conf(marker, request.pk)
+
+
+def plot_demo_ids():
+    """Plots the opt-in example made: its name plus a request from its tagged requester."""
+    from evennia_plots.models import PlotThread
+
+    requesters = ObjectDB.objects.filter(
+        db_tags__db_key=PLOT_DEMO_REQUESTER_TAG, db_tags__db_category=CATEGORY
+    )
+    return list(
+        PlotThread.objects.filter(name=PLOT_DEMO_NAME, story_threads__created_by__in=requesters)
+        .values_list("pk", flat=True)
+        .distinct()
+    )
