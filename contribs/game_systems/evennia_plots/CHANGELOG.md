@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.8.2 — 2026-11-18
+
+- Add optional character-scoped Inbox notices for thread requests, explicit
+  decisions and ownership grants. Connected delivery is available on standalone
+  hosts. The new receipt migration starts empty and leaves earlier activity alone.
+- Serialize owner and request actions with plot closure so unanswered requests
+  close silently and explicit decisions are recorded once.
+- Require Links 0.8.15 or later.
+
 ## 0.8.1 — 2026-11-06
 
 - Filter linked board post titles through the optional Boards presentation

@@ -46,7 +46,7 @@ control a single globally-current arc that gates XP rates across the game.
 | Dep | Kind | Reason |
 |---|---|---|
 | `evennia>=6.0` | required | framework |
-| `evennia-links>=0.5` | required | `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, `connect_on_ready`, shared web staff policy |
+| `evennia-links>=0.8.15` | required | `AbstractVersion`, `AbstractAuthoredLink`, `connect_soft_ref_cleanup`, `connect_on_ready`, shared web staff policy |
 | `evennia-accessibility>=0.1` | `[web]` | accessible forms/templates |
 | `djangorestframework>=3.14` | `[web]` | REST API |
 | `django-filter>=23` | `[web]` | `PlotThreadFilter` |
@@ -149,6 +149,31 @@ placeholders contain no post title or author. Plots keeps Boards and Social
 optional, and its detail page is private/no-store for each reader.
 
 ---
+
+## Personal notices
+
+Install the optional Inbox and add this entry to the host's source registry.
+
+```python
+LINKS_NOTICE_SOURCES["plots"] = "evennia_plots.integrations.notices.PlotNoticeSource"
+```
+
+Current owners receive new thread requests. The requesting character receives
+the explicit acceptance or decline, and a new owner receives the ownership
+grant. These routine notices belong to the exact playable character. Players
+can choose immediate, login summary (the default), or off for Plots in Inbox
+preferences. Clearing a notice leaves the underlying plot and thread alone.
+Plot permissions and ignore settings apply to notice text and counts. Private
+plot notices use generic wording and an in-game command.
+
+Without Inbox, with `NOTICES_ENABLED = False`, or with no `plots` binding,
+eligible connected characters receive the in-game notice. New offline activity
+in that mode stays silent. Inbox reactivation transfers only pending eligible
+work, without immediate hints. A configured binding that fails to load leaves
+work pending. Guests and non-roster puppets receive eligible connected alerts
+without history. Run migrations for the source receipt table when upgrading.
+Existing plots, requests and decisions keep their history without generating
+new notices.
 
 ## Privacy model
 

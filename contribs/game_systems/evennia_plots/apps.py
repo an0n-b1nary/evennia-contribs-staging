@@ -18,8 +18,10 @@ class PlotsConfig(AppConfig):
         from django.conf import settings
 
         from evennia_links import connect_on_ready, connect_soft_ref_cleanup
-        from evennia_plots import signals
+        from evennia_plots import notices, signals
         from evennia_plots.models import PlotBoardLink, PlotCalendarLink, ScenePlotLink
+
+        notices.register()
 
         def _app_present(label):
             return apps.is_installed(label) or any(

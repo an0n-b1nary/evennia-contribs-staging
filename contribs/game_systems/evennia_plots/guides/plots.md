@@ -35,6 +35,15 @@ Each plot's owners decide who may add threads:
 
 `+plot/threads <number>=<open|request|owners>` changes it. Under **By request**, `+thread/new` sends your thread to the owners instead, and `+thread/withdraw` takes the request back if you change your mind.
 
+### Plot notices
+
+If your game has an Inbox, use `+notices` while playing the character involved.
+Plot owners get a notice when someone asks to open a thread. The requester
+gets a notice when an owner or staff member accepts or declines, and a new
+owner gets a notice when they are added. Use the commands in the notice to
+open the plot or thread. You can read or clear it and decide the request
+separately. The Plots preference offers immediate, summary, or off.
+
 ### Held threads
 
 Owners can mark a thread **[[glossary-held|held]]**: they already know the answer, and play is heading towards it. A plot with an open held thread shows **Owner-led**, so you can tell at a glance that someone is steering it, rather than it being left open to wherever players take it.
