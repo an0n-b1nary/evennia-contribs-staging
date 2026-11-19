@@ -52,24 +52,33 @@ class M6Seams(SeededSandboxMixin, EvenniaTest):
         Property.objects.filter(pk=shop.property_id).update(state="archived")
         self.assertNotIn("Sample Supply Shop", shop.room.get_display_footer(self.char2))
 
-    def test_real_character_login_reports_frozen_plot_award(self):
+    def test_frozen_plot_award_reaches_the_character_inbox_once(self):
+        from evennia_links.notices import NoticeContext
+        from evennia_notices.services import project
+
         self.account2.characters.add(self.char2)
         plot = PlotThread.objects.get(name="The Supply Expedition")
         PlotParticipant.objects.create(
             thread=plot, character=self.char2, character_name=self.char2.key
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            plot.conclude(concluded_by=self.char1)
-        self.assertEqual(PlotPayoutRun.objects.get(thread_id=plot.pk).amounts, {"rare-crystal": 2})
+        context = NoticeContext(self.account2, self.char2)
         with patch.object(self.char2, "msg") as message:
-            self.char2.at_post_puppet()
-            self.char2.at_post_puppet()
-        awards = [
-            call.args[0]
-            for call in message.call_args_list
-            if call.args and isinstance(call.args[0], str) and "Plot award" in call.args[0]
-        ]
-        self.assertEqual(len(awards), 1)
+            with self.captureOnCommitCallbacks(execute=True):
+                plot.conclude(concluded_by=self.char1)
+            [award] = project(context, source="resources")
+            with self.captureOnCommitCallbacks(execute=True):
+                self.char2.at_post_puppet()
+                self.char2.at_post_puppet()
+
+        self.assertEqual(PlotPayoutRun.objects.get(thread_id=plot.pk).amounts, {"rare-crystal": 2})
+        self.assertIn("Plot award (The Supply Expedition)", award.text)
+        self.assertIn("2 rare-crystal", award.text)
+        self.assertEqual(len(award.events), 1)
+        [after_puppet] = project(context, source="resources")
+        self.assertEqual(after_puppet.events, award.events)
+        self.assertFalse(
+            any("Plot award" in str(call.args[0]) for call in message.call_args_list if call.args)
+        )
 
     def test_system_seller_stays_off_until_runtime_enable(self):
         from evennia_links import runtime
