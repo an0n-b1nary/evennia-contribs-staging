@@ -9,6 +9,7 @@ from unittest.mock import patch
 from django.apps import apps
 from django.db import transaction
 from django.test import TransactionTestCase, override_settings
+from django.utils import timezone
 from evennia.utils import create
 
 from .awards import record_xp
@@ -189,6 +190,132 @@ class InboxNoticeTests(NoticeFixture, TransactionTestCase):
         XPLog.objects.filter(week="2026-W09").delete()
         self.assertEqual(self.project(), [])
         self.assertEqual(summarize(self.context), (0, 0))
+
+    def test_pending_pass_skips_invalid_rows_and_rotates_failed_attempts(self):
+        from . import notices
+
+        CharacterXP.objects.create(character_id=self.character.pk)
+        aggregate = CharacterXP.objects.get(character_id=self.character.pk)
+        rows = [
+            XPNoticeReceipt(
+                summary=aggregate,
+                week=f"week-{index:03d}",
+                occurred_at=timezone.now(),
+                origin=XPNoticeReceipt.Origin.INBOX,
+            )
+            for index in range(203)
+        ]
+        XPNoticeReceipt.objects.bulk_create(rows)
+        valid = rows[102:]
+        XPLog.objects.bulk_create(
+            [
+                XPLog(
+                    character_id=self.character.pk,
+                    source_type=XPLog.SourceType.RP_SESSION,
+                    source_ref_id=1000 + index,
+                    week=row.week,
+                    amount=1,
+                )
+                for index, row in enumerate(valid)
+            ]
+        )
+        target = valid[-1]
+        route = notices._route
+
+        def selected(character, receipt_id, **kwargs):
+            if receipt_id != target.pk:
+                raise RuntimeError("held receipt")
+            route(character, receipt_id, **kwargs)
+
+        with patch.object(notices, "_route", side_effect=selected):
+            with self.assertLogs("evennia", level="WARNING"):
+                self.show()
+            self.assertFalse(self.project())
+            self.assertEqual(
+                XPNoticeReceipt.objects.filter(last_attempt_at__isnull=False).count(), 100
+            )
+            with self.assertLogs("evennia", level="WARNING"):
+                self.show()
+        [item] = self.project()
+        self.assertIn(target.week, item.text)
+
+    def test_stale_session_cannot_project_count_or_render(self):
+        from evennia_links.notices import StoredEvent
+        from evennia_notices.services import summarize
+        from evennia_xp.integrations.notices import XPNoticeSource, event_for
+
+        self.award()
+        receipt = XPNoticeReceipt.objects.get()
+        event = StoredEvent(
+            **vars(event_for(receipt, self.character.pk)),
+            recipient_kind="character",
+            recipient_id=self.character.pk,
+        )
+        source = XPNoticeSource()
+        self.assertEqual(source.evaluate([event], self.context)[event.event_id].status, "visible")
+        with patch(
+            "evennia_xp.integrations.notices.is_live_connection",
+            side_effect=[True, False],
+        ):
+            self.assertEqual(
+                source.evaluate([event], self.context)[event.event_id].status, "invalid"
+            )
+        from .summary import grouped_totals
+
+        def disconnect(*args):
+            totals = grouped_totals(*args)
+            self.sessions.clear()
+            return totals
+
+        with (
+            patch("evennia_xp.integrations.notices.grouped_totals", side_effect=disconnect),
+            self.assertRaises(ValueError),
+        ):
+            source.render([event], self.context)
+        self.sessions.clear()
+        self.assertEqual(self.project(), [])
+        self.assertEqual(summarize(self.context), (0, 0))
+        self.assertEqual(source.evaluate([event], self.context)[event.event_id].status, "invalid")
+        with self.assertRaises(ValueError):
+            source.render([event], self.context)
+
+    def test_active_inbox_allows_only_a_truly_unowned_puppet_to_use_fallback(self):
+        self.account.characters.remove(self.character)
+        self.award()
+        with patch(
+            "evennia_xp.summary.uses_screenreader",
+            side_effect=lambda _: self.other.characters.add(self.character),
+        ):
+            self.assertFalse(self.show())
+        self.character.msg.assert_not_called()
+        self.assertFalse(self.show())
+        self.other.characters.remove(self.character)
+        self.assertTrue(self.show())
+        self.character.msg.assert_called_once()
+        self.assertEqual(XPNoticeReceipt.objects.get().state, State.DELIVERED)
+
+    def test_temporary_guest_controller_does_not_drop_ordinary_owner_receipt(self):
+        import secrets
+
+        from evennia.accounts.accounts import DefaultGuest
+
+        guest = create.create_account(
+            "XP Visitor",
+            "",
+            secrets.token_urlsafe(32),
+            typeclass=DefaultGuest,
+        )
+        self.character.account = guest
+        session = self.sessions[0]
+        session.get_account = lambda: guest
+        self.award()
+        self.assertTrue(XPNoticeReceipt.objects.filter(state=State.PENDING).exists())
+        self.assertFalse(self.show())
+        self.character.msg.assert_not_called()
+        self.character.account = self.account
+        session.get_account = lambda: self.account
+        self.show()
+        self.assertEqual(len(self.project()), 1)
 
     def test_safe_projection_excludes_manual_reason_granter_and_alt(self):
         from evennia_links.notices import NoticeContext

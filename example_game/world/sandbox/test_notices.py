@@ -226,10 +226,10 @@ class XPNoticeSeams(EvenniaTest):
         self.account2.characters.add(self.char2)
         self.session.puppet = self.char1
 
-    def command(self, caller, command=None):
+    def command(self, caller):
         from evennia_notices.commands import CmdNotices
 
-        command = command or CmdNotices()
+        command = CmdNotices()
         command.caller = caller
         command.session = self.session
         command.switches = []
@@ -289,7 +289,12 @@ class XPNoticeSeams(EvenniaTest):
         self.assertContains(views.inbox(request, history=True).render(), "Cleared")
         set_preference(context, "xp", "off")
         self.session.puppet = self.char1
-        self.assertIn("2.50", self.command(self.char1, CmdXp()))
+        with patch.object(self.char1, "msg") as message:
+            command = CmdXp()
+            command.caller = self.char1
+            command.switches = []
+            command.func()
+        self.assertIn("2.50", message.call_args.args[0])
         xp_route = resolve("/xp/")
         self.assertContains(xp_route.func(request, **xp_route.kwargs).render(), "2.50")
         self.assertEqual(CharacterXP.objects.get(character_id=self.char1.pk).current_balance, 2.5)

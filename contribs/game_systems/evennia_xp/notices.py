@@ -11,7 +11,7 @@ from uuid import uuid4
 from django.apps import apps
 from django.conf import settings
 from django.db import OperationalError, connection, transaction
-from django.db.models import F
+from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from evennia.accounts.accounts import DefaultGuest
 from evennia.accounts.models import AccountDB
@@ -76,13 +76,27 @@ def owner_ids(character):
     if apps.is_installed("evennia_links"):
         from evennia_links.characters import account_ids
 
-        return set(account_ids(character))
+        accounts = AccountDB.objects.in_bulk(account_ids(character))
+        return {
+            account.pk for account in accounts.values() if not isinstance(account, DefaultGuest)
+        }
 
     return {
         account.pk
         for account in AccountDB.objects.all().iterator()
         if not isinstance(account, DefaultGuest) and character in _core_roster(account)
     }
+
+
+def _on_roster(account, character):
+    if apps.is_installed("evennia_links"):
+        from evennia_links.characters import playable_accounts
+
+        return any(
+            character in roster
+            for _, roster in playable_accounts(AccountDB.objects.filter(pk=account.pk))
+        )
+    return character in _core_roster(account)
 
 
 def _is_guest(obj):
@@ -100,6 +114,10 @@ def _is_guest(obj):
             for account in AccountDB.objects.all().iterator()
         )
     return False
+
+
+def _disposable(character):
+    return _is_guest(character) and not owner_ids(character)
 
 
 def _seen(character):
@@ -137,7 +155,7 @@ def stage_award(aggregate, log):
     character = ObjectDB.objects.filter(pk=aggregate.character_id).first()
     if character is not None:
         try:
-            if _is_guest(character):
+            if _disposable(character):
                 sessions = _eligible_connections(character, "guest")
                 if sessions and not _week_logs(aggregate, log.week, exclude=log.pk).exists():
                     transaction.on_commit(
@@ -196,26 +214,33 @@ def _registered_sessions():
     return SESSIONS.get_sessions()
 
 
-def _same_connection(current):
+def is_live_connection(current):
     session, account, character = current.session, current.account, current.character
     return (
-        session.logged_in
+        any(item is session for item in _registered_sessions())
+        and session.logged_in
         and session.get_puppet() is character
         and session.get_account() is account
         and character.account is account
-        and any(item is session for item in _registered_sessions())
     )
 
 
 def _eligible(current, mode):
     if mode == "guest":
-        allowed = _is_guest(current.account) and _is_guest(current.character)
+        allowed = (
+            _is_guest(current.account)
+            and _on_roster(current.account, current.character)
+            and not owner_ids(current.character)
+        )
     else:
-        if _is_guest(current.account) or _is_guest(current.character):
+        if _is_guest(current.account):
             return False
         owners = owner_ids(current.character)
-        allowed = current.account.pk in owners or (mode == "standalone" and not owners)
-    return allowed and _same_connection(current)
+        if owners:
+            allowed = mode != "nonroster" and current.account.pk in owners
+        else:
+            allowed = mode != "inbox" and not _is_guest(current.character)
+    return allowed and is_live_connection(current)
 
 
 def _eligible_connections(character, mode, *, session=None):
@@ -268,7 +293,7 @@ def _route(character, receipt_id, *, fresh, context=None):
     from evennia_links.notices import notify, transfer
 
     aggregate = _locked_summary(character)
-    if aggregate is None or _backend() != "inbox" or _is_guest(character):
+    if aggregate is None or _backend() != "inbox" or _disposable(character):
         return
     if context is not None:
         current = Connection(context.session, context.account, character)
@@ -283,6 +308,8 @@ def _route(character, receipt_id, *, fresh, context=None):
     )
     if row is None or not _week_logs(aggregate, row.week).exists():
         return
+    row.last_attempt_at = timezone.now()
+    row.save(update_fields=["last_attempt_at"])
     from .integrations.notices import event_for
 
     event = event_for(row, character.pk)
@@ -301,30 +328,47 @@ def _route(character, receipt_id, *, fresh, context=None):
     _acknowledge(row, character)
 
 
+@transaction.atomic
+def _mark_attempt(character, receipt_id):
+    aggregate = _locked_summary(character)
+    if aggregate is not None:
+        XPNoticeReceipt.objects.filter(
+            summary=aggregate, pk=receipt_id, state=State.PENDING
+        ).update(last_attempt_at=timezone.now())
+
+
 def _safe_route(character, receipt_id, *, fresh=False, context=None):
     try:
         _sqlite_retry(lambda: _route(character, receipt_id, fresh=fresh, context=context))
     except Exception:
         logger.warning("XP notice dispatch deferred")
+        try:
+            _sqlite_retry(lambda: _mark_attempt(character, receipt_id))
+        except Exception:
+            logger.warning("XP notice retry position unavailable")
 
 
 @transaction.atomic
 def _prepare_receipts(character, mode):
     aggregate = _locked_summary(character)
-    if aggregate is None or _is_guest(character):
+    if aggregate is None or _disposable(character):
         return None
     _stage_legacy(
-        aggregate, character, origin=Origin.STANDALONE if mode == "standalone" else Origin.LEGACY
+        aggregate, character, origin=Origin.LEGACY if mode == "inbox" else Origin.STANDALONE
     )
     rows = XPNoticeReceipt.objects.filter(summary=aggregate)
     repair = rows.filter(compatibility_pending=True).first()
     if repair is not None:
         _acknowledge(repair, character)
     if mode == "inbox":
+        ledger = XPLog.objects.filter(character_id=character.pk, week=OuterRef("week"))
         return list(
-            rows.filter(state=State.PENDING).order_by("pk").values_list("pk", flat=True)[:100]
+            rows.filter(Exists(ledger), state=State.PENDING)
+            .order_by(F("last_attempt_at").asc(nulls_first=True), "pk")
+            .values_list("pk", flat=True)[:100]
         )
-    if _backend() != "standalone":
+    expected = "inbox" if mode == "nonroster" else "standalone"
+    if _backend() != expected:
         return None
     row = (
         rows.select_for_update()
@@ -350,7 +394,7 @@ def _send(character, week, connections, mode, *, claim=None):
     attempted = delivered = False
     for current in connections:
         try:
-            if not _same_connection(current):
+            if not is_live_connection(current):
                 continue
             totals = grouped_totals(character.pk, [week]).get(week)
             if not totals:
@@ -359,19 +403,22 @@ def _send(character, week, connections, mode, *, claim=None):
             writer = character.msg
             if not callable(writer):
                 continue
+            if mode == "guest":
+                if not _guest_attempting(character, claim):
+                    continue
+            else:
+                expected = "inbox" if mode == "nonroster" else "standalone"
+                if (
+                    _backend() != expected
+                    or not XPNoticeReceipt.objects.filter(
+                        pk=claim.pk,
+                        claim=claim.claim,
+                        state=State.ATTEMPTING,
+                        summary__last_payout_week=week,
+                    ).exists()
+                ):
+                    continue
             if not _eligible(current, mode):
-                continue
-            if mode == "standalone" and (
-                _backend() != "standalone"
-                or not XPNoticeReceipt.objects.filter(
-                    pk=claim.pk,
-                    claim=claim.claim,
-                    state=State.ATTEMPTING,
-                    summary__last_payout_week=week,
-                ).exists()
-            ):
-                continue
-            if not _same_connection(current):
                 continue
             attempted = True
             writer(text, session=current.session)
@@ -422,11 +469,13 @@ def _finish_known(character):
 
 def _prepare_committed(character, *, context=None):
     try:
-        if _is_guest(character):
+        if _disposable(character):
             return _send_guest(character) if context is None else False
         mode = _backend()
         if mode == "retry":
             return False
+        if mode == "inbox" and context is None and not owner_ids(character):
+            mode = "nonroster"
         sessions = _eligible_connections(
             character, mode, session=context.session if context is not None else None
         )
@@ -473,26 +522,51 @@ _guest_lock = Lock()
 _GUEST_LIFETIME = 300
 
 
+def _plan_guest_cleanup(key, claim):
+    from twisted.internet import reactor
+
+    if reactor.running:
+        reactor.callFromThread(reactor.callLater, _GUEST_LIFETIME, _expire_guest, key, claim)
+    else:
+        reactor.callLater(_GUEST_LIFETIME, _expire_guest, key, claim)
+
+
 def _expire_guest(key, claim):
+    live = False
+    for current in claim.sessions:
+        try:
+            if is_live_connection(current):
+                live = True
+                break
+        except Exception:
+            continue
     with _guest_lock:
-        if _guest_claims.get(key) is claim:
+        if _guest_claims.get(key) is not claim:
+            return
+        if not claim.attempting and (not claim.consumed or not live):
             _guest_claims.pop(key)
+            return
+    _plan_guest_cleanup(key, claim)
+
+
+def _guest_attempting(character, claim):
+    with _guest_lock:
+        return (
+            _guest_claims.get((character.pk, claim.week)) is claim
+            and claim.attempting
+            and claim.expires > monotonic()
+        )
 
 
 def _stage_guest(character, week, sessions):
-    from twisted.internet import reactor
-
-    live = [current for current in sessions if _same_connection(current)]
-    if not live:
-        return
     # Only the sessions present during the award can ever reuse its transient work.
     key = character.pk, week
     with _guest_lock:
         if key in _guest_claims:
             return
-        claim = GuestClaim(character, week, tuple(live), monotonic() + _GUEST_LIFETIME)
+        claim = GuestClaim(character, week, tuple(sessions), monotonic() + _GUEST_LIFETIME)
         _guest_claims[key] = claim
-    reactor.callLater(_GUEST_LIFETIME, _expire_guest, key, claim)
+    _plan_guest_cleanup(key, claim)
     _send_guest(character)
 
 
@@ -509,7 +583,7 @@ def _send_guest(character):
                 break
         else:
             return False
-    attempted, delivered = _send(character, claim.week, claim.sessions, "guest")
+    attempted, delivered = _send(character, claim.week, claim.sessions, "guest", claim=claim)
     with _guest_lock:
         claim.attempting = False
         claim.consumed = attempted

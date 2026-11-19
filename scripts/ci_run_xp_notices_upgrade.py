@@ -101,7 +101,7 @@ def verify(state, phase):
     account = AccountDB.objects.get(pk=state["owner"])
     character, alt, empty, npc = [ObjectDB.objects.get(pk=pk) for pk in state["ids"]]
     session = connected(account, character)
-    context = NoticeContext(account, character, session)
+    context = NoticeContext(account, character)
     rows = XPNoticeReceipt.objects.filter(summary__character_id=character.pk)
     S = XPNoticeReceipt.State
     if phase == "absent":

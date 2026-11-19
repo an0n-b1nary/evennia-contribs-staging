@@ -19,7 +19,7 @@ from evennia_links.notices import (
 )
 
 from ..models import XPLog, XPNoticeReceipt
-from ..notices import State, owner_ids, prepare_character
+from ..notices import State, is_live_connection, owner_ids, prepare_character
 from ..summary import grouped_totals, summary_text
 
 
@@ -44,6 +44,15 @@ def _week(event):
         return event.subject.key
 
 
+def _current_session(context):
+    if context.session is None:
+        return True
+    try:
+        return context.account is not None and is_live_connection(context)
+    except Exception:
+        return False
+
+
 def _projection(events, context):
     outcomes = {event.event_id: Evaluation("invalid") for event in events}
     visible = set()
@@ -65,22 +74,12 @@ def _projection(events, context):
                 if _week(event) is not None and event.recipient_id in roster:
                     outcomes[event.event_id] = Evaluation("defer", reason="context")
         return outcomes, visible
-    if not isinstance(character, ObjectDB) or is_guest(character):
+    if not isinstance(character, ObjectDB):
         return outcomes, visible
     owners = owner_ids(character)
-    if not owners or (
-        account is not None
-        and (
-            account.pk not in owners
-            or (
-                context.session is not None
-                and (
-                    context.session.get_account() != account
-                    or context.session.get_puppet() != character
-                )
-            )
-        )
-    ):
+    if not owners or (account is not None and account.pk not in owners):
+        return outcomes, visible
+    if not _current_session(context):
         return outcomes, visible
 
     scoped = []
@@ -98,6 +97,8 @@ def _projection(events, context):
             state__in=(State.PENDING, State.TRANSFERRED),
         ).filter(Exists(XPLog.objects.filter(character_id=character.pk, week=OuterRef("week"))))
     }
+    if not _current_session(context):
+        return outcomes, visible
     for event, week in scoped:
         row = rows.get(week)
         if row is None:
@@ -144,4 +145,7 @@ class XPNoticeSource:
             text = summary_text(week, totals, plain=True)
         else:
             text = "XP was awarded for multiple weeks. Use +xp to view your balance and history."
-        return normalize_rendered(RenderedNotice(text))
+        rendered = normalize_rendered(RenderedNotice(text))
+        if not _current_session(context):
+            raise ValueError("XP notice session no longer controls this payout")
+        return rendered

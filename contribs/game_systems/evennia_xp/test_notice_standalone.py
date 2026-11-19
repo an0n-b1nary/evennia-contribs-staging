@@ -167,11 +167,34 @@ class StandaloneNoticeTests(NoticeFixture, TransactionTestCase):
         with patch("evennia_xp.notices.summary_text", side_effect=ValueError("pre-write")):
             self.award()
         self.character.msg.assert_not_called()
+        [session] = self.sessions
+        self.sessions[:] = [self.make_session()]
+        self.assertFalse(self.show())
+        self.sessions[:] = [session]
         self.assertTrue(self.show())
         self.assertFalse(self.show())
         self.character.msg.assert_called_once()
         self.assertFalse(XPNoticeReceipt.objects.exists())
         self.assertIsNone(self.character.attributes.get(SUMMARY_WEEK_ATTRIBUTE))
+
+    def test_guest_attempt_remains_consumed_for_the_registered_connection(self):
+        from .notices import _expire_guest, _guest_claims
+
+        self.make_guest()
+        self.character.msg.side_effect = RuntimeError("socket opened")
+        with patch("evennia_xp.notices._plan_guest_cleanup"):
+            self.award()
+            [(key, claim)] = _guest_claims.items()
+            self.assertTrue(claim.consumed)
+            with patch("evennia_xp.notices.monotonic", return_value=claim.expires + 1):
+                _expire_guest(key, claim)
+                self.assertIs(_guest_claims[key], claim)
+                self.award(2)
+                self.assertFalse(self.show())
+            self.character.msg.assert_called_once()
+            self.sessions.clear()
+            _expire_guest(key, claim)
+        self.assertNotIn(key, _guest_claims)
 
     def test_offline_guest_is_never_replayed_on_later_connection(self):
         self.make_guest()

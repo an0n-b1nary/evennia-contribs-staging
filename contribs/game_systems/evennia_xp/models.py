@@ -198,6 +198,7 @@ class XPNoticeReceipt(models.Model):
     origin = models.CharField(max_length=10, choices=Origin.choices)
     state = models.CharField(max_length=12, choices=State.choices, default=State.PENDING)
     claim = models.UUIDField(null=True)
+    last_attempt_at = models.DateTimeField(null=True)
     acknowledged_at = models.DateTimeField(null=True)
     compatibility_pending = models.BooleanField(default=False)
 
@@ -205,7 +206,7 @@ class XPNoticeReceipt(models.Model):
         constraints = [  # noqa: RUF012
             models.UniqueConstraint(fields=["summary", "week"], name="xp_notice_character_week"),
         ]
-        indexes = [models.Index(fields=["summary", "state", "id"])]  # noqa: RUF012
+        indexes = [models.Index(fields=["summary", "state", "last_attempt_at", "id"])]  # noqa: RUF012
 
 
 class XPSpend(models.Model):
