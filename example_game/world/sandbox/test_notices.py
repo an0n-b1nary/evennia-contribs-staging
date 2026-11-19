@@ -5,14 +5,15 @@
 from importlib import import_module
 from unittest.mock import patch
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
-from django.test import RequestFactory, override_settings
+from django.test import RequestFactory, TransactionTestCase, override_settings
 from django.urls import include, path
 from evennia.accounts.models import AccountDB
 from evennia.objects.models import ObjectDB
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestMixin
 
 from evennia_notices.context import from_web
 from evennia_notices.models import DeliveryReceipt, Notice, NoticeEvent
@@ -217,11 +218,9 @@ class BoardNoticeSeam(EvenniaTest):
 @override_settings(ROOT_URLCONF=__name__)
 class XPNoticeSeams(EvenniaTest):
     def setUp(self):
-        super().setUp()
-        from django.apps import apps
-
         if not apps.is_installed("evennia_xp"):
             self.skipTest("XP physically absent")
+        super().setUp()
         self.account.characters.add(self.char1)
         self.account2.characters.add(self.char2)
         self.session.puppet = self.char1
@@ -266,16 +265,21 @@ class XPNoticeSeams(EvenniaTest):
                 reason="Private audit detail",
             )
             record_xp(self.char2.pk, "46.75", XPLog.SourceType.RP_SESSION, 9001, week="2026-W09")
-        command = self.command(self.char1)
-        self.assertIn("Manual Grant: +2.50", command)
         route = resolve("/notices/")
         request = self.request(self.char1)
-        response = route.func(request, **route.kwargs).render()
-        self.assertContains(response, "Manual Grant: +2.50")
-        self.assertContains(views.preferences(request).render(), ">XP<")
-        for text in ("Private audit detail", self.char2.key, "46.75", "|w"):
-            self.assertNotIn(text, command)
-            self.assertNotContains(response, text)
+        for identity in ("account", "character"):
+            with (
+                self.subTest(identity=identity),
+                override_settings(EVENNIA_COMMS_IDENTITY=identity),
+            ):
+                command = self.command(self.char1)
+                response = route.func(request, **route.kwargs).render()
+                self.assertIn("Manual Grant: +2.50", command)
+                self.assertContains(response, "Manual Grant: +2.50")
+                self.assertContains(views.preferences(request).render(), ">XP<")
+                for text in ("Private audit detail", self.char2.key, "46.75", "|w"):
+                    self.assertNotIn(text, command)
+                    self.assertNotContains(response, text)
         self.assertNotContains(route.func(self.request(), **route.kwargs).render(), "+2.50")
         self.assertNotIn("+2.50", self.command(self.char2))
         self.session.puppet = None
@@ -300,11 +304,16 @@ class XPNoticeSeams(EvenniaTest):
         self.assertEqual(CharacterXP.objects.get(character_id=self.char1.pk).current_balance, 2.5)
         self.assertEqual(DeliveryReceipt.objects.filter(source="xp").count(), 2)
 
+
+class XPPuppetNoticeSeam(EvenniaTestMixin, TransactionTestCase):
     def test_puppet_signal_recovers_pending_legacy_for_exact_character(self):
+        if not apps.is_installed("evennia_xp"):
+            self.skipTest("XP physically absent")
         from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET
 
         from evennia_xp.models import CharacterXP, XPLog
 
+        self.account.characters.add(self.char1)
         CharacterXP.objects.create(character_id=self.char1.pk, last_payout_week="2025-W52")
         XPLog.objects.create(
             character_id=self.char1.pk,
@@ -315,13 +324,14 @@ class XPNoticeSeams(EvenniaTest):
         )
         self.char1.attributes.add("last_xp_summary_week", "2026-W01")
         with patch.object(self.session, "msg") as message:
-            with self.captureOnCommitCallbacks(execute=True):
-                self.session.puppet = None
-                SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=self.session)
+            self.session.puppet = None
+            SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=self.session)
             self.assertFalse(DeliveryReceipt.objects.filter(source="xp").exists())
             self.session.puppet = self.char1
-            with self.captureOnCommitCallbacks(execute=True):
-                SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=self.session)
-            self.assertEqual(DeliveryReceipt.objects.filter(source="xp").count(), 1)
             SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=self.session)
-            self.assertTrue(any("1 unread alerts" in str(call) for call in message.call_args_list))
+            self.assertEqual(DeliveryReceipt.objects.filter(source="xp").count(), 1)
+            summaries = sum("1 unread alerts" in str(call) for call in message.call_args_list)
+            self.assertEqual(summaries, 1)
+            SIGNAL_OBJECT_POST_PUPPET.send(sender=self.char1, session=self.session)
+            summaries = sum("1 unread alerts" in str(call) for call in message.call_args_list)
+            self.assertEqual(summaries, 1)
