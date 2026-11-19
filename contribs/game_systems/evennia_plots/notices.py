@@ -339,15 +339,17 @@ def _write_policy(row, context, mode):
 
 
 def _write_boundary(row, context, mode):
-    if (mode == "playable" and _backend() != "standalone") or not _same_connection(context, mode):
+    if mode == "playable" and _backend() != "standalone":
         return "defer"
     current = _current_claim(row, mode)
     if current is None:
         return "invalid"
-    if context.account.pk in current.suppressed_accounts:
-        return "suppress"
     status = Witnesses([current]).status(current)
-    return "allow" if status == "visible" else status
+    if status != "visible":
+        return status
+    if not _same_connection(context, mode):
+        return "defer"
+    return "suppress" if context.account.pk in current.suppressed_accounts else "allow"
 
 
 def _send(row, sessions, *, mode="playable"):

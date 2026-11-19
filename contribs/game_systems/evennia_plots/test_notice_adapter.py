@@ -110,6 +110,30 @@ class StandalonePlotNoticeTests(PlotNoticeFixture):
         second.msg.assert_called_once()
         self.assertEqual(PlotNoticeReceipt.objects.get().state, State.FALLBACK_DELIVERED)
 
+    def test_unpuppet_during_last_witness_load_does_not_reach_socket(self):
+        first = connected(self.account, self.char1)
+        replacement = connected(self.account, self.char1)
+        boundary = notices._write_boundary
+        status = Witnesses.status
+
+        def race(*args):
+            def unpuppet(*args):
+                first.get_puppet.return_value = None
+                return status(*args)
+
+            with patch.object(Witnesses, "status", autospec=True, side_effect=unpuppet):
+                return boundary(*args)
+
+        with patch(SESSION_LIST, return_value=[first]) as sessions:
+            with patch.object(notices, "_write_boundary", side_effect=race):
+                self.request()
+            first.msg.assert_not_called()
+            self.assertEqual(PlotNoticeReceipt.objects.get().state, State.PENDING)
+            sessions.return_value = [replacement]
+            self.puppet(self.char1, replacement)
+        replacement.msg.assert_called_once()
+        self.assertEqual(PlotNoticeReceipt.objects.get().state, State.FALLBACK_DELIVERED)
+
     def test_missing_writer_can_retry_and_second_connection_can_succeed(self):
         first = connected(self.account, self.char1)
         first.msg = None
