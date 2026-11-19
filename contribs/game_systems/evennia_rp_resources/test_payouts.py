@@ -2,6 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Award authority, frozen membership, rollback and recovery under real Plots."""
 
+from types import SimpleNamespace
 from unittest import skipUnless
 from unittest.mock import patch
 
@@ -10,7 +11,7 @@ from django.db import transaction
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from . import payouts
+from . import notices, payouts
 from .commands import CmdResources
 from .models import (
     PlotPayoutReceipt,
@@ -20,7 +21,6 @@ from .models import (
     ResourceGrant,
 )
 from .services import ResourceError, grant, total_held
-from .summary import notify_plot_summary
 
 
 def nobody(character):
@@ -213,11 +213,19 @@ class PayoutTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_login_summary_is_once_and_hidden_awards_remain_unseen(self):
         self.budget()
         self.conclude()
-        with patch.object(self.char2, "msg") as message:
+        self.char2.account = self.account2
+        session = SimpleNamespace(
+            logged_in=True, get_account=lambda: self.account2, get_puppet=lambda: self.char2
+        )
+        with (
+            override_settings(NOTICES_ENABLED=False),
+            patch.object(notices, "_registered_sessions", return_value=[session]),
+            patch.object(self.char2, "msg") as message,
+        ):
             with override_settings(RP_RESOURCES_REVEALED=False):
-                self.assertFalse(notify_plot_summary(self.char2))
-            self.assertTrue(notify_plot_summary(self.char2))
-            self.assertFalse(notify_plot_summary(self.char2))
+                self.assertFalse(notices._prepare_committed(self.char2, kind="plot"))
+            self.assertTrue(notices._prepare_committed(self.char2, kind="plot"))
+            self.assertFalse(notices._prepare_committed(self.char2, kind="plot"))
         self.assertEqual(message.call_count, 1)
         self.assertIn("4 rare", message.call_args.args[0])
 

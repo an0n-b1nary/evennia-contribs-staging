@@ -7,10 +7,9 @@ does not require RP, sessions, login time or partner counts.
 
 ## Install and wire
 
-Install `evennia-links>=0.8.4,<0.9` first, then `pip install -e .`. Add
+Install `evennia-links>=0.8.13,<0.9` first, then `pip install -e .`. Add
 `"evennia_links"` and `"evennia_rp_resources"` to `INSTALLED_APPS` in that order.
-Links is the only hard contrib dependency. Maps, social, plots and economy
-are optional; resources imports none of their models.
+Links is the only hard contrib dependency. Maps, Social, Plots, Economy and Inbox are optional.
 
 With economy 0.1 installed, resources 0.1.1 registers the `resource` exchange
 asset and reconciliation figures during app startup. `+offer` accepts
@@ -24,9 +23,26 @@ Add `ResourcesCmdSet` to your character cmdset and `evennia_links.commands.CmdRu
 for staff. Call `ensure_resource_script_running()` from
 `evennia_rp_resources.scripts` in your `at_server_start()` hook. Add
 `ResourceSummaryCharacterMixin` before `DefaultCharacter`, or call
-`notify_resource_summary(character)` from `evennia_rp_resources.summary`
-after your own `at_post_puppet` calls `super()`. The mixin is cooperative and
+`prepare_character(character)` from `evennia_rp_resources.notices` after your
+own `at_post_puppet` calls `super()`. Hosts can also call
+`notify_resource_summary(character)` and `notify_plot_summary(character)` from
+`evennia_rp_resources.summary` for the two standalone summaries separately. The mixin is cooperative and
 has no ordering requirement relative to other cooperative mixins.
+
+To use Inbox, install the `inbox` extra (Inbox 0.1.1 and Links 0.8.15 or
+later). Add this entry to the host's `LINKS_NOTICE_SOURCES` mapping:
+
+```python
+"resources": "evennia_rp_resources.integrations.notices.ResourcesNoticeSource",
+```
+
+Weekly grants and paid plot awards appear in the character's Inbox while
+Resources are revealed. The account-wide RP Resources preference defaults to
+the login summary. A private plot award shows its quantities only when the
+recipient can currently view the plot. The Inbox always omits private plot
+names and links. With Inbox disabled or unbound, the current weekly summary
+and pending plot awards use the standalone puppet hook. Awards already handled
+through either path do not replay after switching.
 
 Run `evennia migrate --noinput` and `+resources/seed`. A catalogue provider
 is a dotted path or callable returning dictionaries:

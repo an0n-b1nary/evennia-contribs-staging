@@ -936,6 +936,10 @@ LINKS_NOTICE_SOURCES = {
 }
 if "evennia_xp" in INSTALLED_APPS:
     LINKS_NOTICE_SOURCES["xp"] = "evennia_xp.integrations.notices.XPNoticeSource"
+if "evennia_rp_resources" in INSTALLED_APPS:
+    LINKS_NOTICE_SOURCES["resources"] = (
+        "evennia_rp_resources.integrations.notices.ResourcesNoticeSource"
+    )
 NOTICES_ENABLED = True
 NOTICES_RETENTION_DAYS = 30
 NOTICES_ROUTINE_LIMIT = 500

@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
-from .summary import notify_resource_summary
+"""Cooperative standalone notification hook for hosts with Resources."""
+
+from .notices import prepare_character
 
 
 class ResourceSummaryCharacterMixin:
-    """Place before DefaultCharacter; cooperative, no ordering requirement."""
+    """Place before DefaultCharacter in the typeclass method resolution order."""
 
     def at_post_puppet(self, **kwargs):
+        """Deliver standalone resource summaries for the current character."""
         super().at_post_puppet(**kwargs)
-        notify_resource_summary(self)
-        from .summary import notify_plot_summary
-
-        notify_plot_summary(self)
+        prepare_character(self)

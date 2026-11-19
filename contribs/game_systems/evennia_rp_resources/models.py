@@ -125,3 +125,45 @@ class PlotPayoutReceipt(models.Model):
         constraints: ClassVar = [
             models.UniqueConstraint(fields=["run", "character_id"], name="resources_plot_receipt"),
         ]
+
+
+class ResourceNoticeReceipt(models.Model):
+    """Delivery state backed by exactly one committed Resources award."""
+
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ATTEMPTING = "attempting", "Attempting standalone"
+        TRANSFERRED = "transferred", "Transferred"
+        SUPPRESSED = "suppressed", "Suppressed"
+        DELIVERED = "delivered", "Delivered standalone"
+        UNCERTAIN = "uncertain", "Uncertain standalone"
+        SUPERSEDED = "superseded", "Superseded"
+
+    character = models.ForeignKey("objects.ObjectDB", on_delete=models.CASCADE)
+    weekly = models.OneToOneField(
+        ResourceGrant, null=True, on_delete=models.CASCADE, related_name="notice_receipt"
+    )
+    plot = models.OneToOneField(
+        PlotPayoutReceipt, null=True, on_delete=models.CASCADE, related_name="notice_receipt"
+    )
+    state = models.CharField(max_length=16, choices=State.choices, default=State.PENDING)
+    inbox_origin = models.BooleanField(default=False)
+    baseline_full = models.BooleanField(default=False)
+    full_warning = models.BooleanField(default=False)
+    repair_checkpoint = models.BooleanField(default=False)
+    attempt = models.UUIDField(null=True)
+    attempted_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints: ClassVar = [
+            models.CheckConstraint(
+                condition=(
+                    Q(weekly__isnull=False, plot__isnull=True)
+                    | Q(weekly__isnull=True, plot__isnull=False)
+                ),
+                name="resources_notice_one_award",
+            ),
+        ]
+        indexes: ClassVar = [
+            models.Index(fields=["character", "state", "id"], name="resources_notice_owner_state")
+        ]

@@ -3,6 +3,7 @@
 """Ledger safety, passive income, terrain selection, visibility and commands."""
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
@@ -13,7 +14,7 @@ from evennia.utils.test_resources import BaseEvenniaCommandTest, EvenniaTest
 from evennia_links import runtime
 from evennia_links.commands import CmdRuntime
 
-from . import batch, gathering
+from . import batch, gathering, notices
 from .catalog import seed_catalog
 from .commands import CmdGather, CmdResources
 from .models import ResourceDefinition, ResourceGrant, ResourceHolding
@@ -286,23 +287,34 @@ class ResourceTests(EvenniaTest):
                 "86400s:2026-10-05T00:00:00+00:00",
             )
 
+    def show_weekly_after_commit(self):
+        self.char2.account = self.account2
+        session = SimpleNamespace(
+            logged_in=True, get_account=lambda: self.account2, get_puppet=lambda: self.char2
+        )
+        with (
+            override_settings(NOTICES_ENABLED=False),
+            patch.object(notices, "_registered_sessions", return_value=[session]),
+        ):
+            return notices._prepare_committed(self.char2, kind="weekly")
+
     def test_dark_accrual_summary_waits_until_reveal(self):
         with override_settings(RP_RESOURCES_REVEALED=False):
             self.run_batch()
             with patch.object(self.char2, "msg") as msg:
-                self.assertFalse(notify_resource_summary(self.char2))
+                self.assertFalse(self.show_weekly_after_commit())
                 msg.assert_not_called()
             self.assertIsNone(self.char2.attributes.get("last_resource_summary_week"))
         with patch.object(self.char2, "msg") as msg:
-            self.assertTrue(notify_resource_summary(self.char2))
-            self.assertFalse(notify_resource_summary(self.char2))
+            self.assertTrue(self.show_weekly_after_commit())
+            self.assertFalse(self.show_weekly_after_commit())
             msg.assert_called_once()
 
     def test_full_stores_notification_is_one_quiet_line(self):
         grant(self.char2, "wood", 30)
         self.run_batch()
         with patch.object(self.char2, "msg") as msg:
-            notify_resource_summary(self.char2)
+            self.show_weekly_after_commit()
         self.assertIn("Your stores are full", msg.call_args.args[0])
 
     def test_full_stores_are_mentioned_once_not_weekly(self):
@@ -311,7 +323,7 @@ class ResourceTests(EvenniaTest):
         for week in ("2026-W40", "2026-W41", "2026-W42"):
             self.run_batch(week)
             with patch.object(self.char2, "msg") as msg:
-                notify_resource_summary(self.char2)
+                self.show_weekly_after_commit()
             sent.append([call.args[0] for call in msg.call_args_list])
         self.assertEqual(len(sent[0]), 1)
         self.assertIn("Your stores are full", sent[0][0])
@@ -319,7 +331,7 @@ class ResourceTests(EvenniaTest):
         spend(self.char2, "wood", 20, "Room again")
         self.run_batch("2026-W43")
         with patch.object(self.char2, "msg") as msg:
-            notify_resource_summary(self.char2)
+            self.show_weekly_after_commit()
         self.assertNotIn("full", msg.call_args.args[0])
 
     def batch_script(self):

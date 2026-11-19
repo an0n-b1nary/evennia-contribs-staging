@@ -119,7 +119,7 @@ create review flags without blocking pickup. The room's `MarketRoomMixin` comes
 before the host room class and cooperatively adds the roster; the login hook
 calls `stalls.note_login`. These hooks are gated in absent-partner profiles.
 
-`evennia-rp-resources` 0.1.3 is wired with a generic Materials / Provisions /
+`evennia-rp-resources` 0.3.1 is wired with a generic Materials / Provisions /
 Essences catalogue. The IC rooms already carry forest, hills, urban and water
 terrains; these define the open trickle pool, while Grain is always common.
 The demonstration characters have Timber holdings and the Proving Grounds
@@ -129,11 +129,13 @@ Rare crystal is excluded from passive accrual and available to staff grants.
 Every playable character accrues six units per Monday batch, independently of
 RP. A 30-unit base cap tapers only passive income; stocks never decay. The
 server-start hook ensures the resources script is running and the character's
-cooperative login hook shows one summary after each batch. The summary mixin
-would go before DefaultCharacter with no special ordering; the sandbox calls
-the summary directly, using the same optional-app pattern as XP. Social's
+cooperative puppet hook handles standalone summaries. The Inbox includes
+`RP Resources` as an account-wide preference with character-owned weekly
+gathering and paid plot awards. The puppet count includes awards the character
+can currently view. Private plot awards omit the plot name and link. The
+golden snapshot includes a synthetic gathering notice for its seeded admin. Social's
 `SOCIAL_PROFILE_PROVIDERS` adds the gathering lean to `+finger` and respects the
-viewer's reveal access. This milestone has no web or API surface.
+viewer's reveal access. The resource notices appear on the existing Inbox web page.
 
 Staff can preview with `+resources/run dry`, seed/update the configured catalogue,
 and grant/spend/audit stock. `+runtime` controls registered settings without a
@@ -2143,3 +2145,9 @@ character's Inbox. Choose immediate, summary, or off in Notices preferences.
 When Inbox is disabled or absent, the character hook shows the latest eligible
 payout on first puppet. `+xp` always shows the balance and history. The golden
 builder pays its synthetic character to demonstrate the alert.
+
+The `resources` source shows weekly gathering and paid plot awards for the
+selected character. The RP Resources preference controls immediate, summary,
+or off. The golden builder adds a synthetic weekly award for its verified
+admin character through the regular accrual service. Generic sandbox seeding
+does not issue notice demo awards.

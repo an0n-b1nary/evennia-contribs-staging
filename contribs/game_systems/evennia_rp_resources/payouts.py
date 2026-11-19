@@ -7,12 +7,11 @@ import logging
 from django.apps import apps
 from django.db import transaction
 from django.utils import timezone
-from evennia.objects.models import ObjectDB
 
 from evennia_links.characters import playable_characters
 from evennia_links.guests import is_guest
 
-from . import conf
+from . import conf, notices
 from .models import PlotPayoutReceipt, PlotPayoutRun, PlotThreadResourcePayout
 from .services import ResourceError, _quantity, definition, grant
 
@@ -115,16 +114,13 @@ def on_concluded(sender, thread, **kwargs):
 
 def deliver(run_id):
     result = {"paid": [], "skipped": [], "errors": {}}
-    for receipt_id in PlotPayoutReceipt.objects.filter(
+    for receipt_id, character_id in PlotPayoutReceipt.objects.filter(
         run_id=run_id, paid_at__isnull=True, skipped=False
-    ).values_list("pk", flat=True):
+    ).values_list("pk", "character_id"):
         try:
             with transaction.atomic():
                 # Character first, matching the holdings service and economy.
-                initial = PlotPayoutReceipt.objects.get(pk=receipt_id)
-                character = (
-                    ObjectDB.objects.select_for_update().filter(pk=initial.character_id).first()
-                )
+                character = notices.lock_character(character_id)
                 receipt = (
                     PlotPayoutReceipt.objects.select_for_update()
                     .select_related("run")
@@ -151,6 +147,7 @@ def deliver(run_id):
                     )
                 receipt.paid_at = timezone.now()
                 receipt.save(update_fields=["paid_at"])
+                notices.stage_award(character, plot=receipt)
                 result["paid"].append(character.pk)
         except Exception as exc:
             logger.exception("Resource plot payout %s receipt %s failed", run_id, receipt_id)

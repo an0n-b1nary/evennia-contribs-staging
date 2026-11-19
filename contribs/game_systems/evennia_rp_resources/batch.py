@@ -8,13 +8,12 @@ import random
 from collections import Counter
 
 from django.db import transaction
-from evennia.objects.models import ObjectDB
 
 from evennia_links import periodic
 from evennia_links.characters import playable_characters
 from evennia_links.runtime import cap_raise, get
 
-from . import conf
+from . import conf, notices
 from .gathering import lean, matches_lean, pool
 from .models import ResourceGrant
 from .services import grant, total_held
@@ -84,14 +83,15 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
     for character in eligible_characters() if characters is None else characters:
         try:
             with transaction.atomic():
-                ObjectDB.objects.select_for_update().get(pk=character.pk)
+                notices.lock_character(character.pk)
                 if ResourceGrant.objects.filter(
                     character=character, source="trickle", resource__isnull=True, week=week
                 ).exists():
                     continue
                 quantities, details = _allocation(character, week, resources)
                 if not dry_run:
-                    ResourceGrant.objects.create(
+                    predecessor = notices.latest_receipt(character)
+                    marker = ResourceGrant.objects.create(
                         character=character,
                         quantity=0,
                         source="trickle",
@@ -100,6 +100,7 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
                     )
                     for key, quantity in sorted(quantities.items()):
                         grant(character, key, quantity, "trickle", week=week)
+                    notices.stage_award(character, weekly=marker, predecessor=predecessor)
                 result["characters"][character.pk] = quantities
         except Exception as exc:
             logger.exception("Resources batch failed for #%s, period %s", character.pk, week)

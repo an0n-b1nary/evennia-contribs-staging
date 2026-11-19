@@ -19,7 +19,7 @@ Each week your character gathers a share of resources, the raw materials your ga
 
 Gathering happens on its own once a week, while you're away as well as while you play. It doesn't depend on roleplay, on how long you were logged in, or on who you played with. Everyone gathers the same amount until their stores are nearly full; what differs is the mix.
 
-When you next log in, a short line names what you gained. A week that adds nothing says nothing.
+After you choose your character, the login summary can flag a gathering notice. Open `+notices` to read what you gained and set your account's RP Resources preference. Games without an Inbox show the weekly summary directly.
 
 :::insight[Time pays quantity, choices shape composition]{time-pays-quantity}
 How much you gather depends only on time passing, so nobody falls behind for playing less or gets ahead by grinding. Your choices decide what kind of resources you get, which is where your character's interests show.
@@ -33,7 +33,7 @@ What's open depends on the world, not on where you stand. Resources tied to part
 
 ## The cap
 
-Your stores have a cap on weekly gathering. As you near it, you gather less, and at the cap you gather nothing more; the login line tells you once when your stores are full. Trades, rewards and anything staff give you can take you past the cap. Some things you own, such as a workshop, can raise it.
+Your stores have a cap on weekly gathering. As you near it, you gather less, and at the cap you gather nothing more; you get one warning when your stores are full. Trades, rewards and anything staff give you can take you past the cap. Some things you own, such as a workshop, can raise it.
 
 :::insight[Nothing decays]{nothing-decays}
 What you've gathered stays yours however long you're away. The cap only slows gathering for full stores; it never takes anything back.
@@ -43,7 +43,7 @@ A resource your game retires stays in your stores, and you can still trade or sp
 
 ## Plot rewards
 
-A plot can promise its participants resources when it concludes. The plot's owners propose a reward for each participant, and staff approve it. When the plot concludes, every active participant receives the full reward, including anyone who's offline. Running or owning the plot alone doesn't count; you have to have taken part. The reward ignores your lean and the cap, and you'll see it the next time you log in.
+A plot can promise its participants resources when it concludes. The plot's owners propose a reward for each participant, and staff approve it. When the plot concludes, every active participant receives the full reward, including anyone who's offline. Running or owning the plot alone doesn't count; you have to have taken part. The reward ignores your lean and the cap, and you'll see it in your Inbox or when you next enter the game. Private plot notices show the award without the plot name in the Inbox while you have access to the plot.
 
 ## Spending and trading
 
