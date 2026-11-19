@@ -42,7 +42,9 @@ Plot owners get a notice when someone asks to open a thread. The requester
 gets a notice when an owner or staff member accepts or declines, and a new
 owner gets a notice when they are added. Use the commands in the notice to
 open the plot or thread. You can read or clear it and decide the request
-separately. The Plots preference offers immediate, summary, or off.
+separately. Change delivery with `+notices/set plots=immediate`, `=summary` or
+`=off`. Games without the Inbox show the notice only while you're playing that
+character.
 
 ### Held threads
 
