@@ -95,6 +95,23 @@ def build(scratch):
     emit_moderation_demo_notices(admin, character)
     emit_plot_demo_notice(admin, character, golden=True)
     emit_social_demo_notice(admin, character, golden=True)
+    from evennia_xp.awards import record_xp
+    from evennia_xp.models import XPLog, XPNoticeReceipt
+
+    payout = record_xp(
+        character.pk,
+        "3.50",
+        XPLog.SourceType.MANUAL_GRANT,
+        0,
+        character_name=character.key,
+        reason="Synthetic sandbox payout",
+    )
+    if not XPNoticeReceipt.objects.filter(
+        summary__character_id=character.pk,
+        week=payout.week,
+        state=XPNoticeReceipt.State.TRANSFERRED,
+    ).exists():
+        raise ValueError("Golden XP payout did not reach Inbox")
     connections.close_all()
 
 

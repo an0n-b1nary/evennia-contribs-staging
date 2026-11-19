@@ -175,6 +175,40 @@ class CharacterXP(models.Model):
         return f"CharacterXP: {self.character_name} ({self.current_balance} XP balance)"
 
 
+class XPNoticeReceipt(models.Model):
+    """Transport state for one paid character-week, independent of Inbox storage."""
+
+    class Origin(models.TextChoices):
+        INBOX = "inbox"
+        LEGACY = "legacy"
+        STANDALONE = "standalone"
+
+    class State(models.TextChoices):
+        PENDING = "pending"
+        ATTEMPTING = "attempting"
+        TRANSFERRED = "transferred"
+        SUPPRESSED = "suppressed"
+        DELIVERED = "delivered"
+        UNCERTAIN = "uncertain"
+        SUPERSEDED = "superseded"
+
+    summary = models.ForeignKey(CharacterXP, on_delete=models.CASCADE)
+    week = models.CharField(max_length=10)
+    occurred_at = models.DateTimeField()
+    origin = models.CharField(max_length=10, choices=Origin.choices)
+    state = models.CharField(max_length=12, choices=State.choices, default=State.PENDING)
+    claim = models.UUIDField(null=True)
+    last_attempt_at = models.DateTimeField(null=True)
+    acknowledged_at = models.DateTimeField(null=True)
+    compatibility_pending = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(fields=["summary", "week"], name="xp_notice_character_week"),
+        ]
+        indexes = [models.Index(fields=["summary", "state", "last_attempt_at", "id"])]  # noqa: RUF012
+
+
 class XPSpend(models.Model):
     """One debit with a permanent reference and an optional one-time refund."""
 

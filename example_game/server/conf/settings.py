@@ -934,6 +934,8 @@ LINKS_NOTICE_SOURCES = {
     "plots": "evennia_plots.integrations.notices.PlotNoticeSource",
     "social-pages": "evennia_social.integrations.notices.SocialPageNoticeSource",
 }
+if "evennia_xp" in INSTALLED_APPS:
+    LINKS_NOTICE_SOURCES["xp"] = "evennia_xp.integrations.notices.XPNoticeSource"
 NOTICES_ENABLED = True
 NOTICES_RETENTION_DAYS = 30
 NOTICES_ROUTINE_LIMIT = 500

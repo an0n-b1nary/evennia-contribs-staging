@@ -250,3 +250,33 @@ class NoticeRunnerTests(unittest.TestCase):
                 "evennia_plots.test_notice_adapter.StandalonePlotNoticeTests", run.call_args.args[0]
             )
             self.assertNotIn("evennia_plots.test_notice_concurrency", run.call_args.args[0])
+
+
+class XPNoticeRunnerTests(unittest.TestCase):
+    def test_core_xp_runs_without_links_fixture_or_runner(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            completed = Mock(returncode=0, stdout="Ran 9 tests\nOK")
+            with (
+                patch.object(runner, "find_spec", return_value=None),
+                patch.object(
+                    runner.importlib.metadata,
+                    "distribution",
+                    side_effect=runner.importlib.metadata.PackageNotFoundError,
+                ),
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(runner.subprocess, "run", return_value=completed) as run,
+            ):
+                self.assertEqual(runner.main([str(game), "--minimal-xp"]), 0)
+            self.assertEqual(run.call_args.args[0][-1], "evennia_xp.test_notice_standalone")
+            settings = (game / "server/conf/notices_test_settings.py").read_text()
+            namespace = {"INSTALLED_APPS": []}
+            exec(settings.partition("\n")[2], namespace)
+            self.assertEqual(namespace["INSTALLED_APPS"], ["evennia_xp"])
+            self.assertNotIn("TEST_RUNNER", namespace)
+            self.assertEqual(
+                set(namespace["XP_ABSENT_PARTNERS"]),
+                {"evennia_links", "evennia_notices", "evennia_accessibility"},
+            )

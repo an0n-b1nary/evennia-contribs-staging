@@ -16,7 +16,7 @@ from evennia_xp.summary import notify_xp_summary
 
 
 class XPSummaryCharacterMixin:
-    """Show the first-login XP summary after each weekly batch."""
+    """Prepare Inbox XP alerts or show the first-puppet standalone summary."""
 
     def at_post_puppet(self, **kwargs):
         super().at_post_puppet(**kwargs)

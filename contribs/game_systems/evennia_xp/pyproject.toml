@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-xp"
-version = "0.6.0"
+version = "0.6.1"
 description = "Registry-driven weekly XP batch engine (earn, ledger, +xp command) for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -43,6 +43,7 @@ packages = [
     "evennia_xp",
     "evennia_xp.migrations",
     "evennia_xp.api",
+    "evennia_xp.integrations",
     "evennia_xp.management",
     "evennia_xp.management.commands",
 ]
@@ -51,6 +52,7 @@ packages = [
 "evennia_xp" = "."
 "evennia_xp.migrations" = "migrations"
 "evennia_xp.api" = "api"
+"evennia_xp.integrations" = "integrations"
 "evennia_xp.management" = "management"
 "evennia_xp.management.commands" = "management/commands"
 

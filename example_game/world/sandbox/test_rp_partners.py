@@ -298,13 +298,19 @@ class TestLoginXPSummary(EvenniaTest):
     character_typeclass = Character
     room_typeclass = Room
 
+    @override_settings(NOTICES_ENABLED=False)
     def test_summary_once_per_batch_or_quiet_without_xp(self):
         if apps.is_installed("evennia_xp"):
             from evennia_xp.awards import record_xp
             from evennia_xp.models import XPLog
 
             record_xp(self.char1.pk, 2, XPLog.SourceType.RP_SESSION, 501, week="2026-W40")
-        with mock.patch.object(self.char1, "msg") as message:
+        self.account.characters.add(self.char1)
+        self.session.puppet = self.char1
+        with (
+            mock.patch.object(self.char1, "msg") as message,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             self.char1.at_post_puppet()
             self.char1.at_post_puppet()
         summaries = [

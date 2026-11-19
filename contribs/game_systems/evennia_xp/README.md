@@ -23,8 +23,8 @@ aggregation, scheduling, and the web/API surface.
 - **`CmdXp`** — `+xp`, `+xp/log`, `+xp/sources`,
   `+xp/grant <character>=<amount> # <reason>` with
   `XP_STAFF_LOCK` and optional `evennia-accessibility` screen-reader support.
-- **First-login summary** — `XPSummaryCharacterMixin` shows each character
-  what the last weekly batch paid it, once, the next time it is puppeted.
+- **Weekly XP summary** — a routine alert in the optional Inbox, or a one-time
+  summary at first puppet through `XPSummaryCharacterMixin`.
 - **Projected XP** — `+xp` and (with evennia-rptracker) `+activity` show what
   the collectors would pay a character so far, before the batch runs.
 - **Web + API** (`[web]` extra) — `XPSummaryView` (self-only balance + log)
@@ -203,9 +203,9 @@ provides them and the `EvenniaXPLedger` adapter.
 
 ---
 
-## First-login summary
+## Weekly XP summary
 
-After each weekly batch, a character's next login shows what it earned:
+A paid week has a breakdown of the character's awards grouped by source.
 
 ```
 XP awarded for week 2026-W18: 3.50 XP total
@@ -227,11 +227,24 @@ It calls `super().at_post_puppet()` first, so it composes with other mixins in
 any order. If you'd rather keep your own hook, call
 `evennia_xp.summary.notify_xp_summary(self)` from `at_post_puppet` instead.
 
-The summary compares `CharacterXP.last_payout_week` with the character's
-`last_xp_summary_week` Attribute, so it shows exactly once per batch that paid
-the character and nothing on a quiet week. With `evennia-accessibility`
-installed and `screenreader_mode` on, the bullets and colour codes are dropped.
-Errors are logged and never interrupt login.
+Install and enable Inbox and Links to offer XP alerts in `+notices` and on the
+website. Add this entry to `LINKS_NOTICE_SOURCES` alongside your other sources.
+
+```python
+LINKS_NOTICE_SOURCES["xp"] = "evennia_xp.integrations.notices.XPNoticeSource"
+```
+
+XP defaults to routine summary delivery. Players can choose immediate delivery
+or turn XP alerts off in Inbox preferences. Reading or clearing an alert leaves
+its underlying awards and balance available via `+xp`. Additional credit for
+the same week updates the breakdown without creating another alert.
+
+With Inbox absent, disabled, or deliberately unconfigured for XP, the hook
+shows the latest eligible payout to that character on its next eligible
+puppet. A quiet week has no summary. With `evennia-accessibility` installed
+and `screenreader_mode` on, the standalone message uses plain text. XP needs
+only Evennia for standalone use. The existing `[web]` extra enables the
+separate XP balance and history page and API.
 
 ---
 
