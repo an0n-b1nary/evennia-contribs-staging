@@ -293,6 +293,7 @@ def prepare(context, *, limit=100, allow_fallback=False):
         owners = lock_recipient_owners([character]).get(character.pk)
         if not owners or context.account.pk not in {owner.pk for owner in owners}:
             return Counter(), False
+        boundary = timezone.now().isoformat()
         progress, _ = PageProgress.objects.get_or_create(character=character)
         candidates = _unclaimed_pages(character, _cutoff(character)).filter(
             pk__gt=progress.legacy_position, generated=False
@@ -301,6 +302,11 @@ def prepare(context, *, limit=100, allow_fallback=False):
         if pages:
             _stage(character, pages, owners)
             progress.legacy_position = pages[-1].pk
+        if len(pages) < limit:
+            # Legacy discovery is complete, and every later offline page has its
+            # own row. Move the standalone cutoff so a later Inbox removal does
+            # not count pages that were delivered live while the Inbox was active.
+            character.last_page_seen = boundary
         pending = _pending(character).exclude(origin=Origin.LIVE)
         rows = list(pending.filter(message_id__gt=progress.retry_position)[:limit])
         if not rows and progress.retry_position:

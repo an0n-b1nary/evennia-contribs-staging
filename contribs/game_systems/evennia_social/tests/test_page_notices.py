@@ -429,7 +429,7 @@ class InboxPageTests(PageFixture):
         self.assertEqual(notices.prepare(self.context())[0]["inbox"], 1)
         notices.prepare(self.context())
         self.assertEqual(DeliveryReceipt.objects.count(), 1)
-        self.assertEqual(self.char2.last_page_seen, cutoff.isoformat())
+        self.assertGreater(notices._cutoff(self.char2), pending.db_date_created)
 
     def test_clean_prepare_fallback_waits_for_outer_commit(self):
         session = self.login_session()
@@ -475,6 +475,29 @@ class InboxPageTests(PageFixture):
         notices.prepare(self.context())
         self.assertEqual(DeliveryReceipt.objects.count(), 1)
         self.assertEqual(PageDelivery.objects.get().message, offline)
+
+    def test_inbox_puppet_advances_standalone_cutoff_after_discovery(self):
+        legacy = self.legacy()
+        self.char2.account = self.account2
+        with (
+            patch.object(self.char2.sessions, "count", return_value=1),
+            patch.object(self.char2, "msg"),
+        ):
+            self.page("Seen live while the Inbox was active")
+        self.char2.account = None
+        with patch.object(notices, "transfer", return_value=RouteResult("retry")):
+            counts, more = notices.prepare(self.context(), limit=1)
+        self.assertEqual(counts["retry"], 1)
+        self.assertTrue(more)
+        self.assertIsNone(self.char2.last_page_seen)
+        notices.prepare(self.context(), limit=1)
+        self.assertIsNotNone(self.char2.last_page_seen)
+        self.assertEqual(PageDelivery.objects.get().message, legacy)
+        session = self.login_session()
+        with self.settings(LINKS_NOTICE_SOURCES={}), patch(SESSION_LIST, return_value=[session]):
+            notices._standalone(self.char2)
+        session.msg.assert_not_called()
+        self.assertEqual(PageDelivery.objects.get().state, "inbox")
 
     def test_disabled_duplicate_and_reenable_do_not_replay(self):
         from evennia_notices.models import DeliveryReceipt

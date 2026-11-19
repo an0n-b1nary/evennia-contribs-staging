@@ -93,7 +93,8 @@ class SocialPageNoticeSeams(EvenniaCommandTest):
         history = self.call(CmdPage(), "/last", caller=self.char1)
         self.assertIn("Private source conversation", history)
         self.assertIn("Legacy private conversation", history)
-        self.assertIsNone(self.char1.last_page_seen)
+        # Puppet discovery staged the legacy page, so the standalone cutoff moves.
+        self.assertIsNotNone(self.char1.last_page_seen)
 
     def test_guest_live_reminder_has_no_persistent_state(self):
         guest = create_account(
