@@ -119,6 +119,14 @@ class WorkflowAgreementTests(unittest.TestCase):
         pins = re.findall(r"^\s+EVENNIA_REQUIREMENT: (\S+)$", workflow, flags=re.MULTILINE)
         self.assertEqual(pins, [profile.EVENNIA_REQUIREMENT])
 
+    def test_every_workflow_package_is_an_installable_contrib(self):
+        workflow = (profile.REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        packages = set(re.findall(r"--package\s+(\S+)", workflow))
+        self.assertTrue(packages, "expected profiles that select packages")
+        for package in sorted(packages):
+            with self.subTest(package=package):
+                self.assertTrue((profile.REPO_ROOT / package / "pyproject.toml").is_file())
+
     def test_every_profile_of_a_shared_job_runs_after_another_fails(self):
         merged = 0
         for name, block in workflow_jobs().items():
