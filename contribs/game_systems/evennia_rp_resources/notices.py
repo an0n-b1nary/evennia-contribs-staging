@@ -115,7 +115,7 @@ def stage_award(character, *, weekly=None, plot=None, predecessor=None):
         with transaction.atomic():
             if not get("RP_RESOURCES_REVEALED"):
                 return
-            if is_guest(character):
+            if is_guest(character) and not owner_ids(character):
                 sessions = _eligible_sessions(character, "guest")
                 if sessions:
                     row = ResourceNoticeReceipt(character=character, weekly=weekly, plot=plot)
@@ -181,6 +181,7 @@ class Connection:
     session: object
     account: AccountDB
     character: ObjectDB
+    roster_member: bool
 
 
 def live_connection(current):
@@ -210,9 +211,9 @@ def _eligible(current, mode, owners):
         )
     if is_guest(current.account) or is_guest(current.character):
         return False
-    if mode == "nonroster":
-        return not owners
-    return current.account.pk in owners if owners else mode == "standalone"
+    if current.roster_member:
+        return mode != "nonroster" and current.account.pk in owners
+    return not owners and mode in ("standalone", "nonroster")
 
 
 def _eligible_sessions(character, mode, *, context=None):
@@ -229,7 +230,7 @@ def _eligible_sessions(character, mode, *, context=None):
                 continue
             if context is not None and account is not context.account:
                 continue
-            current = Connection(session, account, character)
+            current = Connection(session, account, character, account.pk in owners)
             if _eligible(current, mode, owners):
                 candidates.append(current)
         except Exception:
@@ -533,36 +534,55 @@ def _claim_query(row):
     )
 
 
-def _transport_allowed(row, current, mode):
+def _transport_award(row, current, mode):
+    """Reload the claimed award and require the connection's original scope."""
     character = current.character
-    if (
-        not get("RP_RESOURCES_REVEALED")
-        or not _eligible(current, mode, owner_ids(character))
-        or not _current_award(row, character)
-    ):
-        return False
+    if not get("RP_RESOURCES_REVEALED") or not _eligible(current, mode, owner_ids(character)):
+        return None
     if mode == "guest":
-        return True
-    expected = "inbox" if mode == "nonroster" else "standalone"
-    return _backend() == expected and _claim_query(row).exists()
+        fresh = ResourceNoticeReceipt(character_id=row.character_id, full_warning=row.full_warning)
+        if row.weekly_id is not None:
+            fresh.weekly = ResourceGrant.objects.filter(pk=row.weekly_id).first()
+        else:
+            fresh.plot = (
+                PlotPayoutReceipt.objects.filter(pk=row.plot_id).select_related("run").first()
+            )
+    else:
+        expected = "inbox" if mode == "nonroster" else "standalone"
+        if _backend() != expected:
+            return None
+        fresh = _claim_query(row).select_related("weekly", "plot__run").first()
+    if (
+        fresh is not None
+        and fresh.character_id == character.pk
+        and _current_award(fresh, character)
+    ):
+        return fresh
+    return None
 
 
 def _send(row, sessions, mode):
     attempted = delivered = False
     for current in sessions:
         try:
-            if not _transport_allowed(row, current, mode):
+            rendering_award = _transport_award(row, current, mode)
+            if rendering_award is None:
                 continue
             writer = current.character.msg
             if not callable(writer):
                 continue
-            text = _standalone_text(row, current)
-            if not text or not _transport_allowed(row, current, mode):
+            text = _standalone_text(rendering_award, current)
+            if not text:
                 continue
-            if row.plot_id is not None:
-                plot = _standalone_plot(row, current)
-                if plot is None or text != award_text(row, plot=plot):
+            live_award = _transport_award(row, current, mode)
+            if live_award is None:
+                continue
+            if live_award.plot_id is not None:
+                plot = _standalone_plot(live_award, current)
+                if plot is None or text != award_text(live_award, plot=plot):
                     continue
+            if not live_connection(current):
+                continue
             attempted = True
             writer(text, session=current.session)
             delivered = True

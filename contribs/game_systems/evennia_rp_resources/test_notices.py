@@ -115,6 +115,23 @@ class StandaloneResourceNoticeTests(ResourceNoticeFixture):
         self.assertTrue(notify_resource_summary(self.character))
         self.character.msg.assert_called_once()
 
+    def test_losing_last_roster_owner_after_render_does_not_change_claim_scope(self):
+        self.award("week-1")
+        render = notices._standalone_text
+
+        def remove_owner(*args):
+            message = render(*args)
+            self.account.characters.remove(self.character)
+            return message
+
+        with patch.object(notices, "_standalone_text", side_effect=remove_owner):
+            self.assertFalse(notify_resource_summary(self.character))
+        self.character.msg.assert_not_called()
+        self.assertEqual(ResourceNoticeReceipt.objects.get().state, State.PENDING)
+        self.account.characters.add(self.character)
+        self.assertTrue(notify_resource_summary(self.character))
+        self.character.msg.assert_called_once()
+
     def test_each_session_is_independent_and_unknown_write_is_never_replayed(self):
         self.sessions.append(self.make_session())
         self.award("week-1")
@@ -222,6 +239,32 @@ class StandaloneResourceNoticeTests(ResourceNoticeFixture):
         self.assertIsNotNone(award.notified_at)
         self.assertEqual(total_held(self.character), 2)
 
+    @skipUnless(apps.is_installed("evennia_plots"), "Optional Plots is absent")
+    def test_paid_receipt_revoked_after_render_is_pending_until_valid_again(self):
+        from evennia_plots.models import PlotThread
+
+        plot = PlotThread.create_thread("Current plot", self.character)
+        award = self.plot_award(plot)
+        paid_at = award.paid_at
+        render = notices._standalone_text
+
+        def revoke(*args):
+            message = render(*args)
+            PlotPayoutReceipt.objects.filter(pk=award.pk).update(paid_at=None)
+            return message
+
+        with patch.object(notices, "_standalone_text", side_effect=revoke):
+            self.assertFalse(notify_plot_summary(self.character))
+        self.character.msg.assert_not_called()
+        award.refresh_from_db()
+        self.assertEqual(award.notice_receipt.state, State.PENDING)
+        self.assertIsNone(award.notified_at)
+
+        PlotPayoutReceipt.objects.filter(pk=award.pk).update(paid_at=paid_at)
+        self.assertTrue(notify_plot_summary(self.character))
+        self.assertFalse(notify_plot_summary(self.character))
+        self.character.msg.assert_called_once()
+
 
 @skipUnless(apps.is_installed("evennia_notices"), "Optional Inbox is absent")
 @override_settings(NOTICES_ENABLED=True, LINKS_NOTICE_SOURCES=SOURCES)
@@ -242,6 +285,49 @@ class InboxResourceNoticeTests(ResourceNoticeFixture):
         from .integrations.notices import ResourcesNoticeSource
 
         ResourcesNoticeSource().prepare(self.context(session=True))
+
+    def test_reveal_changed_during_evaluation_hides_summary_count(self):
+        from django.conf import settings
+
+        from evennia_notices.services import summarize
+
+        from .integrations import notices as projection
+
+        self.award("week-1")
+        load_plots = projection._plots
+
+        def mask(*args):
+            plots = load_plots(*args)
+            settings.RP_RESOURCES_REVEALED = False
+            return plots
+
+        with (
+            override_settings(RP_RESOURCES_REVEALED=True),
+            patch.object(projection, "_plots", side_effect=mask),
+        ):
+            self.assertEqual(summarize(self.context(session=True)), (0, 0))
+        self.session.msg.assert_not_called()
+        self.assertEqual(summarize(self.context(session=True)), (1, 0))
+
+    def test_temporary_guest_puppet_leaves_all_owned_awards_pending(self):
+        from evennia.accounts.accounts import DefaultGuest
+
+        guest = create_account(
+            "Temporary controller", None, token_urlsafe(32), typeclass=DefaultGuest
+        )
+        self.character.account = guest
+        self.award("week-1")
+        self.award("week-2")
+        self.assertEqual(
+            set(ResourceNoticeReceipt.objects.values_list("weekly__week", "state")),
+            {("week-1", State.PENDING), ("week-2", State.PENDING)},
+        )
+        self.character.msg.assert_not_called()
+
+        self.character.account = self.account
+        self.prepare()
+        self.assertEqual(len(self.project()), 2)
+        self.character.msg.assert_not_called()
 
     def test_commit_dry_run_and_no_replay_after_clear_and_backend_switch(self):
         from evennia_notices.models import DeliveryReceipt

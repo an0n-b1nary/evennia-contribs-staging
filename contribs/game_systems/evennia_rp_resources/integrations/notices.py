@@ -65,6 +65,22 @@ def _current(context):
     return context.session is None or (context.account is not None and live_connection(context))
 
 
+def _current_viewer(context):
+    account, character = context.account, context.character
+    return (
+        (
+            account is None
+            or (
+                isinstance(account, AccountDB)
+                and not is_guest(account)
+                and account.pk in owner_ids(character)
+            )
+        )
+        and not is_guest(character)
+        and _current(context)
+    )
+
+
 def _rows(scoped, character):
     subjects = {event.subject for event in scoped}
     return {
@@ -105,16 +121,10 @@ def _projection(events, context):
     visible = []
     if not isinstance(context, NoticeContext) or not isinstance(context.character, ObjectDB):
         return outcomes, visible
-    account, character = context.account, context.character
-    if account is not None and (
-        not isinstance(account, AccountDB)
-        or is_guest(account)
-        or account.pk not in owner_ids(character)
-    ):
-        return outcomes, visible
-    if is_guest(character) or not _current(context):
+    if not _current_viewer(context):
         return outcomes, visible
 
+    account, character = context.account, context.character
     scoped = [event for event in events if _subject(event) and event.recipient_id == character.pk]
     if not scoped:
         return outcomes, visible
@@ -146,10 +156,20 @@ def _projection(events, context):
             current = context if context.session is not None else None
             if not can_view_plot(plot, character, current, owner=plot.resources_owner):
                 continue
-        if account is not None and _current(context):
-            outcomes[event.event_id] = Evaluation("visible")
-            visible.append((row, plot))
-    return outcomes, visible
+        if account is not None:
+            visible.append((event.event_id, row, plot))
+
+    if not visible:
+        return outcomes, []
+    if not get("RP_RESOURCES_REVEALED"):
+        for event_id, _, _ in visible:
+            outcomes[event_id] = Evaluation("defer", reason="unavailable")
+        return outcomes, []
+    if not _current_viewer(context):
+        return outcomes, []
+    for event_id, _, _ in visible:
+        outcomes[event_id] = Evaluation("visible")
+    return outcomes, [(row, plot) for _, row, plot in visible]
 
 
 class ResourcesNoticeSource:
