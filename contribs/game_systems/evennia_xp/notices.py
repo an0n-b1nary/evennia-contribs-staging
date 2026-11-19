@@ -25,6 +25,7 @@ Origin = XPNoticeReceipt.Origin
 State = XPNoticeReceipt.State
 ACKNOWLEDGED = (State.TRANSFERRED, State.SUPPRESSED, State.DELIVERED)
 logger = logging.getLogger("evennia")
+PLAYABLE_ATTRIBUTE = "_playable_characters"  # Evennia's CharactersHandler storage
 
 
 def reserve_writer():
@@ -47,28 +48,41 @@ def _backend():
     if not apps.is_installed("evennia_notices") or not getattr(settings, "NOTICES_ENABLED", True):
         return "standalone"
     configured = getattr(settings, "LINKS_NOTICE_SOURCES", {})
+    if not isinstance(configured, dict) or SOURCE not in configured:
+        # Not offered to Inbox: another source's broken entry must not stall XP.
+        return "standalone"
     try:
         from evennia_links.notices import source_registry
 
         from .integrations.notices import XPNoticeSource
 
-        sources = source_registry()
-        if SOURCE not in configured:
-            return "standalone"
-        if isinstance(sources.get(SOURCE), XPNoticeSource):
+        if isinstance(source_registry().get(SOURCE), XPNoticeSource):
             return "inbox"
     except Exception:
         logger.warning("XP notice binding could not be resolved")
     return "retry"
 
 
-def _core_roster(account):
-    account.attributes.reset_cache()
-    # Refresh the stored Attribute value as well as the handler's lookup cache.
-    attribute = account.attributes.get("_playable_characters", return_obj=True)
-    if attribute is not None:
-        attribute.refresh_from_db(fields=["db_value"])
-    return account.characters.all()
+def _roster_accounts(character, accounts=None):
+    """Accounts whose stored roster lists *character*, read fresh in one query.
+
+    Core-only fallback for games without Links; mirrors its roster sweep so each
+    award or puppet costs one query rather than several per account.
+    """
+    from evennia.utils.dbserialize import from_pickle
+
+    rows = (
+        (AccountDB.objects if accounts is None else accounts)
+        .filter(db_attributes__db_key=PLAYABLE_ATTRIBUTE, db_attributes__db_category__isnull=True)
+        .order_by("pk")
+        .values_list("pk", "db_attributes__db_value")
+    )
+    ids = [
+        account_id
+        for account_id, raw in rows
+        if character.pk in {obj.pk for obj in from_pickle(raw) or () if obj}
+    ]
+    return list(AccountDB.objects.in_bulk(ids).values()) if ids else []
 
 
 def owner_ids(character):
@@ -76,16 +90,10 @@ def owner_ids(character):
     if apps.is_installed("evennia_links"):
         from evennia_links.characters import account_ids
 
-        accounts = AccountDB.objects.in_bulk(account_ids(character))
-        return {
-            account.pk for account in accounts.values() if not isinstance(account, DefaultGuest)
-        }
-
-    return {
-        account.pk
-        for account in AccountDB.objects.all().iterator()
-        if not isinstance(account, DefaultGuest) and character in _core_roster(account)
-    }
+        accounts = AccountDB.objects.in_bulk(account_ids(character)).values()
+    else:
+        accounts = _roster_accounts(character)
+    return {account.pk for account in accounts if not isinstance(account, DefaultGuest)}
 
 
 def _on_roster(account, character):
@@ -96,7 +104,7 @@ def _on_roster(account, character):
             character in roster
             for _, roster in playable_accounts(AccountDB.objects.filter(pk=account.pk))
         )
-    return character in _core_roster(account)
+    return bool(_roster_accounts(character, AccountDB.objects.filter(pk=account.pk)))
 
 
 def _is_guest(obj):
@@ -109,10 +117,7 @@ def _is_guest(obj):
     if isinstance(obj, ObjectDB):
         if isinstance(obj.account, DefaultGuest):
             return True
-        return any(
-            isinstance(account, DefaultGuest) and obj in _core_roster(account)
-            for account in AccountDB.objects.all().iterator()
-        )
+        return any(isinstance(account, DefaultGuest) for account in _roster_accounts(obj))
     return False
 
 
