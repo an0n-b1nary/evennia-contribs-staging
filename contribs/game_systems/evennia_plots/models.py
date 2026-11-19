@@ -43,15 +43,32 @@ Bridge models included here (forced relocate from the hub's links layer):
 
 from datetime import timedelta
 from decimal import Decimal
+from time import sleep
 
 from django.core.validators import MinValueValidator
-from django.db import models, transaction
-from django.db.models import Max, Q
+from django.db import OperationalError, connection, models, transaction
+from django.db.models import F, Max, Q
 from django.utils import timezone
 
 from evennia_links import AbstractAuthoredLink, AbstractVersion
 from evennia_plots import signals as plot_signals
 from evennia_plots.permissions import is_plot_staff
+
+
+def with_plot_writer(plot_id, write):
+    """Run a source mutation under the same parent-first writer guard."""
+    for attempt in range(3):
+        try:
+            with transaction.atomic():
+                plots = PlotThread.objects
+                if connection.vendor == "sqlite":
+                    plots.filter(pk=plot_id).update(status=F("status"))
+                return write(plots.select_for_update().get(pk=plot_id))
+        except OperationalError as exc:
+            if connection.vendor != "sqlite" or "locked" not in str(exc).lower() or attempt == 2:
+                raise
+            sleep(0.025 * (attempt + 1))
+
 
 # ---------------------------------------------------------------------------
 # PlotTag
@@ -532,20 +549,18 @@ class PlotThread(models.Model):
             int: The computed bonus XP (0–5).
         """  # noqa: RUF002
         try:
-            with transaction.atomic():
-                type(self).objects.select_for_update().get(pk=self.pk)
-                return self._conclude_locked(concluded_by)
+            return with_plot_writer(self.pk, lambda plot: self._conclude_locked(plot, concluded_by))
         except Exception:
             self.refresh_from_db()
             raise
 
-    def _conclude_locked(self, concluded_by):
-        bonus = self._compute_bonus_xp()
+    def _conclude_locked(self, plot, concluded_by):
+        bonus = plot._compute_bonus_xp()
         self.bonus_xp_computed = bonus
         self.status = self.Status.CONCLUDED
         self.concluded_at = timezone.now()
         self.save(update_fields=["status", "concluded_at", "bonus_xp_computed"])
-        self.close_story_threads()
+        plot._close_story_threads_locked()
         plot_signals.plot_thread_concluded.send(
             sender=type(self), thread=self, bonus_xp=bonus, concluded_by=concluded_by
         )
@@ -553,21 +568,24 @@ class PlotThread(models.Model):
 
     def archive(self):
         """Transition to ARCHIVED (no bonus)."""
+        try:
+            with_plot_writer(self.pk, self._archive_locked)
+        except Exception:
+            self.refresh_from_db()
+            raise
+
+    def _archive_locked(self, plot):
         self.status = self.Status.ARCHIVED
         self.archived_at = timezone.now()
         self.save(update_fields=["status", "archived_at"])
-        self.close_story_threads()
+        plot._close_story_threads_locked()
         plot_signals.plot_thread_archived.send(sender=type(self), thread=self)
 
     def close_story_threads(self):
-        """Turn open threads into loose ends and decline pending requests.
+        """Close open and requested threads, returning their respective counts."""
+        return with_plot_writer(self.pk, lambda plot: plot._close_story_threads_locked())
 
-        Called when the plot concludes or is archived. Never blocks either:
-        unresolved threads are allowed, and carry no XP consequence.
-
-        Returns:
-            tuple: (number of loose ends, number of requests declined)
-        """
+    def _close_story_threads_locked(self):
         now = timezone.now()
         loose = self.story_threads.filter(status=StoryThread.Status.OPEN).update(
             status=StoryThread.Status.LOOSE_END, updated_at=now
@@ -575,6 +593,8 @@ class PlotThread(models.Model):
         declined = self.story_threads.filter(status=StoryThread.Status.REQUESTED).update(
             status=StoryThread.Status.DECLINED,
             decline_reason="The plot ended before this request was answered.",
+            decided_by=None,
+            decided_by_name="",
             updated_at=now,
         )
         return loose, declined
@@ -1452,3 +1472,48 @@ class PlotBonusCredit(models.Model):
 
     def __str__(self):
         return f"PlotBonusCredit: {self.character_name} ← PlotThread #{self.thread_id}"
+
+
+class PlotNoticeReceipt(models.Model):
+    """Dispatch state for an explicit thread or ownership transition."""
+
+    class Kind(models.TextChoices):
+        REQUEST = "request", "Thread request"
+        ACCEPT = "accept", "Request accepted"
+        DECLINE = "decline", "Request declined"
+        GRANT = "grant", "Ownership granted"
+
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending"
+        INBOX = "inbox", "Inbox owns delivery"
+        SUPPRESSED = "suppressed", "Suppressed"
+        STANDALONE_OFFLINE = "standalone_offline", "Offline in standalone mode"
+        ATTEMPTING = "attempting", "Standalone claim"
+        FALLBACK_DELIVERED = "fallback_delivered", "Delivered standalone"
+        UNCERTAIN = "uncertain", "Standalone write started without confirmation"
+
+    character = models.ForeignKey("objects.ObjectDB", on_delete=models.CASCADE, related_name="+")
+    plot = models.ForeignKey(PlotThread, on_delete=models.CASCADE, related_name="+")
+    thread = models.ForeignKey(StoryThread, null=True, on_delete=models.CASCADE, related_name="+")
+    owner = models.ForeignKey(PlotOwner, null=True, on_delete=models.CASCADE, related_name="+")
+    actor_id = models.PositiveBigIntegerField()
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    event_key = models.CharField(max_length=96)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    state = models.CharField(max_length=24, choices=State.choices, default=State.PENDING)
+    suppressed_accounts = models.JSONField(default=list)
+    claim = models.UUIDField(null=True)
+    last_attempt = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [  # noqa: RUF012
+            models.UniqueConstraint(
+                fields=["character", "event_key"], name="plots_notice_character_event"
+            )
+        ]
+        indexes = [  # noqa: RUF012
+            models.Index(
+                fields=["character", "state", "last_attempt", "id"],
+                name="plots_notice_pending",
+            )
+        ]

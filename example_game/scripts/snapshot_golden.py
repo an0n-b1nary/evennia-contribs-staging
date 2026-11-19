@@ -75,6 +75,7 @@ def build(scratch):
         emit_demo_notices,
         emit_lore_demo_notices,
         emit_moderation_demo_notices,
+        emit_plot_demo_notice,
         emit_social_demo_notice,
     )
 
@@ -92,6 +93,7 @@ def build(scratch):
     emit_calendar_demo_notices(admin, character)
     emit_lore_demo_notices(admin, character)
     emit_moderation_demo_notices(admin, character)
+    emit_plot_demo_notice(admin, character, golden=True)
     emit_social_demo_notice(admin, character, golden=True)
     connections.close_all()
 

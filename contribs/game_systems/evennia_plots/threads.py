@@ -34,13 +34,16 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from evennia_plots.models import (
+    PlotNoticeReceipt,
     PlotOwner,
     PlotThread,
     StoryThread,
     StoryThreadAnswerVersion,
     StoryThreadInterest,
     ThreadLink,
+    with_plot_writer,
 )
+from evennia_plots.notices import record
 from evennia_plots.permissions import is_plot_staff
 
 TITLE_MAX = 200
@@ -76,18 +79,11 @@ def _note_staff(plot, actor, action, detail=""):
         plot.log_staff_action(actor, action, detail)
 
 
-def _notify(characters, text, skip=None):
-    for character in characters:
-        if character is None or (skip is not None and character.pk == skip.pk):
-            continue
-        try:
-            character.msg(text)
-        except Exception:
-            continue
-
-
-def _owners(plot):
-    return [owner.character for owner in plot.owners.select_related("character")]
+def _locked_thread(plot, thread_id):
+    try:
+        return StoryThread.objects.select_for_update().get(plot_id=plot.pk, pk=thread_id)
+    except StoryThread.DoesNotExist as exc:
+        raise ThreadError("This thread no longer exists.") from exc
 
 
 def _require_manager(plot, actor, what):
@@ -161,23 +157,22 @@ def can_read_answer(thread, character):
     return thread.sealed_answer_revealed and thread.plot.can_view(character)
 
 
-def visible_threads(plot, character):
-    """The plot's threads *character* may see, in number order.
+def can_view_thread(thread, character, *, manages=None):
+    """Check thread-level visibility after the viewer passes plot access."""
+    if thread.status not in (StoryThread.Status.REQUESTED, StoryThread.Status.DECLINED):
+        return True
+    if character is None:
+        return False
+    if thread.created_by_id == character.pk:
+        return True
+    return thread.plot.can_manage(character) if manages is None else manages
 
-    Every thread title is public to anyone who can see the plot (there are no
-    hidden threads). Pending and declined requests are shown only to the
-    plot's managers and to the requester, to keep the plot page uncluttered.
-    """
+
+def visible_threads(plot, character):
+    """The plot's threads *character* may see, in number order."""
     threads = plot.story_threads.select_related("plot", "carried_to__plot").order_by("number")
-    if character is not None and plot.can_manage(character):
-        return list(threads)
-    pending = (StoryThread.Status.REQUESTED, StoryThread.Status.DECLINED)
-    return [
-        thread
-        for thread in threads
-        if thread.status not in pending
-        or (character is not None and thread.created_by_id == character.pk)
-    ]
+    manages = character is not None and plot.can_manage(character)
+    return [thread for thread in threads if can_view_thread(thread, character, manages=manages)]
 
 
 def available_actions(thread, character):
@@ -231,6 +226,18 @@ def add_thread(plot, actor, title, detail=""):
     """
     title = _clean(title, TITLE_MAX, "title")
     detail = _clean(detail, DETAIL_MAX, "detail", required=False)
+    for _attempt in range(3):
+        try:
+            return with_plot_writer(
+                plot.pk, lambda current: _add_thread_locked(current, actor, title, detail)
+            )
+        except IntegrityError:
+            # Other thread writers can still race the public number allocation.
+            continue
+    raise ThreadError("Someone else added a thread at the same moment. Try again.")
+
+
+def _add_thread_locked(plot, actor, title, detail):
     if can_add_directly(plot, actor):
         status = StoryThread.Status.OPEN
     elif can_request(plot, actor):
@@ -242,32 +249,23 @@ def add_thread(plot, actor, title, detail=""):
     else:
         raise ThreadError(f"You can't add threads to plot #{plot.plot_number}.")
 
-    for _attempt in range(3):
-        try:
-            with transaction.atomic():
-                thread = StoryThread.objects.create(
-                    plot=plot,
-                    number=StoryThread.next_number(plot),
-                    title=title,
-                    detail=detail,
-                    status=status,
-                    created_by=actor,
-                    created_by_name=_name(actor),
-                )
-            break
-        except IntegrityError:
-            continue
-    else:
-        raise ThreadError("Someone else added a thread at the same moment. Try again.")
-
+    thread = StoryThread.objects.create(
+        plot=plot,
+        number=StoryThread.next_number(plot),
+        title=title,
+        detail=detail,
+        status=status,
+        created_by=actor,
+        created_by_name=_name(actor),
+    )
     if status == StoryThread.Status.REQUESTED:
-        _notify(
-            _owners(plot),
-            f"|y[Plot]|n {_name(actor)} asks to open thread {thread.ref} on "
-            f"|w{plot.name}|n: {thread.title}\n"
-            f"Accept with |w+thread/accept {thread.ref}|n or decline with "
-            f"|w+thread/decline {thread.ref}=<reason>|n.",
-            skip=actor,
+        owners = plot.owners.exclude(character=None).select_related("character")
+        record(
+            PlotNoticeReceipt.Kind.REQUEST,
+            plot,
+            actor,
+            [(owner.character, owner) for owner in owners],
+            thread=thread,
         )
     else:
         _note_staff(plot, actor, "added thread", f"{thread.ref} {thread.title}")
@@ -275,52 +273,64 @@ def add_thread(plot, actor, title, detail=""):
 
 
 def accept(thread, actor):
-    plot = thread.plot
-    _require_manager(plot, actor, "accept thread requests")
-    _require_status(thread, StoryThread.Status.REQUESTED, what="only requests can be accepted")
-    if plot.status not in _PLOT_LIVE:
-        raise ThreadError(f"Plot #{plot.plot_number} is {plot.get_status_display().lower()}.")
-    thread.status = StoryThread.Status.OPEN
-    thread.decided_by = actor
-    thread.decided_by_name = _name(actor)
-    thread.save(update_fields=["status", "decided_by", "decided_by_name", "updated_at"])
-    _note_staff(plot, actor, "accepted thread request", f"{thread.ref} {thread.title}")
-    _notify(
-        [thread.created_by],
-        f"|y[Plot]|n Your thread {thread.ref} on |w{plot.name}|n was accepted: {thread.title}",
-        skip=actor,
-    )
-    return thread
+    return _decide(thread, actor, StoryThread.Status.OPEN)
 
 
 def decline(thread, actor, reason=""):
-    plot = thread.plot
-    _require_manager(plot, actor, "decline thread requests")
-    _require_status(thread, StoryThread.Status.REQUESTED, what="only requests can be declined")
-    thread.status = StoryThread.Status.DECLINED
-    thread.decline_reason = _clean(reason, DECLINE_REASON_MAX, "reason", required=False)
-    thread.decided_by = actor
-    thread.decided_by_name = _name(actor)
-    thread.save(
-        update_fields=["status", "decline_reason", "decided_by", "decided_by_name", "updated_at"]
-    )
-    _note_staff(plot, actor, "declined thread request", f"{thread.ref} {thread.title}")
-    because = f" ({thread.decline_reason})" if thread.decline_reason else ""
-    _notify(
-        [thread.created_by],
-        f"|y[Plot]|n Your thread request {thread.ref} on |w{plot.name}|n was declined{because}.",
-        skip=actor,
-    )
+    return _decide(thread, actor, StoryThread.Status.DECLINED, reason)
+
+
+def _decide(thread, actor, status, reason=""):
+    def decide(plot):
+        current = _locked_thread(plot, thread.pk)
+        current.plot = plot
+        accepted = status == StoryThread.Status.OPEN
+        verb = "accept" if accepted else "decline"
+        action = "accepted" if accepted else "declined"
+        _require_manager(plot, actor, f"{verb} thread requests")
+        _require_status(
+            current, StoryThread.Status.REQUESTED, what=f"only requests can be {action}"
+        )
+        if accepted and plot.status not in _PLOT_LIVE:
+            raise ThreadError(f"Plot #{plot.plot_number} is {plot.get_status_display().lower()}.")
+
+        current.status = status
+        current.decided_by = actor
+        current.decided_by_name = _name(actor)
+        fields = ["status", "decided_by", "decided_by_name", "updated_at"]
+        if not accepted:
+            current.decline_reason = _clean(reason, DECLINE_REASON_MAX, "reason", required=False)
+            fields.append("decline_reason")
+        current.save(update_fields=fields)
+        _note_staff(plot, actor, f"{action} thread request", f"{current.ref} {current.title}")
+        kind = PlotNoticeReceipt.Kind.ACCEPT if accepted else PlotNoticeReceipt.Kind.DECLINE
+        record(kind, plot, actor, [(current.created_by, None)], thread=current)
+        return current, fields
+
+    current, fields = with_plot_writer(thread.plot_id, decide)
+    for field in fields:
+        setattr(thread, field, getattr(current, field))
+    thread.plot = current.plot
     return thread
 
 
 def withdraw(thread, actor):
     """Delete the actor's own pending request. Nothing else is preserved."""
-    _require_status(thread, StoryThread.Status.REQUESTED, what="only requests can be withdrawn")
-    if actor is None or thread.created_by_id != actor.pk:
-        raise ThreadError("Only the character who asked can withdraw a request.")
-    ref = thread.ref
-    thread.delete()
+
+    def delete_request(plot):
+        current = _locked_thread(plot, thread.pk)
+        current.plot = plot
+        _require_status(
+            current, StoryThread.Status.REQUESTED, what="only requests can be withdrawn"
+        )
+        if actor is None or current.created_by_id != actor.pk:
+            raise ThreadError("Only the character who asked can withdraw a request.")
+        ref = current.ref
+        current.delete()
+        return ref
+
+    ref = with_plot_writer(thread.plot_id, delete_request)
+    thread.pk = None
     return ref
 
 
@@ -604,6 +614,10 @@ def carry(thread, actor, target):
 
 
 def add_owner(plot, actor, character):
+    return with_plot_writer(plot.pk, lambda current: _add_owner_locked(current, actor, character))
+
+
+def _add_owner_locked(plot, actor, character):
     _require_manager(plot, actor, "add owners")
     if plot.is_owner(character):
         raise ThreadError(f"{character.key} already owns plot #{plot.plot_number}.")
@@ -615,15 +629,17 @@ def add_owner(plot, actor, character):
         added_by_name=_name(actor),
     )
     _note_staff(plot, actor, "added owner", character.key)
-    _notify(
-        [character],
-        f"|y[Plot]|n {_name(actor)} made you an owner of |w{plot.name}|n (#{plot.plot_number}).",
-        skip=actor,
-    )
+    record(PlotNoticeReceipt.Kind.GRANT, plot, actor, [(character, owner)])
     return owner
 
 
 def remove_owner(plot, actor, character):
+    return with_plot_writer(
+        plot.pk, lambda current: _remove_owner_locked(current, actor, character)
+    )
+
+
+def _remove_owner_locked(plot, actor, character):
     _require_manager(plot, actor, "remove owners")
     owner = plot.owners.filter(character=character).first()
     if owner is None:

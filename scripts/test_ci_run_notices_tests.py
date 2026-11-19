@@ -217,3 +217,36 @@ class NoticeRunnerTests(unittest.TestCase):
             self.assertNotIn(
                 "evennia_social.tests.test_page_notice_concurrency", run.call_args.args[0]
             )
+
+    def test_minimal_plots_verifies_package_and_collects_standalone_tests(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            with (
+                patch.object(
+                    runner,
+                    "find_spec",
+                    side_effect=lambda name: (
+                        object() if name in {"evennia_links", "evennia_plots"} else None
+                    ),
+                ),
+                patch.object(runner, "check_plots_metadata") as package_check,
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(
+                    runner.subprocess,
+                    "run",
+                    return_value=Mock(returncode=0, stdout="Ran 7 tests\nOK"),
+                ) as run,
+            ):
+                self.assertEqual(runner.main([str(game), "--minimal-plots"]), 0)
+            package_check.assert_called_once_with()
+            namespace = {"INSTALLED_APPS": []}
+            settings = (game / "server/conf/notices_test_settings.py").read_text()
+            exec(settings.partition("\n")[2], namespace)
+            self.assertEqual(namespace["INSTALLED_APPS"], ["evennia_links", "evennia_plots"])
+            self.assertIn("PlotNoticeSource", namespace["LINKS_NOTICE_SOURCES"]["plots"])
+            self.assertIn(
+                "evennia_plots.test_notice_adapter.StandalonePlotNoticeTests", run.call_args.args[0]
+            )
+            self.assertNotIn("evennia_plots.test_notice_concurrency", run.call_args.args[0])
