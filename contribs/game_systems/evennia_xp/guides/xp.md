@@ -15,7 +15,7 @@ The website has the same on its XP page, with a breakdown by source.
 
 ## When it's paid
 
-The weekly payout adds up everything you did since the last one. The next time you log in afterwards, you'll see a short summary of what each source paid. A week with nothing to pay shows nothing.
+The weekly payout adds up everything you did since the last one. Look in `+notices` for a breakdown of what each source paid. In Notices preferences you can also choose an immediate alert or turn XP alerts off. Games without XP Inbox alerts show the latest payout the first time you play that character after it is paid. A week with nothing to pay shows nothing.
 
 `+xp` shows what you've earned so far this week before it's paid. It's an estimate: staff review can still take a flagged item out before the payout.
 

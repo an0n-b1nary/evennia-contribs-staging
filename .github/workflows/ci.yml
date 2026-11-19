@@ -830,6 +830,18 @@ jobs:
           --absent evennia_notices --absent evennia_social
           --absent evennia_accessibility --absent evennia_boards
           --absent evennia_calendar --absent evennia_scenes --absent evennia_maps
+      - name: Minimal independent XP source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/game_systems/evennia_xp --
+          python scripts/ci_run_notices_tests.py {game} --minimal-xp
+      - name: Populated XP source upgrade and Inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_xp_notices_upgrade.py {game}
+          --base 2c5286e8223e47c43d25a5a7946180af8c90fe08
       - name: Populated Plots source upgrade and Inbox removal
         if: ${{ !cancelled() }}
         run: >-

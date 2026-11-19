@@ -2137,3 +2137,9 @@ private example with a pending thread for your selected character. Open its
 thread with the command in the notice. Reading or clearing it leaves the
 example thread pending, and repeating the opt-in keeps the same example.
 `+sandbox/reset` deletes the example plot with the rest of the seeded world.
+
+The `xp` source shows each paid week's grouped XP breakdown in the exact
+character's Inbox. Choose immediate, summary, or off in Notices preferences.
+When Inbox is disabled or absent, the character hook shows the latest eligible
+payout on first puppet. `+xp` always shows the balance and history. The golden
+builder pays its synthetic character to demonstrate the alert.

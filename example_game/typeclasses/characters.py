@@ -23,10 +23,8 @@ Mixin order matters: `SocialCharacterMixin` must come *before*
 processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
 "Layering with evennia-social".
 
-- `at_post_puppet` override — calls `evennia_xp.summary.notify_xp_summary`
-  rather than mixing in `XPSummaryCharacterMixin`, because evennia_xp is an
-  optional RP partner here (`ci_run_rp_sandbox_tests.py --absent evennia_xp`)
-  and a mixin would have to be imported unconditionally.
+- `at_post_puppet` calls `evennia_xp.summary.notify_xp_summary` for Inbox
+  recovery or standalone delivery when the optional XP app is installed.
 
 - `get_display_desc` / `filter_visible` overrides — call evennia_rp_equipment's
   display helpers (worn lines in the description, worn items out of "You see")

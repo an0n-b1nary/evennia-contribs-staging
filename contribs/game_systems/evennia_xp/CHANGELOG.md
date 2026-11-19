@@ -11,6 +11,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 
+## [0.6.1] - 2026-11-18
+
+- Route eligible weekly XP summaries to an optionally configured Inbox. Standalone games keep first-puppet delivery. Each paid character-week keeps its routing state across Inbox read, clear, and configuration changes.
+
 ## [0.6.0] - 2026-10-22
 
 - Breaking: manual grants use `+xp/grant <character>=<amount> # <reason>`. Reject the old colon form and invalid or stacked switches; retain unique switch prefixes and case-insensitive matching.

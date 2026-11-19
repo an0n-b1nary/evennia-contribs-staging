@@ -1129,17 +1129,22 @@ def _award_for_summary(char, amount, source_type, ref_id, week="2026-W18"):
     )
 
 
+@override_settings(NOTICES_ENABLED=False)
 class TestNotifyXpSummary(EvenniaTest):
     """The first-login summary, ported from the source project's suite."""
 
     def setUp(self):
         super().setUp()
+        self.account.characters.add(self.char1)
+        self.session.puppet = self.char1
         self.char1.msg = MagicMock()
 
     def _notify(self):
         from evennia_xp.summary import notify_xp_summary
 
-        return notify_xp_summary(self.char1)
+        with self.captureOnCommitCallbacks() as callbacks:
+            notify_xp_summary(self.char1)
+        return callbacks[0]()
 
     def _output(self):
         return self.char1.msg.call_args[0][0]
@@ -1202,8 +1207,8 @@ class TestNotifyXpSummary(EvenniaTest):
     def test_silent_when_already_seen(self):
         from evennia_xp.summary import SUMMARY_WEEK_ATTRIBUTE
 
-        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 6001)
         self.char1.attributes.add(SUMMARY_WEEK_ATTRIBUTE, "2026-W18")
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 6001)
         self.assertFalse(self._notify())
         self.char1.msg.assert_not_called()
 
@@ -1221,15 +1226,27 @@ class TestNotifyXpSummary(EvenniaTest):
         self.assertNotIn("•", output)
         self.assertIn("RP Session: +1.00", output)
 
-    def test_a_failure_is_logged_not_raised_and_retried_next_login(self):
+    def test_started_socket_failure_is_never_replayed(self):
+        from evennia_xp.models import XPNoticeReceipt
         from evennia_xp.summary import SUMMARY_WEEK_ATTRIBUTE
 
         _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 9001)
-        self.char1.msg.side_effect = RuntimeError("session went away")
-        with patch("evennia_xp.summary.logger.log_trace") as trace:
-            self.assertFalse(self._notify())
-        trace.assert_called_once()
+        self.char1.msg.side_effect = RuntimeError("write failed")
+        self.assertFalse(self._notify())
         self.assertIsNone(self.char1.attributes.get(SUMMARY_WEEK_ATTRIBUTE))
+        self.assertEqual(XPNoticeReceipt.objects.get().state, XPNoticeReceipt.State.UNCERTAIN)
+        self.char1.msg.reset_mock(side_effect=True)
+        self.assertFalse(self._notify())
+        self.char1.msg.assert_not_called()
+
+    def test_render_failure_stays_pending_and_retries_at_next_puppet(self):
+        from evennia_xp.models import XPNoticeReceipt
+
+        _award_for_summary(self.char1, Decimal("1.00"), XPLog.SourceType.RP_SESSION, 9002)
+        with patch("evennia_xp.notices.summary_text", side_effect=RuntimeError("render failed")):
+            self.assertFalse(self._notify())
+        self.assertEqual(XPNoticeReceipt.objects.get().state, XPNoticeReceipt.State.PENDING)
+        self.assertTrue(self._notify())
 
 
 class TestXPSummaryCharacterMixin(EvenniaTest):

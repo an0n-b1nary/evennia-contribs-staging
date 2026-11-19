@@ -61,7 +61,12 @@ def main(argv=None):
     selection.add_argument("--minimal-moderation", action="store_true")
     selection.add_argument("--minimal-social", action="store_true")
     selection.add_argument("--minimal-plots", action="store_true")
+    selection.add_argument("--minimal-xp", action="store_true")
     args = parser.parse_args(argv)
+    if args.minimal_xp:
+        args.absent = sorted(
+            set(args.absent) | {"evennia_links", "evennia_notices", "evennia_accessibility"}
+        )
     for name in args.absent:
         if find_spec(name) is not None:
             parser.error(f"{name} remains importable; create a fresh excluded profile")
@@ -75,6 +80,14 @@ def main(argv=None):
     settings = game / "server/conf/settings.py"
     if not settings.is_file():
         parser.error("Supply an initialized disposable game")
+    if args.minimal_xp:
+        (game / "server/conf/notices_test_settings.py").write_text(
+            "from server.conf.settings import *\n"
+            + "\nif 'evennia_xp' not in INSTALLED_APPS: INSTALLED_APPS += ['evennia_xp']\n"
+            + f"XP_ABSENT_PARTNERS = {args.absent!r}\n"
+            + "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
+        )
+        return run_suite(game, ["evennia_xp.test_notice_standalone"])
     shutil.copyfile(
         Path(__file__).with_name("ci_notices_partner_tests.py"),
         game / "ci_notices_partner_tests.py",
@@ -108,6 +121,8 @@ def main(argv=None):
         sources["social-pages"] = "evennia_social.integrations.notices.SocialPageNoticeSource"
     if find_spec("evennia_plots") is not None:
         sources["plots"] = "evennia_plots.integrations.notices.PlotNoticeSource"
+    if find_spec("evennia_xp") is not None:
+        sources["xp"] = "evennia_xp.integrations.notices.XPNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
@@ -159,6 +174,14 @@ def main(argv=None):
             labels.extend(
                 ["evennia_plots.test_notice_adapter", "evennia_plots.test_notice_concurrency"]
             )
+    if find_spec("evennia_xp") is not None:
+        labels.append("evennia_xp.test_notice_standalone")
+        if find_spec("evennia_notices") is not None:
+            labels.extend(["evennia_xp.test_notice_inbox", "evennia_xp.test_notice_concurrency"])
+    return run_suite(game, labels)
+
+
+def run_suite(game, labels):
     result = subprocess.run(
         [shutil.which("evennia"), "test", "--settings=notices_test_settings.py", *labels],
         cwd=game,

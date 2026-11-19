@@ -11,10 +11,8 @@ they see what they earned that week, grouped by source::
       • RP Session (+2.50)
     Use +xp to view your balance and history.
 
-The comparison is ``CharacterXP.last_payout_week`` (the most recent batch that
-paid this character) against the character's ``last_xp_summary_week``
-Attribute (the most recent week it was shown). They differ exactly once per
-paying batch, so the summary never repeats and a quiet week shows nothing.
+With a configured Inbox, each paid week is a routine XP notice. Otherwise
+the current eligible payout is shown on the first eligible puppet.
 
 Two ways to wire it:
 
@@ -34,6 +32,7 @@ Two ways to wire it:
 
 from decimal import Decimal
 
+from django.db.models import Sum
 from evennia.utils import logger
 
 try:
@@ -50,57 +49,46 @@ except ImportError:
 SUMMARY_WEEK_ATTRIBUTE = "last_xp_summary_week"
 
 
-def notify_xp_summary(character):
-    """Show *character* its XP summary if a batch has paid it since it last saw one.
+def grouped_totals(character_id, weeks):
+    """Load only displayable ledger fields in a single query for this character."""
+    from .models import XPLog
 
-    Never raises: a failure here must not break login, so any error is logged
-    and the summary skipped (the week is then *not* marked seen, so the next
-    login retries).
-
-    Args:
-        character: The puppeted character (anything with ``pk``, ``msg`` and
-            ``attributes``).
-
-    Returns:
-        bool: True if a summary was shown.
-    """
-    try:
-        return _notify(character)
-    except Exception:
-        logger.log_trace(f"evennia_xp: XP summary notification failed for #{character.pk}")
-        return False
-
-
-def _notify(character):
-    from evennia_xp.models import CharacterXP, XPLog
-
-    payout_week = (
-        CharacterXP.objects.filter(character_id=character.pk)
-        .values_list("last_payout_week", flat=True)
-        .first()
+    by_week = {}
+    labels = dict(XPLog.SourceType.choices)
+    rows = (
+        XPLog.objects.filter(character_id=character_id, week__in=weeks)
+        .order_by()
+        .values("week", "source_type")
+        .annotate(amount=Sum("amount"))
     )
-    if not payout_week or payout_week == character.attributes.get(SUMMARY_WEEK_ATTRIBUTE):
-        return False
+    for row in rows:
+        sources = by_week.setdefault(row["week"], {})
+        label = labels.get(row["source_type"], "Other XP")
+        sources[label] = sources.get(label, Decimal("0.00")) + row["amount"].quantize(
+            Decimal("0.01")
+        )
+    return by_week
 
-    logs = XPLog.objects.filter(character_id=character.pk, week=payout_week)
-    by_source = {}
-    total = Decimal("0.00")
-    for row in logs:
-        label = row.get_source_type_display()
-        by_source[label] = by_source.get(label, Decimal("0.00")) + row.amount
-        total += row.amount
-    if not by_source:
-        return False
 
-    if uses_screenreader(character):
-        lines = [f"XP awarded for week {payout_week}: {total} XP total"]
+def summary_text(week, by_source, *, plain=False):
+    total = sum(by_source.values(), Decimal("0.00"))
+    if plain:
+        lines = [f"XP awarded for week {week}: {total} XP total"]
         lines += [f"  {source}: +{amount}" for source, amount in sorted(by_source.items())]
         lines.append("Use +xp to view your balance and history.")
     else:
-        lines = [f"|wXP awarded for week {payout_week}:|n {total} XP total"]
+        lines = [f"|wXP awarded for week {week}:|n {total} XP total"]
         lines += [f"  |w•|n {source} (+{amount})" for source, amount in sorted(by_source.items())]
         lines.append("|xUse |w+xp|n|x to view your balance and history.|n")
+    return "\n".join(lines)
 
-    character.msg("\n".join(lines))
-    character.attributes.add(SUMMARY_WEEK_ATTRIBUTE, payout_week)
-    return True
+
+def notify_xp_summary(character):
+    """Prepare this character's payout. Return True for a confirmed standalone write."""
+    from .notices import prepare_character
+
+    try:
+        return prepare_character(character)
+    except Exception:
+        logger.log_trace(f"evennia_xp: XP summary notification failed for #{character.pk}")
+        return False

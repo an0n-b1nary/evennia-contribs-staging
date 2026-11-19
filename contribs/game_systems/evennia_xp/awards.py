@@ -96,6 +96,7 @@ def record_xp(
         XPLog instance if a new row was created, None if already awarded.
     """
     from evennia_xp.models import CharacterXP, XPLog
+    from evennia_xp.notices import reserve_writer, stage_award
     from evennia_xp.signals import xp_awarded
 
     amount = Decimal(str(amount))
@@ -107,11 +108,11 @@ def record_xp(
     if not week:
         week = _current_week()
 
-    name = _resolve_character_name(character_id, fallback=character_name)
-
     is_manual = source_type == XPLog.SourceType.MANUAL_GRANT
 
     with transaction.atomic():
+        reserve_writer()
+        name = _resolve_character_name(character_id, fallback=character_name)
         if is_manual:
             log = XPLog.objects.create(
                 character_id=character_id,
@@ -146,21 +147,16 @@ def record_xp(
         if not created:
             return None
 
-        # Update (or create) the CharacterXP aggregate row.
-        rows_updated = CharacterXP.objects.filter(character_id=character_id).update(
+        aggregate, _ = CharacterXP.objects.select_for_update().get_or_create(
+            character_id=character_id,
+            defaults={"character_name": name},
+        )
+        stage_award(aggregate, log)
+        CharacterXP.objects.filter(pk=aggregate.pk).update(
             total_earned=F("total_earned") + amount,
             current_balance=F("current_balance") + amount,
             last_payout_week=week,
         )
-        if not rows_updated:
-            CharacterXP.objects.create(
-                character_id=character_id,
-                character_name=name,
-                total_earned=amount,
-                total_spent=Decimal("0.00"),
-                current_balance=amount,
-                last_payout_week=week,
-            )
 
     xp_awarded.send(
         sender=XPLog,
