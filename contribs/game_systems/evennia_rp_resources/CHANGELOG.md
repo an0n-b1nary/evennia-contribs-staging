@@ -5,6 +5,11 @@
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - Teach natural resource amounts in economy offers and keep invalid payout numbers readable.
 
+## [0.3.1] - 2026-11-19
+
+- Route weekly gathering and paid plot awards to the optional Inbox, with character-only visibility, quiet full-store weeks, and first-puppet summaries when Inbox is unavailable.
+- Preserve award and delivery records across upgrades and backend changes. Hide unrevealed awards and private plot details from Inbox text and counts according to current access.
+
 ## [0.3.0] - 2026-10-22
 
 - Breaking: grants and spending use `<character>=<quantity> <resource> [# note]`; plot payout proposals use `<plot>=<quantity> <resource>`. Reject the old comma forms and invalid or stacked switches, retaining unique prefixes and the existing audit and payout approval services.

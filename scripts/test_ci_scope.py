@@ -99,6 +99,9 @@ class SelectJobsTests(unittest.TestCase):
 
     def test_xp_upgrade_runner_selects_notice_partners(self):
         self.assertEqual(self.select("scripts/ci_run_xp_notices_upgrade.py"), ["notices-partners"])
+        self.assertEqual(
+            self.select("scripts/ci_run_resources_notices_upgrade.py"), ["notices-partners"]
+        )
 
     def test_social_page_upgrade_runner_selects_notice_partners(self):
         self.assertEqual(

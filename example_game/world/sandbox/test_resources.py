@@ -3,6 +3,7 @@
 """Actual maps/social/login seams, and fresh-process partner absence checks."""
 
 from importlib.util import find_spec
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.apps import apps
@@ -50,9 +51,21 @@ class ResourceSeams(EvenniaTest):
             self.assertNotIn("Gathering", CmdFinger._format_profile(self.char2, self.char2))
             self.assertIn("Gathering", CmdFinger._format_profile(self.char1, self.char2))
 
+    @override_settings(NOTICES_ENABLED=False)
     def test_login_hook_shows_summary_once(self):
+        from evennia_rp_resources import notices
+
+        self.char2.account = self.account2
+        self.account2.characters.add(self.char2)
+        session = SimpleNamespace(
+            logged_in=True, get_account=lambda: self.account2, get_puppet=lambda: self.char2
+        )
         run_weekly_batch("2026-W40", characters=[self.char2])
-        with patch.object(self.char2, "msg") as msg:
+        with (
+            patch.object(notices, "_registered_sessions", return_value=[session]),
+            patch.object(self.char2, "msg") as msg,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             self.char2.at_post_puppet()
             self.char2.at_post_puppet()
         summaries = [
@@ -83,3 +96,32 @@ class ResourceSeams(EvenniaTest):
         result = run_weekly_batch("2026-W40", characters=[self.char2])
         self.assertEqual(result["errors"], [])
         self.assertEqual(total_held(self.char2), 3)
+
+    @override_settings(ROOT_URLCONF="world.sandbox.test_notices")
+    def test_inbox_renders_weekly_award_for_only_the_selected_character(self):
+        from importlib import import_module
+
+        from django.test import RequestFactory
+
+        from evennia_notices import views
+        from evennia_notices.models import Notice
+        from evennia_rp_resources.models import ResourceNoticeReceipt
+
+        self.account2.characters.add(self.char2)
+        with self.captureOnCommitCallbacks(execute=True):
+            result = run_weekly_batch("sandbox-notice-test", characters=[self.char2])
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(ResourceNoticeReceipt.objects.get().state, "transferred")
+        notice = Notice.objects.get(source="resources")
+        request = RequestFactory().get("/notices/")
+        request.user = self.account2
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        self.assertNotContains(views.inbox(request).render(), "This week you gathered")
+        request.session["puppet"] = self.char2.pk
+        self.assertContains(views.inbox(request).render(), "This week you gathered")
+        self.assertContains(
+            views.detail(request, notice.public_ref).render(), "This week you gathered"
+        )
+        self.assertContains(views.preferences(request).render(), "RP Resources")
+        with override_settings(RP_RESOURCES_REVEALED=False):
+            self.assertNotContains(views.inbox(request).render(), "This week you gathered")

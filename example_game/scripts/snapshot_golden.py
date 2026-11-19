@@ -112,6 +112,35 @@ def build(scratch):
         state=XPNoticeReceipt.State.TRANSFERRED,
     ).exists():
         raise ValueError("Golden XP payout did not reach Inbox")
+    from evennia_links.guests import is_guest
+    from evennia_links.notices import NoticeContext, authorize_context
+    from evennia_links.runtime import get
+    from evennia_notices.services import project
+    from evennia_rp_resources.batch import run_weekly_batch
+    from evennia_rp_resources.models import ResourceNoticeReceipt
+
+    context = NoticeContext(admin, character)
+    if (
+        admin.pk != 1
+        or not admin.is_superuser
+        or is_guest(character)
+        or not authorize_context(context)
+        or not get("RP_RESOURCES_REVEALED")
+    ):
+        raise ValueError("Golden Resources award requires the revealed sandbox admin character")
+    period = "sandbox-notice-example"
+    report = run_weekly_batch(period, characters=[character])
+    if (
+        report["errors"]
+        or not ResourceNoticeReceipt.objects.filter(
+            character=character, weekly__week=period, state=ResourceNoticeReceipt.State.TRANSFERRED
+        ).exists()
+        or not any(
+            item.notice.source == "resources" and "This week you gathered" in item.text
+            for item in project(context)
+        )
+    ):
+        raise ValueError("Golden Resources award did not reach the rendered Inbox")
     connections.close_all()
 
 
