@@ -7,10 +7,45 @@ import importlib.metadata
 import shutil
 import subprocess
 import sys
+import tempfile
+from email import message_from_bytes
 from importlib.util import find_spec
 from pathlib import Path
+from zipfile import ZipFile
 
 from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
+
+
+def check_plots_metadata():
+    """Exercise the real wheel and editable metadata outside the inventory tree."""
+    source = Path(__file__).resolve().parents[1] / "contribs/game_systems/evennia_plots"
+    installed = importlib.metadata.distribution("evennia-plots")
+    expected = {"evennia>=6.0", "evennia-links>=0.8.15"}
+
+    def dependencies(requirements):
+        return {item for item in requirements if ";" not in item}
+
+    if dependencies(installed.requires or ()) != expected:
+        raise ValueError("Installed Plots dependencies differ from the minimal profile")
+    with tempfile.TemporaryDirectory(prefix="plots-wheel-") as temporary:
+        scratch = Path(temporary)
+        copy = scratch / "source"
+        shutil.copytree(source, copy, ignore=shutil.ignore_patterns("*.egg-info", "__pycache__"))
+        uv = shutil.which("uv")
+        command = (
+            [uv, "build", "--wheel", "--out-dir", str(scratch), str(copy)]
+            if uv
+            else [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(scratch), str(copy)]
+        )
+        subprocess.run(command, check=True, stdin=subprocess.DEVNULL)
+        (wheel,) = scratch.glob("evennia_plots-*.whl")
+        with ZipFile(wheel) as contents:
+            (meta,) = [name for name in contents.namelist() if name.endswith(".dist-info/METADATA")]
+            built = message_from_bytes(contents.read(meta))
+            if dependencies(built.get_all("Requires-Dist", [])) != expected:
+                raise ValueError("Plots wheel dependencies differ from the minimal profile")
+            if "evennia_plots/integrations/notices.py" not in contents.namelist():
+                raise ValueError("Plots wheel is missing its notice source")
 
 
 def main(argv=None):
@@ -25,6 +60,7 @@ def main(argv=None):
     selection.add_argument("--minimal-lore", action="store_true")
     selection.add_argument("--minimal-moderation", action="store_true")
     selection.add_argument("--minimal-social", action="store_true")
+    selection.add_argument("--minimal-plots", action="store_true")
     args = parser.parse_args(argv)
     for name in args.absent:
         if find_spec(name) is not None:
@@ -56,6 +92,9 @@ def main(argv=None):
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_jobs', 'evennia_moderation']\n"
     elif args.minimal_social:
         extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_posing', 'evennia_social']\n"
+    elif args.minimal_plots:
+        extras = "\nINSTALLED_APPS += ['evennia_links', 'evennia_plots']\n"
+        check_plots_metadata()
     sources = {"fixture": "ci_notices_partner_tests.FixtureSource"}
     if find_spec("evennia_boards") is not None:
         sources["boards"] = "evennia_boards.integrations.notices.BoardNoticeSource"
@@ -67,6 +106,8 @@ def main(argv=None):
         sources["moderation"] = "evennia_moderation.integrations.notices.ModerationNoticeSource"
     if find_spec("evennia_social") is not None:
         sources["social-pages"] = "evennia_social.integrations.notices.SocialPageNoticeSource"
+    if find_spec("evennia_plots") is not None:
+        sources["plots"] = "evennia_plots.integrations.notices.PlotNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
@@ -110,6 +151,13 @@ def main(argv=None):
                     "evennia_social.tests.test_page_notices",
                     "evennia_social.tests.test_page_notice_concurrency",
                 ]
+            )
+    if find_spec("evennia_plots") is not None:
+        if find_spec("evennia_notices") is None:
+            labels.append("evennia_plots.test_notice_adapter.StandalonePlotNoticeTests")
+        else:
+            labels.extend(
+                ["evennia_plots.test_notice_adapter", "evennia_plots.test_notice_concurrency"]
             )
     result = subprocess.run(
         [shutil.which("evennia"), "test", "--settings=notices_test_settings.py", *labels],

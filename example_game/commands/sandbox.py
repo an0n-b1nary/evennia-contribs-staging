@@ -118,6 +118,7 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
                 emit_demo_notices,
                 emit_lore_demo_notices,
                 emit_moderation_demo_notices,
+                emit_plot_demo_notice,
                 emit_social_demo_notice,
                 resolve_demo_offer,
             )
@@ -131,11 +132,14 @@ class CmdSandbox(StrictSwitchMixin, MuxCommand):
                     emit_calendar_demo_notices(context.account, context.character)
                     emit_lore_demo_notices(context.account, context.character)
                     emit_moderation_demo_notices(context.account, context.character)
+                    emit_plot_demo_notice(
+                        context.account, context.character, session=context.session
+                    )
                     emit_social_demo_notice(
                         context.account, context.character, session=context.session
                     )
                     self.msg(
-                        "Example notices ready. Use +notices. Moderation examples belong to your account across characters. Social examples use page/last. Lore examples use +lore/read; Calendar examples use +rsvp; simulated offers use +sandbox/notice-confirm or /notice-decline."
+                        "Example notices ready. Use +notices. Moderation examples belong to your account across characters. Social examples use page/last. Plot examples use +thread. Lore examples use +lore/read; Calendar examples use +rsvp; simulated offers use +sandbox/notice-confirm or /notice-decline."
                     )
                 else:
                     state = resolve_demo_offer(

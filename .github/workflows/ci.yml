@@ -820,6 +820,22 @@ jobs:
           --package contribs/game_systems/evennia_social --
           python scripts/ci_run_notices_tests.py {game} --minimal-social
           --absent evennia_notices --absent evennia_accessibility
+      - name: Minimal independent Plots source
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py
+          --package contribs/base_systems/evennia_links
+          --package contribs/game_systems/evennia_plots --
+          python scripts/ci_run_notices_tests.py {game} --minimal-plots
+          --absent evennia_notices --absent evennia_social
+          --absent evennia_accessibility --absent evennia_boards
+          --absent evennia_calendar --absent evennia_scenes --absent evennia_maps
+      - name: Populated Plots source upgrade and Inbox removal
+        if: ${{ !cancelled() }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_plots_notices_upgrade.py {game}
+          --base 9173aa4a395b4cbeec7858e5c89d37f444d927c3
       - name: Populated Social source upgrade and Inbox removal
         if: ${{ !cancelled() }}
         run: >-

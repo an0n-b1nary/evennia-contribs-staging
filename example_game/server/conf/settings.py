@@ -931,6 +931,7 @@ LINKS_NOTICE_SOURCES = {
     "calendar": "evennia_calendar.integrations.notices.CalendarNoticeSource",
     "lore": "evennia_lore.integrations.notices.LoreNoticeSource",
     "moderation": "evennia_moderation.integrations.notices.ModerationNoticeSource",
+    "plots": "evennia_plots.integrations.notices.PlotNoticeSource",
     "social-pages": "evennia_social.integrations.notices.SocialPageNoticeSource",
 }
 NOTICES_ENABLED = True

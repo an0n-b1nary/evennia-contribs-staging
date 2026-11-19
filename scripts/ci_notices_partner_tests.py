@@ -2,7 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Profile fixtures import neither Inbox nor Social until their presence is known."""
 
-from importlib import metadata
+from importlib import import_module, metadata
 from importlib.util import find_spec
 from unittest.mock import Mock
 
@@ -40,6 +40,8 @@ class NoticePartnerTests(EvenniaTest):
     def test_declared_partners_are_physically_absent(self):
         for name in settings.NOTICES_ABSENT_PARTNERS:
             self.assertIsNone(find_spec(name))
+            with self.assertRaises(ModuleNotFoundError):
+                import_module(name)
             self.assertFalse(apps.is_installed(name))
             with self.assertRaises(metadata.PackageNotFoundError):
                 metadata.distribution(name.replace("_", "-"))

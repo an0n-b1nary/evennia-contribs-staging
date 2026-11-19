@@ -379,3 +379,56 @@ def emit_social_demo_notice(account, character, *, session=None, golden=False):
         )
         record_offline(page, sender, [character], owners, fresh=False)
         return page.pk
+
+
+def emit_plot_demo_notice(account, character, *, session=None, golden=False):
+    """Open one labelled demonstration request for the exact opted-in character."""
+    from django.db.models import F
+    from evennia.server.sessionhandler import SESSIONS
+
+    from evennia_links.notices import authorize_context
+    from evennia_plots import threads
+    from evennia_plots.models import PlotThread
+
+    def eligible():
+        return (
+            character is not None
+            and not is_guest(character)
+            and (
+                (golden and session is None and account.pk == 1 and account.is_superuser)
+                or any(current is session for current in SESSIONS.get_sessions())
+            )
+            and authorize_context(NoticeContext(account, character, session))
+        )
+
+    if not eligible():
+        raise ValueError("Choose your own playable character before opting in")
+
+    with transaction.atomic():
+        ObjectDB.objects.filter(pk=character.pk).update(db_key=F("db_key"))
+        account.attributes.reset_cache()
+        if not eligible():
+            raise ValueError("Choose your own playable character before opting in")
+        generation = seed_subject_templates()
+        marker = f"sandbox_plot_notice_{generation}_{character.pk}"
+        if ServerConfig.objects.conf(marker, default=None) is not None:
+            return
+        sender = create_object(
+            "evennia.objects.objects.DefaultCharacter",
+            key="Example Plot Requester",
+            nohome=True,
+        )
+        sender.tags.add(["example-plot-requester", "sandbox_default"], category=CATEGORY)
+        plot = PlotThread.create_thread(
+            "Example Plot Inbox",
+            creator=character,
+            description="Synthetic example for exploring personal notices.",
+            thread_policy=PlotThread.ThreadPolicy.REQUEST,
+        )
+        plot.activate()
+        request = threads.add_thread(
+            plot, sender, "Example thread request", "This is a simulated plot thread request."
+        )
+        plot.privacy = PlotThread.Privacy.PRIVATE
+        plot.save(update_fields=["privacy"])
+        ServerConfig.objects.conf(marker, request.pk)
