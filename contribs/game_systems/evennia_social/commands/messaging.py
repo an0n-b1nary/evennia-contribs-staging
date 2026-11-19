@@ -7,6 +7,7 @@ Character-level private OOC messaging using Evennia's Msg model.
 Supports multi-recipient, reply shortcuts, and message history.
 """
 
+from django.db import transaction
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links.command_syntax import StrictSwitchMixin
@@ -102,13 +103,17 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
             return "Staff" if self._staff_owned(actor) else "Newcomer"
         return actor.get_display_name(viewer)
 
+    @transaction.atomic
     def _send_page(self, caller_char, targets, message):
         """Persist and deliver allowed contact, with identical sender replies."""
         from evennia.accounts.models import AccountDB
         from evennia.utils import create
 
         from evennia_links.communication import denial
+        from evennia_social import notices
+        from evennia_social.integrations.notices import GENERATION_TAG
 
+        notices.reserve_writer()
         visitor = is_visitor(caller_char, getattr(self, "session", None))
         for target in targets:
             blocked = denial(caller_char, "page", target)
@@ -131,6 +136,9 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
                 self.caller.msg("Visitors may page staff only.")
                 return
 
+        recipient_owners = notices.lock_recipient_owners(
+            [target for target in targets if not isinstance(target, AccountDB)]
+        )
         deliver = [target for target in targets if ignore_level(target, caller_char) == NONE]
 
         def lock(actor):
@@ -139,6 +147,14 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
         read = " or ".join(lock(t) for t in [*deliver, caller_char])
         # Keep every target on the Msg so the sender's history cannot reveal
         # an ignore; hide it from the targets who ignore the sender.
+        character_online = {
+            target.pk: target.has_account for target in targets if not isinstance(target, AccountDB)
+        }
+        offline_targets = [
+            target
+            for target in deliver
+            if not isinstance(target, AccountDB) and not character_online[target.pk]
+        ]
         page = create.create_message(
             caller_char,
             message,
@@ -148,7 +164,7 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
                 f"delete:{lock(caller_char)} or perm(Admin);"
                 f"edit:{lock(caller_char)} or perm(Admin)"
             ),
-            tags=[("page", "comms")],
+            tags=[("page", "comms"), GENERATION_TAG],
         )
         # Evennia's hide_from setter adds the class rather than the instance.
         for target in targets:
@@ -159,6 +175,7 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
                     else page.db_hide_from_objects
                 )
                 hide.add(target)
+        notices.record_offline(page, caller_char, offline_targets, recipient_owners)
         for target in deliver:
             if isinstance(caller_char, AccountDB):
                 target.db.last_pager_account = caller_char.pk
@@ -166,7 +183,7 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
             else:
                 target.db.last_pager = caller_char.pk
                 target.db.last_pager_account = None
-            if not isinstance(target, AccountDB) and not target.has_account:
+            if not isinstance(target, AccountDB) and not character_online[target.pk]:
                 continue
             if isinstance(caller_char, AccountDB) and comms_identity() == "character":
                 # The persistent Msg identifies the account to staff; live
@@ -179,7 +196,12 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
             else:
                 others = ", ".join(self._display(t, target) for t in targets if t != target)
                 recv_text = f"|w{sender_name}|n pages you and {others}: {message}"
-            target.msg((recv_text, {"type": "page"}), from_obj=caller_char)
+            transaction.on_commit(
+                lambda target=target, recv_text=recv_text: self._deliver_live_page(
+                    target, recv_text, caller_char, page
+                ),
+                robust=True,
+            )
 
         target_str = ", ".join(self._display(t, caller_char) for t in targets)
         self.caller.msg(f"You paged {target_str}: {message}")
@@ -187,12 +209,23 @@ class CmdPage(StrictSwitchMixin, MuxCommand):
         offline = [
             self._display(t, caller_char)
             for t in targets
-            if not (t.is_connected if isinstance(t, AccountDB) else t.has_account)
+            if not (t.is_connected if isinstance(t, AccountDB) else character_online[t.pk])
         ]
         if offline:
             self.caller.msg(
                 f"{', '.join(offline)} is offline. They will see your page when they next connect."
             )
+
+    @staticmethod
+    def _deliver_live_page(target, text, sender, page):
+        from evennia.accounts.models import AccountDB
+
+        if isinstance(target, AccountDB) or target.has_account:
+            target.msg((text, {"type": "page"}), from_obj=sender)
+        else:
+            from evennia_social.notices import record_disconnected
+
+            record_disconnected(page, sender, target)
 
     def _show_last(self, count=5):
         """Show the last N pages received."""

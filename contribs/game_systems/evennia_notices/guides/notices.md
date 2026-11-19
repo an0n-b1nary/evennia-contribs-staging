@@ -36,6 +36,8 @@ the active inbox. Social treats notices as OOC contact: hidden/full boundaries,
 legacy full boundaries and posts exceptions suppress their activity completely.
 Staff sender/viewer bypass follows Social's existing rules.
 
+When the game offers the Social pages source, offline page alerts belong to the character that received them. Use `page/last` on that character to see the original page. Reading or clearing an alert leaves the page in Social history. Set its delivery preference with the source name `social-pages`.
+
 Older routine activity may combine within one source. Combined notices keep
 their separate read state and show only activity you may currently see. Read,
 cleared and replaced history is normally removed after 30 days from its first

@@ -97,6 +97,7 @@ class TestSocialIdentity(SocialCommandTestCase):
         with (
             patch.object(self.account2, "get_puppet", return_value=None),
             patch.object(self.char1, "msg") as received,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             result = self.call(CmdPage(), f"{self.char1.key}=Need help", caller=self.account2)
         self.assertIn("Newcomer pages: Need help", strip_ansi(received.call_args.args[0][0]))
@@ -106,7 +107,8 @@ class TestSocialIdentity(SocialCommandTestCase):
         self.assertEqual(page.senders, [self.account2])
         self.assertEqual(page.receivers, [self.char1])
         with patch.object(self.account2, "msg") as visitor:
-            self.call(CmdPage(), "Welcome aboard")
+            with self.captureOnCommitCallbacks(execute=True):
+                self.call(CmdPage(), "Welcome aboard")
             self.assertIn("Welcome aboard", str(visitor.call_args))
             self.assertNotIn(self.account.key, visitor.call_args.args[0][0])
         with patch.object(self.account2, "get_puppet", return_value=None):
@@ -136,6 +138,7 @@ class TestSocialIdentity(SocialCommandTestCase):
         with (
             patch.object(self.account, "get_puppet", return_value=None),
             patch.object(self.account2, "msg") as visitor,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             self.call(CmdPage(), "Staff help", caller=self.account)
         self.assertIn("Staff", str(visitor.call_args))
@@ -152,7 +155,10 @@ class TestSocialIdentity(SocialCommandTestCase):
         with patch.object(self.account, "get_puppet", return_value=None):
             self.call(CmdPage(), f"{self.char2.key}=Checking in", caller=self.account)
         self.assertEqual(self.char2.db.last_pager_account, self.account.pk)
-        with patch.object(self.account, "msg") as staff:
+        with (
+            patch.object(self.account, "msg") as staff,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             output = self.call(CmdPage(), "Thanks", caller=self.char2)
         self.assertNotIn("may page staff only", output)
         self.assertIn(f"{self.char2.key} pages: Thanks", strip_ansi(staff.call_args.args[0][0]))

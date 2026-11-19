@@ -35,6 +35,8 @@ A request is all you can send. Whoever would be moved, or would receive a visito
 
 A page can go to several people at once: `page <name>,<name>=<message>`. `page/last` shows the pages you've received, and `page/recall` shows those you've sent as well. Pages belong to the character, so they never reveal your other characters.
 
+If your game uses Personal notices, you can see offline page alerts for the character you are playing. Use `page/last` to read the original pages. Clearing an alert leaves your pages in history. Change delivery with `+notices/set social-pages=summary`, `=immediate` or `=off`. Games without the Inbox show the unread page count when you begin playing.
+
 ## Profiles
 
 `+finger` shows a character's profile: identity fields such as pronouns and role, a quote, roleplay preferences, a short bio (`+finger/edit`), and a few fields of your own (`+finger/custom`). `+finger/follow <theme>` lists themes you'd like to play, so others can find you through them, and `+finger/public <theme>` chooses whether others see each one.

@@ -33,3 +33,5 @@ Teleporting a character moves them without asking. Prefer `+summon` and `+join`,
 ## Review jobs
 
 Social files no jobs.
+
+Apply the Social migration when upgrading to 0.11.2. With the optional Inbox and `social-pages` source configured, eligible pages after the old puppet-time cutoff transfer on character selection. Older versions could count both live and offline pages under that cutoff. To prepare pending alerts quietly, use `evennia transfer_social_page_notices --character DBREF --limit 100`. A disabled or absent Inbox restores the connected standalone count. Social records which alerts have already been handled.

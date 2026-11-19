@@ -133,26 +133,10 @@ class SocialCharacterMixin:
         self._notify_unread_pages()
 
     def _notify_unread_pages(self):
-        """Check for pages received while offline and notify the player."""
-        from datetime import UTC, datetime
+        """Run Social's standalone and transient guest reminders."""
+        from .notices import puppet_reminder
 
-        from django.db.models import Q
-        from evennia.comms.models import Msg
-
-        page_filter = Q(db_tags__db_key__iexact="page", db_tags__db_category__iexact="comms")
-        pages = Msg.objects.get_messages_by_receiver(self).filter(page_filter)
-        if self.last_page_seen:
-            # last_page_seen is stored as an ISO 8601 string for Django
-            # DateTimeField compatibility.
-            cutoff = datetime.fromisoformat(self.last_page_seen)
-            pages = pages.filter(db_date_created__gt=cutoff)
-        count = pages.count()
-        if count > 0:
-            plural = "s" if count != 1 else ""
-            self.msg(
-                f"|wYou have {count} unread page{plural}.|n Use |wpage/last {count}|n to view."
-            )
-        self.last_page_seen = datetime.now(UTC).isoformat()
+        puppet_reminder(self)
 
     def msg(self, text=None, from_obj=None, session=None, options=None, **kwargs):
         """Filter content from ignored players before it reaches the

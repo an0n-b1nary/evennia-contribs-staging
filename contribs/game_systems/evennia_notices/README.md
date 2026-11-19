@@ -52,8 +52,9 @@ Source receipts must survive inbox disable or physical removal: the removed
 inbox cannot prove an old event was already consumed. Re-enabling must not replay
 it. Socket hints are at most one attempt; the durable inbox survives hint failure.
 
-Calendar, Lore, Moderation, and Boards can route through this Inbox with
-source-owned transfer receipts. Boards alerts belong to the subscribing
-account. Social page and payout queues retain their own delivery.
+Calendar, Lore, Moderation, Boards, and Social pages can route through this
+Inbox with source-owned transfer receipts. Boards alerts belong to the
+subscribing account. The `social-pages` source alerts the exact character that
+received an offline page. Payout queues retain their own delivery.
 The reference game's `+sandbox/notices` is an explicit self opt-in to labelled
 synthetic examples; confirm/decline commands simulate an offer for that player.

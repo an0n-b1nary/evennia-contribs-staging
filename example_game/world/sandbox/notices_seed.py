@@ -307,3 +307,75 @@ def emit_moderation_demo_notices(account, character=None):
     event_for(row)  # Refuse malformed synthetic provenance before reporting success.
     transfer_pending(account)
     return row
+
+
+def emit_social_demo_notice(account, character, *, session=None, golden=False):
+    """Allocate one labelled, quietly transferred page for the exact opted-in character."""
+    from evennia.comms.models import Msg
+    from evennia.server.sessionhandler import SESSIONS
+    from evennia.utils.create import create_message
+
+    from evennia_links.notices import authorize_context
+    from evennia_social.integrations.notices import GENERATION_TAG, page_actor, page_subjects
+    from evennia_social.notices import lock_recipient_owners, record_offline, retry_recorded_page
+
+    def eligible():
+        if session is None:
+            if not (golden and getattr(account, "pk", None) == 1 and account.is_superuser):
+                return False
+        elif not any(current is session for current in SESSIONS.get_sessions()):
+            return False
+        return (
+            character is not None
+            and not is_guest(character)
+            and authorize_context(NoticeContext(account, character, session))
+        )
+
+    if not eligible():
+        raise ValueError("Choose your own playable character before opting in")
+
+    with transaction.atomic():
+        owners = lock_recipient_owners([character])
+        if not eligible() or account.pk not in {owner.pk for owner in owners.get(character.pk, ())}:
+            raise ValueError("Choose your own playable character before opting in")
+        generation = seed_subject_templates()
+        marker = f"social-page-{generation}-{character.pk}"
+        matches = page_subjects(character.pk).filter(
+            db_tags__db_category=CATEGORY, db_tags__db_key=marker
+        )
+        page = matches.first()
+        if page is not None:
+            actor = page_actor(page)
+            if (
+                actor
+                and actor.kind == "character"
+                and ObjectDB.objects.filter(
+                    pk=actor.id,
+                    db_tags__db_category=CATEGORY,
+                    db_tags__db_key="example-social-page-sender",
+                ).exists()
+            ):
+                retry_recorded_page(character, page.pk)
+                return page.pk
+            raise ValueError("The example page identity is unavailable")
+        if Msg.objects.filter(db_tags__db_category=CATEGORY, db_tags__db_key=marker).exists():
+            raise ValueError("The example page identity is unavailable")
+        sender = ObjectDB.objects.filter(
+            db_tags__db_key="example-social-page-sender", db_tags__db_category=CATEGORY
+        ).first()
+        if sender is None:
+            sender = create_object(
+                "evennia.objects.objects.DefaultCharacter",
+                key="Example Page Sender",
+                nohome=True,
+            )
+            sender.tags.add(["example-social-page-sender", "sandbox_default"], category=CATEGORY)
+        page = create_message(
+            sender,
+            "[Sandbox example] This simulated page shows how to find offline pages.",
+            receivers=[character],
+            locks=f"read:id({character.pk})",
+            tags=[("page", "comms"), GENERATION_TAG, (marker, CATEGORY)],
+        )
+        record_offline(page, sender, [character], owners, fresh=False)
+        return page.pk

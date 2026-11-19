@@ -44,6 +44,7 @@ JOBS = {
             "scripts/ci_run_lore_notices_upgrade.py",
             "scripts/ci_run_boards_notices_upgrade.py",
             "scripts/ci_run_moderation_notices_upgrade.py",
+            "scripts/ci_run_social_notices_upgrade.py",
             "example_game/",
         ),
     ),

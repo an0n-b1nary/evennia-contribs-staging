@@ -92,6 +92,11 @@ class SelectJobsTests(unittest.TestCase):
             self.select("scripts/ci_run_boards_notices_upgrade.py"), ["notices-partners"]
         )
 
+    def test_social_page_upgrade_runner_selects_notice_partners(self):
+        self.assertEqual(
+            self.select("scripts/ci_run_social_notices_upgrade.py"), ["notices-partners"]
+        )
+
     def test_example_game_selects_the_jobs_that_copy_it(self):
         self.assertEqual(
             set(self.select("example_game/web/templates/website/guides/page.html")),

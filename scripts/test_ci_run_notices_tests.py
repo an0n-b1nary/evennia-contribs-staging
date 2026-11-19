@@ -180,3 +180,40 @@ class NoticeRunnerTests(unittest.TestCase):
             self.assertIn(
                 "evennia_boards.test_notice_adapter.StandaloneActivityTests", run.call_args.args[0]
             )
+
+    def test_minimal_social_uses_standalone_tests_without_inbox(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary)
+            (game / "server/conf").mkdir(parents=True)
+            (game / "server/conf/settings.py").write_text("")
+            with (
+                patch.object(
+                    runner,
+                    "find_spec",
+                    side_effect=lambda name: (
+                        object()
+                        if name in {"evennia_links", "evennia_posing", "evennia_social"}
+                        else None
+                    ),
+                ),
+                patch.object(runner.shutil, "which", return_value="evennia"),
+                patch.object(
+                    runner.subprocess,
+                    "run",
+                    return_value=Mock(returncode=0, stdout="Ran 12 tests\nOK"),
+                ) as run,
+            ):
+                self.assertEqual(runner.main([str(game), "--minimal-social"]), 0)
+            namespace = {"INSTALLED_APPS": []}
+            settings = (game / "server/conf/notices_test_settings.py").read_text()
+            exec(settings.partition("\n")[2], namespace)
+            self.assertEqual(
+                namespace["INSTALLED_APPS"], ["evennia_links", "evennia_posing", "evennia_social"]
+            )
+            self.assertIn("social-pages", namespace["LINKS_NOTICE_SOURCES"])
+            self.assertIn(
+                "evennia_social.tests.test_page_notices.StandalonePageTests", run.call_args.args[0]
+            )
+            self.assertNotIn(
+                "evennia_social.tests.test_page_notice_concurrency", run.call_args.args[0]
+            )

@@ -121,7 +121,10 @@ class SocialIdentitySeams(EvenniaCommandTest):
         with patch.object(self.account2, "get_puppet", return_value=None):
             self.call(CmdPage(), f"{self.char1.key}=Host help", caller=self.account2)
         self.assertEqual(self.char1.last_pager_account, self.account2.pk)
-        with patch.object(self.account2, "msg") as received:
+        with (
+            patch.object(self.account2, "msg") as received,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             self.call(CmdPage(), "Host reply")
         self.assertIn("Host reply", str(received.call_args))
         self.assertNotIn(self.account.key, str(received.call_args))

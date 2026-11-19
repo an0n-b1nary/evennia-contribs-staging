@@ -4,6 +4,13 @@ All notable changes to `evennia_social` are documented here.
 
 ## [Unreleased]
 
+## 0.11.2 — 2026-11-18
+
+- Route offline playable-character pages through the optional Inbox, with generic
+  alerts, the `page/last` action, and durable delivery bookkeeping owned by Social.
+- Add the initial migration and a bounded transfer command for pending pages.
+  Standalone login reminders and source page history remain available.
+
 ## 0.11.1 — 2026-11-08
 
 - Apply the existing OOC contact boundary to notices, independently of presentation preferences.
