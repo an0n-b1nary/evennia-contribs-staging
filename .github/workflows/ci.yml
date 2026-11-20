@@ -580,12 +580,11 @@ jobs:
           python scripts/ci_run_npc_tests.py {game} --absent evennia_scenes --absent evennia_plots --absent evennia_rp_contest --absent evennia_posing --absent evennia_rptracker --absent evennia_xp --absent evennia_rp_chargen
 
   live-playtest:
-    needs: [scope, sandbox]
-    # Runs when selected even if the sandbox gate was skipped, but not after
-    # it failed.
-    if: >-
-      !failure() && !cancelled()
-      && contains(fromJSON(needs.scope.outputs.jobs), 'live-playtest')
+    # Runs alongside the sandbox gate rather than after it: neither uses the
+    # other's output, and chaining them set the wall time of every full run
+    # (#235).
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'live-playtest')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
