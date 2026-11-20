@@ -91,18 +91,18 @@ class SelectJobsTests(unittest.TestCase):
         self.assertEqual(self.select("scripts/ci_run_npc_tests.py"), ["npc-partners"])
         self.assertEqual(self.select("scripts/ci_run_combat_tests.py"), ["combat-independent"])
         self.assertEqual(
-            self.select("scripts/ci_run_boards_notices_upgrade.py"), ["notices-partners"]
+            self.select("scripts/ci_run_boards_notices_upgrade.py"), ["notices-sources"]
         )
 
-    def test_plots_upgrade_runner_selects_notice_partners(self):
+    def test_plots_upgrade_runner_selects_notices_sources(self):
         self.assertEqual(
-            self.select("scripts/ci_run_plots_notices_upgrade.py"), ["notices-partners"]
+            self.select("scripts/ci_run_plots_notices_upgrade.py"), ["notices-sources"]
         )
 
-    def test_xp_upgrade_runner_selects_notice_partners(self):
-        self.assertEqual(self.select("scripts/ci_run_xp_notices_upgrade.py"), ["notices-partners"])
+    def test_xp_upgrade_runner_selects_notices_sources(self):
+        self.assertEqual(self.select("scripts/ci_run_xp_notices_upgrade.py"), ["notices-sources"])
         self.assertEqual(
-            self.select("scripts/ci_run_resources_notices_upgrade.py"), ["notices-partners"]
+            self.select("scripts/ci_run_resources_notices_upgrade.py"), ["notices-sources"]
         )
 
     def test_economy_upgrade_runner_selects_economy_partners(self):
@@ -111,16 +111,30 @@ class SelectJobsTests(unittest.TestCase):
         )
         self.assertIn("economy-partners", self.select("example_game/server/conf/settings.py"))
 
-    def test_social_page_upgrade_runner_selects_notice_partners(self):
+    def test_social_page_upgrade_runner_selects_notices_sources(self):
         self.assertEqual(
-            self.select("scripts/ci_run_social_notices_upgrade.py"), ["notices-partners"]
+            self.select("scripts/ci_run_social_notices_upgrade.py"), ["notices-sources"]
+        )
+
+    def test_notice_runners_select_every_job_that_runs_them(self):
+        for path in (
+            "scripts/ci_run_resources_tests.py",
+            "scripts/ci_resources_partner_tests.py",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.select(path), ["notices-sources", "resources-partners"])
+        for path in ("scripts/ci_run_notices_tests.py", "scripts/ci_notices_partner_tests.py"):
+            with self.subTest(path=path):
+                self.assertEqual(self.select(path), ["notices-partners", "notices-sources"])
+        self.assertEqual(
+            self.select("scripts/ci_run_notices_upgrade.py"),
+            ["notices-sources", "economy-partners"],
         )
 
     def test_example_game_selects_the_jobs_that_copy_it(self):
         self.assertEqual(
             set(self.select("example_game/web/templates/website/guides/page.html")),
             {
-                "notices-partners",
                 "lore-items-partners",
                 "crafting-partners",
                 "sandbox",
@@ -132,12 +146,18 @@ class SelectJobsTests(unittest.TestCase):
             "calendar-partners",
             self.select("example_game/web/templates/rest_framework/api.html"),
         )
+        # The upgrades run the current settings on the base commit's game.
+        settings = self.select("example_game/server/conf/settings.py")
+        self.assertIn("notices-sources", settings)
+        self.assertIn("economy-partners", settings)
+        self.assertNotIn("notices-partners", settings)
 
     def test_a_leaf_contrib_selects_its_family_and_the_whole_game_jobs(self):
         self.assertEqual(
             self.select("contribs/game_systems/evennia_boards/tests.py"),
             [
                 "notices-partners",
+                "notices-sources",
                 "sandbox",
                 "live-playtest",
                 "moderation-partners",
@@ -165,7 +185,7 @@ class NoticeUpgradeSelectionTests(unittest.TestCase):
     def select(self, *paths):
         jobs, upgrades, _ = scope.select_checks(list(paths))
         if upgrades:
-            self.assertIn("notices-partners", jobs)
+            self.assertIn("notices-sources", jobs)
         return upgrades
 
     def test_source_change_selects_its_populated_upgrade(self):
@@ -191,6 +211,7 @@ class NoticeUpgradeSelectionTests(unittest.TestCase):
     def test_unrelated_contrib_runs_the_partner_job_without_populated_upgrades(self):
         jobs, upgrades, _ = scope.select_checks(["contribs/rpg/evennia_rp_combat/rounds.py"])
         self.assertIn("notices-partners", jobs)
+        self.assertIn("notices-sources", jobs)
         self.assertEqual(upgrades, [])
 
     def test_shared_or_unclassified_changes_run_every_upgrade(self):
@@ -208,6 +229,21 @@ class NoticeUpgradeSelectionTests(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assertEqual(self.select(path), list(scope.NOTICE_UPGRADES))
+
+    def test_every_upgrade_input_selects_the_job_that_runs_upgrades(self):
+        paths = [
+            *scope.SHARED_NOTICE_UPGRADE_PATHS,
+            *(path for _, reads in scope.NOTICE_UPGRADES.values() for path in reads),
+        ]
+        self.assertTrue(paths)
+        for path in paths:
+            with self.subTest(path=path):
+                jobs, upgrades, _ = scope.select_checks([path])
+                self.assertTrue(upgrades)
+                self.assertIn("notices-sources", jobs)
+                # An input that went unclassified would pass only through the
+                # select-everything fallback.
+                self.assertNotEqual(jobs, list(scope.JOBS))
 
 
 class WorkflowAgreementTests(unittest.TestCase):
@@ -256,7 +292,7 @@ class WorkflowAgreementTests(unittest.TestCase):
     def test_populated_upgrade_steps_are_gated_on_their_profile(self):
         jobs = workflow_jobs()
         labels = set(scope.partner_graph(scope.REPO_ROOT / "contribs"))
-        steps = jobs["notices-partners"].split("\n      - name: Populated ")[1:]
+        steps = jobs["notices-sources"].split("\n      - name: Populated ")[1:]
         self.assertEqual(len(steps), len(scope.NOTICE_UPGRADES))
         for (name, (sources, (runner, *_))), step in zip(
             scope.NOTICE_UPGRADES.items(), steps, strict=True
@@ -268,11 +304,51 @@ class WorkflowAgreementTests(unittest.TestCase):
                 )
                 self.assertIn(f"python {runner} {{game}}", step)
         self.assertIn("notice_upgrades: ${{ steps.select.outputs.notice_upgrades }}", jobs["scope"])
+        self.assertNotIn("notice_upgrades", jobs["notices-partners"])
 
     def test_only_nightly_uses_the_broad_host_suites(self):
-        block = workflow_jobs()["notices-partners"]
+        jobs = workflow_jobs()
+        block = jobs["notices-partners"]
         self.assertIn("github.event_name == 'schedule' && 'broad' || 'focused'", block)
         self.assertEqual(block.count('--coverage "$NOTICE_TEST_COVERAGE"'), 3)
+        self.assertNotIn("--coverage", jobs["notices-sources"])
+        self.assertNotIn("NOTICE_TEST_COVERAGE", jobs["notices-sources"])
+
+    def test_notice_host_profiles_are_matrix_entries(self):
+        # An ungated step would run all three profiles in every entry.
+        block = workflow_jobs()["notices-partners"]
+        self.assertIn("fail-fast: false", block)
+        matrix = re.search(r"profile: \[(.*)\]", block)
+        self.assertIsNotNone(matrix)
+        profiles = [value.strip() for value in matrix.group(1).split(",")]
+        self.assertEqual(len(profiles), 3)
+        steps = [
+            step for step in re.split(r"(?m)^      - ", block) if "scripts/ci_profile.py" in step
+        ]
+        self.assertEqual(len(steps), len(profiles))
+        for profile, step in zip(profiles, steps, strict=True):
+            with self.subTest(profile=profile):
+                self.assertIn(f"matrix.profile == '{profile}'", step)
+
+    def test_source_steps_run_without_an_upgrade_selection(self):
+        jobs = workflow_jobs()
+        block = jobs["notices-sources"]
+        steps = {
+            step.split("\n", 1)[0].removeprefix("name: "): step
+            for step in re.split(r"(?m)^      - ", block)
+            if "scripts/ci_profile.py" in step and not step.startswith("name: Populated ")
+        }
+        self.assertTrue(steps)
+        self.assertIn("Minimal independent inbox", steps)
+        self.assertIn("Resources Inbox with Plots physically absent", steps)
+        for name, step in steps.items():
+            with self.subTest(step=name):
+                conditions = re.findall(r"(?m)^        if: (.*)$", step)
+                self.assertEqual(conditions, ["${{ !cancelled() }}"])
+                self.assertNotIn("notice_upgrades", step)
+        # Only the upgrades archive base commits and need the full history.
+        self.assertIn("fetch-depth: 0", block)
+        self.assertNotIn("fetch-depth", jobs["notices-partners"])
 
 
 class CommandLineTests(unittest.TestCase):
@@ -292,7 +368,7 @@ class CommandLineTests(unittest.TestCase):
     def test_paths_print_github_output_lines(self):
         self.assertEqual(
             self.output(["--paths", "scripts/ci_run_boards_notices_upgrade.py"]),
-            {"jobs": ["notices-partners"], "notice_upgrades": ["boards"]},
+            {"jobs": ["notices-sources"], "notice_upgrades": ["boards"]},
         )
 
     def test_diff_lists_both_sides_of_a_rename(self):
