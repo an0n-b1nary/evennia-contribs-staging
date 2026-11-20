@@ -12,7 +12,8 @@ also runs when a file it reads outside contribs/ changes. Top-level docs and
 lint-only files select nothing. Any other path selects every job, so an
 unclassified file fails safe.
 
-Prints `jobs=<JSON list>` for $GITHUB_OUTPUT and explains the choice on stderr.
+Prints the selected jobs and populated Inbox profiles as JSON lists for
+$GITHUB_OUTPUT and explains the choice on stderr.
 """
 
 from __future__ import annotations
@@ -30,6 +31,41 @@ from ci_install_contribs import discover_contribs, requirement_name
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 EVERY_CONTRIB = None
 
+# Profile name in ci.yml -> sources it exercises, runner and any extra files it
+# reads. The dependency graph covers the packages those sources depend on.
+NOTICE_UPGRADES = {
+    "resources": (
+        {"evennia_rp_resources", "evennia_plots"},
+        ("scripts/ci_run_resources_notices_upgrade.py",),
+    ),
+    "xp": ({"evennia_xp"}, ("scripts/ci_run_xp_notices_upgrade.py",)),
+    "plots": ({"evennia_plots"}, ("scripts/ci_run_plots_notices_upgrade.py",)),
+    # The live page command also uses Moderation's communication policy.
+    "social": (
+        {"evennia_social", "evennia_moderation"},
+        ("scripts/ci_run_social_notices_upgrade.py",),
+    ),
+    "boards": ({"evennia_boards"}, ("scripts/ci_run_boards_notices_upgrade.py",)),
+    "moderation": ({"evennia_moderation"}, ("scripts/ci_run_moderation_notices_upgrade.py",)),
+    "lore": ({"evennia_lore"}, ("scripts/ci_run_lore_notices_upgrade.py",)),
+    "calendar": ({"evennia_calendar"}, ("scripts/ci_run_calendar_notices_upgrade.py",)),
+    "pre-foundation": (
+        {"evennia_boards", "evennia_calendar", "evennia_lore", "evennia_moderation"},
+        ("scripts/ci_run_notices_upgrade.py", "scripts/ci_notices_partner_tests.py"),
+    ),
+}
+
+SHARED_NOTICE_CONTRIBS = {"evennia_links", "evennia_notices"}
+SHARED_NOTICE_UPGRADE_PATHS = (
+    # The pre-foundation runner also supplies helpers to the source runners.
+    "scripts/ci_run_notices_upgrade.py",
+    "example_game/server/conf/",
+    # Social registers a presentation policy used by every notice source.
+    "contribs/game_systems/evennia_social/apps.py",
+    "contribs/game_systems/evennia_social/ignore.py",
+    "contribs/game_systems/evennia_social/integrations/ignoring.py",
+)
+
 # Job name in ci.yml -> (contribs it installs and exercises, other paths it
 # reads). EVERY_CONTRIB marks jobs that load the whole example game. Partners
 # a job only verifies as absent aren't listed: their changes can't reach it.
@@ -38,17 +74,8 @@ JOBS = {
         EVERY_CONTRIB,
         (
             "scripts/ci_run_notices_tests.py",
-            "scripts/ci_notices_partner_tests.py",
-            "scripts/ci_run_notices_upgrade.py",
-            "scripts/ci_run_calendar_notices_upgrade.py",
-            "scripts/ci_run_lore_notices_upgrade.py",
-            "scripts/ci_run_boards_notices_upgrade.py",
-            "scripts/ci_run_moderation_notices_upgrade.py",
-            "scripts/ci_run_social_notices_upgrade.py",
-            "scripts/ci_run_plots_notices_upgrade.py",
-            "scripts/ci_run_xp_notices_upgrade.py",
-            "scripts/ci_run_resources_notices_upgrade.py",
             "example_game/",
+            *(path for _, reads in NOTICE_UPGRADES.values() for path in reads),
         ),
     ),
     "lore-items-partners": (
@@ -265,10 +292,10 @@ def dependents(changed: set[str], graph: dict[str, set[str]]) -> set[str]:
     return affected
 
 
-def select_jobs(
+def select_checks(
     paths: list[str], root: pathlib.Path = REPO_ROOT / "contribs"
-) -> tuple[list[str], list[str]]:
-    """Return the jobs to run for changed repo-relative `paths`, and why."""
+) -> tuple[list[str], list[str], list[str]]:
+    """Return the jobs, populated Inbox profiles and reasons for changed paths."""
     changed, direct, reasons = set(), set(), []
     for path in paths:
         parts = path.split("/")
@@ -286,15 +313,34 @@ def select_jobs(
             path.count("/") == pattern.count("/") and fnmatch.fnmatchcase(path, pattern)
             for pattern in NO_PARTNER_JOB
         ):
-            return list(JOBS), [f"{path}: not classified, so every job runs"]
-    affected = dependents(changed, partner_graph(root))
+            return (
+                list(JOBS),
+                list(NOTICE_UPGRADES),
+                [f"{path}: not classified, so every job and upgrade runs"],
+            )
+    graph = partner_graph(root)
+    affected = dependents(changed, graph)
     if changed:
         reasons.append(f"changed contribs: {', '.join(sorted(changed))}")
         reasons.append(f"with dependents: {', '.join(sorted(affected))}")
     for job, (contribs, _) in JOBS.items():
         if affected and (contribs is EVERY_CONTRIB or contribs & affected):
             direct.add(job)
-    return [job for job in JOBS if job in direct], reasons
+    shared_upgrade_paths = any(
+        path.startswith(pattern) if pattern.endswith("/") else path == pattern
+        for path in paths
+        for pattern in SHARED_NOTICE_UPGRADE_PATHS
+    )
+    if SHARED_NOTICE_CONTRIBS & affected or changed - graph.keys() or shared_upgrade_paths:
+        upgrades = list(NOTICE_UPGRADES)
+        reasons.append("shared Inbox inputs or unknown contribs changed, so every upgrade runs")
+    else:
+        upgrades = [
+            name
+            for name, (sources, reads) in NOTICE_UPGRADES.items()
+            if sources & affected or any(path in paths for path in reads)
+        ]
+    return [job for job in JOBS if job in direct], upgrades, reasons
 
 
 def changed_paths(base: str, head: str) -> list[str]:
@@ -317,13 +363,15 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--paths", nargs="+", metavar="PATH")
     args = parser.parse_args(argv)
     if args.all:
-        jobs, reasons = list(JOBS), ["full run"]
+        jobs, upgrades, reasons = list(JOBS), list(NOTICE_UPGRADES), ["full run"]
     else:
-        jobs, reasons = select_jobs(args.paths or changed_paths(*args.diff))
+        jobs, upgrades, reasons = select_checks(args.paths or changed_paths(*args.diff))
     for reason in reasons:
         print(reason, file=sys.stderr)
     print(f"selected: {', '.join(jobs) or 'no partner jobs'}", file=sys.stderr)
+    print(f"populated Inbox upgrades: {', '.join(upgrades) or 'none'}", file=sys.stderr)
     print(f"jobs={json.dumps(jobs)}")
+    print(f"notice_upgrades={json.dumps(upgrades)}")
     return 0
 
 
