@@ -29,7 +29,7 @@ SOURCE = "economy"
 MARKER_KEY = "last_economy_summary"
 FULL_KEY = "economy_full_notified"
 LIMIT = 100
-# A claim older than this can no longer be in flight; its process stopped before settling.
+# After this long, a claim that no live process still holds for settlement is stale.
 _ATTEMPT_LIFETIME = 300
 STIPEND_KINDS = ("starting", "reveal")
 State = EconomyNoticeReceipt.State
@@ -578,16 +578,17 @@ def _transport_line(claim, current, mode):
     if (latest.pk if latest is not None else None) != claim.latest_ubi_id:
         return False
     if latest is not None and latest.pk not in {row.ubi_id for row in claimed}:
+        with _waiting_lock:
+            waiting = set(_waiting)
+        in_flight = Q(attempted_at__gte=timezone.now() - timedelta(seconds=_ATTEMPT_LIFETIME)) | Q(
+            attempt__in=waiting
+        )
         busy = (
             _rows(character)
             .filter(ubi_id=latest.pk)
             .filter(
                 Q(state=State.PENDING)
-                | (
-                    Q(state=State.ATTEMPTING)
-                    & ~Q(attempt=claim.attempt)
-                    & Q(attempted_at__gte=timezone.now() - timedelta(seconds=_ATTEMPT_LIFETIME))
-                )
+                | (Q(state=State.ATTEMPTING) & ~Q(attempt=claim.attempt) & in_flight)
             )
         )
         if busy.exists():

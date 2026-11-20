@@ -335,11 +335,14 @@ class StandaloneEconomyNoticeTests(EconomyNoticeFixture):
         self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
         return ubi
 
-    def test_stale_foreign_attempt_stops_blocking_stipend_line(self):
-        ubi = self.strand_claim()
+    def backdate(self, ubi):
         EconomyNoticeReceipt.objects.filter(ubi=ubi).update(
             attempted_at=timezone.now() - timedelta(seconds=notices._ATTEMPT_LIFETIME + 60)
         )
+
+    def test_stale_foreign_attempt_stops_blocking_stipend_line(self):
+        ubi = self.strand_claim()
+        self.backdate(ubi)
         self.hide()
         self.reveal()
         self.assertTrue(self.show())
@@ -350,6 +353,51 @@ class StandaloneEconomyNoticeTests(EconomyNoticeFixture):
         self.assertEqual(self.state(stipend=self.stipend("reveal")), State.DELIVERED)
         self.assertFalse(self.show())
         self.character.msg.assert_called_once()
+        self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
+
+    def test_stale_foreign_attempt_alone_sends_nothing(self):
+        ubi = self.strand_claim()
+        self.backdate(ubi)
+        self.assertFalse(self.show())
+        self.character.msg.assert_not_called()
+        self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
+
+    def test_settlement_waiting_in_process_keeps_week_busy(self):
+        self.addCleanup(notices._waiting.clear)
+        finalize = notices._finalize
+        held = set()
+
+        def fail_held(claim, *args):
+            if not held or claim.attempt in held:
+                held.add(claim.attempt)
+                raise RuntimeError("database unavailable")
+            return finalize(claim, *args)
+
+        ubi = self.pay("w1")
+        with patch.object(notices, "_finalize", side_effect=fail_held):
+            self.assertTrue(self.show())
+            self.assertEqual(set(notices._waiting), held)
+            self.backdate(ubi)
+            self.hide()
+            self.reveal()
+            self.assertFalse(self.show())
+            self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
+            self.assertEqual(self.state(stipend=self.stipend("reveal")), State.PENDING)
+        self.character.msg.assert_called_once_with(
+            "Your latest income: 100 coins. Stipends received: 100 coins. See +balance.",
+            session=self.session,
+        )
+        self.assertTrue(self.show())
+        self.assertEqual(self.state(ubi=ubi), State.DELIVERED)
+        self.assertEqual(self.state(stipend=self.stipend("reveal")), State.DELIVERED)
+        self.assertFalse(self.show())
+        self.assertEqual(
+            [call.args[0] for call in self.character.msg.call_args_list],
+            [
+                "Your latest income: 100 coins. Stipends received: 100 coins. See +balance.",
+                "Your latest income: 100 coins. Stipends received: 150 coins. See +balance.",
+            ],
+        )
 
     def test_fresh_foreign_attempt_withholds_stipend_line(self):
         self.strand_claim()
