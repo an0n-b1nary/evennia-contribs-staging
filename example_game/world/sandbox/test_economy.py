@@ -10,13 +10,13 @@ from django.conf import settings
 from django.test import override_settings
 from typeclasses.characters import Character
 
+from evennia_economy import partner_tests
 from evennia_economy.batch import run_weekly_batch
 from evennia_economy.models import StipendPayment
-from evennia_economy.partner_tests import EconomyPartnerTests
 from evennia_economy.services import balance
 
 
-class EconomySeams(EconomyPartnerTests):
+class EconomySeams(partner_tests.EconomyPartnerTests):
     character_typeclass = Character
 
     def test_cmdsets_register_atomic_give_and_economy_commands(self):

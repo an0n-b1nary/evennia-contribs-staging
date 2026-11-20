@@ -8,8 +8,8 @@ from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 
 from evennia_building import services
+from evennia_building import tests as building_tests
 from evennia_building.models import Property
-from evennia_building.tests import TestInteriors
 from evennia_maps.permissions import is_room_web_visible
 from evennia_social import presence
 
@@ -17,7 +17,7 @@ from evennia_social import presence
 # TestInteriors mounts only Building; render inherited pages against the host's
 # own URLconf so its includes and namespaces are what get exercised.
 @override_settings(ROOT_URLCONF="web.urls")
-class BuildingInteriorSeams(TestInteriors):
+class BuildingInteriorSeams(building_tests.TestInteriors):
     character_typeclass = Character
     room_typeclass = Room
     exit_typeclass = Exit

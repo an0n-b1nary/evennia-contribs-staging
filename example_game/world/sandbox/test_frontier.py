@@ -8,13 +8,12 @@ from typeclasses.characters import Character
 from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 
-from evennia_building import frontier_lifecycle, services
+from evennia_building import frontier_lifecycle, services, test_frontier
 from evennia_building.models import BuildingClock, Property
-from evennia_building.test_frontier import TestFrontier
 
 
 @override_settings(ROOT_URLCONF="web.urls")
-class FrontierSeams(TestFrontier):
+class FrontierSeams(test_frontier.TestFrontier):
     character_typeclass = Character
     room_typeclass = Room
     exit_typeclass = Exit
