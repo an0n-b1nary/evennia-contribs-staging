@@ -208,7 +208,7 @@ jobs:
     # Seven profiles of 1.6 to 3.7 minutes each, about 17 minutes in all
     # (nightlies 43915083873, 44131328252, 44348203264, 44771173219). One job
     # would be among the longest in the run and seven take seven runner slots,
-    # so they run as two jobs of about 8 and 9 minutes, grouped by measured
+    # so they run as two jobs of about 8 and 10 minutes, grouped by measured
     # time (#249). Each profile is a step with its own fresh environment.
     timeout-minutes: 30
     strategy:
