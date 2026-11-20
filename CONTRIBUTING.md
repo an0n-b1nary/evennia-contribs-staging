@@ -338,7 +338,9 @@ Actions tab, for any branch) run every job. A PR runs less:
   runs the maps suite with host settings plus real overlay, URL, command-import,
   rendered static/live map, tile feed, and browsable API checks.
 - **sandbox**: the `example_game` gate with every contrib installed. It and
-  `live-playtest` run whenever any contrib or `example_game` changes.
+  `live-playtest` run whenever any contrib or `example_game` changes. They run
+  side by side, so `live-playtest` still runs, and may fail for the same
+  cause, when the gate fails.
 
 Each partner profile (in the `*-partners`, `rp-sandbox`, `sandbox` and
 `crafting-independent` jobs) runs through `scripts/ci_profile.py`, which
