@@ -27,6 +27,11 @@ def workflow_jobs() -> dict[str, str]:
     return dict(zip(parts[1::2], parts[2::2], strict=True))
 
 
+def job_scripts(block: str) -> set[str]:
+    """Repo paths of the scripts a job's steps run with `python`."""
+    return set(re.findall(r"\bpython (?:\.\./)?(scripts/[\w/]+\.py)\b", block))
+
+
 class DependentsTests(ContribTreeMixin, unittest.TestCase):
     def test_hard_and_optional_dependents_are_affected_transitively(self):
         self.add("base", "evennia_core")
@@ -349,6 +354,45 @@ class WorkflowAgreementTests(unittest.TestCase):
         # Only the upgrades archive base commits and need the full history.
         self.assertIn("fetch-depth: 0", block)
         self.assertNotIn("fetch-depth", jobs["notices-partners"])
+
+    def test_every_script_a_job_runs_selects_that_job(self):
+        # A change to a runner must select the job that runs it (#301).
+        jobs = workflow_jobs()
+        checked = 0
+        for name in scope.JOBS:
+            block = jobs[name]
+            scripts = job_scripts(block)
+            code = "\n".join(
+                line for line in block.splitlines() if not line.strip().startswith("#")
+            )
+            with self.subTest(job=name):
+                self.assertTrue(scripts)
+                # A script run in a form job_scripts doesn't see would go unchecked.
+                self.assertLessEqual(set(re.findall(r"scripts/[\w/.-]+\.py", code)), scripts)
+                for path in sorted(scripts):
+                    self.assertTrue((scope.REPO_ROOT / path).is_file(), path)
+                    self.assertIn(name, scope.select_checks([path])[0], path)
+                    checked += 1
+        self.assertTrue(scope.JOBS)
+        self.assertTrue(checked)
+
+    def test_modules_a_runner_copies_select_its_jobs(self):
+        # Runners copy their fixture module into the game with with_name().
+        # Only those copies are followed: ci_run_partner_tests.py copies
+        # ci_partner_tests.py or ci_building_partner_tests.py depending on its
+        # mode, so following its REPO_ROOT copies would wrongly demand that a
+        # calendar fixture select building-partners.
+        jobs = workflow_jobs()
+        pairs = set()
+        for name in scope.JOBS:
+            for script in job_scripts(jobs[name]):
+                source = (scope.REPO_ROOT / script).read_text(encoding="utf-8")
+                for module in re.findall(r'with_name\("(\w+\.py)"\)', source):
+                    pairs.add((name, f"scripts/{module}"))
+        self.assertTrue(pairs)
+        for name, path in sorted(pairs):
+            with self.subTest(job=name, module=path):
+                self.assertIn(name, scope.select_checks([path])[0])
 
 
 class CommandLineTests(unittest.TestCase):
