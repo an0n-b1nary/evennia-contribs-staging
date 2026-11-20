@@ -5,12 +5,11 @@ from typeclasses.characters import Character
 from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 
-from evennia_building import attachments, lifecycle, services
-from evennia_building.test_apartments import TestApartments
+from evennia_building import attachments, lifecycle, services, test_apartments
 
 
 @override_settings(ROOT_URLCONF="web.urls")
-class ApartmentSeams(TestApartments):
+class ApartmentSeams(test_apartments.TestApartments):
     character_typeclass = Character
     room_typeclass = Room
     exit_typeclass = Exit
