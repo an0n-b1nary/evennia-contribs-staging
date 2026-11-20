@@ -371,7 +371,8 @@ its queued log writes in memory.
 
 The `test`, partner, `sandbox` and `live-playtest` jobs have a 30-minute
 limit, the `*-independent` and `moderation-partners` jobs 20 minutes, and
-lint and `scope` 5. These bounds include installation.
+lint and `scope` 5. `notices-partners` has 40 minutes until #307 splits it.
+These bounds include installation.
 
 A skipped partner job reports as skipped, not failed. A failure in the nightly
 run shows on the Actions tab and notifies whoever last changed the schedule.
@@ -401,6 +402,39 @@ distribution, and rejects launcher exits that ran zero tests. Exclusions also
 fail before pip runs if a retained contrib has a hard dependency on the omitted
 package. These games use test-only MD5 hashing and a small fixture rather than
 the full sandbox seeder, which deliberately requires every demo contrib.
+
+### Job time budget
+
+A full run takes as long as its slowest job. Short steps can still add up to
+a long job, so check the job's total, not just the new step, whenever a change
+adds a step to `ci.yml` or makes an existing step slower:
+
+- Take the job's current time from a recent uncontended run (the nightly run
+  usually has the runners to itself) and add the new step's expected time.
+- If the new total would make the job the slowest in a full run, or would
+  come within 25% of its timeout (past 22.5 minutes of a 30-minute limit),
+  split the job in the same change: into matrix entries, as the building and
+  crafting profiles are, or into a sibling job. A new job needs its own `JOBS`
+  entry in `scripts/ci_scope.py`.
+- Don't split a job that is within budget. Every repository on the account
+  shares one limit on concurrent jobs, so an extra job waits for a free runner
+  and only helps when it shortens the slowest job.
+- Don't raise a timeout to make room for more steps. Raise one only when the
+  runners' own speed varies, and say so in the commit message.
+
+The jobs API lists each job and step with its start and end times. Use
+`attempts/1`: rerunning failed jobs replaces the timestamps of every job in the
+run. This lists the jobs of a run slowest first, with every step that took a
+minute or more:
+
+```bash
+gh api 'repos/{owner}/{repo}/actions/runs/RUN_ID/attempts/1/jobs?per_page=100' --jq '
+  def mins: ((.completed_at | fromdate) - (.started_at | fromdate)) / 60 * 10 | round / 10;
+  .jobs | sort_by(-mins)[] | select(.conclusion != "skipped")
+  | "\(mins) min  \(.name)", (.steps[] | select(mins >= 1) | "    \(mins) min  \(.name)")'
+```
+
+Find a nightly run's ID with `gh run list --workflow ci.yml --event schedule`.
 
 ## Contrib release versions
 
