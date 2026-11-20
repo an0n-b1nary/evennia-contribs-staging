@@ -205,35 +205,16 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'building-partners')
     runs-on: ubuntu-latest
-    # Seven profiles of two to three minutes each: run in sequence they would
-    # be the longest job in the run, so they stay a matrix, one fresh
-    # environment per cell.
+    # Seven profiles of 1.6 to 3.7 minutes each, about 17 minutes in all
+    # (nightlies 43915083873, 44131328252, 44348203264, 44771173219). One job
+    # would be among the longest in the run and seven take seven runner slots,
+    # so they run as two jobs of about 8 and 10 minutes, grouped by measured
+    # time (#249). Each profile is a step with its own fresh environment.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - profile: building-present
-            args: "--building"
-            excludes: ""
-          - profile: building-no-maps
-            args: "--building --absent evennia_maps"
-            excludes: "--exclude evennia-maps"
-          - profile: building-no-regions
-            args: "--building --absent evennia_regions"
-            excludes: "--exclude evennia-regions"
-          - profile: building-no-jobs
-            args: "--building --absent evennia_jobs"
-            excludes: "--exclude evennia-jobs --exclude evennia-moderation"
-          - profile: building-no-economy
-            args: "--building --absent evennia_economy"
-            excludes: "--exclude evennia-economy"
-          - profile: building-no-social
-            args: "--building --absent evennia_social"
-            excludes: "--exclude evennia-social"
-          - profile: building-core
-            args: "--building --absent evennia_maps --absent evennia_regions --absent evennia_jobs --absent evennia_economy --absent evennia_social"
-            excludes: "--exclude evennia-maps --exclude evennia-regions --exclude evennia-jobs --exclude evennia-moderation --exclude evennia-economy --exclude evennia-social"
+        group: [a, b]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -242,10 +223,45 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
-      - name: Building suite and partner seams with verified absence
+      - name: building-no-maps
+        if: ${{ !cancelled() && matrix.group == 'a' }}
         run: >-
-          python scripts/ci_profile.py ${{ matrix.excludes }} --
-          python scripts/ci_run_partner_tests.py {game} ${{ matrix.args }}
+          python scripts/ci_profile.py --exclude evennia-maps --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_maps
+      - name: building-no-regions
+        if: ${{ !cancelled() && matrix.group == 'a' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-regions --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_regions
+      - name: building-no-social
+        if: ${{ !cancelled() && matrix.group == 'a' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-social --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_social
+      - name: building-present
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_partner_tests.py {game} --building
+      - name: building-no-jobs
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-jobs --exclude evennia-moderation --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_jobs
+      - name: building-no-economy
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-economy --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_economy
+      - name: building-core
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-maps --exclude evennia-regions
+          --exclude evennia-jobs --exclude evennia-moderation --exclude evennia-economy
+          --exclude evennia-social --
+          python scripts/ci_run_partner_tests.py {game} --building --absent evennia_maps
+          --absent evennia_regions --absent evennia_jobs --absent evennia_economy
+          --absent evennia_social
 
   resources-partners:
     needs: scope
