@@ -6,6 +6,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError, distribution
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -24,12 +25,19 @@ def main(argv=None):
             "evennia_jobs",
             "evennia_rp_equipment",
             "evennia_building",
+            "evennia_notices",
         ),
     )
     args = parser.parse_args(argv)
     for name in args.absent:
         if find_spec(name) is not None:
             parser.error(f"{name} is still importable; use a fresh environment with it excluded")
+        try:
+            distribution(name.replace("_", "-"))
+        except PackageNotFoundError:
+            pass
+        else:
+            parser.error(f"{name} distribution remains installed")
     game = args.game_dir.resolve()
     if not (game / "server/conf/settings.py").is_file():
         parser.error("Supply an initialized disposable game directory.")
@@ -40,8 +48,20 @@ def main(argv=None):
         Path(__file__).with_name("ci_economy_partner_tests.py"),
         game / "ci_economy_partner_tests.py",
     )
+    # ci_profile's package selection installs only the requested packages.
+    # Its blank game leaves registration to the profile runner.
+    installed = [
+        name
+        for name in ("evennia_links", "evennia_economy", "evennia_notices")
+        if find_spec(name) is not None
+    ]
     (game / "server/conf/economy_test_settings.py").write_text(
-        f"from server.conf.settings import *\nECONOMY_ABSENT_PARTNERS = {args.absent!r}\n",
+        "from server.conf.settings import *\n"
+        + "INSTALLED_APPS = list(INSTALLED_APPS)\n"
+        + f"INSTALLED_APPS += [label for label in {installed!r} if label not in INSTALLED_APPS]\n"
+        + f"ECONOMY_ABSENT_PARTNERS = {args.absent!r}\n"
+        + "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
+        + "TEST_RUNNER = 'evennia_links.testing.TestRunner'\n",
         encoding="utf-8",
     )
     result = subprocess.run(

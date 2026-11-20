@@ -104,8 +104,15 @@ JOBS = {
             "evennia_moderation",
             "evennia_building",
             "evennia_rp_equipment",
+            "evennia_notices",
         },
-        ("scripts/ci_run_economy_tests.py", "scripts/ci_economy_partner_tests.py"),
+        (
+            "scripts/ci_run_economy_tests.py",
+            "scripts/ci_economy_partner_tests.py",
+            "scripts/ci_run_economy_notices_upgrade.py",
+            "scripts/ci_run_notices_upgrade.py",
+            "example_game/server/conf/settings.py",
+        ),
     ),
     "crafting-partners": (
         {

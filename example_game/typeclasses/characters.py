@@ -26,6 +26,10 @@ processing in `msg()` — see both contribs' READMEs §"Integration recipe" /
 - `at_post_puppet` calls `evennia_xp.summary.notify_xp_summary` for Inbox
   recovery or standalone delivery when the optional XP app is installed.
 
+- `at_post_puppet` pays owed Economy stipends, then calls
+  `evennia_economy.notices.prepare_character` so income and stipends reach the
+  Inbox (or the standalone line when the Inbox is unavailable).
+
 - `get_display_desc` / `filter_visible` overrides — call evennia_rp_equipment's
   display helpers (worn lines in the description, worn items out of "You see")
   rather than mixing in `EquipmentCharacterMixin`, for the same reason as the
@@ -86,13 +90,13 @@ class Character(
 
         if apps.is_installed("evennia_economy"):
             from evennia_economy.batch import ensure_stipends
+            from evennia_economy.notices import prepare_character
             from evennia_economy.stalls import note_login
-            from evennia_economy.summary import notify_economy_summary
             from evennia_links.runtime import get
 
             if not get("RP_ECONOMY_FROZEN"):
                 ensure_stipends(self)
-            notify_economy_summary(self)
+            prepare_character(self)
             note_login(self)
 
         if apps.is_installed("evennia_rp_resources"):

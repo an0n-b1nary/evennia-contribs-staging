@@ -940,6 +940,8 @@ if "evennia_rp_resources" in INSTALLED_APPS:
     LINKS_NOTICE_SOURCES["resources"] = (
         "evennia_rp_resources.integrations.notices.ResourcesNoticeSource"
     )
+if "evennia_economy" in INSTALLED_APPS:
+    LINKS_NOTICE_SOURCES["economy"] = "evennia_economy.integrations.notices.EconomyNoticeSource"
 NOTICES_ENABLED = True
 NOTICES_RETENTION_DAYS = 30
 NOTICES_ROUTINE_LIMIT = 500

@@ -125,6 +125,8 @@ def main(argv=None):
         sources["xp"] = "evennia_xp.integrations.notices.XPNoticeSource"
     if find_spec("evennia_rp_resources") is not None:
         sources["resources"] = "evennia_rp_resources.integrations.notices.ResourcesNoticeSource"
+    if find_spec("evennia_economy") is not None:
+        sources["economy"] = "evennia_economy.integrations.notices.EconomyNoticeSource"
     (game / "server/conf/notices_test_settings.py").write_text(
         "from server.conf.settings import *\n"
         + extras
@@ -180,6 +182,8 @@ def main(argv=None):
         labels.extend(
             ["evennia_rp_resources.test_notices", "evennia_rp_resources.test_notice_concurrency"]
         )
+    if find_spec("evennia_economy") is not None:
+        labels.extend(["evennia_economy.test_notices", "evennia_economy.test_notice_concurrency"])
     if find_spec("evennia_xp") is not None:
         labels.append("evennia_xp.test_notice_standalone")
         if find_spec("evennia_notices") is not None:

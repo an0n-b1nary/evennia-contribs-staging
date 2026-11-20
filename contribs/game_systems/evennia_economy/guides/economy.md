@@ -19,7 +19,9 @@ Every character has a purse. Money comes in every week on its own, and you spend
 
 Each week, every character's purse gets a share of money. It's paid while you're away as well as while you play, and it doesn't depend on how much you roleplayed. A new character also gets a starting sum once.
 
-Income slows as your purse nears its cap, and stops at the cap. The cap only limits weekly income: trades, gifts and anything staff give you can take you past it. Some things you own, such as a stall, raise the cap while you hold them.
+After you choose your character, the login summary can flag an income or stipend notice. Open `+notices` to read it, and set its delivery with the source name `economy`. Games without an Inbox show a short line when you enter the game instead.
+
+Income slows as your purse nears its cap, and stops at the cap; you're told once when your purse reaches it. The cap only limits weekly income: trades, gifts and anything staff give you can take you past it. Some things you own, such as a stall, raise the cap while you hold them.
 
 :::insight[Nothing you hold decays]
 Money you've earned stays yours however long you're away. The cap slows income for full purses instead of taking anything back, so nobody has to log in to protect what they have.

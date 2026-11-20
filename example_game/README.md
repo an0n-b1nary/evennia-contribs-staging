@@ -85,7 +85,7 @@ ensures one cleanup Script is running. See the
 
 ### Economy, stalls and resource gathering
 
-`evennia-economy` 0.2 adds market stalls as well as integer purses and passive weekly income with a
+`evennia-economy` 0.5 adds market stalls as well as integer purses and passive weekly income with a
 five-UBI-week base cap, once-only starting stipends (plus a reveal stipend
 when a hidden economy is revealed), and atomic exchanges
 of money, carried items and resource counters. Demo authors start with 200 coins.
@@ -99,8 +99,11 @@ income previews, `/credit` and `/debit` for adjustments, and `/flags` for review
 The generic jobs reporter files cross-asset round-trip flags as staff discussions.
 Runtime settings control reveal, freeze, stipend amounts, income, taper, cap weeks,
 offer limits and zero-default fees. The server-start hook ensures the scheduler
-runs; the character login hook quietly summarizes income once. No economy mixin,
-MRO change or web/API mount is needed. Stalls are a later milestone.
+runs; the character puppet hook pays owed stipends, then sends income and
+stipends to the selected character's Inbox, or shows one quiet standalone line
+when the Inbox is disabled or absent. No economy mixin, MRO change or web/API
+mount is needed; the notices appear on the existing Inbox web page. Stalls are
+a later milestone.
 
 `world/sandbox/test_economy.py` exercises actual resources, worn equipment,
 review jobs, commands and login/start hooks. CI verifies truly absent resources,
@@ -2151,3 +2154,12 @@ selected character. The RP Resources preference controls immediate, summary,
 or off. The golden builder adds a synthetic weekly award for its verified
 admin character through the regular accrual service. Generic sandbox seeding
 does not issue notice demo awards.
+
+The `economy` source shows each weekly income payment and each stipend as its
+own notice for the selected character; set it with `+notices/set economy=…`.
+A capped week is told once, and zero stipends or zero uncapped income are not
+shown. While the economy is hidden nothing is shown or counted, even for
+staff, and a reveal surfaces only the latest unseen week. A new character's
+first puppet adds a starting-stipend notice. The golden builder pays a
+synthetic income week to its verified admin character through the regular
+batch service. Generic sandbox seeding does not issue notice demo payments.

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.db import IntegrityError, transaction
@@ -11,13 +12,12 @@ from evennia.utils.test_resources import BaseEvenniaCommandTest, EvenniaTest
 
 from evennia_links import runtime
 
-from . import assets, batch, conf
+from . import assets, batch, conf, notices
 from .commands import CmdAccept, CmdBalance, CmdEconomy, CmdGive, CmdOffer
 from .exchange import accept_offer, cancel_offer, create_offer
 from .models import LedgerEntry, Offer, Purse, ReviewFlag, StipendPayment, UBIPayment
 from .reports import account_accrual, reconciliation
 from .services import EconomyError, balance, charge_fee, credit, debit, same_account
-from .summary import notify_economy_summary
 
 
 def money(amount):
@@ -613,12 +613,23 @@ class EconomyTests(EvenniaTest):
         moved.assert_called_once()
         self.assertEqual(self.obj1.location, self.char2)
 
+    def show(self):
+        self.char1.account = self.account
+        session = SimpleNamespace(
+            logged_in=True, get_account=lambda: self.account, get_puppet=lambda: self.char1
+        )
+        with (
+            override_settings(NOTICES_ENABLED=False),
+            patch.object(notices, "_registered_sessions", return_value=[session]),
+        ):
+            return notices._prepare_committed(self.char1)
+
     def test_income_cap_notice_is_given_once(self):
         credit(self.char1, 500)
         for week in ("W1", "W2", "W3"):
             batch.run_weekly_batch(week)
             with patch.object(self.char1, "msg") as msg:
-                notify_economy_summary(self.char1)
+                self.show()
             if week == "W1":
                 self.assertIn("at its income cap", msg.call_args.args[0])
             else:
@@ -635,12 +646,16 @@ class EconomyTests(EvenniaTest):
         with override_settings(RP_ECONOMY_REVEALED=False):
             batch.run_weekly_batch("test")
             with patch.object(self.char1, "msg") as msg:
-                self.assertFalse(notify_economy_summary(self.char1))
+                self.assertFalse(self.show())
                 msg.assert_not_called()
         with patch.object(self.char1, "msg") as msg:
-            self.assertTrue(notify_economy_summary(self.char1))
-            self.assertFalse(notify_economy_summary(self.char1))
+            self.assertTrue(self.show())
+            self.assertFalse(self.show())
             msg.assert_called_once()
+        self.assertEqual(
+            msg.call_args.args[0],
+            "Your latest income: 100 coins. Stipends received: 0 coins. See +balance.",
+        )
 
     def test_reveal_hides_commands_and_help_for_players(self):
         with override_settings(RP_ECONOMY_REVEALED=False):

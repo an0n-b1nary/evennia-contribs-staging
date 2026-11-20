@@ -23,7 +23,7 @@ dependencies = ["evennia>=6.0", "evennia-links>=0.8.13,<0.9", "evennia-rp-resour
 
 [project.optional-dependencies]
 wearable = ["evennia-rp-equipment>=0.3.1,<0.4"]
-money = ["evennia-economy>=0.3.1,<0.5"]
+money = ["evennia-economy>=0.3.1,<0.6"]
 ambient = ["evennia-accessibility>=0.3,<0.4"]
 scenes = ["evennia-scenes>=0.8.2,<0.9"]
 plots = ["evennia-plots>=0.8,<0.9"]

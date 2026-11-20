@@ -21,7 +21,7 @@ from evennia_links import periodic
 from evennia_links.characters import is_playable, playable_characters
 from evennia_links.runtime import cap_raise, get
 
-from . import conf
+from . import conf, notices
 from .models import StipendPayment, UBIPayment
 from .services import balance, credit, lock_characters, require_open
 
@@ -124,9 +124,10 @@ def _stipends(character, *, dry_run=False, at_reveal=False):
         amount = get(f"RP_ECONOMY_{kind.upper()}_STIPEND")
         paid[kind] = amount
         if not dry_run:
-            StipendPayment.objects.create(character=character, kind=kind, amount=amount)
+            row = StipendPayment.objects.create(character=character, kind=kind, amount=amount)
             if amount:
                 credit(character, amount, kind=f"{kind}_stipend")
+            notices.stage_payment(character, stipend=row)
     return paid
 
 
@@ -135,6 +136,7 @@ def ensure_stipends(character):
     if not _owed(character) or not is_eligible(character):
         return {}
     with transaction.atomic():
+        notices.reserve_writer()
         require_open()
         lock_characters(character)
         return _stipends(character)
@@ -160,6 +162,7 @@ def run_stipends(*, at_reveal=False):
             continue
         try:
             with transaction.atomic():
+                notices.reserve_writer()
                 require_open()
                 lock_characters(character)
                 result["characters"][character.pk] = _stipends(character, at_reveal=at_reveal)
@@ -187,6 +190,7 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
     for character in eligible_characters() if characters is None else characters:
         try:
             with transaction.atomic():
+                notices.reserve_writer()
                 require_open()
                 lock_characters(character)
                 stipends = _stipends(character, dry_run=dry_run)
@@ -202,11 +206,13 @@ def run_weekly_batch(week=None, *, dry_run=False, characters=None):
                     "tapered": amount < get("RP_ECONOMY_WEEKLY_AMOUNT"),
                 }
                 if not dry_run:
-                    UBIPayment.objects.create(
+                    predecessor = notices.latest_income(character)
+                    marker = UBIPayment.objects.create(
                         character=character, week=week, amount=amount, details=details
                     )
                     if amount:
                         credit(character, amount, kind="ubi", note=week)
+                    notices.stage_payment(character, ubi=marker, predecessor=predecessor)
                 result["characters"][character.pk] = {"ubi": amount, "stipends": stipends}
         except Exception as exc:
             logger.exception("Economy batch failed for #%s, period %s", character.pk, week)

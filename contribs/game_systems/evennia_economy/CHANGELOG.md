@@ -1,10 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-11-19
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - **Breaking:** accept assets as amounts (`40 coins`, `3 grain`), carried names or dbrefs. Remove colon-prefixed forms; conflicting provider names refuse with named matches and a staff warning.
 - Keep invalid offer, shop and listing numbers readable.
+- Route weekly income and stipends to the optional Inbox (`inbox` extra, source `economy`) as character-only notices, one per income week and one per stipend.
+- Capped weeks already told stay quiet. Zero-amount stipends and zero income that isn't caused by the cap are not shown in the Inbox.
+- Nothing is shown or counted while the economy is hidden, even for staff. A reveal surfaces only the latest unseen week.
+- Preserve payment and summary marker records across upgrades and backend switches; handled payments never replay. With Inbox disabled or absent the standalone first-puppet line is unchanged, except that it now reaches only sessions of roster-owner accounts.
 
 ## 0.4.2 — 2026-10-24
 

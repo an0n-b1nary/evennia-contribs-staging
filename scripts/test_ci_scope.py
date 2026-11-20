@@ -103,6 +103,12 @@ class SelectJobsTests(unittest.TestCase):
             self.select("scripts/ci_run_resources_notices_upgrade.py"), ["notices-partners"]
         )
 
+    def test_economy_upgrade_runner_selects_economy_partners(self):
+        self.assertEqual(
+            self.select("scripts/ci_run_economy_notices_upgrade.py"), ["economy-partners"]
+        )
+        self.assertIn("economy-partners", self.select("example_game/server/conf/settings.py"))
+
     def test_social_page_upgrade_runner_selects_notice_partners(self):
         self.assertEqual(
             self.select("scripts/ci_run_social_notices_upgrade.py"), ["notices-partners"]

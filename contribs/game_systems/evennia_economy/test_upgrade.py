@@ -69,5 +69,12 @@ class StallUpgradeTests(TransactionTestCase):
                 "Original snapshot",
             )
             self.assertFalse(new.get_model("evennia_economy", "Storefront").objects.exists())
+            self.assertFalse(
+                new.get_model("evennia_economy", "EconomyNoticeReceipt").objects.exists()
+            )
+            self.assertEqual(
+                new.get_model("evennia_economy", "UBIPayment").objects.get(pk=payment.pk).amount,
+                23,
+            )
         finally:
             MigrationExecutor(connection).migrate(latest)

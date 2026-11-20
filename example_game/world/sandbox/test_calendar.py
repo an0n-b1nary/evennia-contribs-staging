@@ -52,7 +52,7 @@ class CalendarNoticeSeams(EvenniaTest):
         from evennia_links.notices import NoticeContext
         from evennia_notices.services import project
 
-        projected = project(NoticeContext(self.account, self.char1))
+        projected = project(NoticeContext(self.account, self.char1), source="calendar")
         self.assertIn("Lantern Walk", projected[0].text)
         self.assertIn("you're confirmed", projected[0].text)
         notice.refresh_from_db()
@@ -109,7 +109,9 @@ class CalendarNoticeSeams(EvenniaTest):
             session_summary(self.char1, session=self.session)
         row.refresh_from_db()
         self.assertEqual(row.route_state, "inbox")
-        self.assertEqual(len(project(NoticeContext(self.account, self.char1))), 1)
+        self.assertEqual(
+            len(project(NoticeContext(self.account, self.char1), source="calendar")), 1
+        )
         self.assertEqual(message.call_count, 1)
         self.assertIn("Notices:", message.call_args.args[0])
         self.assertNotIn("Pending Calendar fixture", message.call_args.args[0])

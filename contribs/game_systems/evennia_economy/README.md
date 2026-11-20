@@ -26,14 +26,40 @@ completed income period runs once, retrying only characters that failed, with
 backoff. No typeclass mixin or MRO change is required.
 
 From your character's `at_post_puppet`, after `super()`, call
-`evennia_economy.summary.notify_economy_summary(self)` for one quiet login line.
-Call `evennia_economy.batch.ensure_stipends(character)` from the login hook
-and from any approval hook, so the starting stipend arrives when a character
-first becomes eligible. It checks only that character and returns at once when
-nothing is owed. The weekly batch also reconciles stipends without a login.
-Skip that call while frozen, or handle `EconomyError`. Notifications are
-suppressed while hidden, even for staff.
-There is no web/API surface in this release.
+`evennia_economy.batch.ensure_stipends(self)` and then
+`evennia_economy.notices.prepare_character(self)`. The first pays a stipend the
+character is owed; call it from any approval hook too, so the starting stipend
+arrives when a character first becomes eligible. It checks only that character
+and returns at once when nothing is owed. The weekly batch also reconciles
+stipends without a login. Skip that call while frozen, or handle
+`EconomyError`. `evennia_economy.summary.notify_economy_summary(self)` remains
+as an alias for `prepare_character`. Notifications are suppressed while hidden,
+even for staff.
+
+To use Inbox, install the `inbox` extra (Inbox 0.1.1 and Links 0.8.15 or
+later). Add this entry to the host's `LINKS_NOTICE_SOURCES` mapping:
+
+```python
+"economy": "evennia_economy.integrations.notices.EconomyNoticeSource",
+```
+
+Weekly income and stipends then appear in the character's Inbox as separate
+notices, one per income week and one per stipend, visible only to that
+character. The source name is `economy`: players choose its delivery with
+`+notices/set economy=immediate`, `=summary` or `=off`; it defaults to the
+login summary. A capped week is announced once, not weekly. Zero-amount
+stipends and zero income that isn't caused by the cap are not shown in the
+Inbox. While `RP_ECONOMY_REVEALED` is off nothing is shown or counted, even for
+staff; a reveal surfaces only the latest unseen week, plus any stipends.
+
+With Inbox disabled, unbound or not installed, the puppet hook sends the
+standalone combined line ("Your latest income: … Stipends received: … See
++balance.") once per new payment. It reaches only sessions of accounts that
+have the character on their roster, or of the puppeting account for a
+character on nobody's roster. Payments already handled through either path do
+not replay after switching. Reading or clearing an Inbox notice never changes
+a purse, the journal or a payment record. The Inbox page is the only web
+surface in this release.
 
 ## Commands
 
