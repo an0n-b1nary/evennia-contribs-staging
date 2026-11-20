@@ -222,6 +222,15 @@ class WorkflowAgreementTests(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertIn(f"contains(fromJSON(needs.scope.outputs.jobs), '{name}')", block)
 
+    def test_partner_jobs_wait_only_for_scope(self):
+        # Chaining one partner job after another puts them end to end on the
+        # run's critical path (#235).
+        for name, block in workflow_jobs().items():
+            if name in ALWAYS_RUN:
+                continue
+            with self.subTest(job=name):
+                self.assertRegex(block, r"(?m)^    needs: scope$")
+
     def test_contribs_a_job_installs_are_its_subjects(self):
         # A contrib named after --absent in a job that never installs it is
         # only verified as missing; every other mention means it is installed.
