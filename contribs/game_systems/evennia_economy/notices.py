@@ -5,6 +5,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from threading import Lock
 from time import monotonic
 from uuid import uuid4
@@ -28,6 +29,8 @@ SOURCE = "economy"
 MARKER_KEY = "last_economy_summary"
 FULL_KEY = "economy_full_notified"
 LIMIT = 100
+# A claim older than this can no longer be in flight; its process stopped before settling.
+_ATTEMPT_LIFETIME = 300
 STIPEND_KINDS = ("starting", "reveal")
 State = EconomyNoticeReceipt.State
 ACKNOWLEDGED = (State.TRANSFERRED, State.SUPPRESSED, State.DELIVERED)
@@ -579,7 +582,12 @@ def _transport_line(claim, current, mode):
             _rows(character)
             .filter(ubi_id=latest.pk)
             .filter(
-                Q(state=State.PENDING) | (Q(state=State.ATTEMPTING) & ~Q(attempt=claim.attempt))
+                Q(state=State.PENDING)
+                | (
+                    Q(state=State.ATTEMPTING)
+                    & ~Q(attempt=claim.attempt)
+                    & Q(attempted_at__gte=timezone.now() - timedelta(seconds=_ATTEMPT_LIFETIME))
+                )
             )
         )
         if busy.exists():

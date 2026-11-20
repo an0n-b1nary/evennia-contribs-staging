@@ -2,6 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Committed income and stipends through standalone and real optional Inbox routes."""
 
+from datetime import timedelta
 from secrets import token_urlsafe
 from types import SimpleNamespace
 from unittest import skipUnless
@@ -12,6 +13,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db import transaction
 from django.test import TransactionTestCase, override_settings
+from django.utils import timezone
 from evennia.utils.create import create_account, create_object
 
 from evennia_links import runtime
@@ -325,6 +327,37 @@ class StandaloneEconomyNoticeTests(EconomyNoticeFixture):
         self.assertEqual(self.state(ubi=ubi), State.UNCERTAIN)
         self.assertFalse(self.show())
         self.character.msg.assert_called_once()
+
+    def strand_claim(self):
+        """A claim committed by a process that stopped before settling it."""
+        ubi = self.pay("w1")
+        self.assertIsNotNone(notices._claim_line(self.character, "standalone"))
+        self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
+        return ubi
+
+    def test_stale_foreign_attempt_stops_blocking_stipend_line(self):
+        ubi = self.strand_claim()
+        EconomyNoticeReceipt.objects.filter(ubi=ubi).update(
+            attempted_at=timezone.now() - timedelta(seconds=notices._ATTEMPT_LIFETIME + 60)
+        )
+        self.hide()
+        self.reveal()
+        self.assertTrue(self.show())
+        self.character.msg.assert_called_once_with(
+            "Your latest income: 100 coins. Stipends received: 150 coins. See +balance.",
+            session=self.session,
+        )
+        self.assertEqual(self.state(stipend=self.stipend("reveal")), State.DELIVERED)
+        self.assertFalse(self.show())
+        self.character.msg.assert_called_once()
+
+    def test_fresh_foreign_attempt_withholds_stipend_line(self):
+        self.strand_claim()
+        self.hide()
+        self.reveal()
+        self.assertFalse(self.show())
+        self.character.msg.assert_not_called()
+        self.assertEqual(self.state(stipend=self.stipend("reveal")), State.PENDING)
 
     @override_settings(RP_ECONOMY_REVEAL_STIPEND=0)
     def test_hidden_pending_week_defers_until_reveal(self):
