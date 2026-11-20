@@ -90,6 +90,55 @@ class NoticeRunnerTests(unittest.TestCase):
             self.assertIn("evennia_notices", run.call_args.args[0])
             self.assertIn("evennia_lore", run.call_args.args[0])
 
+    def test_focused_profiles_keep_notice_checks_with_real_partner_combinations(self):
+        for absent in (None, "evennia_notices", "evennia_social"):
+            with self.subTest(absent=absent), tempfile.TemporaryDirectory() as temporary:
+                game = Path(temporary)
+                (game / "server/conf").mkdir(parents=True)
+                (game / "server/conf/settings.py").write_text("")
+                absent_args = ["--absent", absent] if absent else []
+                with (
+                    patch.object(
+                        runner,
+                        "find_spec",
+                        side_effect=lambda name, absent=absent: (
+                            None if name == absent else object()
+                        ),
+                    ),
+                    patch.object(
+                        runner.importlib.metadata,
+                        "distribution",
+                        side_effect=runner.importlib.metadata.PackageNotFoundError,
+                    ),
+                    patch.object(runner, "run_suite", return_value=0) as run,
+                ):
+                    self.assertEqual(
+                        runner.main([str(game), "--coverage", "focused", *absent_args]), 0
+                    )
+                labels = run.call_args.args[1]
+                self.assertIn("ci_notices_partner_tests", labels)
+                self.assertIn("evennia_calendar.tests.TestNotices", labels)
+                self.assertIn("evennia_calendar.test_notice_concurrency", labels)
+                self.assertIn("evennia_lore.test_layers.TestAffirmation", labels)
+                self.assertIn("evennia_lore.test_notice_concurrency", labels)
+                self.assertIn("evennia_moderation.test_notice_privacy", labels)
+                self.assertIn("evennia_moderation.test_notice_concurrency", labels)
+                self.assertNotIn("evennia_calendar", labels)
+                self.assertNotIn("evennia_lore", labels)
+                self.assertNotIn("evennia_moderation", labels)
+                self.assertEqual("evennia_notices" in labels, absent != "evennia_notices")
+                social_labels = [label for label in labels if label.startswith("evennia_social.")]
+                if absent == "evennia_social":
+                    self.assertFalse(social_labels)
+                elif absent == "evennia_notices":
+                    self.assertIn(
+                        "evennia_social.tests.test_page_notices.StandalonePageTests", social_labels
+                    )
+                else:
+                    self.assertIn(
+                        "evennia_social.tests.test_page_notice_concurrency", social_labels
+                    )
+
     def test_minimal_lore_collects_only_core_without_web_partners(self):
         with tempfile.TemporaryDirectory() as temporary:
             game = Path(temporary)
