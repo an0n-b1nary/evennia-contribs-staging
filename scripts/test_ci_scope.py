@@ -50,13 +50,15 @@ class DependentsTests(ContribTreeMixin, unittest.TestCase):
             "party-independent": ({"evennia_rp_party"}, ()),
         }
         with patch.dict(scope.JOBS, jobs, clear=True):
-            selected, _ = scope.select_jobs(["contribs/base/evennia_links/models.py"], self.root)
+            selected, _, _ = scope.select_checks(
+                ["contribs/base/evennia_links/models.py"], self.root
+            )
         self.assertEqual(selected, ["building-partners"])
 
 
 class SelectJobsTests(unittest.TestCase):
     def select(self, *paths):
-        return scope.select_jobs(list(paths))[0]
+        return scope.select_checks(list(paths))[0]
 
     def test_top_level_docs_and_lint_only_files_select_no_partner_jobs(self):
         self.assertEqual(
@@ -159,6 +161,55 @@ class SelectJobsTests(unittest.TestCase):
         self.assertEqual(self.select(), [])
 
 
+class NoticeUpgradeSelectionTests(unittest.TestCase):
+    def select(self, *paths):
+        jobs, upgrades, _ = scope.select_checks(list(paths))
+        if upgrades:
+            self.assertIn("notices-partners", jobs)
+        return upgrades
+
+    def test_source_change_selects_its_populated_upgrade(self):
+        self.assertEqual(self.select("contribs/game_systems/evennia_social/notices.py"), ["social"])
+
+    def test_migration_selects_its_source_and_the_pre_foundation_fixture(self):
+        self.assertEqual(
+            self.select("contribs/game_systems/evennia_calendar/migrations/0010_notice.py"),
+            ["calendar", "pre-foundation"],
+        )
+
+    def test_dependency_changes_select_affected_sources(self):
+        self.assertEqual(self.select("contribs/game_systems/evennia_posing/signals.py"), ["social"])
+        self.assertEqual(
+            self.select("contribs/game_systems/evennia_plots/models.py"),
+            ["resources", "plots", "lore", "pre-foundation"],
+        )
+
+    def test_runner_and_fixture_select_the_profiles_that_read_them(self):
+        self.assertEqual(self.select("scripts/ci_run_lore_notices_upgrade.py"), ["lore"])
+        self.assertEqual(self.select("scripts/ci_notices_partner_tests.py"), ["pre-foundation"])
+
+    def test_unrelated_contrib_runs_the_partner_job_without_populated_upgrades(self):
+        jobs, upgrades, _ = scope.select_checks(["contribs/rpg/evennia_rp_combat/rounds.py"])
+        self.assertIn("notices-partners", jobs)
+        self.assertEqual(upgrades, [])
+
+    def test_shared_or_unclassified_changes_run_every_upgrade(self):
+        for path in (
+            "contribs/base_systems/evennia_links/notices.py",
+            "contribs/game_systems/evennia_notices/services.py",
+            "contribs/game_systems/evennia_social/integrations/ignoring.py",
+            "contribs/game_systems/evennia_unknown/models.py",
+            "example_game/server/conf/settings.py",
+            "scripts/ci_install_contribs.py",
+            "scripts/ci_profile.py",
+            "scripts/ci_run_notices_upgrade.py",
+            ".github/workflows/ci.yml",
+            "requirements.txt",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.select(path), list(scope.NOTICE_UPGRADES))
+
+
 class WorkflowAgreementTests(unittest.TestCase):
     """JOBS must describe the partner jobs ci.yml actually defines."""
 
@@ -193,26 +244,54 @@ class WorkflowAgreementTests(unittest.TestCase):
                 for path in reads:
                     self.assertTrue((scope.REPO_ROOT / path).exists(), path)
 
+    def test_populated_upgrade_steps_are_gated_on_their_profile(self):
+        jobs = workflow_jobs()
+        labels = set(scope.partner_graph(scope.REPO_ROOT / "contribs"))
+        steps = jobs["notices-partners"].split("\n      - name: Populated ")[1:]
+        self.assertEqual(len(steps), len(scope.NOTICE_UPGRADES))
+        for (name, (sources, (runner, *_))), step in zip(
+            scope.NOTICE_UPGRADES.items(), steps, strict=True
+        ):
+            with self.subTest(name=name):
+                self.assertLessEqual(sources, labels)
+                self.assertIn(
+                    f"contains(fromJSON(needs.scope.outputs.notice_upgrades), '{name}')", step
+                )
+                self.assertIn(f"python {runner} {{game}}", step)
+        self.assertIn("notice_upgrades: ${{ steps.select.outputs.notice_upgrades }}", jobs["scope"])
+
+    def test_only_nightly_uses_the_broad_host_suites(self):
+        block = workflow_jobs()["notices-partners"]
+        self.assertIn("github.event_name == 'schedule' && 'broad' || 'focused'", block)
+        self.assertEqual(block.count('--coverage "$NOTICE_TEST_COVERAGE"'), 3)
+
 
 class CommandLineTests(unittest.TestCase):
     def output(self, argv):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(scope.main(argv), 0)
-        key, _, value = out.getvalue().strip().partition("=")
-        self.assertEqual(key, "jobs")
-        return json.loads(value)
+        outputs = dict(line.split("=", 1) for line in out.getvalue().splitlines())
+        return {key: json.loads(value) for key, value in outputs.items()}
 
     def test_full_runs_select_every_job(self):
-        self.assertEqual(self.output(["--all"]), list(scope.JOBS))
+        self.assertEqual(
+            self.output(["--all"]),
+            {"jobs": list(scope.JOBS), "notice_upgrades": list(scope.NOTICE_UPGRADES)},
+        )
 
-    def test_paths_print_a_github_output_line(self):
-        self.assertEqual(self.output(["--paths", "scripts/ci_run_npc_tests.py"]), ["npc-partners"])
+    def test_paths_print_github_output_lines(self):
+        self.assertEqual(
+            self.output(["--paths", "scripts/ci_run_boards_notices_upgrade.py"]),
+            {"jobs": ["notices-partners"], "notice_upgrades": ["boards"]},
+        )
 
     def test_diff_lists_both_sides_of_a_rename(self):
         completed = subprocess.CompletedProcess([], 0, stdout="README.md\n")
         with patch.object(scope.subprocess, "run", return_value=completed) as run:
-            self.assertEqual(self.output(["--diff", "HEAD^1", "HEAD"]), [])
+            self.assertEqual(
+                self.output(["--diff", "HEAD^1", "HEAD"]), {"jobs": [], "notice_upgrades": []}
+            )
         self.assertIn("--no-renames", run.call_args.args[0])
         self.assertEqual(run.call_args.args[0][-2:], ["HEAD^1", "HEAD"])
 

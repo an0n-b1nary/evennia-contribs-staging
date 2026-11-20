@@ -138,7 +138,9 @@ class WorkflowAgreementTests(unittest.TestCase):
             merged += 1
             for step in steps:
                 with self.subTest(job=name, step=step.splitlines()[0]):
-                    self.assertIn("if: ${{ !cancelled() }}", step)
+                    self.assertRegex(
+                        step, r"(?m)^        if: \$\{\{ !cancelled\(\)(?: && .+)? \}\}$"
+                    )
         self.assertTrue(merged, "expected a job that runs several profiles")
 
 
