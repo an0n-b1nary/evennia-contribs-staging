@@ -75,6 +75,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       jobs: ${{ steps.select.outputs.jobs }}
+      notice_upgrades: ${{ steps.select.outputs.notice_upgrades }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -793,6 +794,8 @@ jobs:
     runs-on: ubuntu-latest
     # Main took 23 minutes (run 44633732636); the Economy notice suites add about 3.
     timeout-minutes: 40
+    env:
+      NOTICE_TEST_COVERAGE: ${{ github.event_name == 'schedule' && 'broad' || 'focused' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -805,13 +808,21 @@ jobs:
           version: "0.13.5"
       - name: All real partners
         if: ${{ !cancelled() }}
-        run: python scripts/ci_profile.py -- python scripts/ci_run_notices_tests.py {game}
+        run: >-
+          python scripts/ci_profile.py --
+          python scripts/ci_run_notices_tests.py {game} --coverage "$NOTICE_TEST_COVERAGE"
       - name: Physically absent inbox
         if: ${{ !cancelled() }}
-        run: python scripts/ci_profile.py --exclude evennia-notices -- python scripts/ci_run_notices_tests.py {game} --absent evennia_notices
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-notices --
+          python scripts/ci_run_notices_tests.py {game} --absent evennia_notices
+          --coverage "$NOTICE_TEST_COVERAGE"
       - name: Inbox without Social
         if: ${{ !cancelled() }}
-        run: python scripts/ci_profile.py --exclude evennia-social -- python scripts/ci_run_notices_tests.py {game} --absent evennia_social
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-social --
+          python scripts/ci_run_notices_tests.py {game} --absent evennia_social
+          --coverage "$NOTICE_TEST_COVERAGE"
       - name: Minimal independent inbox
         if: ${{ !cancelled() }}
         run: >-
@@ -892,55 +903,55 @@ jobs:
           --package contribs/game_systems/evennia_rp_resources --
           python scripts/ci_run_resources_tests.py {game} --absent evennia_plots
       - name: Populated Resources source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'resources') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_resources_notices_upgrade.py {game}
           --base 12ee0c2c6fa9e81ca487f4670f2ae15180dfea4a
       - name: Populated XP source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'xp') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_xp_notices_upgrade.py {game}
           --base 2c5286e8223e47c43d25a5a7946180af8c90fe08
       - name: Populated Plots source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'plots') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_plots_notices_upgrade.py {game}
           --base 9173aa4a395b4cbeec7858e5c89d37f444d927c3
       - name: Populated Social source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'social') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_social_notices_upgrade.py {game}
           --base 053915f2535d8c026ef55c5ed32fc38d5027198c
       - name: Populated Boards source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'boards') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_boards_notices_upgrade.py {game}
           --base df6e4a8b7b3e27d79bdcbaf0ea0c2368763e4f72
       - name: Populated Moderation source upgrade and inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'moderation') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_moderation_notices_upgrade.py {game}
           --base 6fb125fa3bbbd4666355744f5ce1ba6ffed66c74
       - name: Populated Lore source upgrade and inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'lore') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_lore_notices_upgrade.py {game}
           --base 6ee4f3454fcb8238cb88ddefc5bb317fe86b6137
       - name: Populated Calendar source upgrade and inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'calendar') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_calendar_notices_upgrade.py {game}
           --base 65bcd5f6ba0568097f5058bc36b41d5ccbed66d0
       - name: Populated pre-foundation upgrade
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(fromJSON(needs.scope.outputs.notice_upgrades), 'pre-foundation') }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_notices_upgrade.py {game}
