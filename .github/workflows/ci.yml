@@ -1,8 +1,9 @@
 name: CI
 
-# Pull requests run lint, the full suite on 3.12, 3.13/3.14 smoke cells and
-# the partner jobs scripts/ci_scope.py selects for the change. Pushes to main,
-# the nightly schedule and manual runs run everything.
+# Pull requests and pushes to main run the full suite on 3.12 and smoke cells
+# on 3.13/3.14. Nightly and manual runs test all three versions in full.
+# Pull requests select partner jobs with scripts/ci_scope.py; other runs use
+# every partner job.
 on:
   push:
     branches: [main]
@@ -96,8 +97,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     # A full cell takes about 9 minutes with parallel workers; the limit leaves
-    # room for setup, slow runners and suite growth. On pull requests 3.13 and
-    # 3.14 run a smoke cell; main and nightly run the full suite on all three.
+    # room for setup, slow runners and suite growth.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -138,11 +138,11 @@ jobs:
         working-directory: ci_game
         run: evennia migrate --noinput < /dev/null
       - name: Run tests
-        if: matrix.python-version == '3.12' || github.event_name != 'pull_request'
+        if: matrix.python-version == '3.12' || (github.event_name != 'pull_request' && github.event_name != 'push')
         working-directory: ci_game
         run: python ../scripts/ci_run_tests.py
       - name: Smoke suite, including the parallel worker start-up
-        if: matrix.python-version != '3.12' && github.event_name == 'pull_request'
+        if: matrix.python-version != '3.12' && (github.event_name == 'pull_request' || github.event_name == 'push')
         working-directory: ci_game
         run: python ../scripts/ci_run_tests.py evennia_links
 

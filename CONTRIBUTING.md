@@ -319,11 +319,18 @@ runner, so a long run doesn't slow down as it goes.
 
 ## CI
 
-Pushes to `main`, a nightly schedule and manual runs (**Run workflow** on the
-Actions tab, for any branch) run every job. A PR runs less:
+Pushes to `main`, nightly runs and manual runs (**Run workflow** on the
+Actions tab, for any branch) select every partner job. PRs select partner jobs
+based on the changed files.
 
 - **lint** (~1 min): pre-commit (anonymity guard + template and command syntax sweeps + Ruff format + Ruff check) + the command sweep's tests + Python syntax check. Always runs.
-- **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest. Installs Evennia, runs the template sweep, sets up a temporary game directory, installs every contrib with uv, runs each contrib's test suite via `evennia test --parallel=auto`. On a PR only 3.12 runs the full suite; 3.13 and 3.14 run a smoke cell (install, migrate, syntax check, template sweep and the `evennia_links` suite with parallel workers), and run in full on `main` and nightly.
+- **test** (~9 min per full cell): Python 3.12 / 3.13 / 3.14 × ubuntu-latest.
+  PRs and pushes to `main` run the full suite on Python 3.12 and smoke checks
+  on 3.13 and 3.14. Nightly and manual runs run the full suite on all three
+  versions. Every cell installs Evennia and all contribs with uv, runs the
+  template sweep and migrates a temporary game. The smoke cells also check
+  Python syntax and run the `evennia_links` suite with parallel workers. Full
+  cells run each contrib's suite with `evennia test --parallel=auto`.
 - **Partner jobs**, selected by `scripts/ci_scope.py` from the PR's changed
   files. A job runs when a changed contrib, or a contrib depending on it through
   hard dependencies or optional extras, is one the job installs, or when a file
