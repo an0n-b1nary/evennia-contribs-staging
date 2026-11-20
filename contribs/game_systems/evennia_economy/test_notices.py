@@ -399,6 +399,48 @@ class StandaloneEconomyNoticeTests(EconomyNoticeFixture):
             ],
         )
 
+    def test_held_unattempted_settlement_is_not_sent_twice(self):
+        self.addCleanup(notices._waiting.clear)
+        finalize, text = notices._finalize, notices.line_text
+        held = set()
+
+        def fail_held(claim, *args):
+            if not held or claim.attempt in held:
+                held.add(claim.attempt)
+                raise RuntimeError("database unavailable")
+            return finalize(claim, *args)
+
+        def drop_once(*args):
+            result = text(*args)
+            if not held:
+                self.session.logged_in = False
+            return result
+
+        ubi = self.pay("w1")
+        with (
+            patch.object(notices, "_finalize", side_effect=fail_held),
+            patch.object(notices, "line_text", side_effect=drop_once),
+        ):
+            self.assertFalse(self.show())
+            self.assertEqual(set(notices._waiting), held)
+            self.session.logged_in = True
+            self.backdate(ubi)
+            self.hide()
+            self.reveal()
+            self.assertFalse(self.show())
+            self.assertEqual(self.state(ubi=ubi), State.ATTEMPTING)
+            self.assertEqual(self.state(stipend=self.stipend("reveal")), State.PENDING)
+        self.character.msg.assert_not_called()
+        self.assertTrue(self.show())
+        self.assertFalse(self.show())
+        self.character.msg.assert_called_once_with(
+            "Your latest income: 100 coins. Stipends received: 150 coins. See +balance.",
+            session=self.session,
+        )
+        self.assertEqual(
+            set(EconomyNoticeReceipt.objects.values_list("state", flat=True)), {State.DELIVERED}
+        )
+
     def test_fresh_foreign_attempt_withholds_stipend_line(self):
         self.strand_claim()
         self.hide()

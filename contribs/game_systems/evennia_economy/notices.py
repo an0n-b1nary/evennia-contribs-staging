@@ -579,7 +579,11 @@ def _transport_line(claim, current, mode):
         return False
     if latest is not None and latest.pk not in {row.ubi_id for row in claimed}:
         with _waiting_lock:
-            waiting = set(_waiting)
+            waiting = {
+                attempt
+                for attempt, item in _waiting.items()
+                if item[0].character_id == character.pk
+            }
         in_flight = Q(attempted_at__gte=timezone.now() - timedelta(seconds=_ATTEMPT_LIFETIME)) | Q(
             attempt__in=waiting
         )
