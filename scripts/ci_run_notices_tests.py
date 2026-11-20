@@ -15,6 +15,30 @@ from zipfile import ZipFile
 
 from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
 
+FOCUSED_LABELS = {
+    "evennia_calendar": (
+        "evennia_calendar.test_notice_adapter",
+        "evennia_calendar.test_notice_concurrency",
+        "evennia_calendar.test_notice_repairs",
+        "evennia_calendar.tests.TestNotices",
+    ),
+    "evennia_lore": (
+        "evennia_lore.test_notice_adapter",
+        "evennia_lore.test_notice_concurrency",
+        "evennia_lore.test_layers.TestAffirmation",
+        "evennia_lore.test_layers.TestSealedNotes.test_unseal_publishes_settles_and_tells_every_holder",
+        "evennia_lore.test_layers.TestSealedLoreReminder",
+    ),
+    "evennia_moderation": (
+        "evennia_moderation.test_notice_adapter",
+        "evennia_moderation.test_notice_concurrency",
+        "evennia_moderation.test_notice_privacy",
+        "evennia_moderation.tests.TestReferrals.test_approval_notice_and_referral_history_survive_allowance_reset",
+        "evennia_moderation.tests.TestReferrals.test_decline_reason_is_staff_choice",
+        "evennia_moderation.tests.TestCommands.test_private_and_shared_decline_keep_referrer_notice_choice",
+    ),
+}
+
 
 def check_plots_metadata():
     """Exercise the real wheel and editable metadata outside the inventory tree."""
@@ -54,6 +78,12 @@ def main(argv=None):
     parser.add_argument("game_dir", type=Path)
     parser.add_argument("--absent", action="append", default=[])
     selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--coverage",
+        choices=("broad", "focused"),
+        default="broad",
+        help="suite for the three full-host profiles",
+    )
     selection.add_argument("--minimal", action="store_true")
     selection.add_argument("--minimal-boards", action="store_true")
     selection.add_argument("--minimal-calendar", action="store_true")
@@ -135,11 +165,12 @@ def main(argv=None):
         + "PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']\n"
         + f"LINKS_NOTICE_SOURCES = {sources!r}\n"
     )
+    focused = args.coverage == "focused"
     labels = ["ci_notices_partner_tests", "evennia_links.test_notices"]
     if find_spec("evennia_notices") is not None:
         labels.append("evennia_notices")
     if find_spec("evennia_moderation") is not None:
-        labels.append("evennia_moderation")
+        labels.extend(FOCUSED_LABELS["evennia_moderation"] if focused else ["evennia_moderation"])
     if find_spec("evennia_boards") is not None:
         if find_spec("evennia_notices") is None:
             labels.append("evennia_boards.test_notice_adapter.StandaloneActivityTests")
@@ -148,13 +179,17 @@ def main(argv=None):
                 ["evennia_boards.test_notice_adapter", "evennia_boards.test_notice_concurrency"]
             )
     if find_spec("evennia_lore") is not None:
-        labels.append("evennia_lore.test_notice_adapter" if args.minimal_lore else "evennia_lore")
+        if args.minimal_lore:
+            labels.append("evennia_lore.test_notice_adapter")
+        else:
+            labels.extend(FOCUSED_LABELS["evennia_lore"] if focused else ["evennia_lore"])
     if find_spec("evennia_calendar") is not None:
-        labels.extend(
-            ["evennia_calendar.test_notice_adapter", "evennia_calendar.test_notice_repairs"]
-            if args.minimal_calendar
-            else ["evennia_calendar"]
-        )
+        if args.minimal_calendar:
+            labels.extend(
+                ["evennia_calendar.test_notice_adapter", "evennia_calendar.test_notice_repairs"]
+            )
+        else:
+            labels.extend(FOCUSED_LABELS["evennia_calendar"] if focused else ["evennia_calendar"])
     if find_spec("evennia_social") is not None:
         labels.extend(
             [
@@ -192,6 +227,7 @@ def main(argv=None):
 
 
 def run_suite(game, labels):
+    print(f"Test labels: {', '.join(labels)}", flush=True)
     result = subprocess.run(
         [shutil.which("evennia"), "test", "--settings=notices_test_settings.py", *labels],
         cwd=game,
