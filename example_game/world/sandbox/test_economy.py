@@ -134,6 +134,7 @@ class EconomySeams(EconomyPartnerTests):
 
         from evennia_economy.models import EconomyNoticeReceipt
         from evennia_notices import views
+        from evennia_notices.models import Notice
 
         with self.captureOnCommitCallbacks(execute=True):
             result = run_weekly_batch("sandbox-notice-test", characters=[self.char2])
@@ -147,6 +148,8 @@ class EconomySeams(EconomyPartnerTests):
         self.assertNotContains(views.inbox(request).render(), "Weekly income")
         request.session["puppet"] = self.char2.pk
         self.assertContains(views.inbox(request).render(), "Weekly income")
+        notice = Notice.objects.get(source="economy", events__event_id__startswith="economy-income")
+        self.assertContains(views.detail(request, notice.public_ref).render(), "Weekly income")
         self.assertContains(views.preferences(request).render(), "Economy")
         with override_settings(RP_ECONOMY_REVEALED=False):
             self.assertNotContains(views.inbox(request).render(), "Weekly income")
