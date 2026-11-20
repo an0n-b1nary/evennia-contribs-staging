@@ -6,6 +6,7 @@
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - Keep invalid review record numbers readable.
+- Allow Economy 0.5 in the optional `money` extra.
 
 ## 0.12.1
 
