@@ -141,6 +141,23 @@ def build(scratch):
         )
     ):
         raise ValueError("Golden Resources award did not reach the rendered Inbox")
+    from evennia_economy.batch import run_weekly_batch as run_economy_batch
+    from evennia_economy.models import EconomyNoticeReceipt
+
+    if not get("RP_ECONOMY_REVEALED") or get("RP_ECONOMY_FROZEN"):
+        raise ValueError("Golden Economy income requires the revealed, open sandbox economy")
+    report = run_economy_batch(period, characters=[character])
+    if (
+        report["errors"]
+        or not EconomyNoticeReceipt.objects.filter(
+            character=character, ubi__week=period, state=EconomyNoticeReceipt.State.TRANSFERRED
+        ).exists()
+        or not any(
+            item.notice.source == "economy" and "Weekly income" in item.text
+            for item in project(context)
+        )
+    ):
+        raise ValueError("Golden Economy income did not reach the rendered Inbox")
     connections.close_all()
 
 
