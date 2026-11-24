@@ -853,9 +853,10 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'notices-sources')
     runs-on: ubuntu-latest
-    # Eight minimal independent sources and Resources with Plots absent, about
-    # three minutes together, then the populated upgrades ci_scope.py selects
-    # for the change, about a minute each and nine on a full run (#307).
+    # The minimal Inbox install, seven minimal independent sources and
+    # Resources with Plots absent, about three minutes together, then the
+    # populated upgrades ci_scope.py selects for the change, about a minute
+    # each and nine on a full run (#307).
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

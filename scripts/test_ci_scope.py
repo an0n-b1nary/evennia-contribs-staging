@@ -213,7 +213,7 @@ class NoticeUpgradeSelectionTests(unittest.TestCase):
         self.assertEqual(self.select("scripts/ci_run_lore_notices_upgrade.py"), ["lore"])
         self.assertEqual(self.select("scripts/ci_notices_partner_tests.py"), ["pre-foundation"])
 
-    def test_unrelated_contrib_runs_the_partner_job_without_populated_upgrades(self):
+    def test_unrelated_contrib_runs_both_inbox_jobs_without_populated_upgrades(self):
         jobs, upgrades, _ = scope.select_checks(["contribs/rpg/evennia_rp_combat/rounds.py"])
         self.assertIn("notices-partners", jobs)
         self.assertIn("notices-sources", jobs)
@@ -343,9 +343,21 @@ class WorkflowAgreementTests(unittest.TestCase):
             for step in re.split(r"(?m)^      - ", block)
             if "scripts/ci_profile.py" in step and not step.startswith("name: Populated ")
         }
-        self.assertTrue(steps)
-        self.assertIn("Minimal independent inbox", steps)
-        self.assertIn("Resources Inbox with Plots physically absent", steps)
+        # Adding or removing a source is a deliberate edit here too.
+        self.assertEqual(
+            list(steps),
+            [
+                "Minimal independent inbox",
+                "Minimal independent Boards source",
+                "Minimal independent Calendar source",
+                "Minimal independent Lore source",
+                "Minimal independent Moderation source",
+                "Minimal independent Social source",
+                "Minimal independent Plots source",
+                "Minimal independent XP source",
+                "Resources Inbox with Plots physically absent",
+            ],
+        )
         for name, step in steps.items():
             with self.subTest(step=name):
                 conditions = re.findall(r"(?m)^        if: (.*)$", step)
