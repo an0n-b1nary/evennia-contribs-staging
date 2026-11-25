@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 0.8.16 — 2026-11-24
+
+- `TestRunner` cancels, at the end of each Evennia test, the reactor timers it scheduled
+  and stops the looping calls of timed scripts it started, so finished tests' scripts no
+  longer stay scheduled.
+
 ## 0.8.15 — 2026-11-08
 
 - Add the model-free optional notices routing/source contract and strict notice ignore evaluation.

@@ -29,7 +29,7 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `ignore_policy_changing` | `ignoring.py` | Pre-change hook for transactional policy bookkeeping |
 | `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
 | `resolve_dotted` | `collect.py` | Import an object from a `"pkg.mod.attr"` settings path |
-| `TestRunner` | `testing.py` | Evennia test runner that stops each test's leftover tasks and thread work slowing the run |
+| `TestRunner` | `testing.py` | Evennia test runner that stops each test's leftover tasks, timers and thread work slowing the run |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
 
@@ -744,9 +744,18 @@ writes:
 TEST_RUNNER = "evennia_links.testing.TestRunner"
 ```
 
+Timed scripts a test starts keep their reactor timers after the test's rows
+roll back, as do direct `reactor.callLater` calls, and each timer holds what it
+references. The runner cancels the timers a test scheduled when the test ends,
+stopping a timed script's looping call rather than just cancelling it. A test
+cleanup that stops a looping call or cancels a `callLater` handle it made
+itself should guard it with `if loop.running` or `if call.active()`, because
+the runner may have got there first.
+
 It behaves like Evennia's own runner otherwise, and also supports
 `evennia test --parallel` when Python spawns its workers rather than forking
-them. Tasks that existed before a test started are left alone.
+them. Tasks and timers that existed before a test started are left alone; only
+tests built on `EvenniaTestMixin` are covered.
 
 ## Guide pages
 
