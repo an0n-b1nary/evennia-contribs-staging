@@ -30,6 +30,7 @@ downstream domain contribs like `evennia-scenes`, `evennia-plots`, etc.).
 | `collect_dicts` | `collect.py` | Send a *collector* signal and merge every receiver's dict answer |
 | `resolve_dotted` | `collect.py` | Import an object from a `"pkg.mod.attr"` settings path |
 | `TestRunner` | `testing.py` | Evennia test runner that stops each test's leftover tasks, timers and thread work slowing the run |
+| `snapshot_timers`, `stop_new_timers` | `testing.py` | Stop the reactor timers a test class starts in class-level setup |
 
 **Not yet included (deferred to a future release):** `NotificationDispatcher`.
 
@@ -751,6 +752,23 @@ stopping a timed script's looping call rather than just cancelling it. A test
 cleanup that stops a looping call or cancels a `callLater` handle it made
 itself should guard it with `if loop.running` or `if call.active()`, because
 the runner may have got there first.
+
+Timers that class-level setup starts, such as a timed script created in
+`setUpTestData`, outlive every test in the class, so the runner leaves them
+alone. A test class can sweep them itself with the same helpers, as a class
+cleanup, which also runs if the class's setup fails:
+
+```python
+from evennia_links.testing import snapshot_timers, stop_new_timers
+
+
+class SeededTests(EvenniaTest):
+    @classmethod
+    def setUpTestData(cls):
+        cls.addClassCleanup(stop_new_timers, snapshot_timers())
+        super().setUpTestData()
+        ...  # create the class's shared world
+```
 
 It behaves like Evennia's own runner otherwise, and also supports
 `evennia test --parallel` when Python spawns its workers rather than forking

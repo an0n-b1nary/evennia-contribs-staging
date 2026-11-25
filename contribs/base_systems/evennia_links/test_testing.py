@@ -8,7 +8,14 @@ from django.test import override_settings
 from evennia.scripts.taskhandler import TASK_HANDLER
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
-from .testing import TestRunner, _prepare_worker, discard_thread_work, isolate_tasks
+from .testing import (
+    TestRunner,
+    _prepare_worker,
+    discard_thread_work,
+    isolate_tasks,
+    snapshot_timers,
+    stop_new_timers,
+)
 
 
 def syntax_test_lock(*args, **kwargs):
@@ -145,6 +152,30 @@ class TestTaskIsolation(EvenniaTestCase):
 
         self.assertTrue(loop.running)
         self.assertTrue(loop.call.active())
+
+    def test_stop_new_timers_sweeps_only_what_followed_the_snapshot(self):
+        from twisted.internet import reactor
+        from twisted.internet.task import LoopingCall
+
+        kept = reactor.callLater(3600, print, "kept")
+        self.addCleanup(lambda: kept.active() and kept.cancel())
+        old_loop = LoopingCall(print)
+        old_loop.start(3600, now=False)
+        self.addCleanup(lambda: old_loop.running and old_loop.stop())
+        snapshot = snapshot_timers()
+        dropped = reactor.callLater(3600, print, "dropped")
+        self.addCleanup(lambda: dropped.active() and dropped.cancel())
+        new_loop = LoopingCall(print)
+        new_loop.start(3600, now=False)
+        self.addCleanup(lambda: new_loop.running and new_loop.stop())
+        old_loop.reset()
+
+        stop_new_timers(snapshot)
+
+        self.assertTrue(kept.active())
+        self.assertTrue(old_loop.running and old_loop.call.active())
+        self.assertFalse(dropped.active())
+        self.assertFalse(new_loop.running)
 
     def test_a_task_from_the_test_is_removed_before_its_timer(self):
         from evennia.utils.utils import delay

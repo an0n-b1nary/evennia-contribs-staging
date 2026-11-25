@@ -37,7 +37,8 @@ row but leaves its timer scheduled, holding the script and what it references.
 At the end of each Evennia test the runner cancels the timers that test
 scheduled, and stops a looping call rather than just cancelling it, so a later
 ``stop()`` doesn't fail. Timers that existed before the test, and the loops
-behind them, are left alone.
+behind them, are left alone. ``snapshot_timers`` and ``stop_new_timers`` do the
+same for timers a test class starts in its class-level setup.
 
 It also prepares Django's parallel workers when
 they are spawned instead of forked (the Linux default from Python 3.14), which
@@ -65,8 +66,13 @@ def _refresh_lock_functions(*, setting, **kwargs):
         _cache_lockfuncs()
 
 
-def _timers():
-    """Return the reactor's delayed calls and the looping calls that own them."""
+def snapshot_timers():
+    """Note the reactor timers that exist now, for a later ``stop_new_timers``.
+
+    Returns:
+        object: An opaque snapshot of the reactor's delayed calls and the
+            looping calls that own them. Pass it to ``stop_new_timers`` as is.
+    """
     from twisted.internet import reactor
     from twisted.internet.task import LoopingCall
 
@@ -74,16 +80,21 @@ def _timers():
     return calls, {call.func for call in calls if isinstance(call.func, LoopingCall)}
 
 
-def _stop_new_timers(calls, loops):
-    """Cancel the delayed calls not in ``calls``, stopping the loops that own them.
+def stop_new_timers(snapshot):
+    """Cancel the reactor timers scheduled since ``snapshot`` was taken.
 
-    A running ``LoopingCall`` is stopped rather than having its call cancelled,
-    so a later ``stop()`` of its script finds it already stopped instead of
-    failing on the cancelled call. Calls of a loop in ``loops`` are left alone.
+    A running ``LoopingCall``, such as a timed script's, is stopped rather than
+    having its call cancelled, so a later ``stop()`` of its script finds it
+    already stopped instead of failing on the cancelled call. Timers in the
+    snapshot, and new calls of a loop that was already in it, are left alone.
+
+    Args:
+        snapshot (object): What ``snapshot_timers`` returned.
     """
     from twisted.internet import reactor
     from twisted.internet.task import LoopingCall
 
+    calls, loops = snapshot
     for call in reactor.getDelayedCalls():
         if call in calls or not call.active():
             continue
@@ -118,7 +129,7 @@ def isolate_tasks():
     @functools.wraps(set_up)
     def setUp(self):
         self._tasks_before_test = set(TASK_HANDLER.tasks)
-        self._timers_before_test = _timers()
+        self._timers_before_test = snapshot_timers()
         set_up(self)
 
     @functools.wraps(tear_down)
@@ -132,7 +143,7 @@ def isolate_tasks():
                     TASK_HANDLER.remove(task_id)
             timers = getattr(self, "_timers_before_test", None)
             if timers is not None:
-                _stop_new_timers(*timers)
+                stop_new_timers(timers)
         finally:
             tear_down(self)
 
