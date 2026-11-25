@@ -10,19 +10,15 @@ from evennia.accounts.models import AccountDB
 from evennia.utils.test_resources import EvenniaTestMixin
 
 from evennia_links.notices import NoticeContext
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 from evennia_moderation import notices
 from evennia_moderation.models import Notice
 from evennia_moderation.tests import FORMS, AdmissionFixture
 
 
+@requires_file_backed_db
 @override_settings(LINKS_NOTICE_SOURCES={}, NOTICES_ENABLED=False)
 class OutcomeRaces(EvenniaTestMixin, TransactionTestCase):
-    def setUp(self):
-        super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Run separately with file-backed TEST database")
-
     def record(self):
         return notices.record_outcome(
             AccountDB.objects.get(pk=self.account.pk),
@@ -103,6 +99,7 @@ class OutcomeRaces(EvenniaTestMixin, TransactionTestCase):
         session.msg.assert_called_once()
 
 
+@requires_file_backed_db
 @override_settings(
     JOBS_REQUEST_FORMS=FORMS,
     MODERATION_REFERRAL_ALLOWANCE=1,
@@ -111,11 +108,6 @@ class OutcomeRaces(EvenniaTestMixin, TransactionTestCase):
 )
 class ReferralOutcomeRaces(AdmissionFixture, EvenniaTestMixin, TransactionTestCase):
     """Two actual staff reviews retain one outcome and one domain decision."""
-
-    def setUp(self):
-        super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Run separately with file-backed TEST database")
 
     def test_two_reviews_of_one_referral_emit_one_outcome(self):
         from evennia_jobs.models import RequestDecision
