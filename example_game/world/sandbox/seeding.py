@@ -33,12 +33,22 @@ class SeededSandboxMixin:
     The seeded rows keep their ids across tests, so every cached instance is
     dropped after each test: Evennia's own flush keeps objects that hold ndb
     data, and those would carry one test's in-memory state into the next.
+
+    Seeding starts timed scripts (opening the demo fight starts combat
+    maintenance), and their reactor timers would outlive the class's rolled-back
+    rows. The links test runner only stops the timers a single test starts, so
+    the class notes the timers before it seeds and stops the new ones when it
+    ends, even if seeding fails. A reseed inside a test is the runner's to
+    clean up.
     """
 
     @classmethod
     def setUpTestData(cls):
         from evennia.utils.create import create_object
 
+        from evennia_links.testing import snapshot_timers, stop_new_timers
+
+        cls.addClassCleanup(stop_new_timers, snapshot_timers())
         super().setUpTestData()
         hall = create_object(cls.room_typeclass, key="Room", nohome=True)
         cls.hall_id = hall.id

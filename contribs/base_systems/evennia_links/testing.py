@@ -30,12 +30,23 @@ forever, five per test, each holding its ``Deferred`` and closures. The runner
 stops the never-started pool, which makes it drop new work instead of queueing
 it. That work could never run either way.
 
+Timed scripts a test starts schedule a ``LoopingCall`` on the reactor, and some
+contribs call ``reactor.callLater`` directly. Tests never run the reactor, so
+those calls never fire, and the rollback that ends a test deletes a script's
+row but leaves its timer scheduled, holding the script and what it references.
+At the end of each Evennia test the runner cancels the timers that test
+scheduled, and stops a looping call rather than just cancelling it, so a later
+``stop()`` doesn't fail. Timers that existed before the test, and the loops
+behind them, are left alone. ``snapshot_timers`` and ``stop_new_timers`` do the
+same for timers a test class starts in its class-level setup.
+
 It also prepares Django's parallel workers when
 they are spawned instead of forked (the Linux default from Python 3.14), which
 Evennia's own runner setup does not reach.
 
 This works around Evennia 6.0's test harness; drop it once Evennia's
-``EvenniaTestMixin`` cleans up its own login task.
+``EvenniaTestMixin`` cleans up its own login task and the timers of scripts a
+test starts.
 """
 
 import functools
@@ -55,12 +66,55 @@ def _refresh_lock_functions(*, setting, **kwargs):
         _cache_lockfuncs()
 
 
-def isolate_tasks():
-    """Make ``EvenniaTestMixin`` remove the tasks each test schedules.
+def snapshot_timers():
+    """Note the reactor timers that exist now, for a later ``stop_new_timers``.
 
-    Wraps the mixin's ``setUp`` to note the task ids that already exist and
-    its ``tearDown`` to remove any others, before Evennia flushes its caches.
-    Safe to call more than once. Django must be set up first.
+    Returns:
+        object: An opaque snapshot of the reactor's delayed calls and the
+            looping calls that own them. Pass it to ``stop_new_timers`` as is.
+    """
+    from twisted.internet import reactor
+    from twisted.internet.task import LoopingCall
+
+    calls = set(reactor.getDelayedCalls())
+    return calls, {call.func for call in calls if isinstance(call.func, LoopingCall)}
+
+
+def stop_new_timers(snapshot):
+    """Cancel the reactor timers scheduled since ``snapshot`` was taken.
+
+    A running ``LoopingCall``, such as a timed script's, is stopped rather than
+    having its call cancelled, so a later ``stop()`` of its script finds it
+    already stopped instead of failing on the cancelled call. Timers in the
+    snapshot, and new calls of a loop that was already in it, are left alone.
+
+    Args:
+        snapshot (object): What ``snapshot_timers`` returned.
+    """
+    from twisted.internet import reactor
+    from twisted.internet.task import LoopingCall
+
+    calls, loops = snapshot
+    for call in reactor.getDelayedCalls():
+        if call in calls or not call.active():
+            continue
+        owner = call.func
+        if isinstance(owner, LoopingCall):
+            if owner in loops:
+                continue
+            if owner.running and owner.call is call:
+                owner.stop()
+                continue
+        call.cancel()
+
+
+def isolate_tasks():
+    """Make ``EvenniaTestMixin`` remove the tasks and cancel the timers each test schedules.
+
+    Wraps the mixin's ``setUp`` to note the task ids and reactor timers that
+    already exist and its ``tearDown`` to remove the other tasks, then cancel
+    the other timers, before Evennia flushes its caches. Safe to call more than
+    once. Django must be set up first.
     """
     from evennia.scripts.taskhandler import TASK_HANDLER
     from evennia.utils.test_resources import EvenniaTestMixin
@@ -75,15 +129,23 @@ def isolate_tasks():
     @functools.wraps(set_up)
     def setUp(self):
         self._tasks_before_test = set(TASK_HANDLER.tasks)
+        self._timers_before_test = snapshot_timers()
         set_up(self)
 
     @functools.wraps(tear_down)
     def tearDown(self):
-        before = getattr(self, "_tasks_before_test", None)
-        if before is not None:
-            for task_id in [task_id for task_id in TASK_HANDLER.tasks if task_id not in before]:
-                TASK_HANDLER.remove(task_id)
-        tear_down(self)
+        try:
+            # Tasks go first: removing one cancels its timer through its
+            # Deferred, which raises if the sweep has cancelled it already.
+            before = getattr(self, "_tasks_before_test", None)
+            if before is not None:
+                for task_id in [task_id for task_id in TASK_HANDLER.tasks if task_id not in before]:
+                    TASK_HANDLER.remove(task_id)
+            timers = getattr(self, "_timers_before_test", None)
+            if timers is not None:
+                stop_new_timers(timers)
+        finally:
+            tear_down(self)
 
     setattr(tearDown, _ISOLATED, True)
     EvenniaTestMixin.setUp = setUp
@@ -149,7 +211,7 @@ class _ParallelTestSuite(ParallelTestSuite):
 
 
 class TestRunner(EvenniaTestSuiteRunner):
-    """Evennia's test runner, with each test's leftover tasks and thread work dropped."""
+    """Evennia's test runner, with each test's leftover tasks, timers and thread work dropped."""
 
     parallel_test_suite = _ParallelTestSuite
 
