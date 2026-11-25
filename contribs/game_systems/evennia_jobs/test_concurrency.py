@@ -1,22 +1,20 @@
 """Run with a file-backed TEST database to exercise SQLite writer serialization."""
 
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from evennia.utils.test_resources import EvenniaTestMixin
 
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 
 from .models import RequestDecision, RequestWithdrawal
 from .review import review_request, submit_request, withdraw_request
 
 
+@requires_file_backed_db
 @override_settings(JOBS_REQUEST_FORMS={"proposal": {"questions": [("reason", "Reason")]}})
 class TestReviewWithdrawalRace(EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Race gate runs separately with a file-backed SQLite TEST database")
         self.submission = submit_request(
             author=self.char2,
             form_key="proposal",
