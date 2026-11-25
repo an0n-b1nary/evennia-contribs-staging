@@ -7,7 +7,12 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import LINKS_TEST_RUNNER, test_exit_code
+from ci_run_partner_tests import (
+    LINKS_TEST_RUNNER,
+    RACE_VERBOSITY,
+    race_exit_code,
+    test_exit_code,
+)
 
 PARTNERS = (
     "evennia_posing",
@@ -49,15 +54,17 @@ def main(argv=None):
             ["evennia_moderation.test_concurrency", "evennia_moderation.test_notice_concurrency"],
         ),
     ):
-        if "race" in settings_file:
+        race = "race" in settings_file
+        if race:
             (game / "server/conf" / settings_file).write_text(
                 "from server.conf.moderation_test_settings import *\n"
                 "from copy import deepcopy\nDATABASES = deepcopy(DATABASES)\n"
                 f"DATABASES['default']['TEST'] = {{'NAME': {str(game / 'moderation-races.sqlite3')!r}}}\n",
                 encoding="utf-8",
             )
+        verbosity = [RACE_VERBOSITY] if race else []
         result = subprocess.run(
-            [launcher, "test", "--noinput", "--settings", settings_file, *labels],
+            [launcher, "test", "--noinput", "--settings", settings_file, *verbosity, *labels],
             cwd=game,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -65,7 +72,7 @@ def main(argv=None):
             text=True,
             check=False,
         )
-        code = test_exit_code(result)
+        code = race_exit_code(result) if race else test_exit_code(result)
         if code:
             return code
     return 0

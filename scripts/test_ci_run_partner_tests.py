@@ -2,6 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Ensure partner-test invocation never accepts a zero-test launcher exit."""
 
+import ast
 import contextlib
 import io
 import re
@@ -42,6 +43,43 @@ class TestPartnerRunner(unittest.TestCase):
         for output in ("Ran 1 test in 0.2s\nOK\n", "Ran 278 tests in 30s\nOK\n"):
             with self.subTest(output=output):
                 self.assertEqual(self.result_code(0, output), 0)
+
+    def race_code(self, code, output):
+        """Apply the race-run check while keeping the unittest output concise."""
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return runner.race_exit_code(subprocess.CompletedProcess([], code, stdout=output))
+
+    def test_race_runs_fail_when_a_race_skips_for_want_of_a_file_backed_database(self):
+        skipped = (
+            "test_x (m.C.test_x) ... skipped 'Needs a file-backed test database: "
+            "SQLite in memory fails competing writers at once'\nRan 1 test\nOK (skipped=1)\n"
+        )
+        self.assertEqual(self.race_code(0, skipped), 1)
+        self.assertEqual(self.result_code(0, skipped), 0)
+
+    def test_race_runs_accept_partner_absence_skips(self):
+        output = "test_x (m.C.test_x) ... skipped 'Economy absent'\nRan 1 test\nOK (skipped=1)\n"
+        self.assertEqual(self.race_code(0, output), 0)
+
+    def test_race_runs_still_need_a_positive_count_and_keep_failures(self):
+        self.assertEqual(self.race_code(0, "Ran 0 tests\nOK\n"), 1)
+        self.assertEqual(self.race_code(2, "Ran 8 tests\nFAILED\n"), 2)
+
+    def test_file_backed_skip_marker_matches_the_links_skip_reason(self):
+        """The guard's marker is part of the reason evennia_links gives, read without Django."""
+        source = runner.REPO_ROOT / "contribs/base_systems/evennia_links/test_transactions.py"
+        values = [
+            node.value
+            for node in ast.parse(source.read_text(encoding="utf-8")).body
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "FILE_BACKED_ONLY"
+        ]
+        self.assertEqual(len(values), 1)
+        self.assertIsInstance(values[0], ast.Constant)
+        self.assertIsInstance(values[0].value, str)
+        self.assertIn(runner.FILE_BACKED_SKIP, values[0].value)
 
     def test_launch_uses_the_disposable_game_and_preserves_its_original_settings(self):
         """Keep generated settings intact and close stdin on the child test process."""
@@ -104,6 +142,7 @@ class TestPartnerRunner(unittest.TestCase):
             self.assertEqual(launch.call_count, 2)
             race_command = launch.call_args.args[0]
             self.assertIn("--settings=building_race_settings.py", race_command)
+            self.assertIn(runner.RACE_VERBOSITY, race_command)
             self.assertNotIn("evennia_jobs.test_concurrency", race_command)
             self.assertEqual(launch.call_args.kwargs["stdin"], subprocess.DEVNULL)
             self.assertIn(
@@ -115,11 +154,13 @@ class TestPartnerRunner(unittest.TestCase):
 class TestRunnerHosts(unittest.TestCase):
     """Every host uses the links test runner, and long suites run in parallel."""
 
-    def launch(self, module, argv, game, init=False):
+    def launch(self, module, argv, game, init=False, output=None, expected=0, stderr=None):
         """Run a runner's main() with `evennia` mocked; return its test commands.
 
         `init` lets a mocked `evennia --init` create the game the runner then
         configures; otherwise `game` is pre-initialized (or must not exist).
+        `output` maps a test command to its stdout; `expected` is main()'s result;
+        `stderr` collects what the runner prints there.
         """
         commands = []
 
@@ -129,15 +170,17 @@ class TestRunnerHosts(unittest.TestCase):
                 (Path(command[-1]) / "server/conf/settings.py").write_text("", encoding="utf-8")
                 return subprocess.CompletedProcess(command, 0)
             commands.append(command)
-            return subprocess.CompletedProcess(command, 0, stdout="Ran 8 tests\nOK\n")
+            stdout = output(command) if output else "Ran 8 tests\nOK\n"
+            return subprocess.CompletedProcess(command, 0, stdout=stdout)
 
         with (
             patch.object(module, "find_spec", return_value=None),
             patch.object(module.shutil, "which", return_value="evennia"),
             patch.object(module.subprocess, "run", side_effect=run),
             contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(stderr or io.StringIO()),
         ):
-            self.assertEqual(module.main(argv), 0)
+            self.assertEqual(module.main(argv), expected)
         return commands
 
     def settings_text(self, game, command):
@@ -200,6 +243,7 @@ class TestRunnerHosts(unittest.TestCase):
                 self.assertEqual(len(commands), 1 + serial_runs)
                 for command in commands[1:]:
                     self.assertNotIn(runner.PARALLEL, command)
+                    self.assertIn(runner.RACE_VERBOSITY, command)
                     self.assertIn("races.sqlite3", self.settings_text(game, command))
 
         for argv, serial_runs in ((["--building"], 1), (["--calendar", "present"], 0)):
@@ -210,7 +254,51 @@ class TestRunnerHosts(unittest.TestCase):
                 self.assertEqual(len(commands), 1 + serial_runs)
                 for command in commands[1:]:
                     self.assertNotIn(runner.PARALLEL, command)
+                    self.assertIn(runner.RACE_VERBOSITY, command)
                     self.assertIn("races.sqlite3", self.settings_text(game, command))
+
+        import ci_run_moderation_tests
+
+        with self.subTest(runner="ci_run_moderation_tests"), tempfile.TemporaryDirectory() as d:
+            game = self.initialized_game(d)
+            commands = self.launch(ci_run_moderation_tests, [str(game)], game)
+            self.assertEqual(len(commands), 2)
+            self.assertNotIn(runner.RACE_VERBOSITY, commands[0])
+            self.assertNotIn(runner.PARALLEL, commands[1])
+            self.assertIn(runner.RACE_VERBOSITY, commands[1])
+            self.assertIn("races.sqlite3", self.settings_text(game, commands[1]))
+
+    def test_race_steps_fail_when_a_race_skips_for_want_of_a_file_backed_database(self):
+        """Each runner's race step returns race_exit_code, not just a positive count."""
+        import ci_run_crafting_tests
+        import ci_run_moderation_tests
+
+        skipped = (
+            "test_x (m.C.test_x) ... skipped 'Needs a file-backed test database: "
+            "SQLite in memory fails competing writers at once'\n\n"
+            "Ran 1 test in 0.001s\n\nOK (skipped=1)\n"
+        )
+
+        def output(command):
+            return skipped if runner.RACE_VERBOSITY in command else "Ran 8 tests\nOK\n"
+
+        # A race step that only checked the count would pass this output.
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.test_exit_code(subprocess.CompletedProcess([], 0, skipped)), 0)
+
+        for module, argv, initialized in (
+            (runner, ["--building"], True),
+            (ci_run_crafting_tests, [], False),
+            (ci_run_moderation_tests, [], True),
+        ):
+            with self.subTest(runner=module.__name__), tempfile.TemporaryDirectory() as directory:
+                game = self.initialized_game(directory) if initialized else Path(directory) / "game"
+                stderr = io.StringIO()
+                commands = self.launch(
+                    module, [str(game), *argv], game, output=output, expected=1, stderr=stderr
+                )
+                self.assertIn(runner.RACE_VERBOSITY, commands[-1])
+                self.assertIn("skipped for want of a file-backed database", stderr.getvalue())
 
 
 if __name__ == "__main__":

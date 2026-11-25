@@ -366,7 +366,8 @@ requirements, using uv when it's on PATH and pip otherwise, and partner
 profiles skip `evennia migrate` because creating the test database runs the
 migrations. The
 sandbox gate, crafting, lore/items, and building and calendar
-partner suites run with parallel workers; file-backed race runs stay serial.
+partner suites run with parallel workers; file-backed race runs stay serial
+and fail if a race test skips for want of a file-backed database.
 Every test host uses the links test runner (`evennia_links.testing.TestRunner`),
 which stops Evennia's test fixture from keeping each finished test's world,
 its queued log writes and its scripts' timers in memory.

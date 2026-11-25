@@ -23,6 +23,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # with its own copy of the test database (DJANGO_TEST_PROCESSES overrides the
 # count). File-backed race runs stay serial.
 PARALLEL = "--parallel=auto"
+# Race runs list each test's outcome so race_exit_code can read skip reasons.
+# Never `-v 2`: the Evennia launcher reads `-v` as --version.
+RACE_VERBOSITY = "--verbosity=2"
+# Matches evennia_links.test_transactions.FILE_BACKED_ONLY, the skip reason of
+# races that need a file-backed database.
+FILE_BACKED_SKIP = "file-backed test database"
 # Evennia 6.0's test mixin leaves a login task and queued log writes behind per
 # test, so a serial run slows with every test. Hosts that
 # ci_install_contribs.py doesn't configure add this line to their settings;
@@ -86,7 +92,14 @@ def building_profile(game, absent, launcher):
     if find_spec("evennia_jobs") is not None:
         labels.append("evennia_jobs.test_concurrency")
     result = subprocess.run(
-        [launcher, "test", "--noinput", "--settings=building_race_settings.py", *labels],
+        [
+            launcher,
+            "test",
+            "--noinput",
+            "--settings=building_race_settings.py",
+            RACE_VERBOSITY,
+            *labels,
+        ],
         cwd=game,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -96,7 +109,7 @@ def building_profile(game, absent, launcher):
         errors="replace",
         check=False,
     )
-    return test_exit_code(result)
+    return race_exit_code(result)
 
 
 def test_exit_code(result: subprocess.CompletedProcess) -> int:
@@ -106,6 +119,20 @@ def test_exit_code(result: subprocess.CompletedProcess) -> int:
         return result.returncode
     if not re.search(r"^Ran [1-9]\d* tests?\b", result.stdout, re.MULTILINE):
         print("No positive test count; refusing a silently-green Evennia run.", file=sys.stderr)
+        return 1
+    return 0
+
+
+def race_exit_code(result: subprocess.CompletedProcess) -> int:
+    """Also fail a file-backed race run whose tests skipped for want of a file-backed database."""
+    code = test_exit_code(result)
+    if code:
+        return code
+    if re.search(r"skipped ['\"][^\n]*" + re.escape(FILE_BACKED_SKIP), result.stdout):
+        print(
+            "A race test skipped for want of a file-backed database in a file-backed run.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
