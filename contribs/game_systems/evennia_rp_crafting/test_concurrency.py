@@ -5,11 +5,10 @@
 from unittest import skipUnless
 
 from django.apps import apps
-from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from evennia.utils.test_resources import EvenniaTestMixin
 
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 
 from . import fixtures, services
 from .errors import CraftingError
@@ -20,11 +19,10 @@ from .tests import CraftingFixture
 from .wave_two import activate
 
 
+@requires_file_backed_db
 class JournalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         self.unlock()
         self.journal = self.book(configuration={"journal": 2}, selected={"wood": 2})
 
@@ -78,13 +76,9 @@ class JournalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.assertFalse(ReadableEdition.objects.exists())
 
 
+@requires_file_backed_db
 @skipUnless(apps.is_installed("evennia_economy"), "Economy absent")
 class ModifierAcceptanceRaces(WaveThreeFixture, EvenniaTestMixin, TransactionTestCase):
-    def setUp(self):
-        super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
-
     def test_cancellation_waits_for_committed_acceptance(self):
         from . import modifiers
         from .models import ModificationLayer
@@ -115,8 +109,6 @@ class ModifierAcceptanceRaces(WaveThreeFixture, EvenniaTestMixin, TransactionTes
         from . import modifiers
         from .models import ModificationLayer
 
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         offer = self.offer()
         before = balance(self.char1)
         with self.assertRaises(ValueError):
@@ -159,12 +151,11 @@ class ModifierAcceptanceRaces(WaveThreeFixture, EvenniaTestMixin, TransactionTes
         self.assertIsNone(row.applied_at)
 
 
+@requires_file_backed_db
 @skipUnless(apps.is_installed("evennia_building"), "building absent")
 class FixtureAuthorityRaces(WaveTwoFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         from evennia_building import services
         from evennia_building.models import Property
 
@@ -303,11 +294,10 @@ class FixtureAuthorityRaces(WaveTwoFixture, EvenniaTestMixin, TransactionTestCas
         self.assertEqual(ActivationUse.objects.count(), 1)
 
 
+@requires_file_backed_db
 class LetterRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         self.unlock()
         from .models import CraftRecord
 
@@ -384,12 +374,11 @@ class LetterRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.assertEqual(state.opened_at, state.first_opened_at)
 
 
+@requires_file_backed_db
 @skipUnless(apps.is_installed("evennia_rp_equipment"), "Equipment absent")
 class WearableStateRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         from .test_states import FACET
 
         self.unlock("weaving")
@@ -432,12 +421,11 @@ class WearableStateRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase)
         self.assertEqual(states.current(self.cloak, states.configuration(self.cloak)), "down")
 
 
+@requires_file_backed_db
 @skipUnless(apps.is_installed("evennia_scenes"), "scenes absent")
 class PatternRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         from evennia.utils.create import create_object
 
         from evennia_scenes.models import Scene, SceneParticipant
@@ -481,12 +469,11 @@ class PatternRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.assertFalse(PatternKnowledge.objects.filter(character=self.char2).exists())
 
 
+@requires_file_backed_db
 @skipUnless(apps.is_installed("evennia_jobs"), "jobs absent")
 class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         from evennia.utils.create import create_object
 
         from evennia_jobs.review import submit_request
@@ -533,11 +520,10 @@ class ProposalRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
         self.assertFalse(RequestDecision.objects.filter(submission=second).exists())
 
 
+@requires_file_backed_db
 class WorkshopConfirmationRaces(CraftingFixture, EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in str(connection.settings_dict["NAME"]):
-            self.skipTest("Race gate requires a file-backed test database")
         from . import unlocks
 
         unlocks.select(self.char1, "writing-0", "3 wood")
