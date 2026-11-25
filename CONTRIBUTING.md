@@ -349,13 +349,15 @@ based on the changed files.
   side by side, so `live-playtest` still runs, and may fail for the same
   cause, when the gate fails.
 
-Each partner profile (in the `*-partners`, `rp-sandbox`, `sandbox` and
-`crafting-independent` jobs) runs through `scripts/ci_profile.py`, which
-installs one combination of partners in a fresh venv and game of its own and
-runs the profile's runner there. A family whose profiles test for a minute or
-two runs them as steps of one job, each in its own venv, so an excluded partner
-is still physically absent; every step runs even after an earlier one fails.
-Building and crafting profiles take longer, so each stays its own matrix job.
+Each partner profile (in the `*-partners`, `notices-sources`, `rp-sandbox`,
+`sandbox` and `crafting-independent` jobs) runs through
+`scripts/ci_profile.py`, which installs one combination of partners in a fresh
+venv and game of its own and runs the profile's runner there. A family whose
+profiles test for a minute or two runs them as steps of one job, each in its
+own venv, so an excluded partner is still physically absent; every step runs
+even after an earlier one fails.
+Building, crafting and the full-host Inbox profiles take longer, so they run
+as matrix entries.
 CI installs with uv: on the runners the time goes into installing, not
 downloading, and uv does it several times faster than pip.
 `ci_install_contribs.py` installs the selection with one
@@ -370,9 +372,9 @@ which stops Evennia's test fixture from keeping each finished test's world and
 its queued log writes in memory.
 
 The `test`, partner, `sandbox` and `live-playtest` jobs have a 30-minute
-limit, the `*-independent` and `moderation-partners` jobs 20 minutes, and
-lint and `scope` 5. `notices-partners` has 40 minutes until #307 splits it.
-These bounds include installation.
+limit, the `*-independent`, `moderation-partners`, `boards-partners`,
+`notices-partners` and `notices-sources` jobs 20 minutes, and lint and `scope`
+5. These bounds include installation.
 
 A skipped partner job reports as skipped, not failed. A failure in the nightly
 run shows on the Actions tab and notifies whoever last changed the schedule.
@@ -551,8 +553,12 @@ live combat suite also exercise Party with actual optional partners.
 `python scripts/ci_profile.py -- python scripts/ci_run_notices_tests.py {game}`
 checks installed routing. Add `--exclude evennia-notices` before `--` and
 `--absent evennia_notices` after the game to prove physical Inbox absence.
-The notices-partners CI job also covers Social absence and a fresh Links/Inbox
-only package selection. Missing distributions, import failure, absent app
+The `notices-partners` CI job runs the all-partners, Inbox-absent and
+Social-absent host profiles as three parallel matrix entries.
+`notices-sources` runs a fresh Links/Inbox only package selection, each
+source's minimal independent install, Resources with Plots physically absent,
+and the populated upgrades `scripts/ci_scope.py` selects for the change (all
+of them on full runs). Missing distributions, import failure, absent app
 registration and positive test counts are asserted. Sources remain responsible
 for durable route receipts across Inbox removal. Calendar's adapter is covered
 with Inbox present/absent, a minimal Links/Calendar install, and a populated

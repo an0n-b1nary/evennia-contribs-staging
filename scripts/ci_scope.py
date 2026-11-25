@@ -33,6 +33,7 @@ EVERY_CONTRIB = None
 
 # Profile name in ci.yml -> sources it exercises, runner and any extra files it
 # reads. The dependency graph covers the packages those sources depend on.
+# notices-sources runs these steps and reads every path listed here.
 NOTICE_UPGRADES = {
     "resources": (
         {"evennia_rp_resources", "evennia_plots"},
@@ -67,14 +68,26 @@ SHARED_NOTICE_UPGRADE_PATHS = (
 )
 
 # Job name in ci.yml -> (contribs it installs and exercises, other paths it
-# reads). EVERY_CONTRIB marks jobs that load the whole example game. Partners
+# reads). EVERY_CONTRIB marks jobs that install every contrib. Partners
 # a job only verifies as absent aren't listed: their changes can't reach it.
 JOBS = {
     "notices-partners": (
         EVERY_CONTRIB,
+        # The runner copies the fixture module into each host game.
+        ("scripts/ci_run_notices_tests.py", "scripts/ci_notices_partner_tests.py"),
+    ),
+    # Reads every upgrade input outside contribs/, so a change that selects a
+    # populated upgrade also selects the job that runs it.
+    "notices-sources": (
+        EVERY_CONTRIB,
         (
             "scripts/ci_run_notices_tests.py",
-            "example_game/",
+            "scripts/ci_notices_partner_tests.py",
+            "scripts/ci_run_resources_tests.py",
+            "scripts/ci_resources_partner_tests.py",
+            # The upgrades copy the base commit's example game but run the
+            # current settings.
+            "example_game/server/conf/",
             *(path for _, reads in NOTICE_UPGRADES.values() for path in reads),
         ),
     ),

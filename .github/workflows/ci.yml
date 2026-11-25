@@ -385,7 +385,8 @@ jobs:
           python scripts/ci_run_economy_tests.py {game}
           --absent evennia_rp_resources --absent evennia_jobs
           --absent evennia_building --absent evennia_rp_equipment
-      # Here rather than notices-partners, which already runs close to its limit.
+      # Not in notices-sources: Economy's upgrade isn't one of the populated Inbox
+      # upgrades ci_scope.py selects, so it runs whenever economy-partners does.
       - name: Populated Economy source upgrade and Inbox removal
         if: ${{ !cancelled() }}
         run: >-
@@ -808,14 +809,22 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'notices-partners')
     runs-on: ubuntu-latest
-    # Main took 23 minutes (run 44633732636); the Economy notice suites add about 3.
-    timeout-minutes: 40
+    # The three full-host Inbox profiles took 6.2, 3.2 and 5.2 minutes in PR
+    # #302's run 44803815140, and 6.1, 3.9 and 6.2 with the nightly's broad
+    # suites (44771173219). With the minimal sources and populated upgrades as
+    # steps of the same job they took about 27 minutes, so each profile is a
+    # matrix entry here and the rest runs in notices-sources (#307). Each
+    # profile is a step with its own fresh environment, its excluded partner
+    # physically absent.
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [all-partners, no-inbox, no-social]
     env:
       NOTICE_TEST_COVERAGE: ${{ github.event_name == 'schedule' && 'broad' || 'focused' }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -823,22 +832,43 @@ jobs:
         with:
           version: "0.13.5"
       - name: All real partners
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.profile == 'all-partners' }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_notices_tests.py {game} --coverage "$NOTICE_TEST_COVERAGE"
       - name: Physically absent inbox
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.profile == 'no-inbox' }}
         run: >-
           python scripts/ci_profile.py --exclude evennia-notices --
           python scripts/ci_run_notices_tests.py {game} --absent evennia_notices
           --coverage "$NOTICE_TEST_COVERAGE"
       - name: Inbox without Social
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.profile == 'no-social' }}
         run: >-
           python scripts/ci_profile.py --exclude evennia-social --
           python scripts/ci_run_notices_tests.py {game} --absent evennia_social
           --coverage "$NOTICE_TEST_COVERAGE"
+
+  notices-sources:
+    needs: scope
+    if: contains(fromJSON(needs.scope.outputs.jobs), 'notices-sources')
+    runs-on: ubuntu-latest
+    # The minimal Inbox install, seven minimal independent sources and
+    # Resources with Plots absent, about three minutes together, then the
+    # populated upgrades ci_scope.py selects for the change, about a minute
+    # each and nine on a full run (#307).
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The populated upgrades archive their base commits.
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.5"
       - name: Minimal independent inbox
         if: ${{ !cancelled() }}
         run: >-
