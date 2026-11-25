@@ -1,10 +1,15 @@
 """SQL rollback must also restore objects already held by callers."""
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Event
+from unittest import skipUnless
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.db import connection, connections, transaction
+from django.db import DEFAULT_DB_ALIAS, connection, connections, transaction
+from django.db.backends.sqlite3.creation import DatabaseCreation
+from django.test import SimpleTestCase, TransactionTestCase
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -64,6 +69,70 @@ class TestAtomicObjects(EvenniaTest):
         self.assertEqual(self.obj1.location, self.room1)
         self.assertIn(self.obj1, self.room1.contents)
         self.assertEqual(ObjectDB.objects.get(pk=pk), self.obj1)
+
+
+FILE_BACKED_ONLY = (
+    "Needs a file-backed test database: SQLite in memory fails competing writers at once"
+)
+
+
+def file_backed_test_db(alias=DEFAULT_DB_ALIAS):
+    """Whether this run's test database for ``alias`` is a real database, not SQLite in memory.
+
+    Read from settings, so it holds at import time and in every parallel worker.
+    """
+    db = connections[alias]
+    if db.vendor != "sqlite":
+        return True
+    return not DatabaseCreation.is_in_memory_db(db.settings_dict["TEST"]["NAME"] or ":memory:")
+
+
+def requires_file_backed_db(cls):
+    """Class decorator: skip the whole class (no setUpClass, world or flush) on in-memory SQLite."""
+    return skipUnless(file_backed_test_db(), FILE_BACKED_ONLY)(cls)
+
+
+class TestFileBackedTestDB(SimpleTestCase):
+    def test_test_name_decides(self):
+        cases = [
+            (None, False),
+            ("", False),
+            (":memory:", False),
+            ("file:memorydb_default?mode=memory&cache=shared", False),
+            ("/x/races.sqlite3", True),
+            (Path("/x/races.sqlite3"), True),
+        ]
+        test_settings = connections["default"].settings_dict["TEST"]
+        with patch.object(connections["default"], "vendor", "sqlite"):
+            for name, expected in cases:
+                with self.subTest(name=name), patch.dict(test_settings, NAME=name):
+                    self.assertIs(file_backed_test_db(), expected)
+
+    def test_other_vendors_run(self):
+        test_settings = connections["default"].settings_dict["TEST"]
+        with (
+            patch.object(connections["default"], "vendor", "postgresql"),
+            patch.dict(test_settings, NAME=None),
+        ):
+            self.assertIs(file_backed_test_db(), True)
+
+    def test_agrees_with_this_runs_database(self):
+        db = connections["default"]
+        if db.vendor != "sqlite":
+            self.assertIs(file_backed_test_db(), True)
+            return
+        self.assertEqual(file_backed_test_db(), not db.is_in_memory_db())
+
+    def test_decorator_marks_the_class(self):
+        test_settings = connections["default"].settings_dict["TEST"]
+        with patch.object(connections["default"], "vendor", "sqlite"):
+            with patch.dict(test_settings, NAME=None):
+                skipped = requires_file_backed_db(type("Skipped", (TransactionTestCase,), {}))
+            with patch.dict(test_settings, NAME="/x/races.sqlite3"):
+                running = requires_file_backed_db(type("Running", (TransactionTestCase,), {}))
+        self.assertTrue(skipped.__unittest_skip__)
+        self.assertEqual(skipped.__unittest_skip_why__, FILE_BACKED_ONLY)
+        self.assertFalse(getattr(running, "__unittest_skip__", False))
 
 
 def committed_race(first, second):
