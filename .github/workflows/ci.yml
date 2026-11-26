@@ -161,6 +161,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # Every partner present: the Lore, Crafting and Equipment suites and Links
+      # pagination under the reference game's settings and URLs, which `test`
+      # doesn't use. Its lore-item and readable seams also run in the sandbox gate.
       - name: all-present
         if: ${{ !cancelled() }}
         run: >-
@@ -190,6 +193,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # The only run of the partner fixture with Calendar installed: overlays,
+      # event links and rendered maps through the real partner URLs. The Maps
+      # suite also runs in `test`, under the bare game's URLconf, and the sandbox
+      # gate checks the same overlays under its own settings.
       - name: calendar-present
         if: ${{ !cancelled() }}
         run: >-
@@ -238,6 +245,10 @@ jobs:
         run: >-
           python scripts/ci_profile.py --exclude evennia-social --
           python scripts/ci_run_partner_tests.py {game} --building --absent evennia_social
+      # Every partner at once: the file-backed Building and Jobs races, and
+      # Building's command, frontier, apartment and interior suites under the
+      # partner URLconf in a bare game. `test` runs those suites without races,
+      # the sandbox gate under its own settings; the other profiles repeat both.
       - name: building-present
         if: ${{ !cancelled() && matrix.group == 'b' }}
         run: >-
@@ -276,6 +287,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # The baseline for the absent profiles below. Resources' suite runs as in
+      # `test`, in a bare game, but serially; the only addition is the real-Maps
+      # terrain seam, which the profiles that keep Maps also run.
       - name: all-present
         if: ${{ !cancelled() }}
         run: >-
@@ -336,6 +350,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # The baseline for the absent profiles below: Economy's suite as in `test`,
+      # but serially, and its partner seams with every partner in a bare game.
+      # `test` doesn't run those seams; the sandbox gate runs them under its own
+      # settings.
       - name: all-present
         if: ${{ !cancelled() }}
         run: >-
@@ -404,6 +422,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Unique to all-present: the file-backed races with every partner at
+          # once, though each race class also runs in another entry. Its Crafting
+          # suite also runs with every partner in `test` and lore-items-partners,
+          # and its world seams in the sandbox gate.
           - profile: all-present
             excludes: ""
             absent: ""
@@ -448,6 +470,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # The baseline for the absent profiles below: the Contest suite with every
+      # partner in a bare game, exactly as `test` runs it but alone and serially.
       - name: all-present
         if: ${{ !cancelled() }}
         run: >-
@@ -478,7 +502,9 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'sandbox')
     runs-on: ubuntu-latest
-    # The full reference game, which wires every contrib.
+    # The full reference game, which wires every contrib. The only run in this
+    # workflow of its whole typeclasses, commands and world suites, under its own
+    # settings; `test` runs only the contrib suites, in a bare game.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -571,6 +597,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # The baseline for the absent profiles below: NPCs' suite as in `test` but
+      # serially, and the real Scenes, Plots and Contest seams together; each seam
+      # also runs in the profiles that keep its partner.
       - name: all-present
         if: ${{ !cancelled() }}
         run: >-
@@ -831,6 +860,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
+      # Registers every real notice source at once, which `test` doesn't, and runs
+      # the Inbox routing fixture and each source's notice tests there. Those
+      # tests also run in `test`, and most of their classes set their own sources.
+      # Nightly adds the full Lore, Calendar and Moderation suites (#295).
       - name: All real partners
         if: ${{ !cancelled() && matrix.profile == 'all-partners' }}
         run: >-
