@@ -35,13 +35,14 @@ def job_scripts(block: str) -> set[str]:
 def workflow_steps(block: str) -> list[tuple[str, str]]:
     """A job block's steps as (name, text) pairs, in order, duplicates kept.
 
-    An unnamed step is named by its first line (`uses: ...`). The comment above
-    a step ends the previous step's text.
+    An unnamed step is named by its first line (`uses: ...`). Full-line comments
+    are dropped, so the comment above a step isn't part of the previous step.
     """
-    return [
-        (step.split("\n", 1)[0].removeprefix("name: "), step)
-        for step in re.split(r"(?m)^      - ", block)[1:]
-    ]
+    steps = []
+    for step in re.split(r"(?m)^      - ", block)[1:]:
+        text = "\n".join(line for line in step.splitlines() if not line.lstrip().startswith("#"))
+        steps.append((text.split("\n", 1)[0].removeprefix("name: "), text))
+    return steps
 
 
 class DependentsTests(ContribTreeMixin, unittest.TestCase):
@@ -386,13 +387,19 @@ class WorkflowAgreementTests(unittest.TestCase):
         # matrix groups (#249, #313). An ungated profile runs in every group,
         # one gated on two groups runs twice, and one gated on an unknown
         # group never runs.
+        jobs = workflow_jobs()
         grouped = {}
-        for job, block in workflow_jobs().items():
+        for job, block in jobs.items():
             matrix = re.search(r"(?m)^        group: \[(.*)\]$", block)
             if matrix:
                 groups = [value.strip() for value in matrix.group(1).split(",")]
                 grouped[job] = (groups, block)
         self.assertLessEqual({"building-partners", "economy-partners"}, set(grouped))
+        # A job gated on matrix.group but missed above (a block-style list, or a
+        # comment after the list) would go unchecked.
+        self.assertEqual(
+            {job for job, block in jobs.items() if "matrix.group" in block}, set(grouped)
+        )
         for job, (groups, block) in grouped.items():
             profiles = [
                 (name, step)
