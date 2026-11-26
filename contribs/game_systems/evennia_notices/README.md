@@ -1,6 +1,6 @@
 # evennia-notices
 
-A separately installable personal inbox for Evennia 6.0. Requires Links 0.8.15;
+A separately installable personal inbox for Evennia 6.0. Requires Links 0.8.17;
 Social and all source contribs are optional. Add `evennia_notices` to
 `INSTALLED_APPS`, register `CmdNotices` in the account cmdset, and include
 `evennia_notices.urls` under the `evennia_notices` namespace.
@@ -12,7 +12,7 @@ See the packaged [guide](guides/notices.md) for player commands and preferences.
 
 ## Host and source integration
 
-Install `evennia-notices` and `evennia-links>=0.8.15`, register the app, command
+Install `evennia-notices` and `evennia-links>=0.8.17`, register the app, command
 and URLs, then call `ensure_notice_maintenance()` on server startup. Run
 `evennia maintain_notices` to invoke the same idempotent maintenance manually.
 `NOTICES_ENABLED`, `NOTICES_RETENTION_DAYS` and `NOTICES_ROUTINE_LIMIT` configure
@@ -29,6 +29,16 @@ Only `lottery_selection` and `waitlist_offer` are outstanding action kinds.
 Sources may supply `prepare(context)` to recover their pending work before a
 login/puppet summary; the authorized actual context is passed once per source,
 and failures are isolated. Do not scan or import another character's work.
+Sources may also supply `available(context)` to withdraw their preference while
+their system is hidden. It receives the authorized `NoticeContext` (character
+may be None) and is called live on every `+notices/settings`, `+notices/set` and
+web preferences request, so keep it cheap and never base a reveal gate on the
+viewer's staff status. Only `True` offers the source; any other return hides it,
+and a hook that raises hides it with a warning. A hidden source is absent from
+the settings list and the web form, and setting it is refused exactly like an
+unknown source. Stored choices are kept and apply again once it is available.
+Routing, summaries and `prepare` are unaffected. Sources without the hook are
+always offered.
 
 Call `evennia_links.notices.notify(recipient, source=slug, event=event,
 context=context, fallback=fallback)`. Use stable transition event IDs; replacement

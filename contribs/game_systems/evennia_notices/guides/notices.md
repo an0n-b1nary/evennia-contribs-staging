@@ -28,6 +28,8 @@ quiet summary storage. Immediate stores them and sends an eligible connected
 session a hint. Off suppresses new routine activity. Decisions always persist:
 their default is immediate, and explicit off or summary keeps them in summaries.
 Changing preferences neither replays old activity nor changes source read state.
+The list shows only the sources your game offers you right now. A choice you made
+earlier is kept and applies again if that source returns.
 
 Every count, summary and rendered notice rechecks current source visibility,
 validity and ignore boundaries. Missing context or unavailable sources expose

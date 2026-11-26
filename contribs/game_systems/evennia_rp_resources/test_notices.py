@@ -2,6 +2,7 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Committed Resources awards through standalone and real optional Inbox routes."""
 
+from importlib import import_module
 from secrets import token_urlsafe
 from types import SimpleNamespace
 from unittest import skipUnless
@@ -9,17 +10,43 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.apps import apps
+from django.conf import settings
 from django.db import transaction
-from django.test import TransactionTestCase, override_settings
+from django.test import RequestFactory, TransactionTestCase, override_settings
 from evennia.utils.create import create_account, create_object
+from evennia.utils.test_resources import EvenniaCommandTest
 
-from . import batch, notices, payouts
+from evennia_links import runtime
+
+from . import batch, conf, notices, payouts
 from .models import PlotPayoutReceipt, PlotPayoutRun, ResourceDefinition, ResourceNoticeReceipt
 from .services import grant, spend, total_held
 from .summary import notify_plot_summary, notify_resource_summary
 
 State = ResourceNoticeReceipt.State
 SOURCES = {"resources": "evennia_rp_resources.integrations.notices.ResourcesNoticeSource"}
+PREFERENCE_SOURCES = {
+    "resources": "evennia_rp_resources.integrations.notices.ResourcesNoticeSource",
+    "other": "evennia_rp_resources.test_notices.OtherSource",
+}
+
+if apps.is_installed("evennia_notices"):
+    from django.urls import include, path
+    from evennia.web.urls import urlpatterns as evennia_patterns
+
+    urlpatterns = [path("notices/", include("evennia_notices.urls")), *evennia_patterns]
+
+
+class OtherSource:
+    """Hookless source proving the preference lists stay populated."""
+
+    label = "Unrelated alerts"
+
+    def evaluate(self, events, context):
+        return {}
+
+    def render(self, events, context):
+        raise ValueError("No notice")
 
 
 @override_settings(
@@ -77,6 +104,27 @@ class ResourceNoticeFixture(TransactionTestCase):
 
 @override_settings(NOTICES_ENABLED=False)
 class StandaloneResourceNoticeTests(ResourceNoticeFixture):
+    def test_inbox_preference_follows_only_the_reveal(self):
+        from evennia_links.notices import NoticeContext
+
+        from .integrations.notices import ResourcesNoticeSource
+
+        source = ResourcesNoticeSource()
+        context = NoticeContext(self.account, self.character)
+        self.assertIs(source.available(context), True)
+        runtime.set("RP_RESOURCES_REVEALED", False)
+        self.assertIs(source.available(context), False)
+        staff = create_account("Resources Staff", None, token_urlsafe(32))
+        staff.is_superuser = True
+        staff.save()
+        staff.characters.add(self.character)
+        self.character.account = staff
+        self.character.locks.cache_lock_bypass(self.character)
+        self.assertTrue(conf.visible(self.character))
+        self.assertIs(source.available(NoticeContext(staff, self.character)), False)
+        runtime.set("RP_RESOURCES_REVEALED", True)
+        self.assertIs(source.available(context), True)
+
     def test_no_write_after_unpuppet_returns_pending_and_retries_once(self):
         self.award("week-1")
         send = notices._send
@@ -516,3 +564,72 @@ class InboxResourceNoticeTests(ResourceNoticeFixture):
         self.prepare()
         self.assertEqual(len(self.project()), 1)
         self.assertFalse(ResourceNoticeReceipt.objects.filter(plot__isnull=False).exists())
+
+
+@skipUnless(apps.is_installed("evennia_notices"), "Optional Inbox is absent")
+@override_settings(
+    NOTICES_ENABLED=True,
+    LINKS_NOTICE_SOURCES=PREFERENCE_SOURCES,
+    ROOT_URLCONF=__name__,
+    RP_RESOURCES_REVEALED=True,
+)
+class InboxResourcePreferenceTests(EvenniaCommandTest):
+    """The RP Resources preference row exists only while resources are revealed, staff included."""
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+
+    def settings_output(self):
+        from evennia_notices.commands import CmdNotices
+
+        return self.call(CmdNotices(), "/settings")
+
+    def page(self, account, character=None):
+        from evennia_notices import views
+
+        request = RequestFactory().get("/notices/preferences/")
+        request.user = account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if character is not None:
+            request.session["puppet"] = character.pk
+        return views.preferences(request).render()
+
+    def assert_hidden(self):
+        output = self.settings_output()
+        self.assertIn("other: summary; decisions: immediate", output)
+        self.assertNotIn("resources", output)
+        for response in (self.page(self.account, self.char1), self.page(self.account2)):
+            self.assertContains(response, 'value="other"')
+            self.assertContains(response, "Unrelated alerts")
+            self.assertNotContains(response, 'value="resources"')
+            self.assertNotContains(response, "RP Resources")
+
+    def test_hidden_resources_preference_is_absent_and_refused_for_staff(self):
+        from evennia_notices.commands import CmdNotices
+        from evennia_notices.models import SourcePreference
+
+        runtime.set("RP_RESOURCES_REVEALED", False)
+        # A staff-visibility gate would show the row here; the reveal gate must not.
+        self.assertTrue(conf.visible(self.char1))
+        self.assert_hidden()
+        self.assertEqual(
+            self.call(CmdNotices(), "/set resources=off"),
+            self.call(CmdNotices(), "/set nosuch=off"),
+        )
+        self.assertFalse(SourcePreference.objects.filter(source="resources").exists())
+
+    def test_stored_choice_survives_hiding_and_applies_after_live_reveal(self):
+        from evennia_notices.commands import CmdNotices
+        from evennia_notices.models import SourcePreference
+
+        self.assertEqual(self.call(CmdNotices(), "/set resources=off"), "Notice preference saved.")
+        runtime.set("RP_RESOURCES_REVEALED", False)
+        self.assert_hidden()
+        self.assertEqual(SourcePreference.objects.get(source="resources").mode, "off")
+        runtime.set("RP_RESOURCES_REVEALED", True)
+        self.assertIn("resources: off; decisions: summary", self.settings_output())
+        response = self.page(self.account, self.char1)
+        self.assertContains(response, 'value="resources"')
+        self.assertContains(response, "RP Resources")

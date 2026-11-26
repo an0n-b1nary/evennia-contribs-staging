@@ -177,6 +177,11 @@ class ResourcesNoticeSource:
 
     label = "RP Resources"
 
+    def available(self, context):
+        """Offer the Inbox preference only while resources are revealed."""
+        # Never conf.visible: a hidden system stays hidden from staff too.
+        return get("RP_RESOURCES_REVEALED") is True
+
     def prepare(self, context):
         """Import pending awards before the Inbox's puppet summary."""
         if (

@@ -28,6 +28,7 @@ from evennia_links.notices import (
     evaluate,
     normalize_rendered,
     recipient_identity,
+    source_available,
     source_registry,
     validate_event,
 )
@@ -504,11 +505,19 @@ def mutate(context, public_ref, operation):
     return _retry(change)
 
 
+class UnknownPreference(ValueError):
+    """A preference refusal that reads exactly like an unknown source or mode."""
+
+
 def set_preference(context, source, mode):
     """Store one account-wide source choice without replaying or reading activity."""
-    if source not in source_registry() or mode not in {"immediate", "summary", "off"}:
-        raise ValueError("Unknown source or preference")
+    adapter = source_registry().get(source)
+    if adapter is None or mode not in {"immediate", "summary", "off"}:
+        raise UnknownPreference("Unknown source or preference")
     ownerships(context)
+    # Checked after authorization so hooks only see an authorized context.
+    if not source_available(adapter, context):
+        raise UnknownPreference("Unknown source or preference")
 
     def change():
         with transaction.atomic():
