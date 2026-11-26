@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-11-26
+
+- `+notices/settings` and the web preferences page omit sources whose optional
+  `available(context)` hook does not admit the viewer; `+notices/set` and web
+  POSTs refuse them with the same reply as an unknown source. Stored choices are
+  kept and apply again once the source is available. Requires Links 0.8.17.
+- `PreferenceForm` now requires a keyword-only `context`.
+
 ## 0.1.1 — 2026-11-09
 
 - Call optional authorized source preparation hooks before login/puppet summaries,

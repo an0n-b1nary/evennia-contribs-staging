@@ -4,7 +4,7 @@
 
 from django import forms
 
-from evennia_links.notices import source_registry
+from evennia_links.notices import available_sources
 
 
 class PreferenceForm(forms.Form):
@@ -15,8 +15,8 @@ class PreferenceForm(forms.Form):
         label="Routine alerts", choices=[(x, x.title()) for x in ("immediate", "summary", "off")]
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, context, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["source"].choices = [
-            (slug, source.label) for slug, source in source_registry().items()
+            (slug, source.label) for slug, source in available_sources(context).items()
         ]

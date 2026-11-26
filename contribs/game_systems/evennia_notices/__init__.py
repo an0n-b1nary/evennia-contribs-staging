@@ -2,4 +2,4 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Durable, source-authorized personal notices."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"

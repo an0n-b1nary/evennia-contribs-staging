@@ -5,7 +5,7 @@
 from evennia.commands.default.muxcommand import MuxCommand
 
 from evennia_links.command_syntax import StrictSwitchMixin
-from evennia_links.notices import source_registry
+from evennia_links.notices import available_sources
 
 from .context import from_command
 from .services import effective_mode, mutate, project, set_preference
@@ -58,7 +58,7 @@ class CmdNotices(StrictSwitchMixin, MuxCommand):
                     "Notice preferences (off keeps decisions in summaries):\n"
                     + "\n".join(
                         f"{slug}: {effective_mode(context.account, slug)}; decisions: {effective_mode(context.account, slug, True)}"
-                        for slug in source_registry()
+                        for slug in available_sources(context)
                     )
                 )
             else:

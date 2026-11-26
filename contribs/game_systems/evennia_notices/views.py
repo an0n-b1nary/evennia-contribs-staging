@@ -3,10 +3,13 @@
 """Authenticated explicit-scope views; GET never acknowledges activity."""
 
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.decorators.http import require_POST
+
+from evennia_links.notices import source_available, source_registry
 
 from .context import from_web
 from .forms import PreferenceForm
@@ -60,8 +63,25 @@ def change(request, public_ref, operation):
 @login_required
 def preferences(request):
     """Edit the shared account preference using a closed validated form."""
-    form = PreferenceForm(request.POST if request.method == "POST" else None)
+    context = from_web(request)
+    form = PreferenceForm(request.POST if request.method == "POST" else None, context=context)
     if request.method == "POST" and form.is_valid():
-        set_preference(from_web(request), **form.cleaned_data)
-        return redirect("evennia_notices:preferences")
+        source = form.cleaned_data["source"]
+        try:
+            set_preference(context, **form.cleaned_data)
+        except ValueError:
+            adapter = source_registry().get(source)
+            if adapter is not None and source_available(adapter, context):
+                raise
+            # The source became unavailable after validation: refuse it like an unknown choice.
+            form.add_error(
+                "source",
+                ValidationError(
+                    form.fields["source"].error_messages["invalid_choice"],
+                    code="invalid_choice",
+                    params={"value": source},
+                ),
+            )
+        else:
+            return redirect("evennia_notices:preferences")
     return _page(request, "preferences", form=form)
