@@ -192,11 +192,9 @@ def source_available(source, context):
     source. Any other return hides it silently. A hook that raises hides it and logs one
     generic warning. A missing hook (or ``available = None``) admits it.
     """
-    hook = getattr(source, "available", None)
-    if hook is None:
-        return True
     try:
-        return hook(context) is True
+        hook = getattr(source, "available", None)
+        return hook is None or hook(context) is True
     except Exception:
         logger.warning("Notice source availability check failed; hiding source")
         return False

@@ -64,6 +64,12 @@ class NoneGate(ExampleSource):
     available = None
 
 
+class RaisingLookup(ExampleSource):
+    @property
+    def available(self):
+        raise RuntimeError("private detail")
+
+
 GATED = {
     "example": "evennia_links.test_notices.ExampleSource",
     "gated": "evennia_links.test_notices.GatedSource",
@@ -122,6 +128,12 @@ class SourceAvailabilityTests(EvenniaTest):
         self.assertNotIn("private detail", logs.output[0])
         self.assertNotIn("broken", logs.output[0])
 
+    def test_raising_hook_lookup_hides_with_one_generic_warning(self):
+        with self.assertLogs("evennia", "WARNING") as logs:
+            self.assertFalse(source_available(RaisingLookup(), self.context))
+        self.assertEqual(len(logs.output), 1)
+        self.assertNotIn("private detail", logs.output[0])
+
     @override_settings(
         LINKS_NOTICE_SOURCES={
             "example": "evennia_links.test_notices.ExampleSource",
@@ -131,6 +143,15 @@ class SourceAvailabilityTests(EvenniaTest):
     def test_only_true_admits_and_other_returns_hide_silently(self):
         with self.assertNoLogs("evennia", "WARNING"):
             self.assertEqual(list(available_sources(self.context)), ["example"])
+
+    def test_raising_hook_lookup_is_a_registry_configuration_error(self):
+        with (
+            override_settings(
+                LINKS_NOTICE_SOURCES={"lookup": "evennia_links.test_notices.RaisingLookup"}
+            ),
+            self.assertRaisesMessage(RuntimeError, "private detail"),
+        ):
+            source_registry()
 
     def test_non_callable_hook_is_rejected_and_none_means_no_hook(self):
         with (
