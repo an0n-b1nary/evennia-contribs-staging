@@ -4,6 +4,7 @@
 
 - Reject unknown, ambiguous and stacked switches before command lookups or changes, including stock command replacements.
 - Teach natural resource amounts in economy offers and keep invalid payout numbers readable.
+- The Inbox RP Resources preference is listed and accepted only while `RP_RESOURCES_REVEALED` is on, for staff too. Earlier choices are kept and apply again after the reveal. The `inbox` extra now requires Inbox 0.1.2.
 
 ## [0.3.1] - 2026-11-19
 
