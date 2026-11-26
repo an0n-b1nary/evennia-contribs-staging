@@ -41,11 +41,14 @@ def is_online(character):
     return bool(_sessions(character))
 
 
-def _sessions(character):
+def _sessions(character, *, observed_sessions=None):
     from evennia.server.sessionhandler import SESSIONS
 
     sessions = []
     for session in SESSIONS.get_sessions():
+        # A durable claim can inspect this session's marker even if it drops out.
+        if observed_sessions is not None:
+            observed_sessions.append(session)
         try:
             if session.get_puppet() == character:
                 sessions.append(session)
@@ -54,12 +57,11 @@ def _sessions(character):
     return sessions
 
 
-def _guest_session_owned(session, character):
+def _guest_session_owned(session, character, account):
     from evennia.accounts.models import AccountDB
 
     from evennia_links.characters import account_ids
 
-    account = session.get_account()
     return (
         isinstance(account, AccountDB)
         and bool(account.pk)
@@ -162,7 +164,7 @@ def _reserve_guest_attempt(session, key):
         return True
 
 
-def _guest_notify(character, payload, actors, key):
+def _guest_notify(character, payload, actors, key, *, observed_sessions=None):
     """Return whether a guest write started and whether one succeeded."""
     from evennia.objects.models import ObjectDB
 
@@ -170,15 +172,18 @@ def _guest_notify(character, payload, actors, key):
     from .models import LoreEntry
 
     attempted = delivered = False
-    for session in _sessions(character):
+    for session in _sessions(character, observed_sessions=observed_sessions):
         try:
             live = ObjectDB.objects.filter(pk=character.pk).first()
-            if live is None or not _guest_session_owned(session, live):
+            if live is None:
+                continue
+            account = session.get_account()
+            if not _guest_session_owned(session, live, account):
                 continue
             if _guest_attempt_seen(session, key):
                 attempted = True
                 continue
-            if _actor_policy(session.get_account(), actors) != "allow":
+            if _actor_policy(account, actors) != "allow":
                 continue
             if payload["kind"] == "advisory":
                 text = _advisory_text(payload)
@@ -187,7 +192,11 @@ def _guest_notify(character, payload, actors, key):
                 if subject_status(entry, live, payload).status != "visible":
                     continue
                 text = normalize_rendered(render_payload(payload)).text
-            if text is None or not _guest_session_owned(session, live):
+            if (
+                text is None
+                or not _guest_session_owned(session, live, account)
+                or session.get_account() != account
+            ):
                 continue
             send = session.msg
             if not callable(send):
@@ -322,16 +331,16 @@ def route_notice(pk, *, fresh=False, context=None):
             return row.route_state
         if not row.provenance_known or not row.envelope:
             return "held"
-        guest = is_guest(row.character)
         contexts = []
+        guest_sessions = None
         prior_guest_attempt = False
-        if guest:
-            # Capture transient evidence before a live session can disappear.
-            sessions = _sessions(row.character)
-            if not sessions:
+        if is_guest(row.character):
+            # Keep transient evidence and its session references through finalization.
+            guest_sessions = _sessions(row.character)
+            if not guest_sessions:
                 return "pending"
             prior_guest_attempt = any(
-                _guest_attempt_seen(session, row.event_key) for session in sessions
+                _guest_attempt_seen(session, row.event_key) for session in guest_sessions
             )
         else:
             try:
@@ -376,28 +385,32 @@ def route_notice(pk, *, fresh=False, context=None):
         row.save(update_fields=["route_state"])
     if connection.in_atomic_block:
         transaction.on_commit(
-            lambda: _safe_deliver_claim(row, contexts, guest, prior_guest_attempt)
+            lambda: _safe_deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
         )
         return "attempting"
-    return _deliver_claim(row, contexts, guest, prior_guest_attempt)
+    return _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
 
 
-def _safe_deliver_claim(row, contexts, guest, prior_guest_attempt):
+def _safe_deliver_claim(row, contexts, guest_sessions, prior_guest_attempt):
     try:
-        _deliver_claim(row, contexts, guest, prior_guest_attempt)
+        _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
     except Exception:
         logger.warning("Lore fallback status unavailable; source attempt retained")
 
 
-def _deliver_claim(row, contexts, guest, prior_guest_attempt):
+def _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt):
     """Recheck each session and send after the durable attempt commits."""
     attempted = prior_guest_attempt
     delivered = False
     try:
         row.refresh_from_db()
-        if guest:
+        if guest_sessions is not None:
             guest_attempted, delivered = _guest_notify(
-                row.character, row.envelope["payload"], row.envelope["actors"], row.event_key
+                row.character,
+                row.envelope["payload"],
+                row.envelope["actors"],
+                row.event_key,
+                observed_sessions=guest_sessions,
             )
             attempted = attempted or guest_attempted
         else:
@@ -422,6 +435,8 @@ def _deliver_claim(row, contexts, guest, prior_guest_attempt):
                     logger.warning("Lore session delivery failed")
     except Exception:
         logger.warning("Lore delivery preparation failed")
+    if guest_sessions is not None and not attempted:
+        attempted = any(_guest_attempt_seen(session, row.event_key) for session in guest_sessions)
     _ack(row, "fallback" if delivered else "uncertain" if attempted else "pending")
     return row.route_state
 

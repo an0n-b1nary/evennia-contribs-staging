@@ -540,11 +540,11 @@ class LoreFallbackTests(EvenniaTest):
         self.sessions = []
         self.enterContext(patch.object(SESSIONS, "get_sessions", return_value=self.sessions))
 
-    def _decision(self, guest=False):
+    def _decision(self, guest=False, actor=None):
         self.sessions.clear()
         self.char2.tags.remove("character", category="guest")
         self.entry.request_affirmation(requested_by=self.char2)
-        self.entry.decline(note="Historical reason")
+        self.entry.decline(declined_by=actor, note="Historical reason")
         if guest:
             self.char2.tags.add("character", category="guest")
         return LoreNotice.objects.latest("pk")
@@ -797,6 +797,102 @@ class LoreFallbackTests(EvenniaTest):
                 else:
                     self._assert_receipt(row, "uncertain")
                 self.sessions.clear()
+
+    def test_guest_account_swap_during_render_cannot_disclose(self):
+        self.account.characters.add(self.char2)
+        render = lore_integration.render_payload
+
+        def ignore_status(account, actor):
+            return "suppress" if account == self.account else "allow"
+
+        for durable in (True, False):
+            with self.subTest(durable=durable):
+                self.sessions.clear()
+                row = self._decision(guest=True, actor=self.char1) if durable else None
+                if not durable:
+                    self.entry = LoreEntry.create_entry(
+                        "Fresh fallback", author=self.char2, body="Content"
+                    )
+                session = self._session()
+                key = f"lore-{self.entry.pk}-{self.entry.notice_sequence}-declined-{self.char2.pk}"
+
+                def switch_account(payload, session=session):
+                    session.get_account.return_value = self.account
+                    return render(payload)
+
+                def route(row):
+                    if row is not None:
+                        self._claim(row)
+                    else:
+                        notices.notify(
+                            self.char2, "", entry=self.entry, kind="declined", actor=self.char1
+                        )
+
+                with patch(
+                    "evennia_links.ignoring.notice_ignore_status", side_effect=ignore_status
+                ):
+                    with (
+                        patch.object(
+                            lore_integration, "render_payload", side_effect=switch_account
+                        ),
+                        self.captureOnCommitCallbacks(execute=True),
+                    ):
+                        route(row)
+                    self.assertEqual(session.get_account(), self.account)
+                    session.msg.assert_not_called()
+                    self.assertNotIn(key, session._lore_notice_attempts)
+                    session.get_account.return_value = self.account2
+                    if durable:
+                        self._retry_once(row, session)
+                    else:
+                        with self.captureOnCommitCallbacks(execute=True):
+                            route(row)
+                        session.msg.assert_called_once()
+                        self.assertIn(key, session._lore_notice_attempts)
+
+    def test_existing_guest_keeps_attempt_when_fresh_send_disconnects(self):
+        render = lore_integration.render_payload
+
+        def send_and_disconnect():
+            with (
+                patch.object(lore_integration, "render_payload", render),
+                patch.object(transaction, "on_commit", side_effect=lambda callback: callback()),
+            ):
+                self.assertTrue(self._fresh_guest_hint())
+            session.msg.assert_called_once()
+            self.assertIn(row.event_key, session._lore_notice_attempts)
+            session.get_puppet.return_value = None
+            self.sessions.clear()
+
+        def render_during_fresh_send(payload):
+            send_and_disconnect()
+            if scenario == "new candidate render fails":
+                raise RuntimeError("durable render fault")
+            return render(payload)
+
+        for scenario in ("before callback", "during render", "new candidate render fails"):
+            with self.subTest(scenario=scenario):
+                row, session = self._decision(guest=True), self._session()
+                with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                    self._claim(row)
+                self.assertEqual(len(callbacks), 1)
+                if scenario == "before callback":
+                    send_and_disconnect()
+                    callbacks[0]()
+                else:
+                    if scenario == "new candidate render fails":
+                        self.sessions.clear()
+                        session = self._session()
+                    with patch.object(
+                        lore_integration, "render_payload", side_effect=render_during_fresh_send
+                    ):
+                        callbacks[0]()
+                session.msg.assert_called_once()
+                replacement = self._session()
+                with self.captureOnCommitCallbacks(execute=True):
+                    self.assertEqual(notices.route_notice(row.pk), "uncertain")
+                self._assert_receipt(row, "uncertain")
+                replacement.msg.assert_not_called()
 
     def test_final_status_failure_does_not_abort_other_claims(self):
         first = self._decision()
