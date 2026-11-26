@@ -7,13 +7,16 @@ import sqlite3
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from unittest import skipUnless
+from unittest.mock import Mock, patch
 
 from django.apps import apps
 from django.db import connections
 from django.test import TransactionTestCase, override_settings
 from evennia.utils.create import create_account, create_object
 
+from evennia_links.notices import NoticeContext
 from evennia_lore import notices
 from evennia_lore.models import LoreEntry, LoreNotice
 
@@ -40,12 +43,14 @@ class LoreWriterTests(TransactionTestCase):
         from django.db.backends.sqlite3.base import DatabaseWrapper
 
         connections["default"] = DatabaseWrapper(config, "default")
-        account = create_account("Lore writer fixture", None, secrets.token_urlsafe(48))
-        character = create_object(
+        self.account = create_account("Lore writer fixture", None, secrets.token_urlsafe(48))
+        self.character = create_object(
             "evennia.objects.objects.DefaultCharacter", key="Lore writer", nohome=True
         )
-        account.characters.add(character)
-        self.entry = LoreEntry.create_entry("Concurrent Lore", author=character, body="Content")
+        self.account.characters.add(self.character)
+        self.entry = LoreEntry.create_entry(
+            "Concurrent Lore", author=self.character, body="Content"
+        )
 
     def tearDown(self):
         connections.close_all()
@@ -74,8 +79,6 @@ class LoreWriterTests(TransactionTestCase):
         self.assertEqual(LoreNotice.objects.get().route_state, "inbox")
 
     def test_concurrent_import_has_one_receipt(self):
-        from unittest.mock import patch
-
         from evennia_notices.models import DeliveryReceipt
 
         with patch.object(notices, "_safe_route", return_value="retry"):
@@ -83,3 +86,52 @@ class LoreWriterTests(TransactionTestCase):
         row = LoreNotice.objects.get()
         self.parallel(lambda: notices.route_notice(row.pk))
         self.assertEqual(DeliveryReceipt.objects.filter(source="lore").count(), 1)
+
+    @override_settings(LINKS_NOTICE_SOURCES={})
+    def test_concurrent_standalone_claim_releases_unstarted_work(self):
+        with patch.object(notices, "_safe_route", return_value="retry"):
+            self.entry.affirm()
+        row = LoreNotice.objects.get()
+        session = Mock()
+        session.get_account.return_value = self.account
+        session.get_puppet.return_value = self.character
+        context = NoticeContext(self.account, self.character, session)
+        rendering, resume = Event(), Event()
+
+        def pause_render(claim):
+            rendering.set()
+            if not resume.wait(timeout=10):
+                raise TimeoutError("Timed out waiting for the competing route")
+            return None
+
+        def first_route():
+            try:
+                return notices.route_notice(row.pk)
+            finally:
+                connections.close_all()
+
+        with patch.object(notices, "connected_contexts", return_value=[context]):
+            with (
+                patch.object(notices, "_render", side_effect=pause_render) as render,
+                ThreadPoolExecutor(max_workers=1) as pool,
+            ):
+                first = pool.submit(first_route)
+                try:
+                    self.assertTrue(rendering.wait(timeout=10))
+                    row.refresh_from_db()
+                    self.assertEqual(row.route_state, "attempting")
+                    self.assertEqual(notices.route_notice(row.pk), "attempting")
+                    session.msg.assert_not_called()
+                finally:
+                    resume.set()
+                self.assertEqual(first.result(timeout=10), "pending")
+                render.assert_called_once()
+            row.refresh_from_db()
+            self.assertEqual(row.route_state, "pending")
+            self.assertIsNone(row.acknowledged_at)
+            self.assertEqual(notices.route_notice(row.pk), "fallback")
+            self.assertEqual(notices.route_notice(row.pk), "fallback")
+        session.msg.assert_called_once()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "fallback")
+        self.assertIsNotNone(row.acknowledged_at)

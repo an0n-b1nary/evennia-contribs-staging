@@ -9,6 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.10.5 — 2026-11-25
+
+### Fixed
+- Retry standalone notices when delivery stops before any session write. A
+  started write with an unknown outcome remains held to prevent replay.
+- Continue delivery to other eligible sessions when one session fails.
+
 ## 0.10.4 — 2026-11-15
 
 ### Added

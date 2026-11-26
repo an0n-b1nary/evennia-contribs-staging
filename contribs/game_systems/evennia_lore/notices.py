@@ -5,6 +5,7 @@
 import logging
 import uuid
 from dataclasses import asdict
+from threading import Lock
 
 from django.conf import settings
 from django.db import connection, transaction
@@ -32,6 +33,7 @@ from evennia_links.notices import (
 logger = logging.getLogger("evennia")
 TERMINAL = {"inbox", "fallback", "suppressed", "invalid"}
 KINDS = {"affirmed", "declined", "unsealed"}
+_GUEST_ATTEMPT_LOCK = Lock()
 
 
 def is_online(character):
@@ -39,18 +41,27 @@ def is_online(character):
     return bool(_sessions(character))
 
 
-def _sessions(character):
+def _sessions(character, *, observed_sessions=None):
     from evennia.server.sessionhandler import SESSIONS
 
-    return [session for session in SESSIONS.get_sessions() if session.get_puppet() == character]
+    sessions = []
+    for session in SESSIONS.get_sessions():
+        # A durable claim can inspect this session's marker even if it drops out.
+        if observed_sessions is not None:
+            observed_sessions.append(session)
+        try:
+            if session.get_puppet() == character:
+                sessions.append(session)
+        except Exception:
+            logger.warning("Lore session lookup incomplete")
+    return sessions
 
 
-def _guest_session_owned(session, character):
+def _guest_session_owned(session, character, account):
     from evennia.accounts.models import AccountDB
 
     from evennia_links.characters import account_ids
 
-    account = session.get_account()
     return (
         isinstance(account, AccountDB)
         and bool(account.pk)
@@ -132,46 +143,81 @@ def _allowed(row, context):
     return evaluate(LoreNoticeSource(), [event], context)[event.event_id].status
 
 
-def _guest_notify(character, payload, actors, key):
-    """Send only to live owned guest sessions; persist no source or Inbox record."""
+def _guest_attempt_seen(session, key):
+    try:
+        with _GUEST_ATTEMPT_LOCK:
+            return key in getattr(session, "_lore_notice_attempts", ())
+    except Exception:
+        logger.warning("Lore guest attempt marker unavailable")
+        return False
+
+
+def _reserve_guest_attempt(session, key):
+    with _GUEST_ATTEMPT_LOCK:
+        seen = getattr(session, "_lore_notice_attempts", None)
+        if seen is None:
+            session._lore_notice_attempts = {key}
+        elif key in seen:
+            return False
+        else:
+            seen.add(key)
+        return True
+
+
+def _guest_notify(character, payload, actors, key, *, observed_sessions=None):
+    """Return whether a guest write started and whether one succeeded."""
     from evennia.objects.models import ObjectDB
 
     from .integrations.notices import render_payload, subject_status
     from .models import LoreEntry
 
-    delivered = False
-    for session in _sessions(character):
-        live = ObjectDB.objects.filter(pk=character.pk).first()
-        if live is None or not _guest_session_owned(session, live):
-            continue
-        if _actor_policy(session.get_account(), actors) != "allow":
-            continue
-        if payload["kind"] == "advisory":
-            text = _advisory_text(payload)
-        else:
-            entry = LoreEntry.all_objects.filter(pk=payload["entry"]).first()
-            if subject_status(entry, live, payload).status != "visible":
-                continue
-            text = normalize_rendered(render_payload(payload)).text
-        if text is None or not _guest_session_owned(session, live):
-            continue
-        seen = getattr(session, "_lore_notice_attempts", set())
-        if key in seen:
-            continue
-        session._lore_notice_attempts = seen | {key}
+    attempted = delivered = False
+    for session in _sessions(character, observed_sessions=observed_sessions):
         try:
-            session.msg(text)
+            live = ObjectDB.objects.filter(pk=character.pk).first()
+            if live is None:
+                continue
+            account = session.get_account()
+            if not _guest_session_owned(session, live, account):
+                continue
+            if _guest_attempt_seen(session, key):
+                attempted = True
+                continue
+            if _actor_policy(account, actors) != "allow":
+                continue
+            if payload["kind"] == "advisory":
+                text = _advisory_text(payload)
+            else:
+                entry = LoreEntry.all_objects.filter(pk=payload["entry"]).first()
+                if subject_status(entry, live, payload).status != "visible":
+                    continue
+                text = normalize_rendered(render_payload(payload)).text
+            if (
+                text is None
+                or not _guest_session_owned(session, live, account)
+                or session.get_account() != account
+            ):
+                continue
+            send = session.msg
+            if not callable(send):
+                continue
+            if not _reserve_guest_attempt(session, key):
+                attempted = True
+                continue
+            attempted = True
+            send(text)
             delivered = True
         except Exception:
-            logger.warning("Lore guest delivery uncertain; transient claim retained")
-    return delivered
+            logger.warning("Lore guest session delivery failed")
+    return attempted, delivered
 
 
 def _safe_guest(character, payload, actors, key):
     try:
-        return _guest_notify(character, payload, actors, key)
+        _, delivered = _guest_notify(character, payload, actors, key)
+        return delivered
     except Exception:
-        logger.warning("Lore guest delivery deferred", exc_info=True)
+        logger.warning("Lore guest delivery deferred")
         return False
 
 
@@ -285,16 +331,18 @@ def route_notice(pk, *, fresh=False, context=None):
             return row.route_state
         if not row.provenance_known or not row.envelope:
             return "held"
+        contexts = []
+        guest_sessions = None
+        prior_guest_attempt = False
         if is_guest(row.character):
-            # Existing structured guest history is acknowledged once, never copied.
-            sessions = _sessions(row.character)
-            if not sessions:
+            # Keep transient evidence and its session references through finalization.
+            guest_sessions = _sessions(row.character)
+            if not guest_sessions:
                 return "pending"
-            row.route_state = "attempting"
-            row.save(update_fields=["route_state"])
-            guest = True
+            prior_guest_attempt = any(
+                _guest_attempt_seen(session, row.event_key) for session in guest_sessions
+            )
         else:
-            guest = False
             try:
                 registry = getattr(settings, "LINKS_NOTICE_SOURCES", {})
                 if not isinstance(registry, dict):
@@ -333,42 +381,63 @@ def route_notice(pk, *, fresh=False, context=None):
                 return row.route_state
             if "visible" not in statuses:
                 return "held"
-            row.route_state = "attempting"
-            row.save(update_fields=["route_state"])
+        row.route_state = "attempting"
+        row.save(update_fields=["route_state"])
     if connection.in_atomic_block:
-        transaction.on_commit(lambda: _deliver_claim(pk, contexts if not guest else [], guest))
+        transaction.on_commit(
+            lambda: _safe_deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
+        )
         return "attempting"
-    return _deliver_claim(pk, contexts if not guest else [], guest)
+    return _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
 
 
-def _deliver_claim(pk, contexts, guest):
-    """Only run socket I/O after the durable attempt transaction commits."""
-    from .models import LoreNotice
+def _safe_deliver_claim(row, contexts, guest_sessions, prior_guest_attempt):
+    try:
+        _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt)
+    except Exception:
+        logger.warning("Lore fallback status unavailable; source attempt retained")
 
-    row = LoreNotice.objects.get(pk=pk)
-    # Socket I/O is after the durable attempting claim commits.
+
+def _deliver_claim(row, contexts, guest_sessions, prior_guest_attempt):
+    """Recheck each session and send after the durable attempt commits."""
+    attempted = prior_guest_attempt
     delivered = False
     try:
         row.refresh_from_db()
-        if guest:
-            delivered = _guest_notify(
-                row.character, row.envelope["payload"], row.envelope["actors"], row.event_key
+        if guest_sessions is not None:
+            guest_attempted, delivered = _guest_notify(
+                row.character,
+                row.envelope["payload"],
+                row.envelope["actors"],
+                row.event_key,
+                observed_sessions=guest_sessions,
             )
+            attempted = attempted or guest_attempted
         else:
             for current in contexts:
-                row.refresh_from_db()
-                if (
-                    not authorize_context(current, row.character)
-                    or _allowed(row, current) != "visible"
-                ):
-                    continue
-                text = _render(row)
-                if text is not None and authorize_context(current, row.character):
-                    current.session.msg(text)
+                try:
+                    row.refresh_from_db()
+                    if (
+                        not authorize_context(current, row.character)
+                        or _allowed(row, current) != "visible"
+                    ):
+                        continue
+                    text = _render(row)
+                    if text is None or not authorize_context(current, row.character):
+                        continue
+                    send = current.session.msg
+                    if not callable(send):
+                        continue
+                    attempted = True
+                    send(text)
                     delivered = True
+                except Exception:
+                    logger.warning("Lore session delivery failed")
     except Exception:
-        logger.warning("Lore delivery uncertain; source attempt retained")
-    _ack(row, "fallback" if delivered else "uncertain")
+        logger.warning("Lore delivery preparation failed")
+    if guest_sessions is not None and not attempted:
+        attempted = any(_guest_attempt_seen(session, row.event_key) for session in guest_sessions)
+    _ack(row, "fallback" if delivered else "uncertain" if attempted else "pending")
     return row.route_state
 
 
