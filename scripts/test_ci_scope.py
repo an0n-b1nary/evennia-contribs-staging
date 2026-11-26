@@ -32,6 +32,18 @@ def job_scripts(block: str) -> set[str]:
     return set(re.findall(r"\bpython (?:\.\./)?(scripts/[\w/]+\.py)\b", block))
 
 
+def workflow_steps(block: str) -> list[tuple[str, str]]:
+    """A job block's steps as (name, text) pairs, in order, duplicates kept.
+
+    An unnamed step is named by its first line (`uses: ...`). The comment above
+    a step ends the previous step's text.
+    """
+    return [
+        (step.split("\n", 1)[0].removeprefix("name: "), step)
+        for step in re.split(r"(?m)^      - ", block)[1:]
+    ]
+
+
 class DependentsTests(ContribTreeMixin, unittest.TestCase):
     def test_hard_and_optional_dependents_are_affected_transitively(self):
         self.add("base", "evennia_core")
@@ -338,14 +350,16 @@ class WorkflowAgreementTests(unittest.TestCase):
     def test_source_steps_run_without_an_upgrade_selection(self):
         jobs = workflow_jobs()
         block = jobs["notices-sources"]
-        steps = {
-            step.split("\n", 1)[0].removeprefix("name: "): step
-            for step in re.split(r"(?m)^      - ", block)
-            if "scripts/ci_profile.py" in step and not step.startswith("name: Populated ")
-        }
+        # A list, not a dict keyed by name: a duplicated name would hide every
+        # step with that name but the last (#312).
+        steps = [
+            (name, step)
+            for name, step in workflow_steps(block)
+            if "scripts/ci_profile.py" in step and not name.startswith("Populated ")
+        ]
         # Adding or removing a source is a deliberate edit here too.
         self.assertEqual(
-            list(steps),
+            [name for name, _ in steps],
             [
                 "Minimal independent inbox",
                 "Minimal independent Boards source",
@@ -358,8 +372,8 @@ class WorkflowAgreementTests(unittest.TestCase):
                 "Resources Inbox with Plots physically absent",
             ],
         )
-        for name, step in steps.items():
-            with self.subTest(step=name):
+        for index, (name, step) in enumerate(steps):
+            with self.subTest(step=name, index=index):
                 conditions = re.findall(r"(?m)^        if: (.*)$", step)
                 self.assertEqual(conditions, ["${{ !cancelled() }}"])
                 self.assertNotIn("notice_upgrades", step)
