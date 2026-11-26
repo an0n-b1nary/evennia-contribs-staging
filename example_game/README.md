@@ -2151,7 +2151,8 @@ builder pays its synthetic character to demonstrate the alert.
 
 The `resources` source shows weekly gathering and paid plot awards for the
 selected character. The RP Resources preference controls immediate, summary,
-or off. The golden builder adds a synthetic weekly award for its verified
+or off; it is not listed or accepted while `RP_RESOURCES_REVEALED` is off,
+even for staff, and an earlier choice applies again after the reveal. The golden builder adds a synthetic weekly award for its verified
 admin character through the regular accrual service. Generic sandbox seeding
 does not issue notice demo awards.
 
@@ -2159,7 +2160,9 @@ The `economy` source shows each weekly income payment and each stipend as its
 own notice for the selected character; set it with `+notices/set economy=…`.
 A capped week is told once, and zero stipends or zero uncapped income are not
 shown. While the economy is hidden nothing is shown or counted, even for
-staff, and a reveal surfaces only the latest unseen week. A new character's
+staff, and a reveal surfaces only the latest unseen week. The `economy`
+preference is not listed or accepted while `RP_ECONOMY_REVEALED` is off, even
+for staff, and an earlier choice applies again after the reveal. A new character's
 first puppet adds a starting-stipend notice. The golden builder pays a
 synthetic income week to its verified admin character through the regular
 batch service. Generic sandbox seeding does not issue notice demo payments.

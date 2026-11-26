@@ -153,6 +153,10 @@ class EconomySeams(partner_tests.EconomyPartnerTests):
         self.assertContains(views.preferences(request).render(), "Economy")
         with override_settings(RP_ECONOMY_REVEALED=False):
             self.assertNotContains(views.inbox(request).render(), "Weekly income")
+            page = views.preferences(request).render()
+            self.assertContains(page, ">Sandbox examples<")
+            self.assertNotContains(page, '<option value="economy">')
+            self.assertNotContains(page, ">Economy<")
 
     def test_start_helper_idempotent(self):
         from evennia.scripts.models import ScriptDB
