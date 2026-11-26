@@ -2,13 +2,16 @@
 # Copyright (c) 2026, an0n-b1nary. See LICENSE for full terms.
 """Lore decision identity, privacy and durable routing behavior."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from django.db import transaction
 from django.test import override_settings
+from evennia.server.sessionhandler import SESSIONS
 from evennia.utils.test_resources import EvenniaTest
 
 from evennia_links.notices import NoticeContext
 from evennia_lore import notices
+from evennia_lore.integrations import notices as lore_integration
 from evennia_lore.models import LoreEntry, LoreNotice
 
 
@@ -524,3 +527,296 @@ class LoreRoutingTests(EvenniaTest):
     @override_settings(NOTICES_ROUTINE_LIMIT=1)
     def test_deleted_actor_does_not_poison_compacted_peer(self):
         self._deleted_actor_mixed_batch(self.char1)
+
+
+@override_settings(LINKS_NOTICE_SOURCES={})
+class LoreFallbackTests(EvenniaTest):
+    """A durable claim distinguishes a skipped write from an unknown outcome."""
+
+    def setUp(self):
+        super().setUp()
+        self.account2.characters.add(self.char2)
+        self.entry = LoreEntry.create_entry("Fallback", author=self.char2, body="Content")
+        self.sessions = []
+        self.enterContext(patch.object(SESSIONS, "get_sessions", return_value=self.sessions))
+
+    def _decision(self, guest=False):
+        self.sessions.clear()
+        self.char2.tags.remove("character", category="guest")
+        self.entry.request_affirmation(requested_by=self.char2)
+        self.entry.decline(note="Historical reason")
+        if guest:
+            self.char2.tags.add("character", category="guest")
+        return LoreNotice.objects.latest("pk")
+
+    def _session(self):
+        session = Mock()
+        session._lore_notice_attempts = set()
+        session.get_account.return_value = self.account2
+        session.get_puppet.return_value = self.char2
+        self.sessions.append(session)
+        return session
+
+    def _claim(self, row):
+        self.assertEqual(notices.route_notice(row.pk), "attempting")
+        self._assert_receipt(row, "attempting")
+
+    def _assert_receipt(self, row, state):
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, state)
+        if state in {"fallback", "invalid"}:
+            self.assertIsNotNone(row.acknowledged_at)
+        else:
+            self.assertIsNone(row.acknowledged_at)
+
+    def _retry_once(self, row, session):
+        session.msg.assert_not_called()
+        self._assert_receipt(row, "pending")
+        self.assertNotIn(row.event_key, session._lore_notice_attempts)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(notices.transfer_pending(self.char2)["attempting"], 1)
+        session.msg.assert_called_once()
+        self._assert_receipt(row, "fallback")
+        self.assertEqual(notices.route_notice(row.pk), "fallback")
+        self.assertEqual(notices.transfer_pending(self.char2)["fallback"], 0)
+        session.msg.assert_called_once()
+
+    def _fail_refresh_once(self):
+        refresh = LoreNotice.refresh_from_db
+        errors = [RuntimeError("read fault")]
+
+        def fail_once(row, *args, **kwargs):
+            if errors:
+                raise errors.pop()
+            return refresh(row, *args, **kwargs)
+
+        return patch.object(LoreNotice, "refresh_from_db", autospec=True, side_effect=fail_once)
+
+    def test_unstarted_fallback_retries_once(self):
+        for guest in (False, True):
+            with self.subTest(guest=guest):
+                row = self._decision(guest)
+                session = self._session()
+                with self.captureOnCommitCallbacks(execute=True):
+                    self._claim(row)
+                    session.get_puppet.return_value = None
+                    if guest:
+                        self.sessions.clear()
+                session.get_puppet.return_value = self.char2
+                self.sessions[:] = [session]
+                self._retry_once(row, session)
+                self.sessions.clear()
+
+    def test_prewrite_render_failure_retries_once(self):
+        for guest in (False, True):
+            for fault in ("render", "refresh"):
+                with self.subTest(guest=guest, fault=fault):
+                    row = self._decision(guest)
+                    session = self._session()
+                    if fault == "refresh":
+                        fault_patch = self._fail_refresh_once()
+                    else:
+                        target, name = (
+                            (lore_integration, "render_payload") if guest else (notices, "_render")
+                        )
+                        fault_patch = patch.object(target, name, side_effect=RuntimeError("render"))
+                    with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                        self._claim(row)
+                    self.assertEqual(len(callbacks), 1)
+                    with fault_patch:
+                        callbacks[0]()
+                    self._retry_once(row, session)
+                    self.sessions.clear()
+
+    def test_empty_advisory_render_has_no_transport_attempt(self):
+        from django.apps import apps
+
+        if not apps.is_installed("evennia_plots"):
+            self.skipTest("Plots physically absent")
+        from evennia_lore.models import PlotLoreLink
+        from evennia_plots.models import PlotThread
+
+        self.entry.kind, self.entry.accuracy = "rumor", "open"
+        self.entry.save(update_fields=["kind", "accuracy"])
+        render = notices._render
+
+        def clear_sealed():
+            LoreEntry.objects.filter(pk=self.entry.pk).update(sealed_notes="")
+
+        def render_after_unseal(row):
+            clear_sealed()
+            return render(row)
+
+        for guest in (False, True):
+            with self.subTest(guest=guest):
+                self.entry.refresh_from_db()
+                self.entry.seal("Sealed explanation")
+                thread = PlotThread.create_thread(name="Advisory", creator=self.char2)
+                PlotLoreLink.objects.create(entry=self.entry, thread_id=thread.pk)
+                thread.conclude(concluded_by=self.char2)
+                row = LoreNotice.objects.latest("pk")
+                self.assertEqual(row.kind, "advisory")
+                session = self._session()
+                if guest:
+                    self.char2.tags.add("character", category="guest")
+                with (
+                    patch.object(notices, "_render", side_effect=render_after_unseal),
+                    self.captureOnCommitCallbacks(execute=True),
+                ):
+                    self._claim(row)
+                    if guest:
+                        clear_sealed()
+                self._assert_receipt(row, "pending")
+                session.msg.assert_not_called()
+                self.char2.tags.remove("character", category="guest")
+                self.assertEqual(notices.route_notice(row.pk), "invalid")
+                self._assert_receipt(row, "invalid")
+                self.sessions.clear()
+
+    def test_failing_session_does_not_skip_eligible_peer(self):
+        for guest, fault in ((False, "socket"), (True, "socket"), (True, "puppet getter")):
+            with self.subTest(guest=guest, fault=fault):
+                row = self._decision(guest)
+                first, peer = self._session(), self._session()
+                with self.captureOnCommitCallbacks(execute=True):
+                    self._claim(row)
+                    if fault == "socket":
+                        first.msg.side_effect = RuntimeError("write fault")
+                    else:
+                        first.get_puppet.side_effect = RuntimeError("session fault")
+                if fault == "socket":
+                    first.msg.assert_called_once()
+                else:
+                    first.msg.assert_not_called()
+                peer.msg.assert_called_once()
+                self._assert_receipt(row, "fallback")
+                self.assertEqual(notices.route_notice(row.pk), "fallback")
+                peer.msg.assert_called_once()
+                self.sessions.clear()
+
+    def test_guest_socket_failure_is_not_replayed(self):
+        row, session = self._decision(guest=True), self._session()
+        session.msg.side_effect = RuntimeError("write fault")
+        with self.captureOnCommitCallbacks(execute=True):
+            self._claim(row)
+        self._assert_receipt(row, "uncertain")
+        self.assertIn(row.event_key, session._lore_notice_attempts)
+        self.assertEqual(notices.route_notice(row.pk), "uncertain")
+        session.msg.assert_called_once()
+
+    def _fresh_guest_hint(self):
+        return notices.notify(self.char2, "", entry=self.entry, kind="declined")
+
+    def test_fresh_guest_prewrite_failure_leaves_hint_retryable(self):
+        from evennia_lore.models import LoreNoticeCursor
+
+        self.char2.tags.add("character", category="guest")
+        cursors = LoreNoticeCursor.objects.order_by("pk").values_list("pk", "scope", "last_pk")
+        existing_cursors = list(cursors)
+        key = f"lore-{self.entry.pk}-{self.entry.notice_sequence}-declined-{self.char2.pk}"
+        first, peer = self._session(), self._session()
+        render = lore_integration.render_payload
+        failures = [RuntimeError("render")]
+
+        def fail_first_render(payload):
+            if failures:
+                raise failures.pop()
+            return render(payload)
+
+        with (
+            patch.object(lore_integration, "render_payload", side_effect=fail_first_render),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._fresh_guest_hint()
+        first.msg.assert_not_called()
+        self.assertNotIn(key, first._lore_notice_attempts)
+        peer.msg.assert_called_once()
+        self.assertIn(key, peer._lore_notice_attempts)
+        for _ in range(2):
+            with self.captureOnCommitCallbacks(execute=True):
+                self._fresh_guest_hint()
+        first.msg.assert_called_once()
+        peer.msg.assert_called_once()
+        self.assertIn(key, first._lore_notice_attempts)
+
+        self.sessions[:] = [first]
+        first.msg.reset_mock()
+        first.msg.side_effect = RuntimeError("write fault")
+        failing_key = f"lore-{self.entry.pk}-{self.entry.notice_sequence}-affirmed-{self.char2.pk}"
+        for _ in range(2):
+            with self.captureOnCommitCallbacks(execute=True):
+                notices.notify(self.char2, "", entry=self.entry, kind="affirmed")
+        first.msg.assert_called_once()
+        self.assertIn(failing_key, first._lore_notice_attempts)
+        self.assertFalse(LoreNotice.objects.exists())
+        self.assertEqual(list(cursors.all()), existing_cursors)
+        self.assertIsNone(self.char2.ndb.lore_transfer_position)
+
+    def test_existing_guest_honors_prior_transient_attempt(self):
+        render = lore_integration.render_payload
+
+        def render_during_fresh_send(payload):
+            # Simulate a fresh hint's commit in a second execution context.
+            with (
+                patch.object(lore_integration, "render_payload", render),
+                patch.object(transaction, "on_commit", side_effect=lambda callback: callback()),
+            ):
+                self.assertTrue(self._fresh_guest_hint())
+            return render(payload)
+
+        for scenario in ("prior marker", "peer", "disconnect", "refresh fault", "interleaved"):
+            with self.subTest(scenario=scenario):
+                row, session = self._decision(guest=True), self._session()
+                if scenario != "interleaved":
+                    with self.captureOnCommitCallbacks(execute=True):
+                        self._fresh_guest_hint()
+                    self.assertIn(row.event_key, session._lore_notice_attempts)
+                    session.msg.assert_called_once()
+                if scenario == "peer":
+                    peer = self._session()
+                with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                    self._claim(row)
+                self.assertEqual(len(callbacks), 1)
+                if scenario == "disconnect":
+                    session.get_puppet.return_value = None
+                    self.sessions.clear()
+                if scenario == "refresh fault":
+                    with self._fail_refresh_once():
+                        callbacks[0]()
+                elif scenario == "interleaved":
+                    with patch.object(
+                        lore_integration, "render_payload", side_effect=render_during_fresh_send
+                    ):
+                        callbacks[0]()
+                else:
+                    callbacks[0]()
+                session.msg.assert_called_once()
+                if scenario == "peer":
+                    peer.msg.assert_called_once()
+                    self._assert_receipt(row, "fallback")
+                else:
+                    self._assert_receipt(row, "uncertain")
+                self.sessions.clear()
+
+    def test_final_status_failure_does_not_abort_other_claims(self):
+        first = self._decision()
+        second, session = self._decision(), self._session()
+        ack = notices._ack
+
+        def fault_first_ack(row, state):
+            if row.pk == first.pk:
+                session.msg.assert_called_once()
+                raise RuntimeError("status fault")
+            ack(row, state)
+
+        with (
+            patch.object(notices, "_ack", side_effect=fault_first_ack),
+            self.captureOnCommitCallbacks(execute=True),
+            transaction.atomic(),
+        ):
+            self._claim(first)
+            self._claim(second)
+        self._assert_receipt(first, "attempting")
+        self._assert_receipt(second, "fallback")
+        self.assertEqual(notices.route_notice(first.pk), "attempting")
+        self.assertEqual(session.msg.call_count, 2)
