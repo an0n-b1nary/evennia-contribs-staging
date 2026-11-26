@@ -32,6 +32,19 @@ def job_scripts(block: str) -> set[str]:
     return set(re.findall(r"\bpython (?:\.\./)?(scripts/[\w/]+\.py)\b", block))
 
 
+def workflow_steps(block: str) -> list[tuple[str, str]]:
+    """A job block's steps as (name, text) pairs, in order, duplicates kept.
+
+    An unnamed step is named by its first line (`uses: ...`). Full-line comments
+    are dropped, so the comment above a step isn't part of the previous step.
+    """
+    steps = []
+    for step in re.split(r"(?m)^      - ", block)[1:]:
+        text = "\n".join(line for line in step.splitlines() if not line.lstrip().startswith("#"))
+        steps.append((text.split("\n", 1)[0].removeprefix("name: "), text))
+    return steps
+
+
 class DependentsTests(ContribTreeMixin, unittest.TestCase):
     def test_hard_and_optional_dependents_are_affected_transitively(self):
         self.add("base", "evennia_core")
@@ -338,14 +351,16 @@ class WorkflowAgreementTests(unittest.TestCase):
     def test_source_steps_run_without_an_upgrade_selection(self):
         jobs = workflow_jobs()
         block = jobs["notices-sources"]
-        steps = {
-            step.split("\n", 1)[0].removeprefix("name: "): step
-            for step in re.split(r"(?m)^      - ", block)
-            if "scripts/ci_profile.py" in step and not step.startswith("name: Populated ")
-        }
+        # A list, not a dict keyed by name: a duplicated name would hide every
+        # step with that name but the last (#312).
+        steps = [
+            (name, step)
+            for name, step in workflow_steps(block)
+            if "scripts/ci_profile.py" in step and not name.startswith("Populated ")
+        ]
         # Adding or removing a source is a deliberate edit here too.
         self.assertEqual(
-            list(steps),
+            [name for name, _ in steps],
             [
                 "Minimal independent inbox",
                 "Minimal independent Boards source",
@@ -358,14 +373,54 @@ class WorkflowAgreementTests(unittest.TestCase):
                 "Resources Inbox with Plots physically absent",
             ],
         )
-        for name, step in steps.items():
-            with self.subTest(step=name):
+        for index, (name, step) in enumerate(steps):
+            with self.subTest(step=name, index=index):
                 conditions = re.findall(r"(?m)^        if: (.*)$", step)
                 self.assertEqual(conditions, ["${{ !cancelled() }}"])
                 self.assertNotIn("notice_upgrades", step)
         # Only the upgrades archive base commits and need the full history.
         self.assertIn("fetch-depth: 0", block)
         self.assertNotIn("fetch-depth", jobs["notices-partners"])
+
+    def test_grouped_profiles_run_in_exactly_one_group(self):
+        # building-partners and economy-partners split their profiles into
+        # matrix groups (#249, #313). An ungated profile runs in every group,
+        # one gated on two groups runs twice, and one gated on an unknown
+        # group never runs.
+        jobs = workflow_jobs()
+        grouped = {}
+        for job, block in jobs.items():
+            matrix = re.search(r"(?m)^        group: \[(.*)\]$", block)
+            if matrix:
+                groups = [value.strip() for value in matrix.group(1).split(",")]
+                grouped[job] = (groups, block)
+        self.assertLessEqual({"building-partners", "economy-partners"}, set(grouped))
+        # A job gated on matrix.group but missed above (a block-style list, or a
+        # comment after the list) would go unchecked.
+        self.assertEqual(
+            {job for job, block in jobs.items() if "matrix.group" in block}, set(grouped)
+        )
+        for job, (groups, block) in grouped.items():
+            profiles = [
+                (name, step)
+                for name, step in workflow_steps(block)
+                if "scripts/ci_profile.py" in step
+            ]
+            used = []
+            for name, step in profiles:
+                with self.subTest(job=job, step=name):
+                    conditions = re.findall(r"(?m)^        if: (.*)$", step)
+                    self.assertEqual(len(conditions), 1)
+                    gate = re.fullmatch(
+                        r"\$\{\{ !cancelled\(\) && matrix\.group == '(\w+)' \}\}", conditions[0]
+                    )
+                    self.assertIsNotNone(gate, conditions[0])
+                    self.assertIn(gate.group(1), groups)
+                    used.append(gate.group(1))
+            with self.subTest(job=job):
+                self.assertIn("fail-fast: false", block)
+                self.assertEqual(len(groups), len(set(groups)))
+                self.assertEqual(set(used), set(groups))  # no group is empty
 
     def test_every_script_a_job_runs_selects_that_job(self):
         # A change to a runner must select the job that runs it (#301).
