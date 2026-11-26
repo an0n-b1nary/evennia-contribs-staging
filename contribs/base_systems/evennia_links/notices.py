@@ -177,8 +177,38 @@ def _resolve_registry(configured):
             callable(getattr(source, method, None)) for method in ("evaluate", "render")
         ):
             raise ValueError("Notice source must supply label, evaluate and render")
+        hook = getattr(source, "available", None)
+        if hook is not None and not callable(hook):
+            raise ValueError("Notice source availability must be callable")
         sources.append((slug, source))
     return tuple(sources)
+
+
+def source_available(source, context):
+    """Return whether one resolved source offers preferences to this authorized context.
+
+    A source may define ``available(context)``; it is called live on every preference
+    listing or change, so it must be cheap. Only a hook returning ``True`` admits the
+    source. Any other return hides it silently. A hook that raises hides it and logs one
+    generic warning. A missing hook (or ``available = None``) admits it.
+    """
+    hook = getattr(source, "available", None)
+    if hook is None:
+        return True
+    try:
+        return hook(context) is True
+    except Exception:
+        logger.warning("Notice source availability check failed; hiding source")
+        return False
+
+
+def available_sources(context):
+    """Return registered sources whose availability admits this context, in registry order."""
+    return {
+        slug: source
+        for slug, source in source_registry().items()
+        if source_available(source, context)
+    }
 
 
 def recipient_identity(recipient):

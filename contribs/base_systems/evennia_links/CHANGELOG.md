@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## 0.8.17 — 2026-11-26
+
+- Notice sources may define an optional `available(context)` hook. `source_available` and
+  `available_sources` apply it live: a missing hook or `available = None` means available,
+  only `True` admits, any other return hides the source, and a raising hook hides it with
+  one generic warning. The registry rejects any other non-callable `available`.
+
 ## 0.8.16 — 2026-11-24
 
 - `TestRunner` cancels, at the end of each Evennia test, the reactor timers it scheduled

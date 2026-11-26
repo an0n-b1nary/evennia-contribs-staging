@@ -801,3 +801,12 @@ returns `fallback_pending` offline. Backend uncertainty never fans out to
 fallback. See the Notices README for the atomic transfer and source receipt
 protocol. Calendar supplies a production adapter; other production source queues
 remain unchanged until their respective adapters are installed.
+
+A source may define `available(context)` to say whether an inbox offers its
+preferences to that authorized context (character may be None).
+`source_available(source, context)` applies it and `available_sources(context)`
+returns the admitted registry entries in order. A missing hook or
+`available = None` means always available; only `True` admits; any other return
+hides the source; a raising hook hides it and logs one generic warning. Any other
+non-callable `available` is rejected when the registry resolves. The hook is
+called live, never cached, so a runtime reveal toggle applies immediately.
