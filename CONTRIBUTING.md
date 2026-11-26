@@ -356,8 +356,9 @@ venv and game of its own and runs the profile's runner there. A family whose
 profiles test for a minute or two runs them as steps of one job, each in its
 own venv, so an excluded partner is still physically absent; every step runs
 even after an earlier one fails.
-Building, crafting and the full-host Inbox profiles take longer, so they run
-as matrix entries.
+Crafting and the full-host Inbox profiles take longer, so each is a matrix
+entry of its own. Building and economy each split their profiles into two
+matrix entries, grouped by measured time, with the profiles as steps.
 CI installs with uv: on the runners the time goes into installing, not
 downloading, and uv does it several times faster than pip.
 `ci_install_contribs.py` installs the selection with one
@@ -416,9 +417,9 @@ adds a step to `ci.yml` or makes an existing step slower:
   usually has the runners to itself) and add the new step's expected time.
 - If the new total would make the job the slowest in a full run, or would
   come within 25% of its timeout (past 22.5 minutes of a 30-minute limit),
-  split the job in the same change: into matrix entries, as the building and
-  crafting profiles are, or into a sibling job. A new job needs its own `JOBS`
-  entry in `scripts/ci_scope.py`.
+  split the job in the same change: into matrix entries, as the building,
+  economy and crafting profiles are, or into a sibling job. A new job needs its
+  own `JOBS` entry in `scripts/ci_scope.py`.
 - Don't split a job that is within budget. Every repository on the account
   shares one limit on concurrent jobs, so an extra job waits for a free runner
   and only helps when it shortens the slowest job.

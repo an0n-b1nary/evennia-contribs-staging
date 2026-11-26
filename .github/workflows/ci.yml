@@ -16,8 +16,10 @@ on:
 # every installed app's migrations, and no partner runner uses the game's own
 # database. Installing, not downloading, is the setup cost (#170), so jobs
 # install with uv. scripts/ci_profile.py gives each partner profile a fresh venv
-# of its own, so a family's short profiles run as steps of one job, each with
-# its excluded partners physically absent (#147). Long profiles stay a matrix.
+# of its own, so a family's short profiles run as steps of one job, or of a
+# two-entry matrix grouped by measured time when one job would take too long,
+# each with its excluded partners physically absent (#147). Long profiles stay a
+# matrix.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -338,11 +340,22 @@ jobs:
     needs: scope
     if: contains(fromJSON(needs.scope.outputs.jobs), 'economy-partners')
     runs-on: ubuntu-latest
+    # Nine profiles of 0.6 to 3.8 minutes each took 13.5 to 23.8 minutes in
+    # all (nightlies 44919111225, 45038328631, 45247506415, 45464899272 and
+    # 45670615340), the slowest, 23.8, within 25% of the 30-minute limit. They
+    # run as two jobs grouped by measured time, with 6.5 to 11.8 and 7.0 to
+    # 12.0 minutes of profiles in those runs (#313). Each profile is a step
+    # with its own fresh environment.
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [a, b]
     steps:
       - uses: actions/checkout@v7
         with:
-          # The populated upgrade archives its base commit.
+          # Group b's populated upgrade archives its base commit. Group a takes
+          # the full history too: it cost a second of checkout (45670615340).
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
@@ -350,42 +363,27 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.5"
-      # The baseline for the absent profiles below: Economy's suite as in `test`,
-      # but serially, and its partner seams with every partner in a bare game.
-      # `test` doesn't run those seams; the sandbox gate runs them under its own
-      # settings.
+      # The baseline for the absent profiles of both groups (it runs in
+      # group a): Economy's suite as in `test`, but serially, and its partner
+      # seams with every partner in a bare game. `test` doesn't run those
+      # seams; the sandbox gate runs them under its own settings.
       - name: all-present
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'a' }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_economy_tests.py {game}
       - name: no-resources
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'a' }}
         run: >-
           python scripts/ci_profile.py --exclude evennia-rp-resources --exclude evennia-rp-crafting --
           python scripts/ci_run_economy_tests.py {game} --absent evennia_rp_resources
       - name: no-jobs
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'a' }}
         run: >-
           python scripts/ci_profile.py --exclude evennia-jobs --exclude evennia-moderation --
           python scripts/ci_run_economy_tests.py {game} --absent evennia_jobs
-      - name: no-building
-        if: ${{ !cancelled() }}
-        run: >-
-          python scripts/ci_profile.py --exclude evennia-building --
-          python scripts/ci_run_economy_tests.py {game} --absent evennia_building
-      - name: no-equipment
-        if: ${{ !cancelled() }}
-        run: >-
-          python scripts/ci_profile.py --exclude evennia-rp-equipment --
-          python scripts/ci_run_economy_tests.py {game} --absent evennia_rp_equipment
-      - name: Economy with Inbox physically absent
-        if: ${{ !cancelled() }}
-        run: >-
-          python scripts/ci_profile.py --exclude evennia-notices --
-          python scripts/ci_run_economy_tests.py {game} --absent evennia_notices
       - name: Minimal Economy and Links
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'a' }}
         run: >-
           python scripts/ci_profile.py
           --package contribs/base_systems/evennia_links
@@ -393,8 +391,23 @@ jobs:
           python scripts/ci_run_economy_tests.py {game}
           --absent evennia_notices --absent evennia_rp_resources --absent evennia_jobs
           --absent evennia_building --absent evennia_rp_equipment
+      - name: no-building
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-building --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_building
+      - name: no-equipment
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-rp-equipment --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_rp_equipment
+      - name: Economy with Inbox physically absent
+        if: ${{ !cancelled() && matrix.group == 'b' }}
+        run: >-
+          python scripts/ci_profile.py --exclude evennia-notices --
+          python scripts/ci_run_economy_tests.py {game} --absent evennia_notices
       - name: Economy Inbox minimal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'b' }}
         run: >-
           python scripts/ci_profile.py
           --package contribs/base_systems/evennia_links
@@ -404,9 +417,10 @@ jobs:
           --absent evennia_rp_resources --absent evennia_jobs
           --absent evennia_building --absent evennia_rp_equipment
       # Not in notices-sources: Economy's upgrade isn't one of the populated Inbox
-      # upgrades ci_scope.py selects, so it runs whenever economy-partners does.
+      # upgrades ci_scope.py selects, so group b runs it whenever economy-partners
+      # runs.
       - name: Populated Economy source upgrade and Inbox removal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'b' }}
         run: >-
           python scripts/ci_profile.py --
           python scripts/ci_run_economy_notices_upgrade.py {game}
