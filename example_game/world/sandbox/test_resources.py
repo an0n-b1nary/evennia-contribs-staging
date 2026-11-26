@@ -122,7 +122,7 @@ class ResourceSeams(EvenniaTest):
         self.assertContains(
             views.detail(request, notice.public_ref).render(), "This week you gathered"
         )
-        self.assertContains(views.preferences(request).render(), "RP Resources")
+        self.assertContains(views.preferences(request).render(), '<option value="resources">')
         with override_settings(RP_RESOURCES_REVEALED=False):
             self.assertNotContains(views.inbox(request).render(), "This week you gathered")
             page = views.preferences(request).render()
