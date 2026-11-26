@@ -15,6 +15,7 @@ from django.db import transaction
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from evennia.utils.create import create_account, create_object
+from evennia.utils.test_resources import EvenniaCommandTest
 
 from evennia_links import runtime
 
@@ -25,6 +26,28 @@ from .summary import notify_economy_summary
 
 State = EconomyNoticeReceipt.State
 SOURCES = {"economy": "evennia_economy.integrations.notices.EconomyNoticeSource"}
+PREFERENCE_SOURCES = {
+    "economy": "evennia_economy.integrations.notices.EconomyNoticeSource",
+    "other": "evennia_economy.test_notices.OtherSource",
+}
+
+if apps.is_installed("evennia_notices"):
+    from django.urls import include, path
+    from evennia.web.urls import urlpatterns as evennia_patterns
+
+    urlpatterns = [path("notices/", include("evennia_notices.urls")), *evennia_patterns]
+
+
+class OtherSource:
+    """Hookless source proving the preference lists stay populated."""
+
+    label = "Unrelated alerts"
+
+    def evaluate(self, events, context):
+        return {}
+
+    def render(self, events, context):
+        raise ValueError("No notice")
 
 
 @override_settings(
@@ -134,6 +157,21 @@ class StandaloneEconomyNoticeTests(EconomyNoticeFixture):
 
     def test_every_payment_creator_stages_one_receipt(self):
         self.assert_population()
+
+    def test_inbox_preference_follows_only_the_reveal(self):
+        from evennia_links.notices import NoticeContext
+
+        from .integrations.notices import EconomyNoticeSource
+
+        source = EconomyNoticeSource()
+        context = NoticeContext(self.account, self.character)
+        self.assertIs(source.available(context), True)
+        self.hide()
+        self.assertIs(source.available(context), False)
+        staff = self.make_staff_visible()
+        self.assertIs(source.available(NoticeContext(staff, self.character)), False)
+        self.reveal()
+        self.assertIs(source.available(context), True)
 
     def test_repeated_puppet_sends_one_combined_line_and_writes_marker(self):
         ubi = self.pay("w1")
@@ -997,3 +1035,75 @@ class InboxEconomyNoticeTests(EconomyNoticeFixture):
         )
         self.prepare()
         self.assertEqual(len(self.project()), 2)
+
+
+@skipUnless(apps.is_installed("evennia_notices"), "Optional Inbox is absent")
+@override_settings(
+    NOTICES_ENABLED=True,
+    LINKS_NOTICE_SOURCES=PREFERENCE_SOURCES,
+    ROOT_URLCONF=__name__,
+    RP_ECONOMY_REVEALED=True,
+)
+class InboxEconomyPreferenceTests(EvenniaCommandTest):
+    """The Economy preference row exists only while the economy is revealed, staff included."""
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.account2.characters.add(self.char2)
+
+    def settings_output(self):
+        from evennia_notices.commands import CmdNotices
+
+        return self.call(CmdNotices(), "/settings")
+
+    def page(self, account, character=None):
+        from importlib import import_module
+
+        from django.test import RequestFactory
+
+        from evennia_notices import views
+
+        request = RequestFactory().get("/notices/preferences/")
+        request.user = account
+        request.session = import_module(settings.SESSION_ENGINE).SessionStore()
+        if character is not None:
+            request.session["puppet"] = character.pk
+        return views.preferences(request).render()
+
+    def assert_hidden(self):
+        output = self.settings_output()
+        self.assertIn("other: summary; decisions: immediate", output)
+        self.assertNotIn("economy", output)
+        for response in (self.page(self.account, self.char1), self.page(self.account2)):
+            self.assertContains(response, 'value="other"')
+            self.assertContains(response, "Unrelated alerts")
+            self.assertNotContains(response, 'value="economy"')
+            self.assertNotContains(response, "Economy")
+
+    def test_hidden_economy_preference_is_absent_and_refused_for_staff(self):
+        from evennia_notices.commands import CmdNotices
+        from evennia_notices.models import SourcePreference
+
+        runtime.set("RP_ECONOMY_REVEALED", False)
+        # A staff-visibility gate would show the row here; the reveal gate must not.
+        self.assertTrue(conf.visible(self.char1))
+        self.assert_hidden()
+        self.assertEqual(
+            self.call(CmdNotices(), "/set economy=off"), self.call(CmdNotices(), "/set nosuch=off")
+        )
+        self.assertFalse(SourcePreference.objects.filter(source="economy").exists())
+
+    def test_stored_choice_survives_hiding_and_applies_after_live_reveal(self):
+        from evennia_notices.commands import CmdNotices
+        from evennia_notices.models import SourcePreference
+
+        self.assertEqual(self.call(CmdNotices(), "/set economy=off"), "Notice preference saved.")
+        runtime.set("RP_ECONOMY_REVEALED", False)
+        self.assert_hidden()
+        self.assertEqual(SourcePreference.objects.get(source="economy").mode, "off")
+        runtime.set("RP_ECONOMY_REVEALED", True)
+        self.assertIn("economy: off; decisions: summary", self.settings_output())
+        response = self.page(self.account, self.char1)
+        self.assertContains(response, 'value="economy"')
+        self.assertContains(response, "Economy")

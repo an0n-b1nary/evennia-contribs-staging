@@ -145,6 +145,11 @@ class EconomyNoticeSource:
 
     label = "Economy"
 
+    def available(self, context):
+        """Offer the Inbox preference only while the economy is revealed."""
+        # Never conf.visible: a hidden system stays hidden from staff too.
+        return get("RP_ECONOMY_REVEALED") is True
+
     def prepare(self, context):
         """Import pending payments before the Inbox's puppet summary."""
         if (

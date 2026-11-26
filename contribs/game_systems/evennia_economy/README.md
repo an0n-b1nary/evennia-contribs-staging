@@ -36,7 +36,7 @@ stipends without a login. Skip that call while frozen, or handle
 as an alias for `prepare_character`. Notifications are suppressed while hidden,
 even for staff.
 
-To use Inbox, install the `inbox` extra (Inbox 0.1.1 and Links 0.8.15 or
+To use Inbox, install the `inbox` extra (Inbox 0.1.2 and Links 0.8.17 or
 later). Add this entry to the host's `LINKS_NOTICE_SOURCES` mapping:
 
 ```python
@@ -51,6 +51,9 @@ login summary. A capped week is announced once, not weekly. Zero-amount
 stipends and zero income that isn't caused by the cap are not shown in the
 Inbox. While `RP_ECONOMY_REVEALED` is off nothing is shown or counted, even for
 staff; a reveal surfaces only the latest unseen week, plus any stipends.
+With Inbox 0.1.2 or later, the `economy` preference is listed and accepted only
+while `RP_ECONOMY_REVEALED` is on, for staff too. A choice made earlier is kept
+and applies again after the reveal.
 
 With Inbox disabled, unbound or not installed, the puppet hook sends the
 standalone combined line ("Your latest income: … Stipends received: … See
