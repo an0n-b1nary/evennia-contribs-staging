@@ -164,6 +164,36 @@ class CanonicalReceiptTests(EvenniaTest):
             self.assertEqual(row.route_state, "fallback")
             self.assertIsNotNone(row.delivered_at)
 
+    @override_settings(NOTICES_ENABLED=False, LINKS_NOTICE_SOURCES={})
+    def test_ordinary_legacy_render_rechecks_rsvp_event_before_transport(self):
+        row = self.legacy()
+        replacement = CalendarEvent.objects.create(
+            title="Replacement event", scheduled_time=self.event.scheduled_time
+        )
+        render = notices.drawn_message
+
+        def reassign(event):
+            self.assertEqual(event.pk, self.event.pk)
+            RSVP.objects.filter(pk=self.rsvp.pk).update(event=replacement)
+            return render(event)
+
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[self.notice_session]),
+            patch.object(type(self.char1), "msg") as message,
+        ):
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                self.assertEqual(notices.route_notice(row.pk), "held")
+            self.assertEqual(len(callbacks), 1)
+            row.refresh_from_db()
+            self.assertEqual(row.route_state, "attempting")
+            with patch.object(notices, "drawn_message", side_effect=reassign) as renderer:
+                callbacks[0]()
+            renderer.assert_called_once()
+        message.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "invalid")
+        self.assertIsNotNone(row.delivered_at)
+
     @skipUnless(apps.is_installed("evennia_notices"), "Optional Inbox physically absent")
     def test_legacy_import_and_producer_replay_share_one_transition(self):
         from evennia_notices.models import DeliveryReceipt
@@ -287,14 +317,12 @@ class GuestReceiptTests(EvenniaTest):
         self.guest_session.msg.assert_not_called()
 
     def test_guest_history_releases_after_disconnect_render_failure_and_account_change(self):
-        from evennia_calendar.integrations.notices import CalendarNoticeSource
-
         row = self.history()
-        render = CalendarNoticeSource.render
+        render = notices.drawn_message
 
-        def change_account(source, events, context):
+        def change_account(event):
             self.guest_session.get_account = lambda: self.account2
-            return render(source, events, context)
+            return render(event)
 
         with patch.object(notices, "_connected_sessions", return_value=[self.guest_session]):
             finish = self.claim_history(row)
@@ -303,16 +331,14 @@ class GuestReceiptTests(EvenniaTest):
             self.assert_history_released(row)
 
             finish = self.claim_history(row)
-            with patch.object(
-                CalendarNoticeSource, "render", side_effect=RuntimeError("Unavailable")
-            ):
+            with patch.object(notices, "drawn_message", side_effect=RuntimeError("Unavailable")):
                 finish()
             self.assert_history_released(row)
 
             finish = self.claim_history(row)
             with (
                 patch.object(self.guest_session, "get_account", return_value=self.guest_account),
-                patch.object(CalendarNoticeSource, "render", change_account),
+                patch.object(notices, "drawn_message", change_account),
             ):
                 finish()
             self.assert_history_released(row)
@@ -330,6 +356,29 @@ class GuestReceiptTests(EvenniaTest):
         )
         row.refresh_from_db()
         self.assertEqual(row.route_state, "fallback")
+        self.assertIsNotNone(row.delivered_at)
+
+    def test_guest_history_renders_only_the_authorized_event_snapshot(self):
+        row = self.history()
+        replacement = CalendarEvent.objects.create(
+            title="Replacement event", scheduled_time=self.event.scheduled_time
+        )
+
+        def reassign(account, actors):
+            RSVP.objects.filter(pk=self.rsvp.pk).update(event=replacement)
+            return "allow"
+
+        with patch.object(notices, "_connected_sessions", return_value=[self.guest_session]):
+            finish = self.claim_history(row)
+            with (
+                patch.object(notices, "_guest_actor_policy", side_effect=reassign),
+                patch.object(notices, "drawn_message", wraps=notices.drawn_message) as renderer,
+            ):
+                finish()
+        renderer.assert_called_once_with(self.event)
+        self.guest_session.msg.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "invalid")
         self.assertIsNotNone(row.delivered_at)
 
     def test_guest_history_keeps_invalidation_after_a_raising_send(self):
@@ -401,6 +450,57 @@ class GuestReceiptTests(EvenniaTest):
             self.assertTrue(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
             self.assertFalse(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
         self.guest_session.msg.assert_called_once_with(render(self.event))
+        self.assertFalse(CalendarNotice.objects.exists())
+
+    def test_overlapping_transient_hints_reserve_each_marker_once(self):
+        render = notices.drawn_message
+        nested = []
+
+        def overlaps(event):
+            if not nested:
+                nested.append(None)
+                nested[0] = notices.notify(self.rsvp, "drawn", "", origin="lottery")
+            return render(event)
+
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[self.guest_session]),
+            patch.object(notices, "drawn_message", side_effect=overlaps),
+        ):
+            self.assertFalse(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
+            self.assertFalse(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
+        self.assertEqual(nested, [True])
+        self.guest_session.msg.assert_called_once_with(render(self.event))
+        self.assertFalse(CalendarNotice.objects.exists())
+
+    def test_overlapping_transient_hints_preserve_a_different_marker(self):
+        other_event = CalendarEvent.objects.create(
+            title="Another selection", scheduled_time=self.event.scheduled_time
+        )
+        other = RSVP.objects.create(
+            event=other_event,
+            character=self.guest_character,
+            status=RSVP.Status.LOTTERY_SELECTED,
+        )
+        render = notices.drawn_message
+        nested = []
+
+        def overlaps(event):
+            if event.pk == self.event.pk:
+                nested.append(notices.notify(other, "drawn", "", origin="lottery"))
+            return render(event)
+
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[self.guest_session]),
+            patch.object(notices, "drawn_message", side_effect=overlaps),
+        ):
+            self.assertTrue(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
+            self.assertFalse(notices.notify(other, "drawn", "", origin="lottery"))
+            self.assertFalse(notices.notify(self.rsvp, "drawn", "", origin="lottery"))
+        self.assertEqual(nested, [True])
+        self.assertEqual(
+            [call.args[0] for call in self.guest_session.msg.call_args_list],
+            [render(other_event), render(self.event)],
+        )
         self.assertFalse(CalendarNotice.objects.exists())
 
     def test_transient_guest_attempt_markers_are_per_session(self):

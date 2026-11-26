@@ -9,6 +9,7 @@ ambiguous pre-upgrade generations remain pending without text or counts.
 import logging
 from dataclasses import asdict
 from functools import partial
+from threading import Lock
 
 from django.apps import apps
 from django.conf import settings
@@ -38,6 +39,7 @@ logger = logging.getLogger("evennia")
 TIME_FORMAT = "%Y-%m-%d %H:%M"
 TERMINAL = {"inbox", "fallback", "suppressed", "invalid"}
 SYSTEM_ORIGINS = {"drawn": "lottery", "seated": "seated", "reminder": "reminder"}
+_guest_hint_lock = Lock()
 
 
 def is_online(character):
@@ -313,7 +315,7 @@ def _session_matches(session, account, character):
 
 def _finish_fallback(row_pk, rsvp_id, routed_at, sessions, *, guest):
     """Write outside the locks and finalize only the claim this callback owns."""
-    from .integrations.notices import CalendarNoticeSource, currentness
+    from .integrations.notices import CalendarNoticeSource, currentness, render_notice
     from .models import CalendarNotice
 
     try:
@@ -326,11 +328,10 @@ def _finish_fallback(row_pk, rsvp_id, routed_at, sessions, *, guest):
 
     attempted = delivered = invalid = False
     source = CalendarNoticeSource()
+    rows = CalendarNotice.objects.select_related("rsvp__event", "character")
     for session in sessions:
         try:
-            live = CalendarNotice.objects.select_related("rsvp__event", "character").get(
-                pk=row_pk, rsvp_id=rsvp_id
-            )
+            live = rows.get(pk=row_pk, rsvp_id=rsvp_id)
             outcome = currentness(live)
             if outcome.status == "invalid":
                 invalid = True
@@ -342,31 +343,41 @@ def _finish_fallback(row_pk, rsvp_id, routed_at, sessions, *, guest):
             if is_guest(character) != guest:
                 continue
             context = NoticeContext(account, character, session)
+            event = _stored(live)
             if guest:
                 if (
                     not _guest_session_owned(session, character, account)
                     or _guest_actor_policy(account, live.actors) != "allow"
                 ):
                     continue
-                event = _stored(live)
+                visible = True
             else:
                 if not authorize_context(context, character):
                     continue
-                event = _stored(live)
-                if evaluate(source, [event], context)[event.event_id].status != "visible":
-                    continue
-            # Trust producer text only for a structured ordinary event.
-            message = (
-                live.message
-                if live.event_key and not guest
-                else normalize_rendered(source.render([event], context)).text
-            )
-            send = (
-                partial(session.msg, message)
-                if guest
-                else partial(character.msg, message, session=session)
-            )
-            if not _session_matches(session, account, character):
+                visible = evaluate(source, [event], context)[event.event_id].status == "visible"
+
+            send = None
+            if visible:
+                # Historical text comes from the authorized snapshot, even if
+                # the RSVP changes before the final lifecycle check.
+                message = (
+                    live.message
+                    if live.event_key and not guest
+                    else normalize_rendered(render_notice(live)).text
+                )
+                send = (
+                    partial(session.msg, message)
+                    if guest
+                    else partial(character.msg, message, session=session)
+                )
+            outcome = currentness(rows.get(pk=row_pk, rsvp_id=rsvp_id))
+            if outcome.status == "invalid":
+                invalid = True
+            if (
+                outcome.status != "visible"
+                or send is None
+                or not _session_matches(session, account, character)
+            ):
                 continue
         except Exception:
             logger.warning("Calendar fallback session preparation failed")
@@ -611,8 +622,7 @@ def _guest_notify(rsvp, kind, origin, actor):
                 if kind == "reminder"
                 else f"{live.pk}-{live.notice_generation}-{origin}"
             )
-            seen = getattr(session, "_calendar_notice_hints", set())
-            if marker in seen:
+            if marker in getattr(session, "_calendar_notice_hints", set()):
                 continue
             message = {
                 "lottery": drawn_message,
@@ -624,11 +634,15 @@ def _guest_notify(rsvp, kind, origin, actor):
             send = partial(session.msg, message)
             if not _session_matches(session, account, live.character):
                 continue
+            with _guest_hint_lock:
+                seen = getattr(session, "_calendar_notice_hints", set())
+                if marker in seen:
+                    continue
+                session._calendar_notice_hints = seen | {marker}
         except Exception:
             logger.warning("Calendar guest hint session preparation failed")
             continue
 
-        session._calendar_notice_hints = seen | {marker}
         try:
             send()
         except Exception:

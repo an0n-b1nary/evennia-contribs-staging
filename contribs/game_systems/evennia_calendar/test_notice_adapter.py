@@ -293,6 +293,28 @@ class CalendarTransitionTests(EvenniaTest):
         self.assertEqual(row.route_state, "uncertain")
         self.assertIsNone(row.delivered_at)
 
+    def test_standalone_acknowledges_cancellation_seen_during_viewer_evaluation(self):
+        evaluate = notices.evaluate
+
+        def cancel(source, events, context):
+            CalendarEvent.objects.filter(pk=self.event.pk).update(is_cancelled=True)
+            return evaluate(source, events, context)
+
+        with (
+            patch.object(
+                notices, "_connected_sessions", return_value=[self.session_for_character()]
+            ),
+            patch.object(self.char1, "msg") as message,
+        ):
+            row, finish = self.claim_draw()
+            with patch.object(notices, "evaluate", side_effect=cancel) as policy:
+                finish()
+            policy.assert_called_once()
+        message.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "invalid")
+        self.assertIsNotNone(row.delivered_at)
+
     def test_standalone_acknowledges_cancellation_before_any_send(self):
         with (
             patch.object(

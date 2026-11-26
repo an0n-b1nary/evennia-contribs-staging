@@ -140,7 +140,6 @@ class CalendarNoticeSource:
 
     def render(self, events, context):
         """Render only eligible constituents; no historical sender names are exposed."""
-        from evennia_calendar import notices
         from evennia_calendar.models import CalendarNotice
 
         rows = (
@@ -153,27 +152,33 @@ class CalendarNoticeSource:
                 f"{len(events)} Calendar updates. Check your calendar for current events.",
                 (NoticeAction("Your calendar", command="+calendar/mine"),),
             )
-        row = rows[events[0].payload["notice"]]
-        event = row.rsvp.event
-        messages = {
-            "lottery": notices.drawn_message,
-            "waitlist_offer": notices.offered_message,
-            "invitation": notices.invited_message,
-            "seated": notices.seated_message,
-            "reminder": notices.reminder_message,
-        }
-        text = messages[row.origin](event)
-        actions = [
-            NoticeAction(
-                "View event",
-                command=f"+calendar {event.pk}",
-                route_name="evennia_calendar:calendar-event-detail",
-                route_args=(event.pk,),
-            )
+        return render_notice(rows[events[0].payload["notice"]])
+
+
+def render_notice(row):
+    """Render one Calendar notice from the supplied row's loaded event."""
+    from evennia_calendar import notices
+
+    event = row.rsvp.event
+    messages = {
+        "lottery": notices.drawn_message,
+        "waitlist_offer": notices.offered_message,
+        "invitation": notices.invited_message,
+        "seated": notices.seated_message,
+        "reminder": notices.reminder_message,
+    }
+    text = messages[row.origin](event)
+    actions = [
+        NoticeAction(
+            "View event",
+            command=f"+calendar {event.pk}",
+            route_name="evennia_calendar:calendar-event-detail",
+            route_args=(event.pk,),
+        )
+    ]
+    if row.origin in {"lottery", "waitlist_offer", "invitation"}:
+        actions += [
+            NoticeAction("Confirm place", command=f"+rsvp/confirm {event.pk}"),
+            NoticeAction("Decline place", command=f"+rsvp/cancel {event.pk}"),
         ]
-        if row.origin in {"lottery", "waitlist_offer", "invitation"}:
-            actions += [
-                NoticeAction("Confirm place", command=f"+rsvp/confirm {event.pk}"),
-                NoticeAction("Decline place", command=f"+rsvp/cancel {event.pk}"),
-            ]
-        return RenderedNotice(text, tuple(actions))
+    return RenderedNotice(text, tuple(actions))
