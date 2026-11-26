@@ -40,11 +40,12 @@ Weekly grants and paid plot awards appear in the character's Inbox while
 Resources are revealed. The account-wide RP Resources preference defaults to
 the login summary. With Inbox 0.1.2 or later, the RP Resources preference is
 listed and accepted only while `RP_RESOURCES_REVEALED` is on, for staff too. A
-choice made earlier is kept and applies again after the reveal. A private plot award shows its quantities only when the
-recipient can currently view the plot. The Inbox always omits private plot
-names and links. With Inbox disabled or unbound, the current weekly summary
-and pending plot awards use the standalone puppet hook. Awards already handled
-through either path do not replay after switching.
+choice made earlier is kept and applies again after the reveal. A private plot
+award shows its quantities only when the recipient can currently view the
+plot. The Inbox always omits private plot names and links. With Inbox disabled
+or unbound, the current weekly summary and pending plot awards use the
+standalone puppet hook. Awards already handled through either path do not
+replay after switching.
 
 Run `evennia migrate --noinput` and `+resources/seed`. A catalogue provider
 is a dotted path or callable returning dictionaries:
