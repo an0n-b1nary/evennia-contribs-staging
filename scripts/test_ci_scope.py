@@ -381,6 +381,40 @@ class WorkflowAgreementTests(unittest.TestCase):
         self.assertIn("fetch-depth: 0", block)
         self.assertNotIn("fetch-depth", jobs["notices-partners"])
 
+    def test_grouped_profiles_run_in_exactly_one_group(self):
+        # building-partners and economy-partners split their profiles into
+        # matrix groups (#249, #313). An ungated profile runs in every group,
+        # one gated on two groups runs twice, and one gated on an unknown
+        # group never runs.
+        grouped = {}
+        for job, block in workflow_jobs().items():
+            matrix = re.search(r"(?m)^        group: \[(.*)\]$", block)
+            if matrix:
+                groups = [value.strip() for value in matrix.group(1).split(",")]
+                grouped[job] = (groups, block)
+        self.assertLessEqual({"building-partners", "economy-partners"}, set(grouped))
+        for job, (groups, block) in grouped.items():
+            profiles = [
+                (name, step)
+                for name, step in workflow_steps(block)
+                if "scripts/ci_profile.py" in step
+            ]
+            used = []
+            for name, step in profiles:
+                with self.subTest(job=job, step=name):
+                    conditions = re.findall(r"(?m)^        if: (.*)$", step)
+                    self.assertEqual(len(conditions), 1)
+                    gate = re.fullmatch(
+                        r"\$\{\{ !cancelled\(\) && matrix\.group == '(\w+)' \}\}", conditions[0]
+                    )
+                    self.assertIsNotNone(gate, conditions[0])
+                    self.assertIn(gate.group(1), groups)
+                    used.append(gate.group(1))
+            with self.subTest(job=job):
+                self.assertIn("fail-fast: false", block)
+                self.assertEqual(len(groups), len(set(groups)))
+                self.assertEqual(set(used), set(groups))  # no group is empty
+
     def test_every_script_a_job_runs_selects_that_job(self):
         # A change to a runner must select the job that runs it (#301).
         jobs = workflow_jobs()
