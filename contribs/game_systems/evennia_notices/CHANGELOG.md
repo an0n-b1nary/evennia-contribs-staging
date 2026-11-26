@@ -7,6 +7,9 @@
   POSTs refuse them with the same reply as an unknown source. Stored choices are
   kept and apply again once the source is available. Requires Links 0.8.17.
 - `PreferenceForm` now requires a keyword-only `context`.
+- `set_preference` raises `UnknownPreference`, a `ValueError` subclass with the
+  unchanged message, when it refuses an unknown or unavailable source or an
+  unknown mode.
 
 ## 0.1.1 — 2026-11-09
 

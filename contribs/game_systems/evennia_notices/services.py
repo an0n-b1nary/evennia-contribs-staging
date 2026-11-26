@@ -505,15 +505,19 @@ def mutate(context, public_ref, operation):
     return _retry(change)
 
 
+class UnknownPreference(ValueError):
+    """A preference refusal that reads exactly like an unknown source or mode."""
+
+
 def set_preference(context, source, mode):
     """Store one account-wide source choice without replaying or reading activity."""
     adapter = source_registry().get(source)
     if adapter is None or mode not in {"immediate", "summary", "off"}:
-        raise ValueError("Unknown source or preference")
+        raise UnknownPreference("Unknown source or preference")
     ownerships(context)
     # Checked after authorization so hooks only see an authorized context.
     if not source_available(adapter, context):
-        raise ValueError("Unknown source or preference")
+        raise UnknownPreference("Unknown source or preference")
 
     def change():
         with transaction.atomic():

@@ -9,11 +9,9 @@ from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.decorators.http import require_POST
 
-from evennia_links.notices import source_available, source_registry
-
 from .context import from_web
 from .forms import PreferenceForm
-from .services import mutate, project, set_preference
+from .services import UnknownPreference, mutate, project, set_preference
 
 
 def _page(request, template, **context):
@@ -69,10 +67,7 @@ def preferences(request):
         source = form.cleaned_data["source"]
         try:
             set_preference(context, **form.cleaned_data)
-        except ValueError:
-            adapter = source_registry().get(source)
-            if adapter is not None and source_available(adapter, context):
-                raise
+        except UnknownPreference:
             # The source became unavailable after validation: refuse it like an unknown choice.
             form.add_error(
                 "source",

@@ -17,7 +17,7 @@ from evennia_links.notices import NoticeContext, NoticeEvent
 from evennia_notices import views
 from evennia_notices.commands import CmdNotices
 from evennia_notices.models import SourcePreference
-from evennia_notices.services import route, set_preference
+from evennia_notices.services import UnknownPreference, route, set_preference
 
 from .test_services import Source
 
@@ -48,6 +48,7 @@ SOURCES = {
     "gated": "evennia_notices.tests.test_availability.GatedSource",
     "broken": "evennia_notices.tests.test_availability.RaisingGate",
 }
+ONLY_GATED = {"gated": "evennia_notices.tests.test_availability.GatedSource"}
 UNKNOWN = "Unknown source or preference"
 
 
@@ -119,11 +120,25 @@ class CommandAvailabilityTests(GateMixin, EvenniaCommandTest):
         )
         self.assertEqual(result.status, "suppressed")
 
+    @override_settings(LINKS_NOTICE_SOURCES=ONLY_GATED)
+    def test_settings_with_every_source_hidden_prints_only_the_header(self):
+        self.assertEqual(
+            self.call(CmdNotices(), "/settings"),
+            "Notice preferences (off keeps decisions in summaries):",
+        )
+
     def test_hook_receives_the_command_context(self):
         self.settings_output()
         self.assertTrue(GatedSource.calls)
         for context in GatedSource.calls:
             self.assertEqual((context.account, context.character), (self.account, self.char1))
+
+    def test_refusals_raise_unknown_preference(self):
+        context = NoticeContext(self.account, self.char1)
+        for source, mode in (("nosuch", "off"), ("test", "arbitrary"), ("gated", "off")):
+            with self.assertRaisesMessage(UnknownPreference, UNKNOWN):
+                set_preference(context, source, mode)
+        self.assertFalse(SourcePreference.objects.exists())
 
     def test_unauthorized_context_is_rejected_before_any_hook_runs(self):
         GatedSource.open = True
@@ -171,6 +186,16 @@ class WebAvailabilityTests(GateMixin, EvenniaTest):
         self.assertContains(response, "Gated examples")
         self.assertContains(response, 'value="test"')
 
+    @override_settings(LINKS_NOTICE_SOURCES=ONLY_GATED)
+    def test_get_with_every_source_hidden_still_renders(self):
+        response = views.preferences(self.request()).render()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My Notices")
+        self.assertContains(response, "<h2>Notice preferences</h2>")
+        self.assertContains(response, '<select name="source"')
+        self.assertNotContains(response, 'value="gated"')
+        self.assertNotContains(response, "Gated examples")
+
     def test_get_passes_the_web_context_to_the_hook(self):
         self.page(self.request(character=self.char1))
         self.assertTrue(GatedSource.calls)
@@ -196,10 +221,24 @@ class WebAvailabilityTests(GateMixin, EvenniaTest):
 
     def test_source_hidden_between_validation_and_saving_is_refused(self):
         with (
-            patch.object(GatedSource, "available", side_effect=[True, False, False]),
+            patch.object(GatedSource, "available", side_effect=[True, False]) as hook,
             self.assertLogs("evennia", "WARNING"),
         ):
             response = views.preferences(self.request("post", {"source": "gated", "mode": "off"}))
+        self.assertEqual(hook.call_count, 2)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response.render(), "Select a valid choice")
+        self.assertFalse(SourcePreference.objects.exists())
+
+    def test_hook_failing_between_validation_and_saving_is_refused(self):
+        with (
+            patch.object(
+                GatedSource, "available", side_effect=[True, RuntimeError("private"), True]
+            ) as hook,
+            self.assertLogs("evennia", "WARNING"),
+        ):
+            response = views.preferences(self.request("post", {"source": "gated", "mode": "off"}))
+        self.assertEqual(hook.call_count, 2)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response.render(), "Select a valid choice")
         self.assertFalse(SourcePreference.objects.exists())
