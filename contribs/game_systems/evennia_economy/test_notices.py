@@ -3,6 +3,7 @@
 """Committed income and stipends through standalone and real optional Inbox routes."""
 
 from datetime import timedelta
+from importlib import import_module
 from secrets import token_urlsafe
 from types import SimpleNamespace
 from unittest import skipUnless
@@ -12,7 +13,7 @@ from uuid import uuid4
 from django.apps import apps
 from django.conf import settings
 from django.db import transaction
-from django.test import TransactionTestCase, override_settings
+from django.test import RequestFactory, TransactionTestCase, override_settings
 from django.utils import timezone
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaCommandTest
@@ -1058,10 +1059,6 @@ class InboxEconomyPreferenceTests(EvenniaCommandTest):
         return self.call(CmdNotices(), "/settings")
 
     def page(self, account, character=None):
-        from importlib import import_module
-
-        from django.test import RequestFactory
-
         from evennia_notices import views
 
         request = RequestFactory().get("/notices/preferences/")
