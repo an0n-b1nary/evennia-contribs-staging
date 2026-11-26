@@ -5,13 +5,12 @@
 from importlib import import_module
 
 from django.conf import settings
-from django.db import connection
 from django.test import RequestFactory, TransactionTestCase, override_settings
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTestMixin
 
 from evennia_jobs.models import RequestDecision
 from evennia_links.notices import NoticeContext
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 from evennia_moderation.models import Application, Notice, Referral
 from evennia_notices import views
 from evennia_notices.services import mutate, project
@@ -101,12 +100,11 @@ class ModerationNoticeSeams(EvenniaCommandTest):
         self.assertFalse(Referral.objects.exists())
 
 
+@requires_file_backed_db
 class ModerationExampleRaces(EvenniaTestMixin, TransactionTestCase):
     """Concurrent self opt-in allocates one synthetic row without domain decisions."""
 
     def test_simultaneous_opt_in_is_one_account_outcome(self):
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Run with a file-backed TEST database")
         from evennia.accounts.models import AccountDB
         from evennia.server.models import ServerConfig
 

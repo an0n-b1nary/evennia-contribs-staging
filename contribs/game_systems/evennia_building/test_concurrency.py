@@ -2,23 +2,21 @@
 
 from django.apps import apps
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestMixin
 
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 
 from . import attachments, collaboration, frontier, frontier_lifecycle, lifecycle, services
 from .models import BuildProject, BuildReview, Frontier, Property
 from .request_form import FORM, FORM_KEY
 
 
+@requires_file_backed_db
 @override_settings(BUILDING_REVEALED=True, BUILDING_PROJECT_LIMIT=2)
 class TestQuotaRace(EvenniaTestMixin, TransactionTestCase):
     def test_two_new_projects_cannot_exceed_owner_quota(self):
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Race gate runs separately with a file-backed SQLite TEST database")
         services.new_project(self.char2, "Existing proposal")
         with self.assertRaisesMessage(ValidationError, "open-project"):
             committed_race(
@@ -28,6 +26,7 @@ class TestQuotaRace(EvenniaTestMixin, TransactionTestCase):
         self.assertEqual(BuildProject.objects.filter(owner=self.char2).count(), 2)
 
 
+@requires_file_backed_db
 @override_settings(
     BUILDING_REVEALED=True,
     JOBS_REQUEST_FORMS={FORM_KEY: FORM},
@@ -36,8 +35,6 @@ class TestQuotaRace(EvenniaTestMixin, TransactionTestCase):
 class TestApartmentRaces(EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Race gate runs separately with a file-backed SQLite TEST database")
         self.tenant = create_object(self.character_typeclass, key="Race tenant")
         self.room1.db.room_type = "ic"
         parent = services.new_project(self.char2, "Race parent")
@@ -118,6 +115,7 @@ class TestApartmentRaces(EvenniaTestMixin, TransactionTestCase):
         self.assertEqual(self.parent.state, "live")
 
 
+@requires_file_backed_db
 @override_settings(
     BUILDING_REVEALED=True,
     JOBS_REQUEST_FORMS={FORM_KEY: FORM},
@@ -126,8 +124,6 @@ class TestApartmentRaces(EvenniaTestMixin, TransactionTestCase):
 class TestFrontierRaces(EvenniaTestMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Race gate runs separately with a file-backed SQLite TEST database")
         self.author = create_object(self.character_typeclass, key="Race author")
         self.room1.db.room_type = "ic"
         self.room1.db.allow_teleport = "public"

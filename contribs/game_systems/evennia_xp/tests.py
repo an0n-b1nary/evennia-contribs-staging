@@ -14,15 +14,20 @@ Run:
     evennia test --settings test_xp_settings.py evennia_xp
 """
 
+import contextlib
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC
 from decimal import Decimal
 from importlib import import_module
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Barrier
 from unittest.mock import MagicMock, Mock, patch
 
 from django.conf import settings
-from django.db import close_old_connections, transaction
+from django.db import close_old_connections, connections, transaction
+from django.db.backends.sqlite3.base import DatabaseWrapper
 from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import include, path
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
@@ -1354,13 +1359,33 @@ class SpendingTests(TestCase):
 
 
 class ConcurrentSpendingTests(TransactionTestCase):
-    def test_two_writers_cannot_overspend(self):
-        from django.db import connection
+    """Two writers on a temporary SQLite file: shared-memory SQLite fails a waiting writer."""
 
-        if connection.vendor == "sqlite" and connection.is_in_memory_db():
-            self.skipTest(
-                "SQLite shared-memory tables fail immediately on locks; use a file test DB"
-            )
+    def setUp(self):
+        original = connections["default"]
+        if original.vendor != "sqlite":
+            super().setUp()
+            return
+        original.ensure_connection()
+        config = original.settings_dict.copy()
+        scratch = TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.addCleanup(self.restore_db, original, config)
+        db_path = Path(scratch.name) / "xp-spending.sqlite3"
+        with contextlib.closing(sqlite3.connect(db_path)) as db:
+            original.connection.backup(db)
+        current = {**config, "NAME": str(db_path), "OPTIONS": {"timeout": 10}}
+        connections.databases["default"] = current
+        connections["default"] = DatabaseWrapper(current, "default")
+        super().setUp()
+
+    @staticmethod
+    def restore_db(original, config):
+        connections.close_all()
+        connections.databases["default"] = config
+        connections["default"] = original
+
+    def test_two_writers_cannot_overspend(self):
         CharacterXP.objects.create(character_id=1, total_earned=10, current_balance=10)
         barrier = Barrier(2)
 

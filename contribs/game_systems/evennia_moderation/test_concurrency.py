@@ -4,13 +4,12 @@
 from unittest.mock import Mock
 
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from evennia.server.models import ServerConfig
 from evennia.utils.test_resources import EvenniaTestMixin
 
 from evennia_jobs.models import RequestDecision
-from evennia_links.test_transactions import committed_race
+from evennia_links.test_transactions import committed_race, requires_file_backed_db
 from evennia_moderation import admissions
 from evennia_moderation.commands import CmdBan, CmdUnban
 from evennia_moderation.models import AdmissionsState, Application, ModerationAction, Referral
@@ -18,6 +17,7 @@ from evennia_moderation.policy import active_actions, stock_bans
 from evennia_moderation.tests import FORMS, AdmissionFixture
 
 
+@requires_file_backed_db
 @override_settings(JOBS_REQUEST_FORMS=FORMS, MODERATION_REFERRAL_ALLOWANCE=1)
 class TestAdmissionRaces(AdmissionFixture, EvenniaTestMixin, TransactionTestCase):
     def prompt(self, command_type, args):
@@ -57,8 +57,6 @@ class TestAdmissionRaces(AdmissionFixture, EvenniaTestMixin, TransactionTestCase
 
     def setUp(self):
         super().setUp()
-        if connection.vendor == "sqlite" and "mode=memory" in connection.settings_dict["NAME"]:
-            self.skipTest("Run separately with a file-backed TEST database")
         AdmissionsState.objects.get_or_create(pk=1)
         ServerConfig.objects.conf("server_bans", [])
 

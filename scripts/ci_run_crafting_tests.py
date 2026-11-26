@@ -9,7 +9,7 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from ci_run_partner_tests import PARALLEL, test_exit_code
+from ci_run_partner_tests import PARALLEL, RACE_VERBOSITY, race_exit_code, test_exit_code
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTNERS = (
@@ -106,6 +106,7 @@ def main(argv=None):
             "test",
             "--noinput",
             "--settings=crafting_race_settings.py",
+            RACE_VERBOSITY,
             "evennia_rp_crafting.test_concurrency",
         ],
         cwd=game,
@@ -116,7 +117,7 @@ def main(argv=None):
         encoding="utf-8",
         errors="replace",
     )
-    return test_exit_code(result)
+    return race_exit_code(result)
 
 
 if __name__ == "__main__":
