@@ -3,8 +3,9 @@
 """Calendar transition identity, durable routing and current inbox presentation."""
 
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest import skipUnless
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from django.apps import apps
 from django.test import override_settings
@@ -141,8 +142,6 @@ class CalendarTransitionTests(EvenniaTest):
         )
 
     def test_already_delivered_notify_returns_false_without_sending_again(self):
-        from types import SimpleNamespace
-
         session = SimpleNamespace(get_account=lambda: self.account, get_puppet=lambda: self.char1)
         with (
             patch.object(notices, "_connected_sessions", return_value=[session]),
@@ -154,10 +153,35 @@ class CalendarTransitionTests(EvenniaTest):
             self.assertFalse(notices.notify(self.rsvp, "drawn", "Draw", origin="lottery"))
             self.assertEqual(message.call_count, 1)
 
-    @skipUnless(apps.is_installed("evennia_social"), "Optional Social is physically absent")
-    def test_standalone_callback_rechecks_ignore_and_never_replays_uncertain_hint(self):
-        from types import SimpleNamespace
+    def session_for_character(self):
+        return SimpleNamespace(get_account=lambda: self.account, get_puppet=lambda: self.char1)
 
+    def claim_draw(self):
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            notices.notify(self.rsvp, "drawn", "Draw", origin="lottery")
+        row = CalendarNotice.objects.get()
+        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(row.route_state, "attempting")
+        self.assertIsNotNone(row.routed_at)
+        self.assertIsNone(row.delivered_at)
+        return row, callbacks[0]
+
+    def assert_released_and_delivers_once(self, row, message, session, text):
+        row.refresh_from_db()
+        self.assertEqual(
+            (row.route_state, row.routed_at, row.delivered_at), ("pending", None, None)
+        )
+        message.assert_not_called()
+        with self.captureOnCommitCallbacks(execute=True):
+            notices.deliver_pending(self.char1)
+        self.assertEqual(notices.route_notice(row.pk), "duplicate")
+        message.assert_called_once_with(text, session=session)
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "fallback")
+        self.assertIsNotNone(row.delivered_at)
+
+    @skipUnless(apps.is_installed("evennia_social"), "Optional Social is physically absent")
+    def test_standalone_callback_releases_claim_after_ignore_change(self):
         from evennia_social import ignore
 
         for account in (self.account, self.account2):
@@ -165,7 +189,7 @@ class CalendarTransitionTests(EvenniaTest):
             account.permissions.clear()
         self.rsvp.status = RSVP.Status.INVITED
         self.rsvp.save(update_fields=["status", "updated_at"])
-        session = SimpleNamespace(get_account=lambda: self.account, get_puppet=lambda: self.char1)
+        session = self.session_for_character()
         with (
             patch.object(notices, "_connected_sessions", return_value=[session]),
             patch.object(self.char1, "msg") as message,
@@ -174,19 +198,116 @@ class CalendarTransitionTests(EvenniaTest):
                 notices.notify(
                     self.rsvp, "invited", "Known invitation", origin="invitation", actor=self.char2
                 )
-            ignore.set_entry(self.account, self.char2, ignore.HIDDEN)
-            for callback in callbacks:
-                callback()
-            message.assert_not_called()
             row = CalendarNotice.objects.get()
-            self.assertIsNone(row.delivered_at)
-            self.assertEqual(row.route_state, "uncertain")
-            self.assertFalse(
-                notices.notify(
-                    self.rsvp, "invited", "Known invitation", origin="invitation", actor=self.char2
-                )
-            )
+            self.assertEqual(len(callbacks), 1)
+            self.assertEqual(row.route_state, "attempting")
             message.assert_not_called()
+            ignore.set_entry(self.account, self.char2, ignore.HIDDEN)
+            callbacks[0]()
+            ignore.remove_entry(self.account, self.char2)
+            self.assert_released_and_delivers_once(row, message, session, "Known invitation")
+
+    def test_standalone_releases_claim_after_disconnect_or_preparation_error(self):
+        session = self.session_for_character()
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[session]),
+            patch.object(self.char1, "msg") as message,
+        ):
+            row, finish = self.claim_draw()
+            message.assert_not_called()
+            with patch.object(session, "get_account", return_value=None):
+                finish()
+            row.refresh_from_db()
+            self.assertEqual(
+                (row.route_state, row.routed_at, row.delivered_at), ("pending", None, None)
+            )
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                self.assertEqual(notices.route_notice(row.pk), "held")
+            self.assertEqual(len(callbacks), 1)
+            row.refresh_from_db()
+            self.assertEqual(row.route_state, "attempting")
+            message.assert_not_called()
+            with patch.object(
+                session, "get_account", side_effect=RuntimeError("Context unavailable")
+            ):
+                callbacks[0]()
+            self.assert_released_and_delivers_once(row, message, session, "Draw")
+
+    def test_standalone_releases_claim_if_guest_classification_changes(self):
+        session = self.session_for_character()
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[session]),
+            patch.object(self.char1, "msg") as message,
+        ):
+            row, finish = self.claim_draw()
+            self.char1.tags.add("character", category="guest")
+            finish()
+            self.char1.tags.remove("character", category="guest")
+            self.assert_released_and_delivers_once(row, message, session, "Draw")
+
+    def test_standalone_sends_individually_after_a_raising_send_and_rechecks_next_puppet(self):
+        first, removed, successful, ineligible = (self.session_for_character() for _ in range(4))
+        ineligible.get_puppet = lambda: self.char2
+
+        def send(text, *, session):
+            if session is first:
+                removed.get_puppet = lambda: self.char2
+                raise RuntimeError("Socket outcome uncertain")
+
+        with (
+            patch.object(
+                notices,
+                "_connected_sessions",
+                return_value=[first, removed, successful, ineligible],
+            ),
+            patch.object(self.char1, "msg", side_effect=send) as message,
+        ):
+            row, finish = self.claim_draw()
+            message.assert_not_called()
+            finish()
+            self.assertEqual(notices.route_notice(row.pk), "duplicate")
+        self.assertEqual(
+            message.call_args_list, [call("Draw", session=first), call("Draw", session=successful)]
+        )
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "fallback")
+        self.assertIsNotNone(row.delivered_at)
+
+    def test_standalone_preserves_uncertainty_if_raising_send_invalidates_rsvp(self):
+        first, second = self.session_for_character(), self.session_for_character()
+
+        def send(text, *, session):
+            self.rsvp.release()
+            raise RuntimeError("Socket outcome uncertain")
+
+        with (
+            patch.object(notices, "_connected_sessions", return_value=[first, second]),
+            patch.object(self.char1, "msg", side_effect=send) as message,
+        ):
+            row, finish = self.claim_draw()
+            message.assert_not_called()
+            finish()
+            self.assertEqual(notices.route_notice(row.pk), "held")
+        message.assert_called_once_with("Draw", session=first)
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "uncertain")
+        self.assertIsNone(row.delivered_at)
+
+    def test_standalone_acknowledges_cancellation_before_any_send(self):
+        with (
+            patch.object(
+                notices, "_connected_sessions", return_value=[self.session_for_character()]
+            ),
+            patch.object(self.char1, "msg") as message,
+        ):
+            row, finish = self.claim_draw()
+            message.assert_not_called()
+            CalendarEvent.objects.filter(pk=self.event.pk).update(is_cancelled=True)
+            finish()
+        message.assert_not_called()
+        row.refresh_from_db()
+        self.assertEqual(row.route_state, "invalid")
+        self.assertIsNotNone(row.delivered_at)
 
     def test_guest_delivery_creates_no_new_source_content(self):
         self.char1.tags.add("character", category="guest")

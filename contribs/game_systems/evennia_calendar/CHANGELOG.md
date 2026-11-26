@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.6.2 — 2026-11-25
+
+### Fixed
+
+- Retry standalone Calendar notices when all sessions become ineligible or
+  preparation fails before transport. A send with an unknown outcome remains
+  held, and one failing session no longer blocks other eligible sessions (#286).
+
 ## 0.6.1 — 2026-11-09
 
 ### Added

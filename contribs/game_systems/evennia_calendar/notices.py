@@ -8,10 +8,11 @@ ambiguous pre-upgrade generations remain pending without text or counts.
 
 import logging
 from dataclasses import asdict
+from functools import partial
 
 from django.apps import apps
 from django.conf import settings
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -272,45 +273,129 @@ def _stored(row):
     )
 
 
-def _finish_fallback(row_pk, character, message, sessions):
-    """A committed source claim precedes socket I/O; uncertainty is never replayed."""
+def _claim_fallback(row, sessions, *, guest=False):
+    """Commit the canonical source claim before starting any transport."""
+    row.route_state, row.routed_at = "attempting", timezone.now()
+    row.save(update_fields=["route_state", "routed_at"])
+    transaction.on_commit(
+        partial(_finish_fallback, row.pk, row.rsvp_id, row.routed_at, sessions, guest=guest)
+    )
+    return "attempting"
+
+
+def _locked_fallback_claim(row_pk, rsvp_id, routed_at):
+    """Reconcile receipts under the RSVP-first lock and return our live claim."""
+    from .models import RSVP, CalendarNotice
+
+    RSVP.objects.filter(pk=rsvp_id).update(notice_generation=F("notice_generation"))
+    row = (
+        CalendarNotice.objects.select_for_update()
+        .filter(
+            pk=row_pk,
+            rsvp_id=rsvp_id,
+            route_state="attempting",
+            delivered_at__isnull=True,
+            routed_at=routed_at,
+        )
+        .first()
+    )
+    if row is None or row.envelope.get("payload", {}).get("notice") != row_pk:
+        return None
+    _reconcile_disposition(row)
+    if row.route_state == "attempting" and row.delivered_at is None and row.routed_at == routed_at:
+        return row
+    return None
+
+
+def _session_matches(session, account, character):
+    return session.get_account() == account and session.get_puppet() == character
+
+
+def _finish_fallback(row_pk, rsvp_id, routed_at, sessions, *, guest):
+    """Write outside the locks and finalize only the claim this callback owns."""
     from .integrations.notices import CalendarNoticeSource, currentness
     from .models import CalendarNotice
 
-    row = CalendarNotice.objects.select_related("rsvp__event", "character").get(pk=row_pk)
-    with transaction.atomic():
-        from .models import RSVP
-
-        RSVP.objects.filter(pk=row.rsvp_id).update(notice_generation=F("notice_generation"))
-        row = CalendarNotice.objects.select_related("rsvp__event", "character").get(pk=row_pk)
-        _reconcile_disposition(row)
-    if row.delivered_at is not None or row.route_state != "attempting":
-        return
-    if currentness(row).status == "invalid":
-        _record_disposition(row, "invalid", acknowledged=True)
-        return
-    if is_guest(row.character):
-        _finish_guest_fallback(row, sessions)
-        return
-    source, event = CalendarNoticeSource(), _stored(row)
-    eligible = []
-    for session in sessions:
-        context = NoticeContext(session.get_account(), character, session)
-        if (
-            authorize_context(context, character)
-            and evaluate(source, [event], context)[event.event_id].status == "visible"
-        ):
-            eligible.append(session)
-    if not eligible:
-        _record_disposition(row, "uncertain", acknowledged=False)
-        return
     try:
-        character.msg(message, session=eligible)
-    except Exception:
-        _record_disposition(row, "uncertain", acknowledged=False)
-        logger.warning("Calendar standalone delivery uncertain; preserving source receipt")
-    else:
-        _record_disposition(row, "fallback", acknowledged=True)
+        with transaction.atomic():
+            if _locked_fallback_claim(row_pk, rsvp_id, routed_at) is None:
+                return
+    except DatabaseError:
+        logger.warning("Calendar fallback could not verify its committed claim")
+        return
+
+    attempted = delivered = invalid = False
+    source = CalendarNoticeSource()
+    for session in sessions:
+        try:
+            live = CalendarNotice.objects.select_related("rsvp__event", "character").get(
+                pk=row_pk, rsvp_id=rsvp_id
+            )
+            outcome = currentness(live)
+            if outcome.status == "invalid":
+                invalid = True
+                continue
+            if outcome.status != "visible":
+                continue
+
+            character, account = live.character, session.get_account()
+            if is_guest(character) != guest:
+                continue
+            context = NoticeContext(account, character, session)
+            if guest:
+                if (
+                    not _guest_session_owned(session, character, account)
+                    or _guest_actor_policy(account, live.actors) != "allow"
+                ):
+                    continue
+                event = _stored(live)
+            else:
+                if not authorize_context(context, character):
+                    continue
+                event = _stored(live)
+                if evaluate(source, [event], context)[event.event_id].status != "visible":
+                    continue
+            # Trust producer text only for a structured ordinary event.
+            message = (
+                live.message
+                if live.event_key and not guest
+                else normalize_rendered(source.render([event], context)).text
+            )
+            send = (
+                partial(session.msg, message)
+                if guest
+                else partial(character.msg, message, session=session)
+            )
+            if not _session_matches(session, account, character):
+                continue
+        except Exception:
+            logger.warning("Calendar fallback session preparation failed")
+            continue
+
+        attempted = True
+        try:
+            send()
+        except Exception:
+            logger.warning("Calendar fallback session delivery uncertain")
+        else:
+            delivered = True
+
+    try:
+        with transaction.atomic():
+            row = _locked_fallback_claim(row_pk, rsvp_id, routed_at)
+            if row is None:
+                return
+            if delivered:
+                _record_disposition(row, "fallback", acknowledged=True)
+            elif invalid and (guest or not attempted):
+                _record_disposition(row, "invalid", acknowledged=True)
+            elif attempted:
+                _record_disposition(row, "uncertain", acknowledged=False)
+            else:
+                row.route_state, row.routed_at = "pending", None
+                row.save(update_fields=["route_state", "routed_at"])
+    except DatabaseError:
+        logger.warning("Calendar fallback could not finalize its committed claim")
 
 
 def _fallback(row):
@@ -338,20 +423,7 @@ def _fallback(row):
             sessions.append(session)
     if not sessions:
         return "pending"
-    # Existing source text is used only for a new structurally known producer.
-    # Legacy text never supplies an author/permission decision.
-    message = (
-        row.message
-        if row.event_key
-        else normalize_rendered(
-            source.render([event], NoticeContext(sessions[0].get_account(), row.character))
-        ).text
-    )
-    row.route_state = "attempting"
-    row.routed_at = timezone.now()
-    row.save(update_fields=["route_state", "routed_at"])
-    transaction.on_commit(lambda: _finish_fallback(row.pk, row.character, message, sessions))
-    return "attempting"
+    return _claim_fallback(row, sessions)
 
 
 def _route_locked(row, context=None, allow_fallback=True, new_event=False):
@@ -440,11 +512,10 @@ def route_notice(pk, context=None, allow_fallback=True):
     return result
 
 
-def _guest_session_owned(session, character):
+def _guest_session_owned(session, character, account):
     """Authorize this connected puppet directly; guests have no web roster."""
     from evennia.accounts.models import AccountDB
 
-    account = session.get_account()
     return (
         isinstance(account, AccountDB)
         and bool(account.pk)
@@ -476,55 +547,18 @@ def _guest_actor_policy(account, actors):
 
 def _guest_fallback(row):
     """Claim only an existing guest history row; no new retained record is made."""
-    owned = [
-        s for s in _connected_sessions(row.character) if _guest_session_owned(s, row.character)
+    candidates = [
+        (session, session.get_account()) for session in _connected_sessions(row.character)
     ]
-    if not owned:
-        return "pending"
-    policies = [_guest_actor_policy(s.get_account(), row.actors) for s in owned]
-    if all(policy == "suppress" for policy in policies):
+    policies = [
+        (session, _guest_actor_policy(account, row.actors))
+        for session, account in candidates
+        if _guest_session_owned(session, row.character, account)
+    ]
+    if policies and all(policy == "suppress" for session, policy in policies):
         return "suppressed"
-    sessions = [
-        session for session, policy in zip(owned, policies, strict=True) if policy == "allow"
-    ]
-    if not sessions:
-        return "pending"
-    row.route_state, row.routed_at = "attempting", timezone.now()
-    row.save(update_fields=["route_state", "routed_at"])
-    transaction.on_commit(lambda: _finish_fallback(row.pk, row.character, "", sessions))
-    return "attempting"
-
-
-def _finish_guest_fallback(row, sessions):
-    """Recheck authoritative source state immediately before every guest socket."""
-    from .integrations.notices import CalendarNoticeSource, currentness
-
-    delivered = invalid = False
-    for session in sessions:
-        live = type(row).objects.select_related("rsvp__event", "character").get(pk=row.pk)
-        outcome = currentness(live)
-        if outcome.status == "invalid":
-            invalid = True
-            continue
-        if (
-            outcome.status != "visible"
-            or not _guest_session_owned(session, live.character)
-            or _guest_actor_policy(session.get_account(), live.actors) != "allow"
-        ):
-            continue
-        text = normalize_rendered(
-            CalendarNoticeSource().render(
-                [_stored(live)], NoticeContext(session.get_account(), live.character)
-            )
-        ).text
-        try:
-            session.msg(text)
-        except Exception:
-            logger.warning("Calendar guest source delivery uncertain; preserving claim")
-        else:
-            delivered = True
-    state = "fallback" if delivered else "invalid" if invalid else "uncertain"
-    _record_disposition(row, state, acknowledged=delivered or invalid)
+    sessions = [session for session, policy in policies if policy == "allow"]
+    return _claim_fallback(row, sessions, guest=True) if sessions else "pending"
 
 
 def _guest_notify(rsvp, kind, origin, actor):
@@ -542,49 +576,61 @@ def _guest_notify(rsvp, kind, origin, actor):
         return False
     actors, shown = _actor_refs(actor), False
     for session in _connected_sessions(rsvp.character):
-        live = RSVP.objects.select_related("event", "character").filter(pk=rsvp.pk).first()
-        if (
-            live is None
-            or live.character_id is None
-            or live.character_id != rsvp.character_id
-            or live.event_id != rsvp.event_id
-            or live.notice_generation != rsvp.notice_generation
-            or expected != (kind, live.status)
-            or live.event.is_cancelled
-            or live.event.is_past
-            or (kind in {"drawn", "invited"} and live.event.confirmation_deadline <= timezone.now())
-            or not _guest_session_owned(session, live.character)
-            or _guest_actor_policy(session.get_account(), actors) != "allow"
-        ):
-            continue
-        existing = _system_transition_rows(
-            live,
-            live.character_id,
-            kind,
-            live.status,
-            actors,
-            origin,
-        ).first()
-        if existing is not None:
-            return route_notice(existing.pk) == "fallback"
-        marker = (
-            f"{live.pk}-reminder"
-            if kind == "reminder"
-            else f"{live.pk}-{live.notice_generation}-{origin}"
-        )
-        seen = getattr(session, "_calendar_notice_hints", set())
-        if marker in seen:
-            continue
-        session._calendar_notice_hints = seen | {marker}
-        message = {
-            "lottery": drawn_message,
-            "waitlist_offer": offered_message,
-            "invitation": invited_message,
-            "seated": seated_message,
-            "reminder": reminder_message,
-        }[origin](live.event)
         try:
-            session.msg(message)
+            live = RSVP.objects.select_related("event", "character").filter(pk=rsvp.pk).first()
+            account = session.get_account()
+            if (
+                live is None
+                or live.character_id is None
+                or live.character_id != rsvp.character_id
+                or live.event_id != rsvp.event_id
+                or live.notice_generation != rsvp.notice_generation
+                or expected != (kind, live.status)
+                or live.event.is_cancelled
+                or live.event.is_past
+                or (
+                    kind in {"drawn", "invited"}
+                    and live.event.confirmation_deadline <= timezone.now()
+                )
+                or not _guest_session_owned(session, live.character, account)
+                or _guest_actor_policy(account, actors) != "allow"
+            ):
+                continue
+            existing = _system_transition_rows(
+                live,
+                live.character_id,
+                kind,
+                live.status,
+                actors,
+                origin,
+            ).first()
+            if existing is not None:
+                return route_notice(existing.pk) == "fallback"
+            marker = (
+                f"{live.pk}-reminder"
+                if kind == "reminder"
+                else f"{live.pk}-{live.notice_generation}-{origin}"
+            )
+            seen = getattr(session, "_calendar_notice_hints", set())
+            if marker in seen:
+                continue
+            message = {
+                "lottery": drawn_message,
+                "waitlist_offer": offered_message,
+                "invitation": invited_message,
+                "seated": seated_message,
+                "reminder": reminder_message,
+            }[origin](live.event)
+            send = partial(session.msg, message)
+            if not _session_matches(session, account, live.character):
+                continue
+        except Exception:
+            logger.warning("Calendar guest hint session preparation failed")
+            continue
+
+        session._calendar_notice_hints = seen | {marker}
+        try:
+            send()
         except Exception:
             logger.warning("Calendar guest hint uncertain; transient attempt retained")
         else:

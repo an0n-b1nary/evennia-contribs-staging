@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evennia-calendar"
-version = "0.6.1"
+version = "0.6.2"
 description = "Event calendar system (+calendar, +cluster, +rsvp) with cluster lottery, priority tokens, web UI, and REST API for Evennia games."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
